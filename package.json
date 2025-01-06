@@ -1,0 +1,26 @@
+{
+  "name": "datastore-monorepo",
+  "version": "0.0.0",
+  "private": true,
+  "packageManager": "pnpm@9.15.3",
+  "description": "",
+  "author": "",
+  "license": "MIT",
+  "keywords": [],
+  "engines": {
+    "node": ">=23.0.0"
+  },
+  "scripts": {
+    "build": "pnpm run -r build",
+    "lint": "eslint --cache .",
+    "test": "vitest run",
+    "test:dev": "vitest",
+    "test:types": "pnpm run -r test:types"
+  },
+  "devDependencies": {
+    "@antfu/eslint-config": "^3.12.1",
+    "eslint": "^9.17.0",
+    "typescript": "^5.7.2",
+    "vitest": "^2.1.8"
+  }
+}
