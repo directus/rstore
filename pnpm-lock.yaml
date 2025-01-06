@@ -33,6 +33,30 @@ importers:
         specifier: ^2.1.8
         version: 2.1.8
 
+  packages/shared:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.7.2
+      unbuild:
+        specifier: ^3.2.0
+        version: 3.2.0(typescript@5.7.2)
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.8
+
+  packages/vue:
+    devDependencies:
+      typescript:
+        specifier: ^5.7.2
+        version: 5.7.2
+      unbuild:
+        specifier: ^3.2.0
+        version: 3.2.0(typescript@5.7.2)
+      vitest:
+        specifier: ^2.1.8
+        version: 2.1.8
+
 packages:
 
   '@ampproject/remapping@2.3.0':
