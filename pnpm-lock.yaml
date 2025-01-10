@@ -22,6 +22,10 @@ importers:
         version: 2.1.8
 
   packages/core:
+    dependencies:
+      '@rstore/shared':
+        specifier: workspace:^
+        version: link:../shared
     devDependencies:
       typescript:
         specifier: ^5.7.2
@@ -46,6 +50,10 @@ importers:
         version: 2.1.8
 
   packages/vue:
+    dependencies:
+      '@rstore/shared':
+        specifier: workspace:^
+        version: link:../shared
     devDependencies:
       typescript:
         specifier: ^5.7.2

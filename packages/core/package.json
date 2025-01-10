@@ -30,6 +30,9 @@
     "prepublishOnly": "pnpm run build",
     "test:types": "tsc --noEmit"
   },
+  "dependencies": {
+    "@rstore/shared": "workspace:^"
+  },
   "devDependencies": {
     "typescript": "^5.7.2",
     "unbuild": "^3.2.0",
