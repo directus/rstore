@@ -1,4 +1,4 @@
-import type { Awaitable } from '../types/util.js'
+import type { Awaitable } from '../types/utils.js'
 
 type HookCallback<TParams extends (any[] | never), TReturn> = (...arguments_: TParams) => Awaitable<TReturn>
 
@@ -13,7 +13,8 @@ export class Hookable<
   constructor() {
     this.hook = this.hook.bind(this)
     this.callHook = this.callHook.bind(this)
-    this.callHookWith = this.callHookWith.bind(this)
+    this.callHookSync = this.callHookSync.bind(this)
+    // this.callHookWith = this.callHookWith.bind(this)
   }
 
   hook<HookName extends HookNameT>(name: HookName, callback: HooksT[HookName]): () => void {
@@ -37,16 +38,27 @@ export class Hookable<
     return returned
   }
 
-  callHookWith<
-    NameT extends HookNameT,
-    CallFunction extends (hooks: HooksT[NameT][]) => any,
-  >(
-    caller: CallFunction,
-    name: NameT,
-  ): ReturnType<CallFunction> {
-    const result = caller(name in this._hooks ? [...this._hooks[name]] : [] as any[])
-    return result
+  callHookSync<HookName extends HookNameT>(name: HookName, ...args: Parameters<HooksT[HookName]>): ReturnType<HooksT[HookName]> | undefined {
+    let returned: any
+    for (const callback of this._hooks[name] ?? []) {
+      const result = callback(...args as any[])
+      if (result != null) {
+        returned = result
+      }
+    }
+    return returned
   }
+
+  // callHookWith<
+  //   NameT extends HookNameT,
+  //   CallFunction extends (hooks: HooksT[NameT][]) => any,
+  // >(
+  //   caller: CallFunction,
+  //   name: NameT,
+  // ): ReturnType<CallFunction> {
+  //   const result = caller(name in this._hooks ? [...this._hooks[name]] : [] as any[])
+  //   return result
+  // }
 }
 
 export function createHooks<T extends Record<string, any>>(): Hookable<T> {

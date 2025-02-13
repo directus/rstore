@@ -1,0 +1,53 @@
+{
+  "name": "my-module",
+  "type": "module",
+  "version": "1.0.0",
+  "description": "My new Nuxt module",
+  "license": "MIT",
+  "repository": "your-org/my-module",
+  "exports": {
+    ".": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/module.mjs",
+      "require": "./dist/module.cjs"
+    }
+  },
+  "main": "./dist/module.cjs",
+  "types": "./dist/types.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "prepack": "nuxt-module-build build",
+    "dev": "nuxi dev playground",
+    "dev:build": "nuxi build playground",
+    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare playground",
+    "release": "npm run lint && npm run test && npm run prepack && changelogen --release && npm publish && git push --follow-tags",
+    "lint": "eslint .",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "test:types": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@nuxt/kit": "^3.15.4",
+    "@rstore/shared": "workspace:^",
+    "@rstore/vue": "workspace:^"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^9.4.0",
+    "@nuxt/devtools": "^2.0.0",
+    "@nuxt/eslint-config": "^1.0.1",
+    "@nuxt/module-builder": "^0.8.4",
+    "@nuxt/schema": "^3.15.4",
+    "@nuxt/test-utils": "^3.15.4",
+    "@nuxt/ui": "3.0.0-alpha.12",
+    "@types/node": "latest",
+    "changelogen": "^0.5.7",
+    "eslint": "^9.20.0",
+    "nuxt": "^3.15.4",
+    "typescript": "~5.7.3",
+    "vitest": "^3.0.5",
+    "vue-tsc": "^2.2.0",
+    "zod": "^3.24.1"
+  }
+}

@@ -27,15 +27,21 @@
   ],
   "scripts": {
     "build": "unbuild",
+    "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",
     "prepublishOnly": "pnpm run build",
     "test:types": "tsc --noEmit"
   },
+  "peerDependencies": {
+    "vue": "^3.2.29"
+  },
   "dependencies": {
+    "@rstore/core": "workspace:^",
     "@rstore/shared": "workspace:^"
   },
   "devDependencies": {
     "typescript": "^5.7.2",
     "unbuild": "^3.2.0",
-    "vitest": "^2.1.8"
+    "vitest": "^2.1.8",
+    "vue": "^3.2.29"
   }
 }

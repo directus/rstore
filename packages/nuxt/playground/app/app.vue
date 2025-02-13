@@ -1,0 +1,42 @@
+<script setup>
+const store = useVanillaStore()
+</script>
+
+<template>
+  <div>
+    <nav class="flex items-center px-2 gap-2">
+      <UNavigationMenu
+        :items="[
+          {
+            label: 'Users',
+            icon: 'lucide:users',
+            children: [
+              {
+                label: 'List',
+                to: '/users',
+              },
+              {
+                label: 'Filter',
+                to: '/users/filter',
+              },
+            ],
+          },
+        ]"
+        content-orientation="vertical"
+        class="min-w-200"
+      />
+
+      <div class="flex-1" />
+
+      <UPopover>
+        <UButton label="cache" color="neutral" variant="subtle" size="xs" />
+
+        <template #content>
+          <pre class="text-xs overflow-auto max-w-200 max-h-100 p-2">{{ store.cache.getState() }}</pre>
+        </template>
+      </UPopover>
+    </nav>
+
+    <NuxtPage />
+  </div>
+</template>

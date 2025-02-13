@@ -1,4 +1,13 @@
-export interface Model<TItem = any> {
+import type { Path, PathValue } from './utils'
+
+export type GetKey<TItem> = (item: TItem) => string | undefined | null
+
+export interface CustomModelTypeMeta {}
+
+export interface ModelType<
+  TItem = any,
+  TComputed extends Record<string, any> = Record<string, any>,
+> {
   /**
    * Name of the model.
    *
@@ -7,30 +16,67 @@ export interface Model<TItem = any> {
   name: string
 
   /**
-   * Compute the id of the item. By default it returns the `id` or `_id` field.
-   * @param item The item to compute the id from
-   * @returns The unique data id of the item
+   * Compute the key of the item. By default it returns the `key` or `_key` field.
+   * @param item The item to compute the key from
+   * @returns The unique data key of the item
    *
    * @example
    *
    * ```ts
-   * id: (item) => [item.postId, item.authorId].join(':')
+   * key: (item) => [item.postKey, item.authorKey].join(':')
    * ```
    */
-  id?: (item: TItem) => string
+  key?: GetKey<TItem>
 
   /**
    * Relations to other models.
    */
   relations?: Array<ModelRelation>
+
+  /**
+   * Computed properties for the model.
+   */
+  computed?: {
+    [K in keyof TComputed]: (item: TItem) => TComputed[K]
+  }
+
+  /**
+   * Field configuration for the model.
+   */
+  fields?: {
+    [K in Path<TItem>]: {
+      /**
+       * Parse the value received from the adapters.
+       */
+      parse?: (value: any) => PathValue<TItem, K>
+
+      /**
+       * Serialize the value before sending it to the adapters.
+       */
+      serialize?: (value: PathValue<TItem, K>) => any
+    }
+  }
+
+  meta?: CustomModelTypeMeta
+
+  /**
+   * @private
+   */
+  $item?: TItem
 }
 
 /**
  * Default values for any model.
  */
-export type ModelDefaults = Partial<Pick<Model, 'id'>>
+export type ModelDefaults = Partial<Pick<ModelType, 'key' | 'computed' | 'fields' | 'meta'>>
 
 export interface ModelRelation {
+  /**
+   * Name of the relation.
+   * This relation will be available on the model as `name`.
+   */
+  name: string
+
   /**
    * Type of the relation.
    *
@@ -56,15 +102,40 @@ export interface ModelRelation {
   reference?: string
 }
 
-export interface ResolvedModel<TItem = any> {
+export type Model<TModelTypes extends Record<string, ModelType> = Record<string, ModelType>> = TModelTypes
+
+export interface ResolvedModelType<
+  TModelType extends ModelType,
+  TModelDefaults extends ModelDefaults, // @TODO apply default types
+> {
   name: string
-  id: (item: TItem) => string
+  key: NonNullable<TModelType['key']>
   relations: Array<ResolvedModelRelation>
+  computed: NonNullable<TModelDefaults['computed'] & TModelType['computed']>
+  fields: TModelType['fields']
+  meta?: CustomModelTypeMeta
+  $item?: TModelType['$item']
 }
 
 export interface ResolvedModelRelation {
+  name: string
   type: 'one' | 'many'
   model: string
   field: string
   reference: string
 }
+
+export type ResolvedModel<
+  TModelTypes extends Record<string, ModelType>,
+  TModelDefaults extends ModelDefaults,
+> = {
+  [K in keyof TModelTypes]: ResolvedModelType<TModelTypes[K], TModelDefaults>
+}
+
+// @TODO relation fields
+
+export type ResolvedModelItem<
+  TModelType extends ModelType,
+  TModelDefaults extends ModelDefaults,
+  _TModel extends Model,
+> = NonNullable<ResolvedModelType<TModelType, TModelDefaults>['$item']>
