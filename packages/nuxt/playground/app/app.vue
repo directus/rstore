@@ -8,8 +8,13 @@ const store = useVanillaStore()
       <UNavigationMenu
         :items="[
           {
+            icon: 'lucide:home',
+            to: '/',
+          },
+          {
             label: 'Users',
             icon: 'lucide:users',
+            active: $route.path.startsWith('/users'),
             children: [
               {
                 label: 'List',
