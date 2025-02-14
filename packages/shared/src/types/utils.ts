@@ -1,5 +1,7 @@
 export type Awaitable<T> = T | Promise<T>
 
+export type HybridPromise<T> = Promise<T> & T
+
 type Primitive = null | undefined | string | number | boolean | symbol | bigint
 
 type IsEqual<T1, T2> = T1 extends T2

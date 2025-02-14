@@ -4,7 +4,7 @@ import type { FetchPolicy, Model, ModelDefaults, ModelType, QueryApi, ResolvedMo
 import { set } from '@rstore/shared'
 import { defaultManyMarker } from './cache'
 
-const defaultFetchPolicy: FetchPolicy = 'cache-first'
+export const defaultFetchPolicy: FetchPolicy = 'cache-first'
 
 export interface CreateQueryApiOptions<
   TModelType extends ModelType,
@@ -25,15 +25,11 @@ export function createQueryApi<
     type,
   }: CreateQueryApiOptions<TModelType, TModelDefaults, TModel>,
 ): QueryApi<TModelType, TModelDefaults, TModel> {
-  function getFetchPolicy(value: FetchPolicy | null | undefined) {
-    return value ?? store.findDefaults.fetchPolicy ?? defaultFetchPolicy
-  }
-
   // Peek first item in the cache
   const peekFirst: QueryApi<TModelType, TModelDefaults, TModel>['peekFirst'] = (keyOrOptions) => {
     const key = typeof keyOrOptions === 'string' ? keyOrOptions : keyOrOptions?.key
     const findOptions = typeof keyOrOptions === 'string' ? {} : keyOrOptions
-    const fetchPolicy = getFetchPolicy(findOptions?.fetchPolicy)
+    const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
 
     if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
       let result: any
@@ -65,7 +61,7 @@ export function createQueryApi<
   const findFirst: QueryApi<TModelType, TModelDefaults, TModel>['findFirst'] = async (keyOrOptions) => {
     const key = typeof keyOrOptions === 'string' ? keyOrOptions : keyOrOptions?.key
     const findOptions = typeof keyOrOptions === 'string' ? {} : keyOrOptions
-    const fetchPolicy = getFetchPolicy(findOptions?.fetchPolicy)
+    const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
 
     let result: any
 
@@ -107,7 +103,7 @@ export function createQueryApi<
   }
 
   const peekMany: QueryApi<TModelType, TModelDefaults, TModel>['peekMany'] = (findOptions) => {
-    const fetchPolicy = getFetchPolicy(findOptions?.fetchPolicy)
+    const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
     if (fetchPolicy === 'no-cache') {
       return []
     }
@@ -144,7 +140,7 @@ export function createQueryApi<
   }
 
   const findMany: QueryApi<TModelType, TModelDefaults, TModel>['findMany'] = async (findOptions) => {
-    const fetchPolicy = getFetchPolicy(findOptions?.fetchPolicy)
+    const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
 
     let result: any
 
@@ -211,10 +207,10 @@ export function createQueryApi<
   }
 }
 
-function shouldReadCacheFromFetchPolicy(fetchPolicy: FetchPolicy | null | undefined) {
+export function shouldReadCacheFromFetchPolicy(fetchPolicy: FetchPolicy | null | undefined) {
   return fetchPolicy === 'cache-and-fetch' || fetchPolicy === 'cache-first' || fetchPolicy === 'cache-only'
 }
 
-function shouldFetchDataFromFetchPolicy(fetchPolicy: FetchPolicy | null | undefined) {
+export function shouldFetchDataFromFetchPolicy(fetchPolicy: FetchPolicy | null | undefined) {
   return fetchPolicy === 'cache-and-fetch' || fetchPolicy === 'cache-first' || fetchPolicy === 'no-cache'
 }

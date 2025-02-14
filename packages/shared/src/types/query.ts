@@ -96,6 +96,14 @@ export interface FindFirstOptions<
   key?: string
 }
 
+export interface FindManyOptions<
+  TModelType extends ModelType,
+  TModelDefaults extends ModelDefaults,
+  TModel extends Model,
+> extends FindOptions<TModelType, TModelDefaults, TModel> {
+  // nothing here yet
+}
+
 export interface QueryApi<
   TModelType extends ModelType,
   TModelDefaults extends ModelDefaults,
@@ -116,10 +124,10 @@ export interface QueryApi<
   /**
    * Find all items that match the query in the cache without fetching the data from the adapter plugins.
    */
-  peekMany: (options?: FindOptions<TModelType, TModelDefaults, TModel>) => Array<TrackedItem<TModelType, TModelDefaults, TModel>>
+  peekMany: (options?: FindManyOptions<TModelType, TModelDefaults, TModel>) => Array<TrackedItem<TModelType, TModelDefaults, TModel>>
 
   /**
    * Find all items that match the query.
    */
-  findMany: (options?: FindOptions<TModelType, TModelDefaults, TModel>) => Promise<Array<TrackedItem<TModelType, TModelDefaults, TModel>>>
+  findMany: (options?: FindManyOptions<TModelType, TModelDefaults, TModel>) => Promise<Array<TrackedItem<TModelType, TModelDefaults, TModel>>>
 }

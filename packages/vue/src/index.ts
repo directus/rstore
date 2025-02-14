@@ -2,6 +2,10 @@ export {
   createStore,
 } from './store'
 
+export type {
+  VueStore,
+} from './store'
+
 export {
   defineModelType,
 } from '@rstore/core'

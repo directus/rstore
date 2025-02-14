@@ -33,7 +33,7 @@ export const db: Db = {
     },
     {
       id: 'user2',
-      email: faker.internet.email(),
+      email: 'user2@acme.com',
       name: faker.person.fullName(),
       avatar: faker.image.avatar(),
       createdAt: new Date(),

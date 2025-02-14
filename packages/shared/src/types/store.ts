@@ -2,7 +2,7 @@ import type { Hooks } from '../utils/hooks'
 import type { Cache } from './cache'
 import type { Model, ModelDefaults, ResolvedModel } from './model'
 import type { Plugin } from './plugin'
-import type { FindOptions, QueryApi } from './query'
+import type { FetchPolicy, FindOptions, QueryApi } from './query'
 
 export interface Store<
   TModel extends Model,
@@ -17,4 +17,5 @@ export interface Store<
     [TKey in keyof TModel]: QueryApi<TModel[TKey], TModelDefaults, TModel>
   }
   findDefaults: Partial<FindOptions<any, any, any>>
+  getFetchPolicy: (value: FetchPolicy | null | undefined) => FetchPolicy
 }

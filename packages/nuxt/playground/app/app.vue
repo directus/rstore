@@ -4,7 +4,7 @@ const store = useVanillaStore()
 
 <template>
   <div>
-    <nav class="flex items-center px-2 gap-2">
+    <nav class="flex items-center px-2 gap-2 relative z-10">
       <UNavigationMenu
         :items="[
           {
@@ -34,7 +34,7 @@ const store = useVanillaStore()
       <div class="flex-1" />
 
       <UPopover>
-        <UButton label="cache" color="neutral" variant="subtle" size="xs" />
+        <UButton label="cache" color="neutral" variant="subtle" icon="lucide:database-zap" />
 
         <template #content>
           <pre class="text-xs overflow-auto max-w-200 max-h-100 p-2">{{ store.cache.getState() }}</pre>

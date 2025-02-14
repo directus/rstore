@@ -21,9 +21,9 @@ export default defineNuxtPlugin({
                 payload.setResult(await $fetch(`/api/rest/${payload.type.meta.path}/${payload.key}`))
               }
             })
-            hook('beforeCacheReadMany', (payload) => {
-              // payload.setMarker(`many:${payload.type.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
-            })
+            // hook('beforeCacheReadMany', (payload) => {
+            //   payload.setMarker(`many:${payload.type.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
+            // })
             hook('fetchMany', async (payload) => {
               // payload.setMarker(`many:${payload.type.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
 

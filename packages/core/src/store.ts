@@ -1,7 +1,7 @@
 import { type Cache, type FindOptions, get, type Hooks, type Model, type ModelDefaults, type Plugin, type QueryApi, type Store } from '@rstore/shared'
 import { resolveModel } from './model'
 import { setupPlugin } from './plugin'
-import { createQueryApi } from './query'
+import { createQueryApi, defaultFetchPolicy } from './query'
 
 export interface CreateStoreOptions<
   TModel extends Model = Model,
@@ -31,6 +31,9 @@ export async function createStore<
     hooks: options.hooks,
     query: undefined as any,
     findDefaults: options.findDefaults ?? {},
+    getFetchPolicy(value) {
+      return value ?? store.findDefaults.fetchPolicy ?? defaultFetchPolicy
+    },
   }
 
   // Query API

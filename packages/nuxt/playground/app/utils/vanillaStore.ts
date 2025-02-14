@@ -1,7 +1,7 @@
-import type { Model, ModelDefaults, ModelType, Store } from '@rstore/shared'
+import type { Model } from '@rstore/shared'
 import type { InjectionKey } from 'vue'
 import type { Message, User } from '~~/server/utils/db'
-import { defineModelType } from '@rstore/vue'
+import { defineModelType, type VueStore } from '@rstore/vue'
 
 export const vanillaModel = {
   User: defineModelType<User>({
@@ -50,7 +50,7 @@ export const vanillaModel = {
   }),
 } as const satisfies Model
 
-export const vanillaStoreKey = Symbol('vanillaStore') as InjectionKey<Store<typeof vanillaModel>>
+export const vanillaStoreKey = Symbol('vanillaStore') as InjectionKey<VueStore<typeof vanillaModel>>
 
 export function useVanillaStore() {
   const store = inject(vanillaStoreKey, null)
