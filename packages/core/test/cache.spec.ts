@@ -10,6 +10,7 @@ describe('defaultMarker', () => {
       fields: {},
       getKey: () => '',
       relations: [],
+      schema: {} as any,
     }
     const result = defaultMarker(type)
     expect(result).toBe('TestType:{}:{}')
@@ -22,6 +23,7 @@ describe('defaultMarker', () => {
       fields: {},
       getKey: () => '',
       relations: [],
+      schema: {} as any,
     }
     const findOptions = { filter: { id: 1 } }
     const result = defaultMarker(type, findOptions as any)
@@ -35,6 +37,7 @@ describe('defaultMarker', () => {
       fields: {},
       getKey: () => '',
       relations: [],
+      schema: {} as any,
     }
     const findOptions = { filter: { id: 1 }, sort: 'asc' }
     const result = defaultMarker(type, findOptions as any)
@@ -48,6 +51,7 @@ describe('defaultMarker', () => {
       fields: {},
       getKey: () => '',
       relations: [],
+      schema: {} as any,
     }
     const findOptions = { filter: () => true, params: { foo: 'bar' } }
     const result = defaultMarker(type, findOptions)
