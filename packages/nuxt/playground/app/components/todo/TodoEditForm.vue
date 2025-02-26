@@ -28,10 +28,19 @@ updateTodo.$onSaved(() => emit('close'))
         v-model="updateTodo.text"
         placeholder="What needs to be done?"
         autofocus
+        class="w-full"
       />
     </UFormField>
 
     <div class="flex items-center gap-4">
+      <UButton
+        type="button"
+        icon="lucide:rotate-ccw"
+        color="neutral"
+        variant="soft"
+        :disabled="updateTodo.$loading"
+        @click="updateTodo.$reset()"
+      />
       <UButton
         type="button"
         icon="lucide:x"

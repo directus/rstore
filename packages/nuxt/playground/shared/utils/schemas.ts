@@ -28,7 +28,7 @@ export const updateValidationSchemas = {
     text: z.string(),
   }).partial(),
   todos: z.object({
-    text: z.string(),
+    text: z.string().min(1),
     completed: z.boolean(),
   }).partial(),
 } as const

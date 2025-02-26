@@ -25,7 +25,7 @@ const editOpen = ref(false)
 <template>
   <div
     v-if="todo"
-    class="todo flex items-center p-4 gap-4 hover:bg-primary-500/5 rounded-md"
+    class="todo flex items-center p-4 gap-4 hover:bg-primary-500/5 rounded-md cursor-pointer"
     :class="{
       'opacity-50': todo.completed,
     }"
