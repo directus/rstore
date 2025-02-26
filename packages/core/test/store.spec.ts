@@ -1,6 +1,8 @@
+import type { Cache, FetchPolicy, Model, ModelDefaults, Plugin } from '@rstore/shared'
 import type { CreateStoreCoreOptions } from '../src/store'
-import { type Cache, createHooks, type Model, type ModelDefaults, type Plugin } from '@rstore/shared'
+import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { defaultFetchPolicy } from '../src'
 import { createStoreCore } from '../src/store'
 
 describe('createStoreCore', () => {
@@ -74,5 +76,28 @@ describe('createStoreCore', () => {
     store.processItemParsing(store.model.Test, item)
 
     expect(item.name).toBe('TEST')
+  })
+
+  describe('getFetchPolicy', () => {
+    it('should return default fetch policy if no value is provided', async () => {
+      const store = await createStoreCore(options)
+      const fetchPolicy = store.getFetchPolicy(undefined)
+      expect(fetchPolicy).toBe(defaultFetchPolicy)
+    })
+
+    it('should return provided fetch policy if value is provided', async () => {
+      const customFetchPolicy = 'some-policy' as FetchPolicy
+      const store = await createStoreCore(options)
+      const fetchPolicy = store.getFetchPolicy(customFetchPolicy)
+      expect(fetchPolicy).toBe(customFetchPolicy)
+    })
+
+    it('should return findDefaults fetch policy if no value is provided and findDefaults has fetch policy', async () => {
+      const customFetchPolicy = 'find-default-policy' as FetchPolicy
+      options.findDefaults = { fetchPolicy: customFetchPolicy }
+      const store = await createStoreCore(options)
+      const fetchPolicy = store.getFetchPolicy(undefined)
+      expect(fetchPolicy).toBe(customFetchPolicy)
+    })
   })
 })
