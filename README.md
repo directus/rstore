@@ -9,3 +9,9 @@
 ---
 
 [![ci](https://github.com/Akryum/rstore/actions/workflows/ci.yml/badge.svg)](https://github.com/Akryum/rstore/actions/workflows/ci.yml)
+
+# Sponsors
+
+[💚 Become a sponsor!](https://github.com/sponsors/Akryum)
+
+![sponsors](https://akryum.netlify.app/sponsors.svg)
