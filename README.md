@@ -7,5 +7,5 @@
 </p>
 
 ---
- 
+
 [![ci](https://github.com/Akryum/rstore/actions/workflows/ci.yml/badge.svg)](https://github.com/Akryum/rstore/actions/workflows/ci.yml)
