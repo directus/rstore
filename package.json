@@ -14,15 +14,15 @@
     "build": "pnpm run -r build",
     "dev": "pnpm run -r dev",
     "lint": "eslint --cache .",
-    "test": "vitest run --exclude \"./packages/nuxt/**\"",
-    "test:dev": "vitest --exclude \"./packages/nuxt/**\"",
+    "test": "vitest run",
+    "test:dev": "vitest",
     "test:types": "pnpm run -r test:types"
   },
   "devDependencies": {
     "@antfu/eslint-config": "^3.12.1",
     "eslint": "^9.17.0",
     "typescript": "^5.7.2",
-    "vitest": "^2.1.8"
+    "vitest": "catalog:"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

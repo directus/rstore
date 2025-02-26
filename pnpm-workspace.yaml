@@ -1,2 +1,5 @@
 packages:
   - packages/*
+
+catalog:
+  vitest: ^3.0.7
