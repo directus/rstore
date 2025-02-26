@@ -5,3 +5,7 @@
     <img alt="rstore logo" src="./img/LogoTextVerticalBlack.png" width="175px" height="200px">
   </picture>
 </p>
+
+---
+ 
+[![ci](https://github.com/Akryum/rstore/actions/workflows/ci.yml/badge.svg)](https://github.com/Akryum/rstore/actions/workflows/ci.yml)
