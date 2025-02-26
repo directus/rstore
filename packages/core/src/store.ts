@@ -39,7 +39,7 @@ export async function createStoreCore<
         type,
         item,
         modifyItem: (path, value) => {
-          set(item, path, value)
+          set(item, path, value as any)
         },
       })
     },
