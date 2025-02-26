@@ -5,21 +5,19 @@ const querySchema = z.object({
 })
 
 export default defineEventHandler(async (event) => {
-  let result = db.users
+  const { type } = getRouterParams(event) as { type: keyof Db }
+  let result = db[type]
 
   const query = await getValidatedQuery(event, querySchema.parse)
 
   if (query.filter) {
     const filters = query.filter.split(',').map(filter => filter.split(':'))
-    result = result.filter((user) => {
+    result = result.filter((item) => {
       return filters.every(([key, value]) => {
-        // @ts-ignore
-        return user[key] === value
+        return item[key as keyof typeof item] === value
       })
-    })
+    }) as Db[keyof Db]
   }
-
-  console.log(result)
 
   return result
 })

@@ -1,5 +1,7 @@
 export * from './cache.js'
+export * from './item.js'
 export * from './model.js'
+export * from './mutation.js'
 export * from './plugin.js'
 export * from './query.js'
 export * from './store.js'

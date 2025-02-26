@@ -1,5 +1,4 @@
 import type { Cache } from '@rstore/shared'
-import { defaultManyMarker } from '@rstore/core'
 import { ref } from 'vue'
 
 export function createCache(): Cache {
@@ -7,17 +6,24 @@ export function createCache(): Cache {
 
   // @TODO Tracked item proxy + relation resolving
 
+  function mark(marker: string) {
+    if (!state.value._markers) {
+      state.value._markers = {}
+    }
+    state.value._markers[marker] = true
+  }
+
   return {
-    readItem(type, key) {
+    readItem({ type, key }) {
       return state.value[type.name]?.[key]
     },
-    readItems(type, marker) {
+    readItems({ type, marker }) {
       if (!state.value._markers?.[marker]) {
         return []
       }
       return Object.values(state.value[type.name] ?? {})
     },
-    writeItem(type, key, item) {
+    writeItem({ type, key, item, marker }) {
       let typeItems = state.value[type.name]
       if (!typeItems) {
         typeItems = state.value[type.name] = {}
@@ -28,19 +34,18 @@ export function createCache(): Cache {
       else {
         Object.assign(typeItems[key], item)
       }
+      if (marker) {
+        mark(marker)
+      }
     },
-    writeItems(type, items, marker) {
-      let count = 0
-      for (const { key, value } of items) {
-        this.writeItem(type, key, value)
-        count++
+    writeItems({ type, items, marker }) {
+      for (const { key, value: item } of items) {
+        this.writeItem({ type, key, item })
       }
-      if (count > 0) {
-        if (!state.value._markers) {
-          state.value._markers = {}
-        }
-        state.value._markers[marker] = true
-      }
+      mark(marker)
+    },
+    deleteItem({ type, key }) {
+      delete state.value[type.name]?.[key]
     },
     getState() {
       return state.value

@@ -1,10 +1,19 @@
 import type { Model } from '@rstore/shared'
 import type { InjectionKey } from 'vue'
-import type { Message, User } from '~~/server/utils/db'
-import { defineModelType, type VueStore } from '@rstore/vue'
+import { defineItemType, type VueStore } from '@rstore/vue'
 
 export const vanillaModel = {
-  User: defineModelType<User>({
+  Todo: defineItemType<Todo>().modelType({
+    name: 'Todo',
+    schema: {
+      create: createValidationSchemas.todos,
+      update: updateValidationSchemas.todos,
+    },
+    meta: {
+      path: 'todos',
+    },
+  }),
+  User: defineItemType<User>().modelType({
     name: 'User',
     relations: [
       {
@@ -26,7 +35,7 @@ export const vanillaModel = {
       path: 'users',
     },
   }),
-  Message: defineModelType<Message>({
+  Message: defineItemType<Message>().modelType({
     name: 'Message',
     relations: [
       {

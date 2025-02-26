@@ -1,9 +1,9 @@
-import type { FindFirstOptions, FindManyOptions, HybridPromise, Model, ModelDefaults, ModelType, QueryApi, Store, TrackedItem } from '@rstore/shared'
+import type { FindOptions, HybridPromise, Model, ModelDefaults, ModelType, StoreCore } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import { shouldReadCacheFromFetchPolicy } from '@rstore/core'
-import { computed, reactive, ref, toValue, watch } from 'vue'
+import { computed, ref, toValue, watch } from 'vue'
 
-export interface QueryReturn<
+export interface VueQueryReturn<
   _TModelType extends ModelType,
   _TModelDefaults extends ModelDefaults,
   _TModel extends Model,
@@ -14,43 +14,49 @@ export interface QueryReturn<
   error: Ref<Error | null>
 }
 
-/**
- * @private
- */
-export function query<
+export interface VueCreateQueryOptions<
   TModelType extends ModelType,
   TModelDefaults extends ModelDefaults,
   TModel extends Model,
-  TMethod extends 'findFirst' | 'findMany',
-  TCacheMethod extends 'peekFirst' | 'peekMany',
-  TOptions extends TMethod extends 'findFirst'
-    ? FindFirstOptions<TModelType, TModelDefaults, TModel>
-    : TMethod extends 'findMany'
-      ? FindManyOptions<TModelType, TModelDefaults, TModel>
-      : never,
-  TResult extends Awaited<ReturnType<QueryApi<TModelType, TModelDefaults, TModel>[TMethod]>>,
->(
-  store: Store<TModel, TModelDefaults>,
-  model: TModelType,
-  method: TMethod,
-  cacheMethod: TCacheMethod,
-  options?: MaybeRefOrGetter<TOptions>,
-): HybridPromise<QueryReturn<TModelType, TModelDefaults, TModel, TResult>> {
+  TOptions extends FindOptions<TModelType, TModelDefaults, TModel>,
+  TResult,
+> {
+  store: StoreCore<TModel, TModelDefaults>
+  fetchMethod: (options?: TOptions) => Promise<TResult>
+  cacheMethod: (options?: TOptions) => TResult
+  defaultValue: TResult
+  options?: MaybeRefOrGetter<TOptions | undefined>
+}
+
+/**
+ * @private
+ */
+export function createQuery<
+  TModelType extends ModelType,
+  TModelDefaults extends ModelDefaults,
+  TModel extends Model,
+  TOptions extends FindOptions<TModelType, TModelDefaults, TModel>,
+  TResult,
+>({
+  store,
+  fetchMethod,
+  cacheMethod,
+  defaultValue,
+  options,
+}: VueCreateQueryOptions<TModelType, TModelDefaults, TModel, TOptions, TResult>): HybridPromise<VueQueryReturn<TModelType, TModelDefaults, TModel, TResult>> {
   const fetchPolicy = store.getFetchPolicy(toValue(options)?.fetchPolicy)
 
-  const query = store.query[model.name] as QueryApi<TModelType, TModelDefaults, TModel>
-
-  const result = ref<TResult>((method === 'findFirst' ? null : []) as TResult)
+  const result = ref<TResult>(defaultValue)
 
   const data = (shouldReadCacheFromFetchPolicy(fetchPolicy)
-    ? computed(() => query[cacheMethod](toValue(options)) ?? null)
+    ? computed(() => cacheMethod(toValue(options)) ?? null)
     : result) as Ref<TResult>
 
   const loading = ref(false)
 
   const error = ref<Error | null>(null)
 
-  const returnObject: QueryReturn<TModelType, TModelDefaults, TModel, TResult> = {
+  const returnObject: VueQueryReturn<TModelType, TModelDefaults, TModel, TResult> = {
     data,
     loading,
     error,
@@ -61,18 +67,17 @@ export function query<
     error.value = null
 
     try {
-      const finalOptions = toValue(options)
+      const finalOptions: TOptions = toValue(options) ?? {} as TOptions
 
       // If fetchPolicy is `cache-and-fetch`, fetch in parallel
       if (fetchPolicy === 'cache-and-fetch') {
-        query[method]({
+        fetchMethod({
           ...finalOptions,
           fetchPolicy: 'fetch-only',
-        })
+        } as FindOptions<TModelType, TModelDefaults, TModel> as any)
       }
 
-      const item = await query[method](finalOptions)
-      result.value = item
+      result.value = await fetchMethod(finalOptions)
     }
     catch (e: any) {
       error.value = e
@@ -91,23 +96,7 @@ export function query<
     deep: true,
   })
 
-  const promise = load() as HybridPromise<QueryReturn<TModelType, TModelDefaults, TModel, TResult>>
+  const promise = load() as HybridPromise<VueQueryReturn<TModelType, TModelDefaults, TModel, TResult>>
   Object.assign(promise, returnObject)
   return promise
-}
-
-export interface VueQueryApi<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
-  TModel extends Model,
-  TItem extends TrackedItem<TModelType, TModelDefaults, TModel>,
-> extends QueryApi<TModelType, TModelDefaults, TModel> {
-  /**
-   * Create a reactive query for the first item that matches the given options.
-   */
-  queryFirst: (options?: MaybeRefOrGetter<string | FindFirstOptions<TModelType, TModelDefaults, TModel>>) => HybridPromise<QueryReturn<TModelType, TModelDefaults, TModel, TItem | null>>
-  /**
-   * Create a reactive query for all items that match the given options.
-   */
-  queryMany: (options?: MaybeRefOrGetter<FindManyOptions<TModelType, TModelDefaults, TModel>>) => HybridPromise<QueryReturn<TModelType, TModelDefaults, TModel, Array<TItem>>>
 }

@@ -8,6 +8,7 @@ export default defineNuxtConfig({
   modules: [
     '../src/module',
     '@nuxt/ui',
+    '@vueuse/nuxt',
   ],
 
   myModule: {},

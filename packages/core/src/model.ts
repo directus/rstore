@@ -1,13 +1,48 @@
-import { type GetKey, type ModelDefaults, type ModelType, type ResolvedModel, todo } from '@rstore/shared'
+import type { Full, GetKey, ModelDefaults, ModelType, ModelTypeSchemas, ResolvedModel } from '@rstore/shared'
+import { todo } from '@rstore/shared'
 
 export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
 
-export function defineModelType<
+/**
+ * Allow typing the model item type thanks to currying.
+ */
+export function defineItemType<
   TItem extends Record<string, any>,
-  TComputed extends Record<string, any> = any,
-  TModelType extends ModelType<TItem, TComputed> = ModelType<TItem, TComputed>,
->(model: TModelType): TModelType {
+>() {
+  return {
+    /**
+     * Define a typed model type.
+     */
+    modelType: <
+      TComputed extends Record<string, any>,
+      TSchemas extends ModelTypeSchemas,
+      TModelType extends ModelType<TItem, TComputed, TSchemas> = ModelType<TItem, TComputed, TSchemas>,
+    > (model: TModelType): TModelType & { '~item': TItem } => model as any,
+  }
+}
+
+/**
+ * Define an untyped model type.
+ */
+export function defineModelType(model: ModelType) {
   return model
+}
+
+const emptySchemas: Full<ModelTypeSchemas> = {
+  create: {
+    '~standard': {
+      validate: value => ({ value }),
+      vendor: 'rstore',
+      version: 1,
+    },
+  },
+  update: {
+    '~standard': {
+      validate: value => ({ value }),
+      vendor: 'rstore',
+      version: 1,
+    },
+  },
 }
 
 export function resolveModel<
@@ -32,7 +67,7 @@ export function resolveModel<
 
     resolved[key] = {
       name: type.name,
-      key: type.key ?? defaults?.key ?? defaultGetKey,
+      getKey: type.getKey ?? defaults?.getKey ?? defaultGetKey,
       relations: type.relations?.map(relation => ({
         name: relation.name,
         type: relation.type,
@@ -45,6 +80,10 @@ export function resolveModel<
         ...type.computed,
       },
       fields,
+      schema: {
+        create: type.schema?.create ?? emptySchemas.create,
+        update: type.schema?.update ?? emptySchemas.update,
+      },
       meta: {
         ...defaults?.meta,
         ...type.meta,

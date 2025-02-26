@@ -12,6 +12,11 @@ const store = useVanillaStore()
             to: '/',
           },
           {
+            label: 'Todo',
+            icon: 'lucide:check-check',
+            to: '/todo',
+          },
+          {
             label: 'Users',
             icon: 'lucide:users',
             active: $route.path.startsWith('/users'),
@@ -21,8 +26,12 @@ const store = useVanillaStore()
                 to: '/users',
               },
               {
-                label: 'Filter',
+                label: 'Filter many',
                 to: '/users/filter',
+              },
+              {
+                label: 'Filter first',
+                to: '/users/filter-first',
               },
             ],
           },

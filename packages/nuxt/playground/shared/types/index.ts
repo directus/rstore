@@ -1,3 +1,5 @@
+/* eslint-disable unused-imports/no-unused-vars */
+
 import type { Model, ModelDefaults, ModelType } from '@rstore/shared'
 
 declare module '@rstore/vue' {

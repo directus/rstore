@@ -1,9 +1,9 @@
-import { type Cache, type FindOptions, get, type Hooks, type Model, type ModelDefaults, type Plugin, type QueryApi, type Store } from '@rstore/shared'
+import { type Cache, type FindOptions, get, type Hooks, type Model, type ModelDefaults, type Plugin, set, type StoreCore } from '@rstore/shared'
+import { defaultFetchPolicy } from './fetchPolicy'
 import { resolveModel } from './model'
 import { setupPlugin } from './plugin'
-import { createQueryApi, defaultFetchPolicy } from './query'
 
-export interface CreateStoreOptions<
+export interface CreateStoreCoreOptions<
   TModel extends Model = Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
@@ -15,40 +15,36 @@ export interface CreateStoreOptions<
   findDefaults?: Partial<FindOptions<any, any, any>>
 }
 
-export async function createStore<
+export async function createStoreCore<
   TModel extends Model = Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
->(options: CreateStoreOptions<TModel, TModelDefaults>): Promise<Store<TModel, TModelDefaults>> {
+>(options: CreateStoreCoreOptions<TModel, TModelDefaults>): Promise<StoreCore<TModel, TModelDefaults>> {
   // Create store
 
   const model = resolveModel(options.model, options.modelDefaults)
 
-  const store: Store<TModel, TModelDefaults> = {
+  const store: StoreCore<TModel, TModelDefaults> = {
     cache: options.cache,
     model,
     modelDefaults: options.modelDefaults ?? {} as TModelDefaults,
     plugins: options.plugins ?? [],
     hooks: options.hooks,
-    query: undefined as any,
     findDefaults: options.findDefaults ?? {},
     getFetchPolicy(value) {
       return value ?? store.findDefaults.fetchPolicy ?? defaultFetchPolicy
     },
+    processItemParsing(type, item) {
+      store.hooks.callHookSync('parseItem', {
+        store,
+        type,
+        item,
+        modifyItem: (path, value) => {
+          set(item, path, value)
+        },
+      })
+    },
+    mutationHistory: [],
   }
-
-  // Query API
-
-  const query = {} as {
-    [TKey in keyof TModel]: QueryApi<TModel[TKey], TModelDefaults, TModel>
-  }
-  for (const key in model) {
-    query[key] = createQueryApi({
-      store,
-      type: model[key],
-    }) as QueryApi<TModel[keyof TModel], TModelDefaults, TModel>
-  }
-
-  store.query = query
 
   // Setup plugins
 

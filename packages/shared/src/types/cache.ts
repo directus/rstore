@@ -1,9 +1,9 @@
+import type { TrackedItem } from './item'
 import type { Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType } from './model'
-import type { TrackedItem } from './query'
 
 /*
 
-Markers are used to track if a list was already fetched once.
+Markers are used to track if a query (usually with a filter) was already fetched once.
 This is useful to return an empty list from the cache if the list was never actually fetched despite part of it potentially being in the cache -
 which is a nice default for most apps.
 The markers can be overwritten by plugins using the `payload.setMarker` method.
@@ -36,26 +36,39 @@ export interface Cache<
   TModel extends Model = Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
-  readItem: <TModelType extends ModelType = ModelType>(type: ResolvedModelType<TModelType, TModelDefaults>, key: string) => TrackedItem<TModelType, TModelDefaults, TModel> | undefined
+  readItem: <TModelType extends ModelType = ModelType>(params: {
+    type: ResolvedModelType<TModelType, TModelDefaults>
+    key: string
+  }) => TrackedItem<TModelType, TModelDefaults, TModel> | undefined
 
-  /**
-   * Read items from the cache
-   * @param type
-   * @param marker Marker to consider that the corresponding list was already fetched once. Allow returning empty list if marker is not found.
-   * @returns
-   */
-  readItems: <TModelType extends ModelType = ModelType>(type: ResolvedModelType<TModelType, TModelDefaults>, marker: string) => Array<TrackedItem<TModelType, TModelDefaults, TModel>>
+  writeItem: <TModelType extends ModelType = ModelType>(params: {
+    type: ResolvedModelType<TModelType, TModelDefaults>
+    key: string
+    item: ResolvedModelItem<TModelType, TModelDefaults, TModel>
+    marker?: string
+  }) => void
 
-  writeItem: <TModelType extends ModelType = ModelType>(type: ResolvedModelType<TModelType, TModelDefaults>, key: string, item: ResolvedModelItem<TModelType, TModelDefaults, TModel>) => void
+  deleteItem: <TModelType extends ModelType = ModelType>(params: {
+    type: ResolvedModelType<TModelType, TModelDefaults>
+    key: string
+  }) => void
 
-  /**
-   * Write items list to the cache
-   * @param type
-   * @param items
-   * @param marker Marker to consider that the corresponding list was already fetched once.
-   * @returns
-   */
-  writeItems: <TModelType extends ModelType = ModelType>(type: ResolvedModelType<TModelType, TModelDefaults>, items: Array<WriteItem<TModelType, TModelDefaults, TModel>>, marker: string) => void
+  readItems: <TModelType extends ModelType = ModelType>(params: {
+    type: ResolvedModelType<TModelType, TModelDefaults>
+    /**
+     * Marker to consider that the corresponding list was already fetched once. Allow returning empty list if marker is not found.
+     */
+    marker: string
+  }) => Array<TrackedItem<TModelType, TModelDefaults, TModel>>
+
+  writeItems: <TModelType extends ModelType = ModelType>(params: {
+    type: ResolvedModelType<TModelType, TModelDefaults>
+    items: Array<WriteItem<TModelType, TModelDefaults, TModel>>
+    /**
+     * Marker to consider that the corresponding list was already fetched once.
+     */
+    marker: string
+  }) => void
 
   getState: () => CustomCacheState
 

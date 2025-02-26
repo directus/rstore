@@ -3,12 +3,19 @@ import { createStore } from '@rstore/vue'
 export default defineNuxtPlugin({
   name: 'vanilla-rstore',
   async setup(nuxtApp) {
+    function parseDate(value: any): Date {
+      return typeof value === 'string' ? new Date(value) : value
+    }
+
     const store = await createStore({
       model: vanillaModel,
       modelDefaults: {
         fields: {
           createdAt: {
-            parse: value => typeof value === 'string' ? new Date(value) : value,
+            parse: parseDate,
+          },
+          updatedAt: {
+            parse: parseDate,
           },
         },
       },
@@ -18,7 +25,17 @@ export default defineNuxtPlugin({
           setup({ hook }) {
             hook('fetchFirst', async (payload) => {
               if (payload.type.meta?.path) {
-                payload.setResult(await $fetch(`/api/rest/${payload.type.meta.path}/${payload.key}`))
+                if (payload.key) {
+                  const result = await $fetch(`/api/rest/${payload.type.meta.path}/${payload.key}`)
+                  payload.setResult(result)
+                }
+                else {
+                  const result: any = await $fetch(`/api/rest/${payload.type.meta.path}`, {
+                    method: 'GET',
+                    query: payload.findOptions?.params,
+                  })
+                  payload.setResult(result?.[0])
+                }
               }
             })
             // hook('beforeCacheReadMany', (payload) => {
@@ -28,10 +45,42 @@ export default defineNuxtPlugin({
               // payload.setMarker(`many:${payload.type.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
 
               if (payload.type.meta?.path) {
-                payload.setResult(await $fetch(`/api/rest/${payload.type.meta.path}`, {
+                const result = await $fetch(`/api/rest/${payload.type.meta.path}`, {
                   method: 'GET',
                   query: payload.findOptions?.params,
-                }))
+                })
+                payload.setResult(result)
+              }
+            })
+
+            hook('createItem', async (payload) => {
+              if (payload.type.meta?.path) {
+                const result = await $fetch(`/api/rest/${payload.type.meta.path}`, {
+                  method: 'POST',
+                  body: payload.item,
+                })
+                payload.setResult(result)
+              }
+            })
+
+            hook('updateItem', async (payload) => {
+              if (payload.type.meta?.path) {
+                const result = await $fetch(`/api/rest/${payload.type.meta.path}/${payload.key}`, {
+                  method: 'PATCH',
+                  body: {
+                    ...payload.item,
+                    id: undefined,
+                  },
+                })
+                payload.setResult(result)
+              }
+            })
+
+            hook('deleteItem', async (payload) => {
+              if (payload.type.meta?.path) {
+                await $fetch(`/api/rest/${payload.type.meta.path}/${payload.key}`, {
+                  method: 'DELETE',
+                })
               }
             })
           },
@@ -49,7 +98,6 @@ export default defineNuxtPlugin({
       store.cache.setState(nuxtApp.payload.data[cacheKey])
     }
 
-    // @ts-expect-error @TODO fix type error
     nuxtApp.vueApp.provide(vanillaStoreKey, store)
   },
 })

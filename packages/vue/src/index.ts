@@ -7,6 +7,7 @@ export type {
 } from './store'
 
 export {
+  defineItemType,
   defineModelType,
 } from '@rstore/core'
 

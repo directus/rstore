@@ -36,8 +36,8 @@ type AnyIsEqual<T1, T2> = T1 extends T2
   : never
 
 type PathImpl<K extends string | number, V, TraversedTypes> = V extends
-| Primitive
-| BrowserNativeObject
+  | Primitive
+  | BrowserNativeObject
   ? `${K}`
   : true extends AnyIsEqual<TraversedTypes, V>
     ? `${K}`
@@ -79,3 +79,11 @@ type PathValueImpl<T, P extends string> = T extends any
           : never
         : never
   : never
+
+export type Full<T> = {
+  [P in keyof T]-?: T[P];
+}
+
+export type FilterNotStartingWith<Set, Needle extends string> = Set extends `${Needle}${infer _X}` ? never : Set
+
+export type FilterStartsWith<Set, Needle extends string> = Set extends `${Needle}${infer _X}` ? Set : never

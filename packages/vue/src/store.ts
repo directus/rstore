@@ -1,8 +1,8 @@
-import type { FindOptions, Model, ModelDefaults, Plugin, Store, TrackedItem } from '@rstore/shared'
-import { createStore as _createStore } from '@rstore/core'
+import type { Cache, FindOptions, Model, ModelDefaults, Plugin, StoreCore, TrackedItem } from '@rstore/shared'
+import { createStoreCore } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
+import { createModelApi, type VueModelApi } from './api'
 import { createCache } from './cache'
-import { query, type VueQueryApi } from './query'
 
 export interface CreateStoreOptions<
   TModel extends Model = Model,
@@ -14,23 +14,35 @@ export interface CreateStoreOptions<
   findDefaults?: Partial<FindOptions<any, any, any>>
 }
 
-export type VueStoreQueryProxy<
+export type VueStoreModelApiProxy<
   TModel extends Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > = {
-  [TKey in keyof TModel]: VueQueryApi<TModel[TKey], TModelDefaults, TModel, TrackedItem<TModel[TKey], TModelDefaults, TModel>>
+  [TKey in keyof TModel]: VueModelApi<TModel[TKey], TModelDefaults, TModel, TrackedItem<TModel[TKey], TModelDefaults, TModel>>
+}
+
+export interface VueStoreBase<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults = ModelDefaults,
+> {
+  cache: Pick<Cache, 'getState' | 'setState' | 'clear'>
+
+  /**
+   * @private
+   */
+  _core: StoreCore<TModel, TModelDefaults>
 }
 
 export type VueStore<
   TModel extends Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
-> = Store<TModel, TModelDefaults> & VueStoreQueryProxy<TModel, TModelDefaults>
+> = VueStoreBase<TModel, TModelDefaults> & VueStoreModelApiProxy<TModel, TModelDefaults>
 
 export async function createStore<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
 >(options: CreateStoreOptions<TModel, TModelDefaults>): Promise<VueStore<TModel, TModelDefaults>> {
-  const store = await _createStore({
+  const storeCore = await createStoreCore<TModel, TModelDefaults>({
     model: options.model,
     modelDefaults: options.modelDefaults,
     plugins: options.plugins,
@@ -39,30 +51,24 @@ export async function createStore<
     findDefaults: options.findDefaults,
   })
 
-  const queryCache: Map<keyof TModel, VueQueryApi<TModel[keyof TModel], TModelDefaults, TModel, TrackedItem<TModel[keyof TModel], TModelDefaults, TModel>>> = new Map()
+  const queryCache: Map<keyof TModel, VueModelApi<TModel[keyof TModel], TModelDefaults, TModel, TrackedItem<TModel[keyof TModel], TModelDefaults, TModel>>> = new Map()
 
-  const storeProxy = new Proxy(store, {
-    get(target, key) {
-      if (key in target.model) {
+  const storeBase: VueStoreBase<TModel, TModelDefaults> = {
+    cache: storeCore.cache,
+    _core: storeCore,
+  }
+
+  const storeProxy = new Proxy(storeBase, {
+    get(_, key) {
+      if (key in storeCore.model) {
         const typeName = key as keyof TModel
         if (!queryCache.has(typeName)) {
-          queryCache.set(typeName, {
-            // @ts-expect-error string or object type issues @TODO fix
-            peekFirst: keyOrOptions => target.query[typeName].peekFirst(keyOrOptions),
-            // @ts-expect-error string or object type issues @TODO fix
-            findFirst: keyOrOptions => target.query[typeName].findFirst(keyOrOptions),
-            peekMany: options => target.query[typeName].peekMany(options),
-            findMany: options => target.query[typeName].findMany(options),
-            // @ts-expect-error string or object type issues @TODO fix
-            queryFirst: options => query(store, target.model[typeName], 'findFirst', 'peekFirst', options),
-            // @ts-expect-error string or object type issues @TODO fix
-            queryMany: options => query(store, target.model[typeName], 'findMany', 'peekMany', options),
-          })
+          queryCache.set(typeName, createModelApi(storeCore, storeCore.model[typeName]))
         }
         return queryCache.get(typeName)
       }
 
-      return Reflect.get(target, key)
+      return Reflect.get(storeBase, key)
     },
   }) as VueStore<TModel, TModelDefaults>
 

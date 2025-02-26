@@ -2,22 +2,6 @@
 
 import type { Model, ModelDefaults, ModelType, ResolvedModelItem } from './model'
 
-/**
- * Tracked object. The object is tracked by the store and can be used to update the data.
- */
-export type TrackedItem<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
-  TModel extends Model,
-> = ResolvedModelItem<TModelType, TModelDefaults, TModel> & {
-  /**
-   * Name of the model.
-   */
-  $type: TModelType['name']
-  // @TODO
-  // $save: () => Promise<void>
-}
-
 export interface CustomParams {}
 
 export interface CustomFilterOption<
@@ -104,30 +88,7 @@ export interface FindManyOptions<
   // nothing here yet
 }
 
-export interface QueryApi<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
-  TModel extends Model,
-> {
-  /**
-   * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
-   */
-  peekFirst: ((key?: string) => TrackedItem<TModelType, TModelDefaults, TModel> | null)
-    & ((options?: FindFirstOptions<TModelType, TModelDefaults, TModel>) => TrackedItem<TModelType, TModelDefaults, TModel> | null)
-
-  /**
-   * Find the first item that matches the query.
-   */
-  findFirst: ((key?: string) => Promise<TrackedItem<TModelType, TModelDefaults, TModel> | null>)
-    & ((options?: FindFirstOptions<TModelType, TModelDefaults, TModel>) => Promise<TrackedItem<TModelType, TModelDefaults, TModel> | null>)
-
-  /**
-   * Find all items that match the query in the cache without fetching the data from the adapter plugins.
-   */
-  peekMany: (options?: FindManyOptions<TModelType, TModelDefaults, TModel>) => Array<TrackedItem<TModelType, TModelDefaults, TModel>>
-
-  /**
-   * Find all items that match the query.
-   */
-  findMany: (options?: FindManyOptions<TModelType, TModelDefaults, TModel>) => Promise<Array<TrackedItem<TModelType, TModelDefaults, TModel>>>
+export interface QueryResult<TResult> {
+  result: TResult
+  marker?: string
 }
