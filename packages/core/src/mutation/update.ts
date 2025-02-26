@@ -67,5 +67,12 @@ export async function updateItem<
     throw new Error('Item update failed: result is nullish')
   }
 
+  store.mutationHistory.push({
+    operation: 'update',
+    type,
+    key,
+    payload: item,
+  })
+
   return result
 }

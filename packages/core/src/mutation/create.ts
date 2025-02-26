@@ -56,5 +56,11 @@ export async function createItem<
     throw new Error('Item creation failed: result is nullish')
   }
 
+  store.mutationHistory.push({
+    operation: 'create',
+    type,
+    payload: item,
+  })
+
   return result
 }

@@ -33,4 +33,10 @@ export async function deleteItem<
       key,
     })
   }
+
+  store.mutationHistory.push({
+    operation: 'delete',
+    type,
+    key,
+  })
 }
