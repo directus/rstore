@@ -2,7 +2,7 @@
   "name": "datastore-monorepo",
   "version": "0.0.0",
   "private": true,
-  "packageManager": "pnpm@10.5.0+sha512.11106a5916c7406fe4b8cb8e3067974b8728f47308a4f5ac5e850304afa6f57e2847d7950dfe78877d8d36bfb401d381c4215db3a4c3547ffa63c14333a6fa51",
+  "packageManager": "pnpm@10.5.1+sha512.c424c076bd25c1a5b188c37bb1ca56cc1e136fbf530d98bcb3289982a08fd25527b8c9c4ec113be5e3393c39af04521dd647bcf1d0801eaf8ac6a7b14da313af",
   "description": "",
   "author": "",
   "license": "MIT",
