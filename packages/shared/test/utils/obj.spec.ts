@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { get, set } from '../../src/utils/obj.js'
+import { get, pickNonSpecialProps, pickSpecialProps, set } from '../../src/utils/obj.js'
 
 describe('get', () => {
   it('should return the value at the given path', () => {
@@ -38,5 +38,39 @@ describe('set', () => {
     const obj = { a: { b: { c: 42 } } }
     set(obj, 'a.b.c', 100)
     expect(obj.a.b.c).toBe(100)
+  })
+})
+
+describe('pickNonSpecialProps', () => {
+  it('should pick properties not starting with $', () => {
+    const obj = { a: 1, b: 2, $c: 3, $d: 4 }
+    expect(pickNonSpecialProps(obj)).toEqual({ a: 1, b: 2 })
+  })
+
+  it('should return an empty object if all properties start with $', () => {
+    const obj = { $a: 1, $b: 2 }
+    expect(pickNonSpecialProps(obj)).toEqual({})
+  })
+
+  it('should return the same object if no properties start with $', () => {
+    const obj = { a: 1, b: 2 }
+    expect(pickNonSpecialProps(obj)).toEqual({ a: 1, b: 2 })
+  })
+})
+
+describe('pickSpecialProps', () => {
+  it('should pick properties starting with $', () => {
+    const obj = { a: 1, b: 2, $c: 3, $d: 4 }
+    expect(pickSpecialProps(obj)).toEqual({ $c: 3, $d: 4 })
+  })
+
+  it('should return an empty object if no properties start with $', () => {
+    const obj = { a: 1, b: 2 }
+    expect(pickSpecialProps(obj)).toEqual({})
+  })
+
+  it('should return the same object if all properties start with $', () => {
+    const obj = { $a: 1, $b: 2 }
+    expect(pickSpecialProps(obj)).toEqual({ $a: 1, $b: 2 })
   })
 })

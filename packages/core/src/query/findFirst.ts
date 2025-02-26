@@ -66,20 +66,20 @@ export async function findFirst<
 
     if (result) {
       store.processItemParsing(type, result)
-    }
 
-    if (fetchPolicy !== 'no-cache') {
-      const key = type.getKey(result)
-      if (!key) {
-        console.warn(`Key is undefined for ${type.name}. Item was not written to cache.`)
-      }
-      else {
-        store.cache.writeItem({
-          type,
-          key,
-          item: result,
-          marker: getMarker('first', marker),
-        })
+      if (fetchPolicy !== 'no-cache') {
+        const key = type.getKey(result)
+        if (!key) {
+          console.warn(`Key is undefined for ${type.name}. Item was not written to cache.`)
+        }
+        else {
+          store.cache.writeItem({
+            type,
+            key,
+            item: result,
+            marker: getMarker('first', marker),
+          })
+        }
       }
     }
   }

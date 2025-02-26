@@ -55,14 +55,14 @@ export function peekFirst<
       result = store.cache.readItems({
         type,
         marker: getMarker('first', marker),
-      }).filter(item => filterFn(item))?.[0]
+      }).filter(item => filterFn(item))?.[0] ?? null
 
       // Fallback to many marker
       if (!result) {
         result = store.cache.readItems({
           type,
           marker: getMarker('many', marker),
-        }).filter(item => filterFn(item))?.[0]
+        }).filter(item => filterFn(item))?.[0] ?? null
       }
     }
 
