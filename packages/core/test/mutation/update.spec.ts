@@ -61,6 +61,30 @@ describe('updateItem', () => {
     })
   })
 
+  it('should update an item with specific key', async () => {
+    const resultItem = { id: '1', text: 'foo' } as ResolvedModelItem<ModelType, ModelDefaults, Model>
+    mockStore.hooks.callHook = vi.fn(async (hookName, { setResult }) => setResult(resultItem)) as any
+    mockItem.text = 'foo'
+
+    const result = await updateItem({
+      ...options,
+      key: '1',
+    })
+
+    expect(result).toEqual(resultItem)
+    expect(mockStore.cache.writeItem).toHaveBeenCalledWith({
+      type: mockType,
+      key: '1',
+      item: resultItem,
+    })
+    expect(mockStore.mutationHistory).toContainEqual({
+      operation: 'update',
+      type: mockType,
+      key: '1',
+      payload: mockItem,
+    })
+  })
+
   it('should throw an error if result is nullish', async () => {
     mockStore.hooks.callHook = vi.fn(async () => {}) as any
     mockItem.id = '1'

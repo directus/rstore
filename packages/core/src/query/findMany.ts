@@ -1,4 +1,4 @@
-import type { FindManyOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, TrackedItem, WriteItem } from '@rstore/shared'
+import type { FindManyOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, WrappedItem, WriteItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekMany } from './peekMany'
@@ -24,7 +24,7 @@ export async function findMany<
   store,
   type,
   findOptions,
-}: FindManyParams<TModelType, TModelDefaults, TModel>): Promise<QueryResult<Array<TrackedItem<TModelType, TModelDefaults, TModel>>>> {
+}: FindManyParams<TModelType, TModelDefaults, TModel>): Promise<QueryResult<Array<WrappedItem<TModelType, TModelDefaults, TModel>>>> {
   const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
 
   let result: any

@@ -1,4 +1,4 @@
-import type { TrackedItem } from './item'
+import type { WrappedItem } from './item'
 import type { Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType } from './model'
 
 /*
@@ -39,7 +39,7 @@ export interface Cache<
   readItem: <TModelType extends ModelType = ModelType>(params: {
     type: ResolvedModelType<TModelType, TModelDefaults>
     key: string
-  }) => TrackedItem<TModelType, TModelDefaults, TModel> | undefined
+  }) => WrappedItem<TModelType, TModelDefaults, TModel> | undefined
 
   writeItem: <TModelType extends ModelType = ModelType>(params: {
     type: ResolvedModelType<TModelType, TModelDefaults>
@@ -59,7 +59,7 @@ export interface Cache<
      * Marker to consider that the corresponding list was already fetched once. Allow returning empty list if marker is not found.
      */
     marker: string
-  }) => Array<TrackedItem<TModelType, TModelDefaults, TModel>>
+  }) => Array<WrappedItem<TModelType, TModelDefaults, TModel>>
 
   writeItems: <TModelType extends ModelType = ModelType>(params: {
     type: ResolvedModelType<TModelType, TModelDefaults>

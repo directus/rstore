@@ -1,4 +1,4 @@
-import type { FindFirstOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, TrackedItem } from '@rstore/shared'
+import type { FindFirstOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekFirst } from './peekFirst'
@@ -24,7 +24,7 @@ export async function findFirst<
   store,
   type,
   findOptions: keyOrOptions,
-}: FindFirstParams<TModelType, TModelDefaults, TModel>): Promise<QueryResult<TrackedItem<TModelType, TModelDefaults, TModel> | null>> {
+}: FindFirstParams<TModelType, TModelDefaults, TModel>): Promise<QueryResult<WrappedItem<TModelType, TModelDefaults, TModel> | null>> {
   const findOptions: FindFirstOptions<TModelType, TModelDefaults, TModel> = typeof keyOrOptions === 'string'
     ? {
         key: keyOrOptions,

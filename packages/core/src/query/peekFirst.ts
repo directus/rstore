@@ -1,4 +1,4 @@
-import type { FindFirstOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, TrackedItem } from '@rstore/shared'
+import type { FindFirstOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
@@ -23,7 +23,7 @@ export function peekFirst<
   store,
   type,
   findOptions: keyOrOptions,
-}: PeekFirstOptions<TModelType, TModelDefaults, TModel>): QueryResult<TrackedItem<TModelType, TModelDefaults, TModel> | null> {
+}: PeekFirstOptions<TModelType, TModelDefaults, TModel>): QueryResult<WrappedItem<TModelType, TModelDefaults, TModel> | null> {
   const findOptions: FindFirstOptions<TModelType, TModelDefaults, TModel> = typeof keyOrOptions === 'string'
     ? {
         key: keyOrOptions,

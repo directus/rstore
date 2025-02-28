@@ -1,4 +1,4 @@
-import type { FindManyOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, TrackedItem } from '@rstore/shared'
+import type { FindManyOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
@@ -23,7 +23,7 @@ export function peekMany<
   store,
   type,
   findOptions,
-}: PeekManyOptions<TModelType, TModelDefaults, TModel>): QueryResult<Array<TrackedItem<TModelType, TModelDefaults, TModel>>> {
+}: PeekManyOptions<TModelType, TModelDefaults, TModel>): QueryResult<Array<WrappedItem<TModelType, TModelDefaults, TModel>>> {
   const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
   if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let marker = defaultMarker(type, findOptions)

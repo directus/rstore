@@ -1,4 +1,4 @@
-import type { ModelDefaults, ModelType, ResolvedModelType, StoreCore, TrackedItem } from '@rstore/shared'
+import type { ModelDefaults, ModelType, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { findFirst } from '../../src/query/findFirst'
@@ -59,7 +59,7 @@ describe('findFirst', () => {
       store: mockStore,
       type: modelType,
       findOptions: {
-        filter: (item: TrackedItem<TestModelType, TestModelDefaults, any>) => item.id === '2',
+        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '2',
       },
     })
 
@@ -71,7 +71,7 @@ describe('findFirst', () => {
       store: mockStore,
       type: modelType,
       findOptions: {
-        filter: (item: TrackedItem<TestModelType, TestModelDefaults, any>) => item.id === '3',
+        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '3',
       },
     })
 

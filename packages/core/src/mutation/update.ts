@@ -9,6 +9,7 @@ export interface UpdateOptions<
   store: StoreCore<TModel, TModelDefaults>
   type: ResolvedModelType<TModelType, TModelDefaults>
   item: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
+  key?: string | null
   skipCache?: boolean
 }
 
@@ -20,10 +21,11 @@ export async function updateItem<
   store,
   type,
   item,
+  key,
   skipCache,
 }: UpdateOptions<TModelType, TModelDefaults, TModel>): Promise<ResolvedModelItem<TModelType, TModelDefaults, TModel>> {
   item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
-  const key = type.getKey(item)
+  key = key ?? type.getKey(item)
 
   if (!key) {
     throw new Error('Item update failed: key is not defined')

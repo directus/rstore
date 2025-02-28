@@ -1,8 +1,9 @@
+import type { CreateFormObject, FindFirstOptions, FindManyOptions, HybridPromise, Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueQueryReturn } from './query'
 import { createItem, deleteItem, findFirst, findMany, peekFirst, peekMany, updateItem } from '@rstore/core'
-import { type CreateFormObject, type FindFirstOptions, type FindManyOptions, type HybridPromise, type Model, type ModelDefaults, type ModelType, pickNonSpecialProps, type ResolvedModelItem, type ResolvedModelType, type StoreCore, type TrackedItem, type UpdateFormObject } from '@rstore/shared'
+import { pickNonSpecialProps } from '@rstore/shared'
 import { createEventHook } from '@vueuse/core'
 import { markRaw, reactive, toValue } from 'vue'
 import { createQuery } from './query'
@@ -11,21 +12,21 @@ export interface VueModelApi<
   TModelType extends ModelType,
   TModelDefaults extends ModelDefaults,
   TModel extends Model,
-  TItem extends TrackedItem<TModelType, TModelDefaults, TModel>,
+  TItem extends WrappedItem<TModelType, TModelDefaults, TModel>,
 > {
   /**
    * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
    */
   peekFirst: (
     options: MaybeRefOrGetter<string | FindFirstOptions<TModelType, TModelDefaults, TModel>>,
-  ) => TrackedItem<TModelType, TModelDefaults, TModel> | null
+  ) => WrappedItem<TModelType, TModelDefaults, TModel> | null
 
   /**
    * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
    */
   findFirst: (
     options: MaybeRefOrGetter<string | FindFirstOptions<TModelType, TModelDefaults, TModel>>,
-  ) => Promise<TrackedItem<TModelType, TModelDefaults, TModel> | null>
+  ) => Promise<WrappedItem<TModelType, TModelDefaults, TModel> | null>
 
   /**
    * Create a reactive query for the first item that matches the given options.
@@ -39,14 +40,14 @@ export interface VueModelApi<
    */
   peekMany: (
     options?: MaybeRefOrGetter<FindManyOptions<TModelType, TModelDefaults, TModel> | undefined>,
-  ) => Array<TrackedItem<TModelType, TModelDefaults, TModel>>
+  ) => Array<WrappedItem<TModelType, TModelDefaults, TModel>>
 
   /**
    * Find all items that match the query.
    */
   findMany: (
     options?: MaybeRefOrGetter<FindManyOptions<TModelType, TModelDefaults, TModel> | undefined>,
-  ) => Promise<Array<TrackedItem<TModelType, TModelDefaults, TModel>>>
+  ) => Promise<Array<WrappedItem<TModelType, TModelDefaults, TModel>>>
 
   /**
    * Create a reactive query for all items that match the given options.
@@ -81,6 +82,9 @@ export interface VueModelApi<
    */
   update: (
     item: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>,
+    updateOptions?: {
+      key?: string | null
+    }
   ) => Promise<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
 
   /**
@@ -122,8 +126,8 @@ export function createModelApi<
 >(
   store: StoreCore<TModel, TModelDefaults>,
   type: ResolvedModelType<TModelType, TModelDefaults>,
-): VueModelApi<TModel[keyof TModel], TModelDefaults, TModel, TrackedItem<TModel[keyof TModel], TModelDefaults, TModel>> {
-  type Api = VueModelApi<TModel[keyof TModel], TModelDefaults, TModel, TrackedItem<TModel[keyof TModel], TModelDefaults, TModel>>
+): VueModelApi<TModel[keyof TModel], TModelDefaults, TModel, WrappedItem<TModel[keyof TModel], TModelDefaults, TModel>> {
+  type Api = VueModelApi<TModel[keyof TModel], TModelDefaults, TModel, WrappedItem<TModel[keyof TModel], TModelDefaults, TModel>>
   const api: Api = {
     peekFirst: findOptions => peekFirst({
       store,
@@ -216,10 +220,11 @@ export function createModelApi<
       return form
     },
 
-    update: item => updateItem({
+    update: (item, updateOptions) => updateItem({
       store,
       type,
       item,
+      key: updateOptions?.key,
     }),
 
     updateForm: async (options, formOptions) => {
