@@ -6,6 +6,12 @@ export interface User {
   createdAt: Date
 }
 
+export interface Bot {
+  id: string
+  name: string
+  createdAt: Date
+}
+
 export interface Message {
   id: string
   authorId: string

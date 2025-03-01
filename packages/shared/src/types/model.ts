@@ -1,5 +1,8 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import type { Full, Path, PathValue } from './utils'
+import type { WrappedItem } from './item'
+import type { Full, KeysToUnion, Path, PathValue } from './utils'
+
+/* eslint-disable unused-imports/no-unused-vars */
 
 export type GetKey<TItem> = (item: TItem) => string | undefined | null
 
@@ -41,7 +44,7 @@ export interface ModelType<
   /**
    * Relations to other models.
    */
-  'relations'?: Array<ModelRelation>
+  'relations'?: Record<string, ModelRelation>
 
   /**
    * Computed properties for the model.
@@ -82,36 +85,25 @@ export interface ModelType<
  */
 export type ModelDefaults = Partial<Pick<ModelType, 'getKey' | 'computed' | 'fields' | 'meta'>>
 
+export type ModelTypeDataKeys<
+  TModelType extends ModelType,
+  TModelDefaults extends ModelDefaults,
+> = keyof TModelType['~item'] | keyof TModelType['computed'] | keyof TModelDefaults['computed']
+
 export interface ModelRelation {
-  /**
-   * Name of the relation.
-   * This relation will be available on the model as `name`.
-   */
-  name: string
+  many?: boolean
 
-  /**
-   * Type of the relation.
-   *
-   * `one` means that the current model has a single reference to the target model.
-   *
-   * `many` means that the current model has multiple references to the target model.
-   */
-  type: 'one' | 'many'
+  to: Record<string, {
+    /**
+     * Field name on the current model type.
+     */
+    on: string
 
-  /**
-   * Name of the target model.
-   */
-  model: string
-
-  /**
-   * Field name on the current model.
-   */
-  field?: string
-
-  /**
-   * Field name on the target model.
-   */
-  reference?: string
+    /**
+     * Field name on the target model type.
+     */
+    eq: string
+  }>
 }
 
 export type Model<TModelTypes extends Record<string, ModelType> = Record<string, ModelType>> = TModelTypes
@@ -119,11 +111,12 @@ export type Model<TModelTypes extends Record<string, ModelType> = Record<string,
 export interface ResolvedModelType<
   TModelType extends ModelType,
   TModelDefaults extends ModelDefaults,
+  _TModel extends Model,
   TSchemas extends ModelTypeSchemas = ModelTypeSchemas,
 > {
   'name': string
   'getKey': NonNullable<TModelType['getKey']>
-  'relations': Array<ResolvedModelRelation>
+  'relations': NonNullable<TModelType['relations']>
   'computed': NonNullable<TModelDefaults['computed'] & TModelType['computed']>
   'fields': TModelType['fields']
   'schema': Full<TSchemas>
@@ -131,25 +124,45 @@ export interface ResolvedModelType<
   '~item'?: TModelType['~item']
 }
 
-export interface ResolvedModelRelation {
-  name: string
-  type: 'one' | 'many'
-  model: string
-  field: string
-  reference: string
-}
-
 export type ResolvedModel<
   TModelTypes extends Record<string, ModelType>,
   TModelDefaults extends ModelDefaults,
 > = {
-  [K in keyof TModelTypes]: ResolvedModelType<TModelTypes[K], TModelDefaults>
+  [K in keyof TModelTypes]: ResolvedModelType<TModelTypes[K], TModelDefaults, Model<TModelTypes>>
 }
 
-// @TODO relation fields
+export type ResolvedModelItemBase<
+  TModelType extends ModelType,
+  TModelDefaults extends ModelDefaults,
+  TModel extends Model,
+> = NonNullable<ResolvedModelType<TModelType, TModelDefaults, TModel>['~item']>
 
 export type ResolvedModelItem<
   TModelType extends ModelType,
   TModelDefaults extends ModelDefaults,
-  _TModel extends Model,
-> = NonNullable<ResolvedModelType<TModelType, TModelDefaults>['~item']>
+  TModel extends Model,
+> = ResolvedModelItemBase<TModelType, TModelDefaults, TModel> & ResolvedRelationItems<TModelType, TModelDefaults, TModel>
+
+export type ResolvedRelationItems<
+  TModelType extends ModelType,
+  TModelDefaults extends ModelDefaults,
+  TModel extends Model,
+> = {
+  [K in keyof NonNullable<TModelType['relations']>]: ResolvedRelationItemsForRelation<TModelType, TModelDefaults, TModel, NonNullable<ResolvedModelType<TModelType, TModelDefaults, TModel>['relations']>[K]>
+}
+
+export type ResolvedRelationItemsForRelation<
+  TModelType extends ModelType,
+  TModelDefaults extends ModelDefaults,
+  TModel extends Model,
+  TRelation extends ModelRelation,
+> = TRelation['many'] extends true
+  ? Array<ResolvedRelationItemsForRelationTargetModels<TModelType, TModelDefaults, TModel, TRelation>>
+  : ResolvedRelationItemsForRelationTargetModels<TModelType, TModelDefaults, TModel, TRelation> | undefined
+
+export type ResolvedRelationItemsForRelationTargetModels<
+  TModelType extends ModelType,
+  TModelDefaults extends ModelDefaults,
+  TModel extends Model,
+  TRelation extends ModelRelation,
+> = WrappedItem<TModel[KeysToUnion<TRelation['to']>], TModelDefaults, TModel>

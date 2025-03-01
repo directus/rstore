@@ -21,14 +21,14 @@ export function createCache<
   const wrappedItems = new Map<string, WrappedItem<any, any, any>>()
 
   function getWrappedItemCacheKey<TModelType extends ModelType>(
-    type: ResolvedModelType<TModelType, TModelDefaults>,
+    type: ResolvedModelType<TModelType, TModelDefaults, TModel>,
     key: string,
   ) {
     return `${type.name}:${key}`
   }
 
   function getWrappedItem<TModelType extends ModelType>(
-    type: ResolvedModelType<TModelType, TModelDefaults>,
+    type: ResolvedModelType<TModelType, TModelDefaults, TModel>,
     item: ResolvedModelItem<TModelType, TModelDefaults, TModel> | null | undefined,
   ): WrappedItem<TModelType, TModelDefaults, TModel> | undefined {
     if (!item) {

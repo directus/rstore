@@ -8,7 +8,7 @@ export interface PeekManyOptions<
   TModel extends Model,
 > {
   store: StoreCore<TModel, TModelDefaults>
-  type: ResolvedModelType<TModelType, TModelDefaults>
+  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   findOptions?: FindManyOptions<TModelType, TModelDefaults, TModel>
 }
 

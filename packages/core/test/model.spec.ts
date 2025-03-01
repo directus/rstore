@@ -56,15 +56,16 @@ describe('model', () => {
       TestModel: {
         name: 'TestModel',
         getKey: (item: any) => item.id,
-        relations: [
-          {
-            name: 'test',
-            model: 'Test2',
-            type: 'one',
-            field: 'testId',
-            reference: 'id',
+        relations: {
+          test: {
+            to: {
+              Test2: {
+                on: 'testId',
+                eq: 'id',
+              },
+            },
           },
-        ],
+        },
         computed: {
           calc: item => item.id + 1,
         },
@@ -98,15 +99,16 @@ describe('model', () => {
     const resolved = resolveModel(modelTypes)
 
     expect(resolved.TestModel.getKey).toBe(modelTypes.TestModel.getKey)
-    expect(resolved.TestModel.relations).toEqual([
-      {
-        name: 'test',
-        model: 'Test2',
-        type: 'one',
-        field: 'testId',
-        reference: 'id',
+    expect(resolved.TestModel.relations).toEqual({
+      test: {
+        to: {
+          Test2: {
+            on: 'testId',
+            eq: 'id',
+          },
+        },
       },
-    ])
+    })
     expect(resolved.TestModel.computed.calc).toBeTypeOf('function')
     expect(resolved.TestModel.fields!.createdAt.parse).toBeTypeOf('function')
     expect(resolved.TestModel.schema.create['~standard'].vendor).toBe('rstore')
@@ -141,7 +143,7 @@ describe('model', () => {
     const resolved = resolveModel(modelTypes, defaults)
 
     expect(resolved.TestModel.getKey).toBe(defaults.getKey)
-    expect(resolved.TestModel.relations).toEqual([])
+    expect(resolved.TestModel.relations).toEqual({})
     expect(resolved.TestModel.computed.calc).toBeTypeOf('function')
     expect(resolved.TestModel.fields!.createdAt.parse).toBeTypeOf('function')
     expect(resolved.TestModel.schema.create['~standard'].vendor).toBe('rstore')

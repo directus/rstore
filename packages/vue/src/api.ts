@@ -1,4 +1,4 @@
-import type { CreateFormObject, FindFirstOptions, FindManyOptions, HybridPromise, Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
+import type { CreateFormObject, FindFirstOptions, FindManyOptions, HybridPromise, Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelItemBase, ResolvedModelType, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueQueryReturn } from './query'
@@ -125,7 +125,7 @@ export function createModelApi<
   TModel extends Model,
 >(
   store: StoreCore<TModel, TModelDefaults>,
-  type: ResolvedModelType<TModelType, TModelDefaults>,
+  type: ResolvedModelType<TModelType, TModelDefaults, TModel>,
 ): VueModelApi<TModel[keyof TModel], TModelDefaults, TModel, WrappedItem<TModel[keyof TModel], TModelDefaults, TModel>> {
   type Api = VueModelApi<TModel[keyof TModel], TModelDefaults, TModel, WrappedItem<TModel[keyof TModel], TModelDefaults, TModel>>
   const api: Api = {
@@ -232,7 +232,7 @@ export function createModelApi<
 
       const onSaved = createEventHook()
 
-      async function getFormData(): Promise<ResolvedModelItem<TModelType, TModelDefaults, TModel>> {
+      async function getFormData(): Promise<ResolvedModelItemBase<TModelType, TModelDefaults, TModel>> {
         const item = await api.findFirst(options)
 
         if (!item) {

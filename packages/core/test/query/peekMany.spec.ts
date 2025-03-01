@@ -13,7 +13,7 @@ interface TestModelType extends ModelType {
 
 describe('peekMany', () => {
   let mockStore: StoreCore<any, any>
-  let modelType: ResolvedModelType<any, any>
+  let modelType: ResolvedModelType<any, any, any>
 
   beforeEach(() => {
     mockStore = {

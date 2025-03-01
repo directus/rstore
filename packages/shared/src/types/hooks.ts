@@ -1,4 +1,4 @@
-import type { Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType } from './model'
+import type { Model, ModelDefaults, ModelType, ResolvedModelItemBase, ResolvedModelType } from './model'
 import type { FindOptions } from './query'
 import type { StoreCore } from './store'
 import type { Awaitable, Path, PathValue } from './utils'
@@ -23,11 +23,11 @@ export interface HookDefinitions<
   > (
     payload: {
       store: StoreCore<TModel, TModelDefaults>
-      type: ResolvedModelType<TModelType, TModelDefaults>
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
       key?: string
       findOptions?: FindOptions<TModelType, TModelDefaults, TModel>
-      getResult: () => ResolvedModelItem<TModelType, TModelDefaults, TModel> | undefined
-      setResult: (result: ResolvedModelItem<TModelType, TModelDefaults, TModel>) => void
+      getResult: () => ResolvedModelItemBase<TModelType, TModelDefaults, TModel> | undefined
+      setResult: (result: ResolvedModelItemBase<TModelType, TModelDefaults, TModel>) => void
       setMarker: (marker: string) => void
     }
   ) => Awaitable<void>
@@ -37,7 +37,7 @@ export interface HookDefinitions<
   > (
     payload: {
       store: StoreCore<TModel, TModelDefaults>
-      type: ResolvedModelType<TModelType, TModelDefaults>
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
       key?: string
       findOptions?: FindOptions<TModelType, TModelDefaults, TModel>
       setMarker: (marker: string) => void
@@ -52,11 +52,11 @@ export interface HookDefinitions<
   > (
     payload: {
       store: StoreCore<TModel, TModelDefaults>
-      type: ResolvedModelType<TModelType, TModelDefaults>
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
       key?: string
       findOptions?: FindOptions<TModelType, TModelDefaults, TModel>
-      getResult: () => ResolvedModelItem<TModelType, TModelDefaults, TModel> | undefined
-      setResult: (result: ResolvedModelItem<TModelType, TModelDefaults, TModel>) => void
+      getResult: () => ResolvedModelItemBase<TModelType, TModelDefaults, TModel> | undefined
+      setResult: (result: ResolvedModelItemBase<TModelType, TModelDefaults, TModel>) => void
     }
   ) => void
 
@@ -68,10 +68,10 @@ export interface HookDefinitions<
   > (
     payload: {
       store: StoreCore<TModel, TModelDefaults>
-      type: ResolvedModelType<TModelType, TModelDefaults>
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
       findOptions?: FindOptions<TModelType, TModelDefaults, TModel>
-      getResult: () => Array<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
-      setResult: (result: Array<ResolvedModelItem<TModelType, TModelDefaults, TModel>>) => void
+      getResult: () => Array<ResolvedModelItemBase<TModelType, TModelDefaults, TModel>>
+      setResult: (result: Array<ResolvedModelItemBase<TModelType, TModelDefaults, TModel>>) => void
       setMarker: (marker: string) => void
     }
   ) => Awaitable<void>
@@ -81,7 +81,7 @@ export interface HookDefinitions<
   > (
     payload: {
       store: StoreCore<TModel, TModelDefaults>
-      type: ResolvedModelType<TModelType, TModelDefaults>
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
       key?: string
       findOptions?: FindOptions<TModelType, TModelDefaults, TModel>
       setMarker: (marker: string) => void
@@ -96,10 +96,10 @@ export interface HookDefinitions<
   > (
     payload: {
       store: StoreCore<TModel, TModelDefaults>
-      type: ResolvedModelType<TModelType, TModelDefaults>
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
       findOptions?: FindOptions<TModelType, TModelDefaults, TModel>
-      getResult: () => Array<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
-      setResult: (result: Array<ResolvedModelItem<TModelType, TModelDefaults, TModel>>) => void
+      getResult: () => Array<ResolvedModelItemBase<TModelType, TModelDefaults, TModel>>
+      setResult: (result: Array<ResolvedModelItemBase<TModelType, TModelDefaults, TModel>>) => void
     }
   ) => void
 
@@ -111,9 +111,9 @@ export interface HookDefinitions<
   > (
     payload: {
       store: StoreCore<TModel, TModelDefaults>
-      type: ResolvedModelType<TModelType, TModelDefaults>
-      item: ResolvedModelItem<TModelType, TModelDefaults, TModel>
-      modifyItem: <TItem extends ResolvedModelItem<TModelType, TModelDefaults, TModel>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
+      item: ResolvedModelItemBase<TModelType, TModelDefaults, TModel>
+      modifyItem: <TItem extends ResolvedModelItemBase<TModelType, TModelDefaults, TModel>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
     }
   ) => void
 
@@ -125,10 +125,10 @@ export interface HookDefinitions<
   > (
     payload: {
       store: StoreCore<TModel, TModelDefaults>
-      type: ResolvedModelType<TModelType, TModelDefaults>
-      item: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
-      getResult: () => ResolvedModelItem<TModelType, TModelDefaults, TModel> | undefined
-      setResult: (result: ResolvedModelItem<TModelType, TModelDefaults, TModel>) => void
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
+      item: Partial<ResolvedModelItemBase<TModelType, TModelDefaults, TModel>>
+      getResult: () => ResolvedModelItemBase<TModelType, TModelDefaults, TModel> | undefined
+      setResult: (result: ResolvedModelItemBase<TModelType, TModelDefaults, TModel>) => void
     }
   ) => void
 
@@ -140,11 +140,11 @@ export interface HookDefinitions<
   > (
     payload: {
       store: StoreCore<TModel, TModelDefaults>
-      type: ResolvedModelType<TModelType, TModelDefaults>
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
       key: string
-      item: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
-      getResult: () => ResolvedModelItem<TModelType, TModelDefaults, TModel> | undefined
-      setResult: (result: ResolvedModelItem<TModelType, TModelDefaults, TModel>) => void
+      item: Partial<ResolvedModelItemBase<TModelType, TModelDefaults, TModel>>
+      getResult: () => ResolvedModelItemBase<TModelType, TModelDefaults, TModel> | undefined
+      setResult: (result: ResolvedModelItemBase<TModelType, TModelDefaults, TModel>) => void
     }
   ) => void
 
@@ -156,7 +156,7 @@ export interface HookDefinitions<
   > (
     payload: {
       store: StoreCore<TModel, TModelDefaults>
-      type: ResolvedModelType<TModelType, TModelDefaults>
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
       key: string
     }
   ) => void

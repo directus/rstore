@@ -25,7 +25,7 @@ vi.mock('../../src/query/peekFirst', () => ({
 
 describe('findFirst', () => {
   let mockStore: StoreCore<any, any>
-  let modelType: ResolvedModelType<any, any>
+  let modelType: ResolvedModelType<any, any, any>
 
   beforeEach(() => {
     mockStore = {

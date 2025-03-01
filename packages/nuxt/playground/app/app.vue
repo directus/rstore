@@ -3,7 +3,7 @@ const store = useVanillaStore()
 </script>
 
 <template>
-  <div>
+  <UApp>
     <nav class="flex items-center px-2 gap-2 relative z-10">
       <UNavigationMenu
         :items="[
@@ -35,6 +35,17 @@ const store = useVanillaStore()
               },
             ],
           },
+          {
+            label: 'Messages',
+            icon: 'lucide:mail',
+            active: $route.path.startsWith('/messages'),
+            children: [
+              {
+                label: 'Cache',
+                to: '/messages/cache',
+              },
+            ],
+          },
         ]"
         content-orientation="vertical"
         class="min-w-200"
@@ -52,5 +63,5 @@ const store = useVanillaStore()
     </nav>
 
     <NuxtPage />
-  </div>
+  </UApp>
 </template>

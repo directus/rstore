@@ -6,7 +6,7 @@ export interface DeleteOptions<
   TModel extends Model,
 > {
   store: StoreCore<TModel, TModelDefaults>
-  type: ResolvedModelType<TModelType, TModelDefaults>
+  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   key: string
   skipCache?: boolean
 }

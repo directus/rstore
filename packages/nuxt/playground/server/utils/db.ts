@@ -3,6 +3,7 @@ import { faker } from '@faker-js/faker'
 export interface Db {
   todos: Todo[]
   users: User[]
+  bots: Bot[]
   messages: Message[]
 }
 
@@ -31,5 +32,34 @@ export const db: Db = {
       createdAt: new Date(),
     },
   ],
-  messages: [],
+  bots: [
+    {
+      id: 'bot1',
+      name: 'DataBot',
+      createdAt: new Date(),
+    },
+  ],
+  messages: [
+    {
+      id: 'message1',
+      authorId: 'user1',
+      recipientId: 'user2',
+      text: faker.lorem.paragraph(),
+      createdAt: new Date(),
+    },
+    {
+      id: 'message2',
+      authorId: 'user2',
+      recipientId: 'user1',
+      text: faker.lorem.paragraph(),
+      createdAt: new Date(),
+    },
+    {
+      id: 'message3',
+      authorId: 'bot1',
+      recipientId: 'user1',
+      text: faker.lorem.paragraph(),
+      createdAt: new Date(),
+    },
+  ],
 }

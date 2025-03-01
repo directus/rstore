@@ -9,7 +9,7 @@ export interface FindFirstParams<
   TModel extends Model,
 > {
   store: StoreCore<TModel, TModelDefaults>
-  type: ResolvedModelType<TModelType, TModelDefaults>
+  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   findOptions: string | FindFirstOptions<TModelType, TModelDefaults, TModel>
 }
 

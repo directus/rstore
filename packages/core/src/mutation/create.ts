@@ -6,7 +6,7 @@ export interface CreateOptions<
   TModel extends Model,
 > {
   store: StoreCore<TModel, TModelDefaults>
-  type: ResolvedModelType<TModelType, TModelDefaults>
+  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   item: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
   skipCache?: boolean
 }

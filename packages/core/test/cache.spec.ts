@@ -4,7 +4,7 @@ import { defaultMarker, getMarker } from '../src'
 
 describe('defaultMarker', () => {
   it('should generate marker with empty findOptions', () => {
-    const type: ResolvedModelType<any, any> = {
+    const type: ResolvedModelType<any, any, any> = {
       name: 'TestType',
       computed: {},
       fields: {},
@@ -17,7 +17,7 @@ describe('defaultMarker', () => {
   })
 
   it('should generate marker with findOptions', () => {
-    const type: ResolvedModelType<any, any> = {
+    const type: ResolvedModelType<any, any, any> = {
       name: 'TestType',
       computed: {},
       fields: {},
@@ -31,7 +31,7 @@ describe('defaultMarker', () => {
   })
 
   it('should generate marker with findOptions and non-function filter', () => {
-    const type: ResolvedModelType<any, any> = {
+    const type: ResolvedModelType<any, any, any> = {
       name: 'TestType',
       computed: {},
       fields: {},
@@ -45,7 +45,7 @@ describe('defaultMarker', () => {
   })
 
   it('should generate marker with findOptions and function filter and params', () => {
-    const type: ResolvedModelType<any, any> = {
+    const type: ResolvedModelType<any, any, any> = {
       name: 'TestType',
       computed: {},
       fields: {},

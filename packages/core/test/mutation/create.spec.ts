@@ -5,7 +5,7 @@ import { createItem } from '../../src/mutation/create'
 
 describe('createItem', () => {
   let mockStore: StoreCore<Model, ModelDefaults>
-  let mockType: ResolvedModelType<ModelType, ModelDefaults>
+  let mockType: ResolvedModelType<ModelType, ModelDefaults, Model>
   let mockItem: Partial<ResolvedModelItem<ModelType, ModelDefaults, Model>>
   let options: CreateOptions<ModelType, ModelDefaults, Model>
 
@@ -23,7 +23,7 @@ describe('createItem', () => {
 
     mockType = {
       getKey: vi.fn(),
-    } as unknown as ResolvedModelType<ModelType, ModelDefaults>
+    } as unknown as ResolvedModelType<ModelType, ModelDefaults, Model>
 
     mockItem = {}
 

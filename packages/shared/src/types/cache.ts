@@ -1,5 +1,5 @@
 import type { WrappedItem } from './item'
-import type { Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType } from './model'
+import type { Model, ModelDefaults, ModelType, ResolvedModelItemBase, ResolvedModelType } from './model'
 
 /*
 
@@ -29,7 +29,7 @@ export interface WriteItem<
   TModel extends Model = Model,
 > {
   key: string
-  value: ResolvedModelItem<TModelType, TModelDefaults, TModel>
+  value: ResolvedModelItemBase<TModelType, TModelDefaults, TModel>
 }
 
 export interface Cache<
@@ -37,24 +37,24 @@ export interface Cache<
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
   readItem: <TModelType extends ModelType = ModelType>(params: {
-    type: ResolvedModelType<TModelType, TModelDefaults>
+    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
     key: string
   }) => WrappedItem<TModelType, TModelDefaults, TModel> | undefined
 
   writeItem: <TModelType extends ModelType = ModelType>(params: {
-    type: ResolvedModelType<TModelType, TModelDefaults>
+    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
     key: string
-    item: ResolvedModelItem<TModelType, TModelDefaults, TModel>
+    item: ResolvedModelItemBase<TModelType, TModelDefaults, TModel>
     marker?: string
   }) => void
 
   deleteItem: <TModelType extends ModelType = ModelType>(params: {
-    type: ResolvedModelType<TModelType, TModelDefaults>
+    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
     key: string
   }) => void
 
   readItems: <TModelType extends ModelType = ModelType>(params: {
-    type: ResolvedModelType<TModelType, TModelDefaults>
+    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
     /**
      * Marker to consider that the corresponding list was already fetched once. Allow returning empty list if marker is not found.
      */
@@ -62,7 +62,7 @@ export interface Cache<
   }) => Array<WrappedItem<TModelType, TModelDefaults, TModel>>
 
   writeItems: <TModelType extends ModelType = ModelType>(params: {
-    type: ResolvedModelType<TModelType, TModelDefaults>
+    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
     items: Array<WriteItem<TModelType, TModelDefaults, TModel>>
     /**
      * Marker to consider that the corresponding list was already fetched once.

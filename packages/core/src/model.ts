@@ -1,5 +1,4 @@
 import type { Full, GetKey, ModelDefaults, ModelType, ModelTypeSchemas, ResolvedModel } from '@rstore/shared'
-import { todo } from '@rstore/shared'
 
 export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
 
@@ -68,13 +67,7 @@ export function resolveModel<
     resolved[key] = {
       name: type.name,
       getKey: type.getKey ?? defaults?.getKey ?? defaultGetKey,
-      relations: type.relations?.map(relation => ({
-        name: relation.name,
-        type: relation.type,
-        model: relation.model,
-        field: relation.field ?? todo('guess relation field'), // @TODO guess field
-        reference: relation.reference ?? todo('guess relation reference'), // @TODO guess reference
-      })) ?? [],
+      relations: type.relations ?? {},
       computed: {
         ...defaults?.computed,
         ...type.computed,

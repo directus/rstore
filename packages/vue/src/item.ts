@@ -1,4 +1,4 @@
-import type { Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType, WrappedItem, WrappedItemEditOptions } from '@rstore/shared'
+import type { Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType, WrappedItem, WrappedItemBase, WrappedItemEditOptions } from '@rstore/shared'
 import type { VueModelApi } from './api'
 import type { VueStore } from './store'
 
@@ -8,7 +8,7 @@ export interface WrapItemOptions<
   TModel extends Model,
 > {
   store: VueStore<TModel, TModelDefaults>
-  type: ResolvedModelType<TModelType, TModelDefaults>
+  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   item: ResolvedModelItem<TModelType, TModelDefaults, TModel>
 }
 
@@ -20,7 +20,7 @@ export function wrapItem<
   store,
   type,
   item,
-}: WrapItemOptions<TModelType, TModelDefaults, TModel>): WrappedItem<TModelType, TModelDefaults, TModel> {
+}: WrapItemOptions<TModelType, TModelDefaults, TModel>): WrappedItemBase<TModelType, TModelDefaults, TModel> {
   function getApi(): VueModelApi<TModelType, TModelDefaults, TModel, WrappedItem<TModelType, TModelDefaults, TModel>> {
     return store[type.name]
   }
@@ -29,7 +29,7 @@ export function wrapItem<
     get: (target, key) => {
       switch (key) {
         case '$type':
-          return (type.name) satisfies WrappedItem<TModelType, TModelDefaults, TModel>['$type']
+          return (type.name) satisfies WrappedItemBase<TModelType, TModelDefaults, TModel>['$type']
 
         case '$updateForm':
           return ((options?: WrappedItemEditOptions<TModelType, TModelDefaults, TModel>) => {
@@ -43,7 +43,7 @@ export function wrapItem<
               defaultValues: options?.defaultValues,
             })
             return form
-          }) satisfies WrappedItem<TModelType, TModelDefaults, TModel>['$updateForm']
+          }) satisfies WrappedItemBase<TModelType, TModelDefaults, TModel>['$updateForm']
 
         case '$update':
           return ((data: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>) => {
@@ -51,7 +51,7 @@ export function wrapItem<
             return getApi().update(data, {
               key,
             })
-          }) satisfies WrappedItem<TModelType, TModelDefaults, TModel>['$update']
+          }) satisfies WrappedItemBase<TModelType, TModelDefaults, TModel>['$update']
 
         case '$delete':
           return (() => {
@@ -60,7 +60,41 @@ export function wrapItem<
               throw new Error('Key is required on item to delete')
             }
             return getApi().delete(key)
-          }) satisfies WrappedItem<TModelType, TModelDefaults, TModel>['$delete']
+          }) satisfies WrappedItemBase<TModelType, TModelDefaults, TModel>['$delete']
+      }
+
+      // Resolve related items in the cache
+      if (key in type.relations) {
+        if (Reflect.has(target, key)) {
+          // @TODO resolve references
+          return Reflect.get(target, key)
+        }
+        else {
+          const relation = type.relations[key as string]
+          const result: Array<any> = []
+          for (const targetModelName in relation.to) {
+            const targetModel = relation.to[targetModelName]
+            const targetApi = store[targetModelName]
+            const value = Reflect.get(target, targetModel.eq)
+            const cacheResultForTarget = targetApi[relation.many ? 'peekMany' : 'peekFirst']({
+              filter: foreignItem => foreignItem[targetModel.on] === value,
+            })
+            if (Array.isArray(cacheResultForTarget)) {
+              result.push(...cacheResultForTarget)
+            }
+            else if (cacheResultForTarget) {
+              result.push(cacheResultForTarget)
+              break
+            }
+          }
+
+          if (relation.many) {
+            return result
+          }
+          else {
+            return result[0]
+          }
+        }
       }
 
       return Reflect.get(target, key)

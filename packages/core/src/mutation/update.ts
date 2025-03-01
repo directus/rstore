@@ -7,7 +7,7 @@ export interface UpdateOptions<
   TModel extends Model,
 > {
   store: StoreCore<TModel, TModelDefaults>
-  type: ResolvedModelType<TModelType, TModelDefaults>
+  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   item: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
   key?: string | null
   skipCache?: boolean

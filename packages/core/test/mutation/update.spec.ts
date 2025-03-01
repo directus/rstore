@@ -9,7 +9,7 @@ vi.mock('../../src/query/peekFirst', () => ({
 
 describe('updateItem', () => {
   let mockStore: StoreCore<Model, ModelDefaults>
-  let mockType: ResolvedModelType<ModelType, ModelDefaults>
+  let mockType: ResolvedModelType<ModelType, ModelDefaults, Model>
   let mockItem: Partial<ResolvedModelItem<ModelType, ModelDefaults, Model>>
   let options: UpdateOptions<ModelType, ModelDefaults, Model>
 
@@ -27,7 +27,7 @@ describe('updateItem', () => {
 
     mockType = {
       getKey: vi.fn(item => item.id),
-    } as unknown as ResolvedModelType<ModelType, ModelDefaults>
+    } as unknown as ResolvedModelType<ModelType, ModelDefaults, Model>
 
     mockItem = {}
 

@@ -12,51 +12,91 @@ export const vanillaModel = {
     meta: {
       path: 'todos',
     },
-  }),
+  } as const),
   User: defineItemType<User>().modelType({
     name: 'User',
-    relations: [
-      {
-        name: 'receivedMessages',
-        model: 'Message',
-        type: 'many',
-        field: 'id',
-        reference: 'recipientId',
+    relations: {
+      receivedMessages: {
+        to: {
+          Message: {
+            on: 'recipientId',
+            eq: 'id',
+          },
+        },
+        many: true,
       },
-      {
-        name: 'sentMessages',
-        model: 'Message',
-        type: 'many',
-        field: 'id',
-        reference: 'authorId',
+      sentMessages: {
+        to: {
+          Message: {
+            on: 'authorId',
+            eq: 'id',
+          },
+        },
+        many: true,
       },
-    ],
+    },
     meta: {
       path: 'users',
     },
-  }),
+  } as const),
+  Bot: defineItemType<Bot>().modelType({
+    name: 'Bot',
+    relations: {
+      receivedMessages: {
+        to: {
+          Message: {
+            on: 'recipientId',
+            eq: 'id',
+          },
+        },
+        many: true,
+      },
+      sentMessages: {
+        to: {
+          Message: {
+            on: 'authorId',
+            eq: 'id',
+          },
+        },
+        many: true,
+      },
+    },
+    meta: {
+      path: 'bots',
+    },
+  } as const),
   Message: defineItemType<Message>().modelType({
     name: 'Message',
-    relations: [
-      {
-        name: 'author',
-        model: 'User',
-        type: 'one',
-        field: 'authorId',
-        reference: 'id',
+    relations: {
+      author: {
+        to: {
+          User: {
+            on: 'id',
+            eq: 'authorId',
+          },
+          Bot: {
+            on: 'id',
+            eq: 'authorId',
+          },
+        },
       },
-      {
-        name: 'recipient',
-        model: 'Message',
-        type: 'many',
-        field: 'recipientId',
-        reference: 'id',
+      recipient: {
+        to: {
+          User: {
+            on: 'id',
+            eq: 'recipientId',
+          },
+          Bot: {
+            on: 'id',
+            eq: 'recipientId',
+          },
+        },
       },
-    ],
+    },
     meta: {
       path: 'messages',
     },
-  }),
+  } as const),
 } as const satisfies Model
 
 export const vanillaStoreKey = Symbol('vanillaStore') as InjectionKey<VueStore<typeof vanillaModel>>

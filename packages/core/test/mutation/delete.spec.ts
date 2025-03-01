@@ -4,7 +4,7 @@ import { deleteItem } from '../../src/mutation/delete'
 
 describe('deleteItem', () => {
   let mockStore: StoreCore<Model, ModelDefaults>
-  let mockType: ResolvedModelType<ModelType, ModelDefaults>
+  let mockType: ResolvedModelType<ModelType, ModelDefaults, Model>
   let mockKey: string
 
   beforeEach(() => {
