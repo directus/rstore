@@ -14,8 +14,8 @@ export {
 export type {
   CustomCacheState,
   CustomFilterOption,
+  CustomHookMeta,
   CustomModelTypeMeta,
   CustomParams,
   CustomSortOption,
-  CustomHookMeta,
 } from '@rstore/shared'
