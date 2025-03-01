@@ -1,4 +1,5 @@
 import type { Model, ModelDefaults, ModelType, ResolvedModelType, StoreCore } from '@rstore/shared'
+import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deleteItem } from '../../src/mutation/delete'
 
@@ -9,9 +10,7 @@ describe('deleteItem', () => {
 
   beforeEach(() => {
     mockStore = {
-      hooks: {
-        callHook: vi.fn(),
-      },
+      hooks: createHooks(),
       cache: {
         deleteItem: vi.fn(),
       },
@@ -23,13 +22,16 @@ describe('deleteItem', () => {
   })
 
   it('should call deleteItem hook', async () => {
+    const spy = vi.fn()
+    mockStore.hooks.hook('deleteItem', ({ store, type, key }) => spy({ store, type, key }))
+
     await deleteItem({
       store: mockStore,
       type: mockType,
       key: mockKey,
     })
 
-    expect(mockStore.hooks.callHook).toHaveBeenCalledWith('deleteItem', {
+    expect(spy).toHaveBeenCalledWith({
       store: mockStore,
       type: mockType,
       key: mockKey,
