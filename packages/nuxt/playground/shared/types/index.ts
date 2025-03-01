@@ -14,6 +14,10 @@ declare module '@rstore/vue' {
   > {
     email?: string
   }
+
+  export interface CustomHookMeta {
+    storeHistoryItem?: Pick<StoreHistoryItem, 'started'>
+  }
 }
 
 export {}

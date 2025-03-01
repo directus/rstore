@@ -12,5 +12,5 @@ const { data: users } = await store.User.queryMany()
     />
   </div>
 
-  <Output>{{ users }}</Output>
+  <Output :data="users" title="users" />
 </template>

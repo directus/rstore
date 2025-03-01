@@ -83,19 +83,63 @@ export default defineNuxtPlugin({
                 })
               }
             })
+
+            const storeStats = useStoreStats()
+
+            hook('beforeFetch', (payload) => {
+              payload.meta.storeHistoryItem = {
+                started: new Date(),
+              }
+            })
+
+            hook('afterFetch', (payload) => {
+              if (payload.meta.storeHistoryItem) {
+                storeStats.value.store.push({
+                  operation: payload.many ? 'fetchMany' : 'fetchFirst',
+                  type: payload.type.name,
+                  started: payload.meta.storeHistoryItem.started,
+                  ended: new Date(),
+                  result: payload.getResult(),
+                  key: payload.key,
+                  findOptions: payload.findOptions,
+                  server: import.meta.server,
+                })
+              }
+            })
+
+            hook('beforeMutation', (payload) => {
+              payload.meta.storeHistoryItem = {
+                started: new Date(),
+              }
+            })
+
+            hook('afterMutation', (payload) => {
+              if (payload.meta.storeHistoryItem) {
+                storeStats.value.store.push({
+                  operation: payload.mutation,
+                  type: payload.type.name,
+                  started: payload.meta.storeHistoryItem.started,
+                  ended: new Date(),
+                  result: payload.getResult(),
+                  key: payload.key,
+                  item: payload.item,
+                  server: import.meta.server,
+                })
+              }
+            })
           },
         },
       ],
     })
 
-    const cacheKey = 'vanillaStore'
+    const cacheKey = '$svanilla-rstore'
 
     nuxtApp.hook('app:rendered', () => {
-      nuxtApp.payload.data[cacheKey] = store.cache.getState()
+      nuxtApp.payload.state[cacheKey] = markRaw(store.cache.getState())
     })
 
-    if (import.meta.client && nuxtApp.payload.data[cacheKey]) {
-      store.cache.setState(nuxtApp.payload.data[cacheKey])
+    if (import.meta.client && nuxtApp.payload.state[cacheKey]) {
+      store.cache.setState(nuxtApp.payload.state[cacheKey])
     }
 
     nuxtApp.vueApp.provide(vanillaStoreKey, store)

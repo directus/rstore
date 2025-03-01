@@ -30,7 +30,8 @@
   "dependencies": {
     "@nuxt/kit": "^3.15.4",
     "@rstore/shared": "workspace:^",
-    "@rstore/vue": "workspace:^"
+    "@rstore/vue": "workspace:^",
+    "shiki": "^3.1.0"
   },
   "devDependencies": {
     "@faker-js/faker": "^9.4.0",

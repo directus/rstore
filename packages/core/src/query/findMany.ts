@@ -1,4 +1,5 @@
 import type { FindManyOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, WrappedItem, WriteItem } from '@rstore/shared'
+import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekMany } from './peekMany'
@@ -9,6 +10,7 @@ export interface FindManyParams<
   TModel extends Model,
 > {
   store: StoreCore<TModel, TModelDefaults>
+  meta?: CustomHookMeta
   type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   findOptions?: FindManyOptions<TModelType, TModelDefaults, TModel>
 }
@@ -22,16 +24,25 @@ export async function findMany<
   TModel extends Model,
 >({
   store,
+  meta,
   type,
   findOptions,
 }: FindManyParams<TModelType, TModelDefaults, TModel>): Promise<QueryResult<Array<WrappedItem<TModelType, TModelDefaults, TModel>>>> {
-  const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
+  meta = meta ?? {}
+
+  findOptions = findOptions ?? {}
+  const fetchPolicy = store.getFetchPolicy(findOptions.fetchPolicy)
 
   let result: any
   let marker: string | undefined
 
   if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
-    const peekManyResult = peekMany({ store, type, findOptions })
+    const peekManyResult = peekMany({
+      store,
+      meta,
+      type,
+      findOptions,
+    })
     result = peekManyResult.result
     marker = peekManyResult.marker
   }
@@ -41,8 +52,20 @@ export async function findMany<
       marker = defaultMarker(type, findOptions)
     }
 
+    await store.hooks.callHook('beforeFetch', {
+      store,
+      meta,
+      type,
+      findOptions,
+      many: true,
+      updateFindOptions: (value) => {
+        Object.assign(findOptions, value)
+      },
+    })
+
     await store.hooks.callHook('fetchMany', {
       store,
+      meta,
       type,
       findOptions,
       getResult: () => result,
@@ -51,6 +74,18 @@ export async function findMany<
       },
       setMarker: (value) => {
         marker = value
+      },
+    })
+
+    await store.hooks.callHook('afterFetch', {
+      store,
+      meta,
+      type,
+      findOptions,
+      many: true,
+      getResult: () => result,
+      setResult: (value) => {
+        result = value
       },
     })
 

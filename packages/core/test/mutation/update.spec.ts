@@ -1,5 +1,6 @@
 import type { Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType, StoreCore } from '@rstore/shared'
 import type { UpdateOptions } from '../../src/mutation/update'
+import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { updateItem } from '../../src/mutation/update'
 
@@ -15,9 +16,7 @@ describe('updateItem', () => {
 
   beforeEach(() => {
     mockStore = {
-      hooks: {
-        callHook: vi.fn(),
-      },
+      hooks: createHooks(),
       processItemParsing: vi.fn(),
       cache: {
         writeItem: vi.fn(),
@@ -41,7 +40,7 @@ describe('updateItem', () => {
 
   it('should update an item and write it to the cache', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<ModelType, ModelDefaults, Model>
-    mockStore.hooks.callHook = vi.fn(async (hookName, { setResult }) => setResult(resultItem)) as any
+    mockStore.hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockType.getKey = vi.fn(() => '1')
 
     const result = await updateItem(options)
@@ -63,7 +62,7 @@ describe('updateItem', () => {
 
   it('should update an item with specific key', async () => {
     const resultItem = { id: '1', text: 'foo' } as ResolvedModelItem<ModelType, ModelDefaults, Model>
-    mockStore.hooks.callHook = vi.fn(async (hookName, { setResult }) => setResult(resultItem)) as any
+    mockStore.hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockItem.text = 'foo'
 
     const result = await updateItem({
@@ -86,7 +85,6 @@ describe('updateItem', () => {
   })
 
   it('should throw an error if result is nullish', async () => {
-    mockStore.hooks.callHook = vi.fn(async () => {}) as any
     mockItem.id = '1'
 
     await expect(updateItem(options)).rejects.toThrow('Item update failed: result is nullish')
@@ -94,7 +92,7 @@ describe('updateItem', () => {
 
   it('should throw an error if key is not defined', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<ModelType, ModelDefaults, Model>
-    mockStore.hooks.callHook = vi.fn(async (hookName, { setResult }) => setResult(resultItem)) as any
+    mockStore.hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockType.getKey = vi.fn(() => undefined)
 
     await expect(updateItem(options)).rejects.toThrow('Item update failed: key is not defined')
@@ -102,7 +100,7 @@ describe('updateItem', () => {
 
   it('should skip cache if skipCache is true', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<ModelType, ModelDefaults, Model>
-    mockStore.hooks.callHook = vi.fn(async (hookName, { setResult }) => setResult(resultItem)) as any
+    mockStore.hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockType.getKey = vi.fn(() => '1')
 
     const result = await updateItem({ ...options, skipCache: true })

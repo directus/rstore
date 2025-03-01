@@ -1,4 +1,5 @@
-import { type Model, type ModelDefaults, type ModelType, pickNonSpecialProps, type ResolvedModelItem, type ResolvedModelType, type StoreCore } from '@rstore/shared'
+import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
+import { type Model, type ModelDefaults, type ModelType, pickNonSpecialProps, type ResolvedModelItem, type ResolvedModelType, set, type StoreCore } from '@rstore/shared'
 import { peekFirst } from '../query'
 
 export interface UpdateOptions<
@@ -24,6 +25,8 @@ export async function updateItem<
   key,
   skipCache,
 }: UpdateOptions<TModelType, TModelDefaults, TModel>): Promise<ResolvedModelItem<TModelType, TModelDefaults, TModel>> {
+  const meta: CustomHookMeta = {}
+
   item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
   key = key ?? type.getKey(item)
 
@@ -31,8 +34,24 @@ export async function updateItem<
     throw new Error('Item update failed: key is not defined')
   }
 
+  await store.hooks.callHook('beforeMutation', {
+    store,
+    meta,
+    type,
+    mutation: 'update',
+    key,
+    item,
+    modifyItem: (path: any, value: any) => {
+      set(item, path, value)
+    },
+    setItem: (newItem) => {
+      item = newItem
+    },
+  })
+
   let result: ResolvedModelItem<TModelType, TModelDefaults, TModel> | null = peekFirst({
     store,
+    meta,
     type,
     findOptions: {
       key,
@@ -45,7 +64,21 @@ export async function updateItem<
 
   await store.hooks.callHook('updateItem', {
     store,
+    meta,
     type,
+    key,
+    item,
+    getResult: () => result,
+    setResult: (newResult) => {
+      result = newResult
+    },
+  })
+
+  await store.hooks.callHook('afterMutation', {
+    store,
+    meta,
+    type,
+    mutation: 'update',
     key,
     item,
     getResult: () => result,

@@ -1,5 +1,6 @@
 import type { Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType, StoreCore } from '@rstore/shared'
 import type { CreateOptions } from '../../src/mutation/create'
+import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createItem } from '../../src/mutation/create'
 
@@ -11,9 +12,7 @@ describe('createItem', () => {
 
   beforeEach(() => {
     mockStore = {
-      hooks: {
-        callHook: vi.fn(),
-      },
+      hooks: createHooks(),
       processItemParsing: vi.fn(),
       cache: {
         writeItem: vi.fn(),
@@ -37,7 +36,7 @@ describe('createItem', () => {
 
   it('should create an item and write it to the cache', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<ModelType, ModelDefaults, Model>
-    mockStore.hooks.callHook = vi.fn(async (hookName, { setResult }) => setResult(resultItem)) as any
+    mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockType.getKey = vi.fn(() => '1')
 
     const result = await createItem(options)
@@ -64,7 +63,7 @@ describe('createItem', () => {
 
   it('should throw an error if key is not defined', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<ModelType, ModelDefaults, Model>
-    mockStore.hooks.callHook = vi.fn(async (hookName, { setResult }) => setResult(resultItem)) as any
+    mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockType.getKey = vi.fn(() => undefined)
 
     await expect(createItem(options)).rejects.toThrow('Item creation failed: key is not defined')
@@ -72,7 +71,7 @@ describe('createItem', () => {
 
   it('should skip cache if skipCache is true', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<ModelType, ModelDefaults, Model>
-    mockStore.hooks.callHook = vi.fn(async (hookName, { setResult }) => setResult(resultItem)) as any
+    mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockType.getKey = vi.fn(() => '1')
 
     const result = await createItem({ ...options, skipCache: true })

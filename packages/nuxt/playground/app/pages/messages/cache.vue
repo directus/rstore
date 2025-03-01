@@ -2,10 +2,15 @@
 const store = useVanillaStore()
 
 // Load all messages
-const { data: messages } = await store.Message.queryMany()
-
-const { data: users } = await store.User.queryMany()
-const { data: bots } = await store.Bot.queryMany()
+const [
+  { data: messages },
+  { data: users },
+  { data: bots },
+] = await Promise.all([
+  store.Message.queryMany(),
+  store.User.queryMany(),
+  store.Bot.queryMany(),
+])
 
 const selectedUser = shallowRef<typeof users.value[number] | null>(null)
 </script>
@@ -53,6 +58,7 @@ const selectedUser = shallowRef<typeof users.value[number] | null>(null)
               v-for="{ id } in selectedUser.receivedMessages"
               :id
               :key="id"
+              skip-nested-fetch
             />
 
             <div
@@ -70,6 +76,7 @@ const selectedUser = shallowRef<typeof users.value[number] | null>(null)
               v-for="{ id } in selectedUser.sentMessages"
               :id
               :key="id"
+              skip-nested-fetch
             />
 
             <div
@@ -86,7 +93,7 @@ const selectedUser = shallowRef<typeof users.value[number] | null>(null)
 
   <USeparator />
 
-  <Output>{{ messages }}</Output>
-  <Output>{{ users }}</Output>
-  <Output>{{ bots }}</Output>
+  <Output :data="messages" title="messages" />
+  <Output :data="users" title="users" />
+  <Output :data="bots" title="bots" />
 </template>

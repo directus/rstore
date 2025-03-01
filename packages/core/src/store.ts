@@ -1,3 +1,4 @@
+import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
 import { type Cache, type FindOptions, get, type Hooks, type Model, type ModelDefaults, type Plugin, set, type StoreCore } from '@rstore/shared'
 import { defaultFetchPolicy } from './fetchPolicy'
 import { resolveModel } from './model'
@@ -36,6 +37,7 @@ export async function createStoreCore<
     processItemParsing(type, item) {
       store.hooks.callHookSync('parseItem', {
         store,
+        meta: {},
         type,
         item,
         modifyItem: (path, value) => {
@@ -54,8 +56,11 @@ export async function createStoreCore<
 
   // Init store hook
 
+  const meta: CustomHookMeta = {}
+
   await store.hooks.callHook('init', {
     store,
+    meta,
   })
 
   // Model hooks

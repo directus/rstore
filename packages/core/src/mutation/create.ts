@@ -1,4 +1,5 @@
-import { type Model, type ModelDefaults, type ModelType, pickNonSpecialProps, type ResolvedModelItem, type ResolvedModelType, type StoreCore } from '@rstore/shared'
+import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
+import { type Model, type ModelDefaults, type ModelType, pickNonSpecialProps, type ResolvedModelItem, type ResolvedModelType, set, type StoreCore } from '@rstore/shared'
 
 export interface CreateOptions<
   TModelType extends ModelType,
@@ -21,12 +22,41 @@ export async function createItem<
   item,
   skipCache,
 }: CreateOptions<TModelType, TModelDefaults, TModel>): Promise<ResolvedModelItem<TModelType, TModelDefaults, TModel>> {
+  const meta: CustomHookMeta = {}
+
   item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
   let result: ResolvedModelItem<TModelType, TModelDefaults, TModel> | undefined
 
+  await store.hooks.callHook('beforeMutation', {
+    store,
+    meta,
+    type,
+    mutation: 'create',
+    item,
+    modifyItem: (path: any, value: any) => {
+      set(item, path, value)
+    },
+    setItem: (newItem) => {
+      item = newItem
+    },
+  })
+
   await store.hooks.callHook('createItem', {
     store,
+    meta,
     type,
+    item,
+    getResult: () => result,
+    setResult: (newResult) => {
+      result = newResult
+    },
+  })
+
+  await store.hooks.callHook('afterMutation', {
+    store,
+    meta,
+    type,
+    mutation: 'create',
     item,
     getResult: () => result,
     setResult: (newResult) => {

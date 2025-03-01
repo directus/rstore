@@ -1,4 +1,5 @@
 import type { FindManyOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
+import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
@@ -8,6 +9,7 @@ export interface PeekManyOptions<
   TModel extends Model,
 > {
   store: StoreCore<TModel, TModelDefaults>
+  meta?: CustomHookMeta
   type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   findOptions?: FindManyOptions<TModelType, TModelDefaults, TModel>
 }
@@ -21,15 +23,19 @@ export function peekMany<
   TModel extends Model,
 >({
   store,
+  meta,
   type,
   findOptions,
 }: PeekManyOptions<TModelType, TModelDefaults, TModel>): QueryResult<Array<WrappedItem<TModelType, TModelDefaults, TModel>>> {
+  meta = meta ?? {}
+
   const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
   if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let marker = defaultMarker(type, findOptions)
 
     store.hooks.callHookSync('beforeCacheReadMany', {
       store,
+      meta,
       type,
       findOptions,
       setMarker: (value) => {
@@ -49,6 +55,7 @@ export function peekMany<
 
     store.hooks.callHookSync('cacheFilterMany', {
       store,
+      meta,
       type,
       findOptions,
       getResult: () => result,

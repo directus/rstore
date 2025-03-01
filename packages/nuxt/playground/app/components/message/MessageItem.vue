@@ -1,6 +1,7 @@
 <script lang="ts" setup>
 const props = defineProps<{
   id: string
+  skipNestedFetch?: boolean
 }>()
 
 const store = useVanillaStore()
@@ -34,6 +35,7 @@ const { data: message } = await store.Message.queryFirst(props.id)
           variant="soft"
           size="sm"
           label="Bot"
+          class="rounded-full"
         />
 
         <UTooltip
@@ -46,6 +48,7 @@ const { data: message } = await store.Message.queryFirst(props.id)
             variant="soft"
             size="sm"
             :label="message.author.sentMessages.length"
+            class="rounded-full"
           />
         </UTooltip>
       </div>

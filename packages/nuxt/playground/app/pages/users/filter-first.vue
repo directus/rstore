@@ -31,5 +31,5 @@ const { data: user } = await store.User.queryFirst(() => ({
     />
   </div>
 
-  <Output>{{ user }}</Output>
+  <Output :data="user" title="user" />
 </template>

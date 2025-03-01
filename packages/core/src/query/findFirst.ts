@@ -1,4 +1,5 @@
 import type { FindFirstOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
+import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekFirst } from './peekFirst'
@@ -9,6 +10,7 @@ export interface FindFirstParams<
   TModel extends Model,
 > {
   store: StoreCore<TModel, TModelDefaults>
+  meta?: CustomHookMeta
   type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   findOptions: string | FindFirstOptions<TModelType, TModelDefaults, TModel>
 }
@@ -22,9 +24,12 @@ export async function findFirst<
   TModel extends Model,
 >({
   store,
+  meta,
   type,
   findOptions: keyOrOptions,
 }: FindFirstParams<TModelType, TModelDefaults, TModel>): Promise<QueryResult<WrappedItem<TModelType, TModelDefaults, TModel> | null>> {
+  meta = meta ?? {}
+
   const findOptions: FindFirstOptions<TModelType, TModelDefaults, TModel> = typeof keyOrOptions === 'string'
     ? {
         key: keyOrOptions,
@@ -38,6 +43,7 @@ export async function findFirst<
   if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     const peekResult = peekFirst({
       store,
+      meta,
       type,
       findOptions,
     })
@@ -50,8 +56,21 @@ export async function findFirst<
       marker = defaultMarker(type, findOptions)
     }
 
+    await store.hooks.callHook('beforeFetch', {
+      store,
+      meta,
+      type,
+      key: findOptions.key,
+      findOptions,
+      many: false,
+      updateFindOptions: (value) => {
+        Object.assign(findOptions, value)
+      },
+    })
+
     await store.hooks.callHook('fetchFirst', {
       store,
+      meta,
       type,
       key: findOptions.key,
       findOptions,
@@ -61,6 +80,19 @@ export async function findFirst<
       },
       setMarker: (value) => {
         marker = value
+      },
+    })
+
+    await store.hooks.callHook('afterFetch', {
+      store,
+      meta,
+      type,
+      key: findOptions.key,
+      findOptions,
+      many: false,
+      getResult: () => result,
+      setResult: (value) => {
+        result = value
       },
     })
 

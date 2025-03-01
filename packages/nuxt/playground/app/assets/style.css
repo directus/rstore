@@ -2,5 +2,5 @@
 @import "@nuxt/ui";
 
 @utility border-default {
-  @apply border border-neutral-100 dark:border-neutral-800;
+  @apply border-neutral-100 dark:border-neutral-800;
 }

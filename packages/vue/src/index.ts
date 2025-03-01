@@ -17,4 +17,5 @@ export type {
   CustomModelTypeMeta,
   CustomParams,
   CustomSortOption,
+  CustomHookMeta,
 } from '@rstore/shared'

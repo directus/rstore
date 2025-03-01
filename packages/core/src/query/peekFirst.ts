@@ -1,4 +1,5 @@
 import type { FindFirstOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
+import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
@@ -8,6 +9,7 @@ export interface PeekFirstOptions<
   TModel extends Model,
 > {
   store: StoreCore<TModel, TModelDefaults>
+  meta?: CustomHookMeta
   type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   findOptions: string | FindFirstOptions<TModelType, TModelDefaults, TModel>
 }
@@ -21,9 +23,12 @@ export function peekFirst<
   TModel extends Model,
 >({
   store,
+  meta,
   type,
   findOptions: keyOrOptions,
 }: PeekFirstOptions<TModelType, TModelDefaults, TModel>): QueryResult<WrappedItem<TModelType, TModelDefaults, TModel> | null> {
+  meta = meta ?? {}
+
   const findOptions: FindFirstOptions<TModelType, TModelDefaults, TModel> = typeof keyOrOptions === 'string'
     ? {
         key: keyOrOptions,
@@ -38,6 +43,7 @@ export function peekFirst<
 
     store.hooks.callHookSync('beforeCacheReadFirst', {
       store,
+      meta,
       type,
       findOptions,
       setMarker: (value) => {
@@ -68,6 +74,7 @@ export function peekFirst<
 
     store.hooks.callHookSync('cacheFilterFirst', {
       store,
+      meta,
       type,
       getResult: () => result,
       setResult: (value) => {

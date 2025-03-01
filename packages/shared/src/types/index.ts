@@ -1,4 +1,5 @@
 export * from './cache.js'
+export * from './hooks.js'
 export * from './item.js'
 export * from './model.js'
 export * from './mutation.js'

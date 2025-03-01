@@ -16,7 +16,9 @@ export function createCache<
 >({
   getStore,
 }: CreateCacheOptions<TModel, TModelDefaults>): Cache {
-  const state = ref<Record<string, any>>({})
+  const state = ref<Record<string, any>>({
+    _markers: {},
+  })
 
   const wrappedItems = new Map<string, WrappedItem<any, any, any>>()
 

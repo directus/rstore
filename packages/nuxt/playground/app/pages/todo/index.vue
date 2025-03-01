@@ -11,7 +11,7 @@ createTodo.$onSaved(() => {
 </script>
 
 <template>
-  <div class="m-4 p-4 border-default rounded-xl flex flex-col gap-px">
+  <div class="m-4 p-4 border border-default rounded-xl flex flex-col gap-px">
     <UForm
       :state="createTodo"
       :schema="createTodo.$schema"
@@ -52,5 +52,5 @@ createTodo.$onSaved(() => {
     </div>
   </div>
 
-  <Output>{{ todos }}</Output>
+  <Output :data="todos" title="todos" />
 </template>

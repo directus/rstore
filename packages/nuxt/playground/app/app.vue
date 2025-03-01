@@ -1,67 +1,102 @@
-<script setup>
-const store = useVanillaStore()
+<script lang="ts" setup>
+useHead({
+  title: 'rstore playground',
+})
+
+const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
 </script>
 
 <template>
   <UApp>
-    <nav class="flex items-center px-2 gap-2 relative z-10">
-      <UNavigationMenu
-        :items="[
-          {
-            icon: 'lucide:home',
-            to: '/',
-          },
-          {
-            label: 'Todo',
-            icon: 'lucide:check-check',
-            to: '/todo',
-          },
-          {
-            label: 'Users',
-            icon: 'lucide:users',
-            active: $route.path.startsWith('/users'),
-            children: [
+    <NuxtRouteAnnouncer />
+    <NuxtLoadingIndicator />
+
+    <div class="flex h-screen">
+      <div class="flex-1 min-w-0 flex flex-col h-screen">
+        <nav class="flex items-center px-4 gap-2 relative z-10">
+          <UNavigationMenu
+            :items="[
               {
-                label: 'List',
-                to: '/users',
+                icon: 'lucide:home',
+                to: '/',
               },
               {
-                label: 'Filter many',
-                to: '/users/filter',
+                label: 'Todo',
+                icon: 'lucide:check-check',
+                to: '/todo',
               },
               {
-                label: 'Filter first',
-                to: '/users/filter-first',
+                label: 'Users',
+                icon: 'lucide:users',
+                active: $route.path.startsWith('/users'),
+                children: [
+                  {
+                    label: 'List',
+                    to: '/users',
+                  },
+                  {
+                    label: 'Filter many',
+                    to: '/users/filter',
+                  },
+                  {
+                    label: 'Filter first',
+                    to: '/users/filter-first',
+                  },
+                ],
               },
-            ],
-          },
-          {
-            label: 'Messages',
-            icon: 'lucide:mail',
-            active: $route.path.startsWith('/messages'),
-            children: [
               {
-                label: 'Cache',
-                to: '/messages/cache',
+                label: 'Messages',
+                icon: 'lucide:mail',
+                active: $route.path.startsWith('/messages'),
+                children: [
+                  {
+                    label: 'Cache',
+                    to: '/messages/cache',
+                  },
+                ],
               },
-            ],
-          },
-        ]"
-        content-orientation="vertical"
-        class="min-w-200"
-      />
+            ]"
+            content-orientation="vertical"
+            class="min-w-200 flex-1"
+          />
 
-      <div class="flex-1" />
+          <div class="flex-1" />
 
-      <UPopover>
-        <UButton label="cache" color="neutral" variant="subtle" icon="lucide:database-zap" />
+          <ClientOnly>
+            <UTooltip text="rstore">
+              <UButton
+                icon="lucide:database-zap"
+                size="sm"
+                v-bind="devtoolsOpen ? {
+                  color: 'primary',
+                  variant: 'solid',
+                } : {
+                  color: 'neutral',
+                  variant: 'subtle',
+                }"
+                @click="devtoolsOpen = !devtoolsOpen"
+              />
+            </UTooltip>
+          </ClientOnly>
+        </nav>
 
-        <template #content>
-          <pre class="text-xs overflow-auto max-w-200 max-h-100 p-2">{{ store.cache.getState() }}</pre>
-        </template>
-      </UPopover>
-    </nav>
+        <div class="flex-1">
+          <NuxtPage />
+        </div>
+      </div>
 
-    <NuxtPage />
+      <ClientOnly>
+        <div
+          class="flex-none border-l border-default bg-gray-50 dark:bg-gray-900 w-100 transition-all duration-300 ease-in-out overflow-hidden"
+          :class="{
+            '!w-0': !devtoolsOpen,
+          }"
+        >
+          <Devtools
+            class="w-100 h-full"
+          />
+        </div>
+      </ClientOnly>
+    </div>
   </UApp>
 </template>
