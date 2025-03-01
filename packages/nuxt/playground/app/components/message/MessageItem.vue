@@ -16,6 +16,7 @@ const { data: message } = await store.Message.queryFirst(props.id)
     <UAvatar
       :src="message.author && 'avatar' in message.author ? message.author.avatar : undefined"
       :alt="message.author?.name"
+      :icon="message.author?.$type === 'Bot' ? 'lucide:bot' : undefined"
     />
     <div class="flex flex-col gap-1">
       <div
