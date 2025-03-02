@@ -19,7 +19,7 @@ const { data: message } = await store.Message.queryFirst(props.id)
       :alt="message.author?.name"
       :icon="message.author?.$type === 'Bot' ? 'lucide:bot' : undefined"
     />
-    <div class="flex flex-col gap-1">
+    <div class="flex-1 min-w-0 flex flex-col gap-1">
       <div
         v-if="message.author"
         class="flex items-center gap-2"
@@ -51,6 +51,10 @@ const { data: message } = await store.Message.queryFirst(props.id)
             class="rounded-full"
           />
         </UTooltip>
+
+        <span class="opacity-50 ml-auto text-sm">
+          {{ message.timeAgo }}
+        </span>
       </div>
       <p
         class="px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg"
