@@ -9,21 +9,10 @@ const { data, lang = 'json' } = defineProps<{
 
 const colorMode = useColorMode()
 
-function renderHtml() {
-  return codeToHtml(lang === 'json' ? JSON.stringify(data, null, 2) : String(data), {
-    lang,
-    theme: colorMode.value === 'dark' ? 'one-dark-pro' : 'one-light',
-  })
-}
-const html = ref(await renderHtml())
-
-onMounted(() => {
-  watchEffect(async () => {
-    // Add a space to force re-rendering
-    // Is there a bug in Vue?
-    html.value = `${await renderHtml()} `
-  })
-})
+const html = asyncComputed(() => codeToHtml(lang === 'json' ? JSON.stringify(data, null, 2) : String(data), {
+  lang,
+  theme: colorMode.value === 'dark' ? 'one-dark-pro' : 'one-light',
+}))
 </script>
 
 <template>
