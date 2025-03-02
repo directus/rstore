@@ -141,7 +141,7 @@ export type ResolvedModelItem<
   TModelType extends ModelType,
   TModelDefaults extends ModelDefaults,
   TModel extends Model,
-> = ResolvedModelItemBase<TModelType, TModelDefaults, TModel> & ResolvedRelationItems<TModelType, TModelDefaults, TModel>
+> = ResolvedModelItemBase<TModelType, TModelDefaults, TModel> & ResolvedRelationItems<TModelType, TModelDefaults, TModel> & ResolvedComputedFields<TModelType, TModelDefaults, TModel>
 
 export type ResolvedRelationItems<
   TModelType extends ModelType,
@@ -151,7 +151,7 @@ export type ResolvedRelationItems<
   [K in keyof NonNullable<TModelType['relations']>]: ResolvedRelationItemsForRelation<TModelType, TModelDefaults, TModel, NonNullable<ResolvedModelType<TModelType, TModelDefaults, TModel>['relations']>[K]>
 }
 
-export type ResolvedRelationItemsForRelation<
+type ResolvedRelationItemsForRelation<
   TModelType extends ModelType,
   TModelDefaults extends ModelDefaults,
   TModel extends Model,
@@ -160,9 +160,17 @@ export type ResolvedRelationItemsForRelation<
   ? Array<ResolvedRelationItemsForRelationTargetModels<TModelType, TModelDefaults, TModel, TRelation>>
   : ResolvedRelationItemsForRelationTargetModels<TModelType, TModelDefaults, TModel, TRelation> | undefined
 
-export type ResolvedRelationItemsForRelationTargetModels<
+type ResolvedRelationItemsForRelationTargetModels<
   TModelType extends ModelType,
   TModelDefaults extends ModelDefaults,
   TModel extends Model,
   TRelation extends ModelRelation,
 > = WrappedItem<TModel[KeysToUnion<TRelation['to']>], TModelDefaults, TModel>
+
+type ResolvedComputedFields<
+  TModelType extends ModelType,
+  TModelDefaults extends ModelDefaults,
+  TModel extends Model,
+> = {
+  [K in keyof NonNullable<TModelDefaults['computed'] & TModelType['computed']>]: ReturnType<NonNullable<TModelDefaults['computed'] & TModelType['computed']>[K]>
+}

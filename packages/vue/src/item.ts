@@ -63,6 +63,11 @@ export function wrapItem<
           }) satisfies WrappedItemBase<TModelType, TModelDefaults, TModel>['$delete']
       }
 
+      // Resolve computed properties
+      if (key in type.computed) {
+        return type.computed[key as string](proxy)
+      }
+
       // Resolve related items in the cache
       if (key in type.relations) {
         if (Reflect.has(target, key)) {
@@ -75,7 +80,7 @@ export function wrapItem<
           for (const targetModelName in relation.to) {
             const targetModel = relation.to[targetModelName]
             const targetApi = store[targetModelName]
-            const value = Reflect.get(target, targetModel.eq)
+            const value = Reflect.get(proxy, targetModel.eq)
             const cacheResultForTarget = targetApi[relation.many ? 'peekMany' : 'peekFirst']({
               filter: foreignItem => foreignItem[targetModel.on] === value,
             })

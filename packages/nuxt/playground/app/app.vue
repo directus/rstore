@@ -53,6 +53,10 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
                     label: 'Cache',
                     to: '/messages/cache',
                   },
+                  {
+                    label: 'Computed',
+                    to: '/messages/computed',
+                  },
                 ],
               },
             ]"
