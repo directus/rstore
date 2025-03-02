@@ -36,14 +36,14 @@ const resultHtml = asyncComputed(() => props.item.result
           :name="icons[props.item.operation]"
           class="mr-1 relative top-px"
           :class="{
-            'text-blue-500': ['fetchFist', 'fetchMany'].includes(item.operation),
+            'text-blue-500': ['fetchFirst', 'fetchMany'].includes(item.operation),
             'text-orange-500': ['create', 'update', 'delete'].includes(item.operation),
           }"
         />
         <span
           class="mr-0.5"
           :class="{
-            'text-blue-500': ['fetchFist', 'fetchMany'].includes(item.operation),
+            'text-blue-500': ['fetchFirst', 'fetchMany'].includes(item.operation),
             'text-orange-500': ['create', 'update', 'delete'].includes(item.operation),
           }"
         >{{ item.operation }}</span>

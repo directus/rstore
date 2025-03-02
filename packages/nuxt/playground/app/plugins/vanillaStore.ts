@@ -101,7 +101,7 @@ export default defineNuxtPlugin({
                   ended: new Date(),
                   result: payload.getResult(),
                   key: payload.key,
-                  findOptions: payload.findOptions,
+                  findOptions: convertFunctionsToString(payload.findOptions),
                   server: import.meta.server,
                 })
               }
@@ -145,3 +145,19 @@ export default defineNuxtPlugin({
     nuxtApp.vueApp.provide(vanillaStoreKey, store)
   },
 })
+
+function convertFunctionsToString(obj: Record<string, any> | undefined) {
+  if (!obj) {
+    return obj
+  }
+  const result: Record<string, any> = {}
+  for (const key in obj) {
+    if (typeof obj[key] === 'function') {
+      result[key] = obj[key].toString()
+    }
+    else {
+      result[key] = obj[key]
+    }
+  }
+  return result
+}

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { createHighlighter } from 'shiki'
+import { codeToHtml } from 'shiki'
 
 const { data, lang = 'json' } = defineProps<{
   data: any
@@ -7,26 +7,21 @@ const { data, lang = 'json' } = defineProps<{
   title?: string
 }>()
 
-const highlighter = await createHighlighter({
-  langs: [lang],
-  themes: ['one-dark-pro', 'one-light'],
-})
-
 const colorMode = useColorMode()
 
 function renderHtml() {
-  return `${highlighter.codeToHtml(lang === 'json' ? JSON.stringify(data, null, 2) : String(data), {
+  return codeToHtml(lang === 'json' ? JSON.stringify(data, null, 2) : String(data), {
     lang,
     theme: colorMode.value === 'dark' ? 'one-dark-pro' : 'one-light',
-  })} `
+  })
 }
-const html = ref(renderHtml())
+const html = ref(await renderHtml())
 
 onMounted(() => {
-  watchEffect(() => {
+  watchEffect(async () => {
     // Add a space to force re-rendering
     // Is there a bug in Vue?
-    html.value = `${renderHtml()} `
+    html.value = `${await renderHtml()} `
   })
 })
 </script>

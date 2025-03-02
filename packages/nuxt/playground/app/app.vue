@@ -12,7 +12,7 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
     <NuxtLoadingIndicator />
 
     <div class="flex h-screen">
-      <div class="flex-1 min-w-0 flex flex-col h-screen">
+      <div class="flex-1 min-w-0 flex flex-col h-screen overflow-auto">
         <nav class="flex items-center px-4 gap-2 relative z-10">
           <UNavigationMenu
             :items="[
