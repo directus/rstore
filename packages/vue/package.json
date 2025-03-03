@@ -3,6 +3,11 @@
   "type": "module",
   "version": "0.0.0",
   "description": "",
+  "repository": {
+    "url": "https://github.com/Akryum/rstore.git",
+    "type": "git",
+    "directory": "packages/vue"
+  },
   "sideEffects": false,
   "publishConfig": {
     "access": "public"

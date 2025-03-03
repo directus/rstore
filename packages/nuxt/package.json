@@ -4,7 +4,11 @@
   "version": "1.0.0",
   "description": "My new Nuxt module",
   "license": "MIT",
-  "repository": "your-org/my-module",
+  "repository": {
+    "url": "https://github.com/Akryum/rstore.git",
+    "type": "git",
+    "directory": "packages/nuxt"
+  },
   "publishConfig": {
     "access": "public"
   },
