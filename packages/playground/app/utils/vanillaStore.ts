@@ -3,7 +3,8 @@ import type { InjectionKey } from 'vue'
 import { defineItemType, type VueStore } from '@rstore/vue'
 import { formatTimeAgo } from '@vueuse/core'
 
-const time = useTimestamp()
+const reactiveTime = useTimestamp()
+const getTime = () => import.meta.server ? Date.now() : reactiveTime.value
 
 const Todo = defineItemType<Todo>().modelType({
   name: 'Todo',
@@ -100,7 +101,7 @@ const Message = defineItemType<Message>().modelType({
   },
   computed: {
     extract: message => `${message.text.slice(0, 10)}... (+${message.text.length - 10} chars)`,
-    timeAgo: message => formatTimeAgo(message.createdAt, {}, time.value),
+    timeAgo: message => formatTimeAgo(message.createdAt, {}, getTime()),
   },
   meta: {
     path: 'messages',
