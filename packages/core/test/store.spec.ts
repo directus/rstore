@@ -196,7 +196,7 @@ describe('createStoreCore', () => {
         Foo: {
           name: 'Foo',
           isInstanceOf: (item: any) => 'fooname' in item,
-        }
+        },
       }
       options.model = model
       const store = await createStoreCore(options)
