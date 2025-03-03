@@ -8,7 +8,7 @@
 
 ---
 
-[![ci](https://github.com/Akryum/rstore/actions/workflows/ci.yml/badge.svg)](https://github.com/Akryum/rstore/actions/workflows/ci.yml) | [Nightly releases](https://nightly.akryum.dev/Akryum/rstore)
+[![ci](https://github.com/Akryum/rstore/actions/workflows/ci.yml/badge.svg)](https://github.com/Akryum/rstore/actions/workflows/ci.yml) | [Nightly releases](https://nightly.akryum.dev/Akryum/rstore) | [Contributing guide](./CONTRIBUTING.md)
 
 # Sponsors
 
