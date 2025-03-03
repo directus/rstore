@@ -5,6 +5,9 @@
   "description": "My new Nuxt module",
   "license": "MIT",
   "repository": "your-org/my-module",
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/types.d.ts",
