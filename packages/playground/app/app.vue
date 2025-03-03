@@ -50,6 +50,10 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
                 active: $route.path.startsWith('/messages'),
                 children: [
                   {
+                    label: 'Nested fetch',
+                    to: '/messages/nested-fetch',
+                  },
+                  {
                     label: 'Cache',
                     to: '/messages/cache',
                   },

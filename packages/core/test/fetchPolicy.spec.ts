@@ -15,6 +15,10 @@ describe('fetchPolicy', () => {
       expect(shouldReadCacheFromFetchPolicy('cache-only')).toBe(true)
     })
 
+    it('should return false for fetch-only', () => {
+      expect(shouldReadCacheFromFetchPolicy('fetch-only')).toBe(false)
+    })
+
     it('should return false for no-cache', () => {
       expect(shouldReadCacheFromFetchPolicy('no-cache')).toBe(false)
     })
@@ -35,6 +39,10 @@ describe('fetchPolicy', () => {
 
     it('should return true for cache-first', () => {
       expect(shouldFetchDataFromFetchPolicy('cache-first')).toBe(true)
+    })
+
+    it('should return true for fetch-only', () => {
+      expect(shouldFetchDataFromFetchPolicy('fetch-only')).toBe(true)
     })
 
     it('should return true for no-cache', () => {

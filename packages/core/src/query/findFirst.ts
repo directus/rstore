@@ -116,6 +116,18 @@ export async function findFirst<
     }
   }
 
+  if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
+    await store.hooks.callHook('fetchRelations', {
+      store,
+      meta,
+      type,
+      key: findOptions.key,
+      findOptions,
+      many: false,
+      getResult: () => result,
+    })
+  }
+
   return {
     result,
     marker,

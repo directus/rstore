@@ -17,7 +17,6 @@ export interface StoreCore<
   findDefaults: Partial<FindOptions<any, any, any>>
   getFetchPolicy: (value: FetchPolicy | null | undefined) => FetchPolicy
   processItemParsing: <TModelType extends ModelType> (type: ResolvedModelType<TModelType, TModelDefaults, TModel>, item: any) => void
-  // writeIntoCache: (item: any) => void
-  // getType: (item: any) => string
+  getType: (item: any, types?: string[]) => ResolvedModelType<ModelType, ModelDefaults, Model> | null
   mutationHistory: Array<MutationOperation<any, TModelDefaults, TModel>>
 }

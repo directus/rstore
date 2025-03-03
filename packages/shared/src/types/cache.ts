@@ -1,5 +1,5 @@
 import type { WrappedItem } from './item'
-import type { Model, ModelDefaults, ModelType, ResolvedModelItemBase, ResolvedModelType } from './model'
+import type { Model, ModelDefaults, ModelRelation, ModelType, ResolvedModelItemBase, ResolvedModelType } from './model'
 
 /*
 
@@ -58,7 +58,7 @@ export interface Cache<
     /**
      * Marker to consider that the corresponding list was already fetched once. Allow returning empty list if marker is not found.
      */
-    marker: string
+    marker?: string
   }) => Array<WrappedItem<TModelType, TModelDefaults, TModel>>
 
   writeItems: <TModelType extends ModelType = ModelType>(params: {
@@ -68,6 +68,13 @@ export interface Cache<
      * Marker to consider that the corresponding list was already fetched once.
      */
     marker: string
+  }) => void
+
+  writeItemForRelation: <TModelType extends ModelType = ModelType>(params: {
+    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
+    relationKey: keyof ResolvedModelItemBase<TModelType, TModelDefaults, TModel>['relations']
+    relation: ModelRelation
+    item: any
   }) => void
 
   getState: () => CustomCacheState

@@ -12,6 +12,7 @@ export interface PeekManyOptions<
   meta?: CustomHookMeta
   type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   findOptions?: FindManyOptions<TModelType, TModelDefaults, TModel>
+  force?: boolean
 }
 
 /**
@@ -26,11 +27,12 @@ export function peekMany<
   meta,
   type,
   findOptions,
+  force,
 }: PeekManyOptions<TModelType, TModelDefaults, TModel>): QueryResult<Array<WrappedItem<TModelType, TModelDefaults, TModel>>> {
   meta = meta ?? {}
 
   const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
-  if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
+  if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let marker = defaultMarker(type, findOptions)
 
     store.hooks.callHookSync('beforeCacheReadMany', {
@@ -45,8 +47,10 @@ export function peekMany<
 
     let result = store.cache.readItems({
       type,
-      marker: getMarker('many', marker),
+      marker: force ? undefined : getMarker('many', marker),
     })
+
+    // console.log('peekMany', type, findOptions, result, getMarker('many', marker))
 
     if (typeof findOptions?.filter === 'function') {
       const filterFn = findOptions.filter

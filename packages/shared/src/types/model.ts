@@ -42,6 +42,11 @@ export interface ModelType<
   'getKey'?: GetKey<TItem>
 
   /**
+   * Check if the item is an instance of the model type.
+   */
+  'isInstanceOf'?: (item: any) => boolean
+
+  /**
    * Relations to other models.
    */
   'relations'?: Record<string, ModelRelation>
@@ -80,10 +85,14 @@ export interface ModelType<
   '~item'?: TItem
 }
 
+export type DefaultIsInstanceOf = (type: ModelType) => (item: any) => boolean
+
 /**
  * Default values for any model.
  */
-export type ModelDefaults = Partial<Pick<ModelType, 'getKey' | 'computed' | 'fields' | 'meta'>>
+export type ModelDefaults = Partial<Pick<ModelType, 'getKey' | 'computed' | 'fields' | 'meta'>> & {
+  isInstanceOf?: DefaultIsInstanceOf
+}
 
 export type ModelTypeDataKeys<
   TModelType extends ModelType,
@@ -116,6 +125,7 @@ export interface ResolvedModelType<
 > {
   'name': string
   'getKey': NonNullable<TModelType['getKey']>
+  'isInstanceOf': NonNullable<TModelType['isInstanceOf']>
   'relations': NonNullable<TModelType['relations']>
   'computed': NonNullable<TModelDefaults['computed'] & TModelType['computed']>
   'fields': TModelType['fields']

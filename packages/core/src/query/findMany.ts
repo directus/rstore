@@ -114,6 +114,17 @@ export async function findMany<
     }
   }
 
+  if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
+    await store.hooks.callHook('fetchRelations', {
+      store,
+      meta,
+      type,
+      findOptions,
+      many: true,
+      getResult: () => result,
+    })
+  }
+
   return {
     result,
     marker,

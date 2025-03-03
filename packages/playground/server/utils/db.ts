@@ -31,6 +31,13 @@ export const db: Db = {
       avatar: faker.image.avatar(),
       createdAt: new Date(),
     },
+    {
+      id: 'user3',
+      email: 'user3@acme.com',
+      name: faker.person.fullName(),
+      avatar: faker.image.avatar(),
+      createdAt: new Date(),
+    },
   ],
   bots: [
     {
@@ -58,6 +65,13 @@ export const db: Db = {
       id: 'message3',
       authorId: 'bot1',
       recipientId: 'user1',
+      text: faker.lorem.paragraph(),
+      createdAt: new Date(),
+    },
+    {
+      id: 'message4',
+      authorId: 'user2',
+      recipientId: 'user3',
       text: faker.lorem.paragraph(),
       createdAt: new Date(),
     },

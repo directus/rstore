@@ -1,6 +1,8 @@
-import type { Full, GetKey, ModelDefaults, ModelType, ModelTypeSchemas, ResolvedModel } from '@rstore/shared'
+import type { DefaultIsInstanceOf, Full, GetKey, ModelDefaults, ModelType, ModelTypeSchemas, ResolvedModel } from '@rstore/shared'
 
 export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
+
+export const defaultIsInstanceOf: DefaultIsInstanceOf = type => item => item.__typename === type.name
 
 /**
  * Allow typing the model item type thanks to currying.
@@ -49,6 +51,7 @@ export function resolveModel<
   TModelDefaults extends ModelDefaults,
 >(types: TModelTypes, defaults?: TModelDefaults): ResolvedModel<TModelTypes, TModelDefaults> {
   const resolved = {} as ResolvedModel<TModelTypes, TModelDefaults>
+
   for (const key in types) {
     const type = types[key]
 
@@ -66,7 +69,8 @@ export function resolveModel<
 
     resolved[key] = {
       name: type.name,
-      getKey: type.getKey ?? defaults?.getKey ?? defaultGetKey,
+      getKey: item => (type.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
+      isInstanceOf: item => type.isInstanceOf?.(item) || defaults?.isInstanceOf?.(type)(item) || defaultIsInstanceOf(type)(item),
       relations: type.relations ?? {},
       computed: {
         ...defaults?.computed,

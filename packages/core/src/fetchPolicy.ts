@@ -7,5 +7,5 @@ export function shouldReadCacheFromFetchPolicy(fetchPolicy: FetchPolicy | null |
 }
 
 export function shouldFetchDataFromFetchPolicy(fetchPolicy: FetchPolicy | null | undefined) {
-  return fetchPolicy === 'cache-and-fetch' || fetchPolicy === 'cache-first' || fetchPolicy === 'no-cache'
+  return fetchPolicy === 'cache-and-fetch' || fetchPolicy === 'cache-first' || fetchPolicy === 'fetch-only' || fetchPolicy === 'no-cache'
 }

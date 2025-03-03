@@ -65,22 +65,61 @@ export function createCache<
       return getWrappedItem(type, state.value[type.name]?.[key])
     },
     readItems({ type, marker }) {
-      if (!state.value._markers?.[marker]) {
+      if (marker && !state.value._markers?.[marker]) {
         return []
       }
       return Object.values<any>(state.value[type.name] ?? {}).map(item => getWrappedItem(type, item)).filter(Boolean) as WrappedItem<any, any, any>[]
     },
     writeItem({ type, key, item, marker }) {
-      let typeItems = state.value[type.name]
-      if (!typeItems) {
-        typeItems = state.value[type.name] = {}
+      let itemsForType = state.value[type.name]
+      if (!itemsForType) {
+        itemsForType = state.value[type.name] = {}
       }
-      item = pickNonSpecialProps(item)
-      if (!typeItems[key]) {
-        typeItems[key] = item
+      const rawData = pickNonSpecialProps(item)
+
+      // Handle relations
+      const data = {} as Record<string, any>
+      for (const key in rawData) {
+        if (key in type.relations) {
+          const relation = type.relations[key]
+          const rawItem = rawData[key]
+
+          if (relation.many && !Array.isArray(rawItem)) {
+            throw new Error(`Expected array for relation ${type.name}.${key}`)
+          }
+          else if (!relation.many && Array.isArray(rawItem)) {
+            throw new Error(`Expected object for relation ${type.name}.${key}`)
+          }
+
+          if (Array.isArray(rawItem)) {
+            for (const nestedItem of rawItem as any[]) {
+              this.writeItemForRelation({
+                type,
+                relationKey: key,
+                relation,
+                item: nestedItem,
+              })
+            }
+          }
+          else {
+            this.writeItemForRelation({
+              type,
+              relationKey: key,
+              relation,
+              item: rawItem,
+            })
+          }
+        }
+        else {
+          data[key] = rawData[key]
+        }
+      }
+
+      if (!itemsForType[key]) {
+        itemsForType[key] = data
       }
       else {
-        Object.assign(typeItems[key], item)
+        Object.assign(itemsForType[key], data)
       }
       if (marker) {
         mark(marker)
@@ -91,6 +130,26 @@ export function createCache<
         this.writeItem({ type, key, item })
       }
       mark(marker)
+    },
+    writeItemForRelation({ type, relationKey, relation, item }) {
+      const store = getStore()
+      const possibleTypes = Object.keys(relation.to)
+      const nestedItemType = store._core.getType(item, possibleTypes)
+      if (!nestedItemType) {
+        throw new Error(`Could not determine type for relation ${type.name}.${String(relationKey)}`)
+      }
+      const nestedKey = nestedItemType.getKey(item)
+      if (!nestedKey) {
+        throw new Error(`Could not determine key for relation ${type.name}.${String(relationKey)}`)
+      }
+
+      store._core.processItemParsing(type, item)
+
+      this.writeItem({
+        type: nestedItemType,
+        key: nestedKey,
+        item,
+      })
     },
     deleteItem({ type, key }) {
       delete state.value[type.name]?.[key]

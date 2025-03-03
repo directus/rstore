@@ -12,7 +12,7 @@ const [
   store.Bot.queryMany(),
 ])
 
-const selectedUser = shallowRef<typeof users.value[number] | null>(null)
+const selectedUser = shallowRef<typeof users.value[number] | null>(users.value?.[0] ?? null)
 </script>
 
 <template>

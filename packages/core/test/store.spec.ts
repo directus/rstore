@@ -100,4 +100,110 @@ describe('createStoreCore', () => {
       expect(fetchPolicy).toBe(customFetchPolicy)
     })
   })
+
+  describe('getType', () => {
+    it('should return the correct type for an item', async () => {
+      const model: Model = {
+        Test: {
+          name: 'Test',
+          isInstanceOf: (item: any) => item.__typename === 'Test',
+        },
+        AnotherTest: {
+          name: 'AnotherTest',
+          isInstanceOf: (item: any) => item.__typename === 'AnotherTest',
+        },
+      }
+      options.model = model
+      const store = await createStoreCore(options)
+
+      const testItem = { __typename: 'Test' }
+      const anotherTestItem = { __typename: 'AnotherTest' }
+
+      expect(store.getType(testItem)).toBe(store.model.Test)
+      expect(store.getType(anotherTestItem)).toBe(store.model.AnotherTest)
+    })
+
+    it('should return the correct type for an item with no typename', async () => {
+      const model: Model = {
+        User: {
+          name: 'User',
+          isInstanceOf: (item: any) => 'username' in item,
+        },
+        Bot: {
+          name: 'Bot',
+          isInstanceOf: (item: any) => 'botname' in item,
+        },
+      }
+      options.model = model
+      const store = await createStoreCore(options)
+
+      const testItem = { username: 'toto' }
+      const anotherTestItem = { botname: 'bender' }
+
+      expect(store.getType(testItem)).toBe(store.model.User)
+      expect(store.getType(anotherTestItem)).toBe(store.model.Bot)
+    })
+
+    it('should return null if no type matches the item', async () => {
+      const model: Model = {
+        Test: {
+          name: 'Test',
+          isInstanceOf: (item: any) => item.__typename === 'Test',
+        },
+      }
+      options.model = model
+      const store = await createStoreCore(options)
+
+      const unknownItem = { __typename: 'Unknown' }
+
+      expect(store.getType(unknownItem)).toBeNull()
+    })
+
+    it('should search in only specified types', async () => {
+      const model: Model = {
+        User: {
+          name: 'User',
+          isInstanceOf: (item: any) => 'username' in item,
+        },
+        User2: {
+          name: 'User',
+          isInstanceOf: (item: any) => 'username' in item,
+        },
+        Bot: {
+          name: 'Bot',
+          isInstanceOf: (item: any) => 'botname' in item,
+        },
+      }
+      options.model = model
+      const store = await createStoreCore(options)
+
+      const testItem = { username: 'toto' }
+
+      expect(store.getType(testItem)).toBe(store.model.User)
+      expect(store.getType(testItem, ['User2', 'Bot'])).toBe(store.model.User2)
+    })
+
+    it('should return if only one specified type', async () => {
+      const model: Model = {
+        User: {
+          name: 'User',
+          isInstanceOf: (item: any) => 'username' in item,
+        },
+        Bot: {
+          name: 'Bot',
+          isInstanceOf: (item: any) => 'botname' in item,
+        },
+        Foo: {
+          name: 'Foo',
+          isInstanceOf: (item: any) => 'fooname' in item,
+        }
+      }
+      options.model = model
+      const store = await createStoreCore(options)
+
+      const testItem = { username: 'toto' }
+
+      expect(store.getType(testItem, ['Foo'])).toBe(store.model.Foo)
+    })
+  })
 })

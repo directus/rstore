@@ -1,6 +1,6 @@
-import type { Model, ModelDefaults } from '@rstore/shared'
+import type { Model, ModelDefaults, ModelType } from '@rstore/shared'
 import { describe, expect, it } from 'vitest'
-import { defaultGetKey, resolveModel } from '../src/model'
+import { defaultGetKey, defaultIsInstanceOf, resolveModel } from '../src/model'
 
 describe('default get key', () => {
   it('should return id if present', () => {
@@ -19,6 +19,26 @@ describe('default get key', () => {
   })
 })
 
+describe('default isInstanceOf', () => {
+  it('should return true if item __typename matches type name', () => {
+    const type = { name: 'TestModel' } as ModelType
+    const item = { __typename: 'TestModel' }
+    expect(defaultIsInstanceOf(type)(item)).toBe(true)
+  })
+
+  it('should return false if item __typename does not match type name', () => {
+    const type = { name: 'TestModel' } as ModelType
+    const item = { __typename: 'AnotherModel' }
+    expect(defaultIsInstanceOf(type)(item)).toBe(false)
+  })
+
+  it('should return false if item does not have __typename', () => {
+    const type = { name: 'TestModel' } as ModelType
+    const item = { id: 123 }
+    expect(defaultIsInstanceOf(type)(item)).toBe(false)
+  })
+})
+
 describe('model', () => {
   it('should resolve model with defaults', () => {
     const modelTypes: Model = {
@@ -34,18 +54,18 @@ describe('model', () => {
       },
     }
     const defaults: ModelDefaults = {
-      getKey: (item: any) => item.id,
+      getKey: (item: any) => `${item.id}$default`,
       meta: {
         test: 'meow',
       },
     }
     const resolved = resolveModel(modelTypes, defaults)
-    expect(resolved.TestModel.getKey).toBe(defaults.getKey)
+    expect(resolved.TestModel.getKey({ id: 'foo' })).toBe(defaults.getKey?.({ id: 'foo' }))
     expect(resolved.TestModel.meta).toEqual({
       path: '/test',
       test: 'meow',
     })
-    expect(resolved.Test2.getKey).toBe(modelTypes.Test2.getKey)
+    expect(resolved.Test2.getKey({ id: 'foo' })).toBe(modelTypes.Test2.getKey?.({ id: 'foo' }))
     expect(resolved.Test2.meta).toEqual({
       test: 'meow',
     })
@@ -98,7 +118,7 @@ describe('model', () => {
 
     const resolved = resolveModel(modelTypes)
 
-    expect(resolved.TestModel.getKey).toBe(modelTypes.TestModel.getKey)
+    expect(resolved.TestModel.getKey({ id: 'foo' })).toBe(modelTypes.TestModel.getKey?.({ id: 'foo' }))
     expect(resolved.TestModel.relations).toEqual({
       test: {
         to: {
@@ -142,7 +162,7 @@ describe('model', () => {
 
     const resolved = resolveModel(modelTypes, defaults)
 
-    expect(resolved.TestModel.getKey).toBe(defaults.getKey)
+    expect(resolved.TestModel.getKey({ id: 0 })).toBe(defaults.getKey?.({ id: 0 }))
     expect(resolved.TestModel.relations).toEqual({})
     expect(resolved.TestModel.computed.calc).toBeTypeOf('function')
     expect(resolved.TestModel.fields!.createdAt.parse).toBeTypeOf('function')

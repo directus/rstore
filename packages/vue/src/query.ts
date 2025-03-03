@@ -1,7 +1,6 @@
 import type { FindOptions, HybridPromise, Model, ModelDefaults, ModelType, StoreCore } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
-import { shouldReadCacheFromFetchPolicy } from '@rstore/core'
-import { computed, ref, toValue, watch } from 'vue'
+import { computed, ref, shallowRef, toValue, watch } from 'vue'
 
 export interface VueQueryReturn<
   _TModelType extends ModelType,
@@ -46,9 +45,10 @@ export function createQuery<
 }: VueCreateQueryOptions<TModelType, TModelDefaults, TModel, TOptions, TResult>): HybridPromise<VueQueryReturn<TModelType, TModelDefaults, TModel, TResult>> {
   const fetchPolicy = store.getFetchPolicy(toValue(options)?.fetchPolicy)
 
-  const result = ref<TResult>(defaultValue)
+  const result = shallowRef<TResult>(defaultValue)
 
-  const data = (shouldReadCacheFromFetchPolicy(fetchPolicy)
+  // @TODO include nested relations in no-cache results
+  const data = (fetchPolicy !== 'no-cache'
     ? computed(() => cacheMethod(toValue(options)) ?? null)
     : result) as Ref<TResult>
 

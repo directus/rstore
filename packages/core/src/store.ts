@@ -45,6 +45,18 @@ export async function createStoreCore<
         },
       })
     },
+    getType(item, types?) {
+      if (types?.length === 1) {
+        return store.model[types[0]]
+      }
+      for (const key of types ?? Object.keys(store.model)) {
+        const type = store.model[key]
+        if (type.isInstanceOf(item)) {
+          return type
+        }
+      }
+      return null
+    },
     mutationHistory: [],
   }
 

@@ -9,6 +9,7 @@ describe('defaultMarker', () => {
       computed: {},
       fields: {},
       getKey: () => '',
+      isInstanceOf: () => true,
       relations: [],
       schema: {} as any,
     }
@@ -22,6 +23,7 @@ describe('defaultMarker', () => {
       computed: {},
       fields: {},
       getKey: () => '',
+      isInstanceOf: () => true,
       relations: [],
       schema: {} as any,
     }
@@ -36,6 +38,7 @@ describe('defaultMarker', () => {
       computed: {},
       fields: {},
       getKey: () => '',
+      isInstanceOf: () => true,
       relations: [],
       schema: {} as any,
     }
@@ -50,6 +53,7 @@ describe('defaultMarker', () => {
       computed: {},
       fields: {},
       getKey: () => '',
+      isInstanceOf: () => true,
       relations: [],
       schema: {} as any,
     }

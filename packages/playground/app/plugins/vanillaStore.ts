@@ -53,6 +53,43 @@ export default defineNuxtPlugin({
               }
             })
 
+            hook('fetchRelations', async (payload) => {
+              const payloadResult = payload.getResult()
+              const items: any[] = Array.isArray(payloadResult) ? payloadResult : [payloadResult]
+              await Promise.all(items.map(async (item) => {
+                const key = payload.type.getKey(item)
+                if (key) {
+                  const wrappedItem = payload.store.cache.readItem({
+                    type: payload.type,
+                    key,
+                  })
+                  if (!wrappedItem) {
+                    return
+                  }
+
+                  for (const relationKey in payload.findOptions.include) {
+                    if (!payload.findOptions.include[relationKey]) {
+                      continue
+                    }
+
+                    const relation = payload.type.relations[relationKey]
+                    if (!relation) {
+                      throw new Error(`Relation "${relationKey}" does not exist on model "${payload.type.name}"`)
+                    }
+
+                    await Promise.all(Object.keys(relation.to).map((modelKey) => {
+                      const relationData = relation.to[modelKey]!
+                      return store[modelKey as keyof typeof vanillaModel].findMany({
+                        params: {
+                          filter: `${relationData.on}:${wrappedItem[relationData.eq]}`,
+                        },
+                      })
+                    }))
+                  }
+                }
+              }))
+            })
+
             hook('createItem', async (payload) => {
               if (payload.type.meta?.path) {
                 const result = await $fetch(`/api/rest/${payload.type.meta.path}`, {

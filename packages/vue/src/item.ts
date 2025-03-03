@@ -1,6 +1,7 @@
 import type { Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType, WrappedItem, WrappedItemBase, WrappedItemEditOptions } from '@rstore/shared'
 import type { VueModelApi } from './api'
 import type { VueStore } from './store'
+import { peekFirst, peekMany } from '@rstore/core'
 
 export interface WrapItemOptions<
   TModelType extends ModelType,
@@ -79,11 +80,16 @@ export function wrapItem<
           const result: Array<any> = []
           for (const targetModelName in relation.to) {
             const targetModel = relation.to[targetModelName]
-            const targetApi = store[targetModelName]
+            const targetType = store._core.model[targetModelName]
             const value = Reflect.get(proxy, targetModel.eq)
-            const cacheResultForTarget = targetApi[relation.many ? 'peekMany' : 'peekFirst']({
-              filter: foreignItem => foreignItem[targetModel.on] === value,
-            })
+            const cacheResultForTarget = (relation.many ? peekMany : peekFirst)({
+              store: store._core,
+              type: targetType,
+              findOptions: {
+                filter: foreignItem => foreignItem[targetModel.on] === value,
+              },
+              force: true,
+            }).result
             if (Array.isArray(cacheResultForTarget)) {
               result.push(...cacheResultForTarget)
             }

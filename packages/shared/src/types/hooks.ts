@@ -141,6 +141,20 @@ export interface HookDefinitions<
     }
   ) => void
 
+  fetchRelations: <
+    TModelType extends ModelType,
+  > (
+    payload: {
+      store: StoreCore<TModel, TModelDefaults>
+      meta: CustomHookMeta
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
+      key?: string
+      findOptions: FindOptions<TModelType, TModelDefaults, TModel> & NonNullable<FindOptions<TModelType, TModelDefaults, TModel>['include']>
+      many: boolean
+      getResult: () => ResolvedModelItemBase<TModelType, TModelDefaults, TModel>
+    }
+  ) => Awaitable<void>
+
   /**
    * Called when an item is fetched by plugins.
    */

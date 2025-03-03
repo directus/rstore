@@ -12,6 +12,7 @@ export interface PeekFirstOptions<
   meta?: CustomHookMeta
   type: ResolvedModelType<TModelType, TModelDefaults, TModel>
   findOptions: string | FindFirstOptions<TModelType, TModelDefaults, TModel>
+  force?: boolean
 }
 
 /**
@@ -26,6 +27,7 @@ export function peekFirst<
   meta,
   type,
   findOptions: keyOrOptions,
+  force,
 }: PeekFirstOptions<TModelType, TModelDefaults, TModel>): QueryResult<WrappedItem<TModelType, TModelDefaults, TModel> | null> {
   meta = meta ?? {}
 
@@ -37,7 +39,7 @@ export function peekFirst<
   const key = findOptions?.key
   const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
 
-  if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
+  if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let result: any
     let marker = defaultMarker(type, findOptions)
 
@@ -60,7 +62,7 @@ export function peekFirst<
       // Try with first marker first
       result = store.cache.readItems({
         type,
-        marker: getMarker('first', marker),
+        marker: force ? undefined : getMarker('first', marker),
       }).filter(item => filterFn(item))?.[0] ?? null
 
       // Fallback to many marker
