@@ -26,10 +26,10 @@
   ],
   "scripts": {
     "prepack": "nuxt-module-build build",
-    "dev": "nuxi dev ../playground",
+    "dev": "nuxi prepare playground && nuxi dev ../playground",
     "dev:build": "nuxi build ../playground",
     "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare ../playground",
-    "prepublishOnly": "nuxi prepare ../playground && pnpm run prepack",
+    "prepublishOnly": "nuxi prepare playground && pnpm run prepack",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest watch"
