@@ -1,0 +1,93 @@
+# Changelog
+
+
+## v0.1.0
+
+
+### 🚀 Enhancements
+
+- Create store, read, plugins, cache ([aaa80ec](https://github.com/Akryum/rstore/commit/aaa80ec))
+- Vue query ([6d3bccb](https://github.com/Akryum/rstore/commit/6d3bccb))
+- Mutations and refactored query ([73648e2](https://github.com/Akryum/rstore/commit/73648e2))
+- Mutation history ([9904eef](https://github.com/Akryum/rstore/commit/9904eef))
+- Wrapped item ([db37633](https://github.com/Akryum/rstore/commit/db37633))
+- Resolve relations ([7d44610](https://github.com/Akryum/rstore/commit/7d44610))
+- More hooks + example devtools ([d1b5a72](https://github.com/Akryum/rstore/commit/d1b5a72))
+- Computed fields ([31da02d](https://github.com/Akryum/rstore/commit/31da02d))
+- Nested fetch ([c31e5c7](https://github.com/Akryum/rstore/commit/c31e5c7))
+- **plugin:** AddModelDefaults ([175f402](https://github.com/Akryum/rstore/commit/175f402))
+- Nuxt module ([2cc1a4c](https://github.com/Akryum/rstore/commit/2cc1a4c))
+
+### 🩹 Fixes
+
+- Build ([3a2e525](https://github.com/Akryum/rstore/commit/3a2e525))
+- **nuxt:** Inject improvements ([690aeee](https://github.com/Akryum/rstore/commit/690aeee))
+
+### 💅 Refactors
+
+- Merge Vue store with core store ([cb65b83](https://github.com/Akryum/rstore/commit/cb65b83))
+
+### 📖 Documentation
+
+- Update README.md ([7722387](https://github.com/Akryum/rstore/commit/7722387))
+- Update README.md ([f57c711](https://github.com/Akryum/rstore/commit/f57c711))
+- Sponsors ([e2d6863](https://github.com/Akryum/rstore/commit/e2d6863))
+- Commit convention ([98d9172](https://github.com/Akryum/rstore/commit/98d9172))
+- Contributing ([92ac651](https://github.com/Akryum/rstore/commit/92ac651))
+- Link to contributing guide ([f3a5ae3](https://github.com/Akryum/rstore/commit/f3a5ae3))
+- Update readme ([10b29cd](https://github.com/Akryum/rstore/commit/10b29cd))
+- Update logo src ([7d3bb9b](https://github.com/Akryum/rstore/commit/7d3bb9b))
+- Fix logo width ([ebcf14e](https://github.com/Akryum/rstore/commit/ebcf14e))
+- Fix image size ([cfc727e](https://github.com/Akryum/rstore/commit/cfc727e))
+
+### 🏡 Chore
+
+- Create packages ([bd61a0b](https://github.com/Akryum/rstore/commit/bd61a0b))
+- Create more packages ([714910f](https://github.com/Akryum/rstore/commit/714910f))
+- Vscode pin gh action ([659a487](https://github.com/Akryum/rstore/commit/659a487))
+- Improved playground menu ([ff97a7e](https://github.com/Akryum/rstore/commit/ff97a7e))
+- **example:** More form demo ([57bedbd](https://github.com/Akryum/rstore/commit/57bedbd))
+- Logos ([fefdb6a](https://github.com/Akryum/rstore/commit/fefdb6a))
+- Fix pnpm corepack ([7db8fa9](https://github.com/Akryum/rstore/commit/7db8fa9))
+- Trailing space ([631b995](https://github.com/Akryum/rstore/commit/631b995))
+- Create FUNDING.yml ([bdbf7d3](https://github.com/Akryum/rstore/commit/bdbf7d3))
+- Bot avatar ([6ba5101](https://github.com/Akryum/rstore/commit/6ba5101))
+- **example:** Fix output ssr ([9aa5cd9](https://github.com/Akryum/rstore/commit/9aa5cd9))
+- Devtools fixes ([2e41515](https://github.com/Akryum/rstore/commit/2e41515))
+- **playground:** Home + favicon ([2b24a04](https://github.com/Akryum/rstore/commit/2b24a04))
+- Separate playground into its own workspace ([4a95611](https://github.com/Akryum/rstore/commit/4a95611))
+- Add .node-version ([6636e0c](https://github.com/Akryum/rstore/commit/6636e0c))
+- **playground:** Shiki client only ([3194b5a](https://github.com/Akryum/rstore/commit/3194b5a))
+- **playground:** Fix get time ([8af4de9](https://github.com/Akryum/rstore/commit/8af4de9))
+- Update pnpm ([171f44e](https://github.com/Akryum/rstore/commit/171f44e))
+- Setup repository info ([671ed4a](https://github.com/Akryum/rstore/commit/671ed4a))
+- Nuxt prepublish ([dffe83e](https://github.com/Akryum/rstore/commit/dffe83e))
+- Package descriptions ([c08960c](https://github.com/Akryum/rstore/commit/c08960c))
+- **playground:** Fix fetch relations ([49d094a](https://github.com/Akryum/rstore/commit/49d094a))
+- Add release script ([fae6fb8](https://github.com/Akryum/rstore/commit/fae6fb8))
+
+### ✅ Tests
+
+- **lint:** Fix ([214da28](https://github.com/Akryum/rstore/commit/214da28))
+- **ci:** Try fix ([918ecaf](https://github.com/Akryum/rstore/commit/918ecaf))
+- **ci:** Revert ([c079c2a](https://github.com/Akryum/rstore/commit/c079c2a))
+- **ci:** Try fix ([dec241f](https://github.com/Akryum/rstore/commit/dec241f))
+- **ci:** Fix ([8dd52b2](https://github.com/Akryum/rstore/commit/8dd52b2))
+- Upgrade to vitest 3 + more tests ([a62d0de](https://github.com/Akryum/rstore/commit/a62d0de))
+- Store.getFetchPolicy ([dc42f16](https://github.com/Akryum/rstore/commit/dc42f16))
+- More ([cf56ffb](https://github.com/Akryum/rstore/commit/cf56ffb))
+- **lint:** Fix unused import ([12db4f4](https://github.com/Akryum/rstore/commit/12db4f4))
+- Fix delete test ([c47a840](https://github.com/Akryum/rstore/commit/c47a840))
+- **lint:** Fix ([0e45d94](https://github.com/Akryum/rstore/commit/0e45d94))
+
+### 🤖 CI
+
+- Release notes ([3afa0d8](https://github.com/Akryum/rstore/commit/3afa0d8))
+- Pr-title ([d70d449](https://github.com/Akryum/rstore/commit/d70d449))
+- Nightly ([0bb6f4b](https://github.com/Akryum/rstore/commit/0bb6f4b))
+- Fix nightly releases ([4bbfcb6](https://github.com/Akryum/rstore/commit/4bbfcb6))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
