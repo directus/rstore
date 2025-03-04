@@ -3,7 +3,7 @@ const props = defineProps<{
   id: string
 }>()
 
-const store = useVanillaStore()
+const store = useStore()
 const { data: todo } = await store.Todo.queryFirst(props.id)
 
 async function toggle() {

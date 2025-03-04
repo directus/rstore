@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-const store = useVanillaStore()
+const store = useStore()
 
 const email = ref('user1@acme.com')
 

@@ -2,7 +2,7 @@
 import type { TabsItem } from '@nuxt/ui'
 import { codeToHtml } from 'shiki'
 
-const store = useVanillaStore()
+const store = useStore()
 
 const stats = useStoreStats()
 

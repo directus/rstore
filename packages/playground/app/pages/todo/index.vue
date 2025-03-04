@@ -1,5 +1,6 @@
 <script lang="ts" setup>
-const store = useVanillaStore()
+const store = useStore()
+
 const { data: todos } = await store.Todo.queryMany()
 
 const createTodo = store.Todo.createForm()

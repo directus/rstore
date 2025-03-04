@@ -1,8 +1,8 @@
 {
   "name": "@rstore/nuxt",
   "type": "module",
-  "version": "1.0.0",
-  "description": "My new Nuxt module",
+  "version": "0.0.0",
+  "description": "Reactive Store for Nuxt",
   "license": "MIT",
   "repository": {
     "url": "https://github.com/Akryum/rstore.git",

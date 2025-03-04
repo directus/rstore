@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-const store = useVanillaStore()
+const store = useStore()
 
 const { data: messages } = await store.Message.queryMany()
 </script>

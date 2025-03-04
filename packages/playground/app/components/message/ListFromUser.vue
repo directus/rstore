@@ -3,7 +3,7 @@ const props = defineProps<{
   userId: string
 }>()
 
-const store = useVanillaStore()
+const store = useStore()
 
 const { data: userWithMessages } = await store.User.queryFirst(() => ({
   key: props.userId,

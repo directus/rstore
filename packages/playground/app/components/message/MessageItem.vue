@@ -4,7 +4,7 @@ const props = defineProps<{
   skipNestedFetch?: boolean
 }>()
 
-const store = useVanillaStore()
+const store = useStore()
 
 const { data: message } = await store.Message.queryFirst(props.id)
 </script>

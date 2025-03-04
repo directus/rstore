@@ -3,7 +3,7 @@ const props = defineProps<{
   id: string
 }>()
 
-const store = useVanillaStore()
+const store = useStore()
 
 const { data: user } = await store.User.queryFirst(props.id)
 </script>

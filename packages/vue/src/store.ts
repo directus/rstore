@@ -1,4 +1,4 @@
-import type { Cache, FindOptions, Model, ModelDefaults, Plugin, StoreCore, WrappedItem } from '@rstore/shared'
+import type { FindOptions, Model, ModelDefaults, Plugin, StoreCore, WrappedItem } from '@rstore/shared'
 import { createStoreCore } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createModelApi, type VueModelApi } from './api'

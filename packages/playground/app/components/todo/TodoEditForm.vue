@@ -7,7 +7,7 @@ const emit = defineEmits<{
   close: []
 }>()
 
-const store = useVanillaStore()
+const store = useStore()
 
 const updateTodo = await store.Todo.updateForm(props.id)
 updateTodo.$onSaved(() => emit('close'))

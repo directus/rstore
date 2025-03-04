@@ -6,7 +6,7 @@ const props = defineProps<{
   item: ResolvedModelType<any, any, any>
 }>()
 
-const store = useVanillaStore()
+const store = useStore()
 
 const colorMode = useColorMode()
 const cacheHtml = asyncComputed(() => codeToHtml(JSON.stringify((store.cache.getState() as any)[props.item.name] ?? {}, null, 2), {
