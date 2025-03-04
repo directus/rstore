@@ -1,8 +1,8 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Akryum/rstore/blob/main/img/LogoTextHorizontalWhite.png?raw=true" width="175px" height="200px">
-    <source media="(prefers-color-scheme: light)" srcset="https://github.com/Akryum/rstore/blob/main/img/LogoTextHorizontalBlack.png?raw=true" width="175px" height="200px">
-    <img alt="rstore logo" src="https://github.com/Akryum/rstore/blob/main/img/LogoTextHorizontalBlack.png?raw=true" width="175px" height="200px">
+    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Akryum/rstore/blob/main/img/LogoTextHorizontalWhite.png?raw=true" width="653px" height="200px">
+    <source media="(prefers-color-scheme: light)" srcset="https://github.com/Akryum/rstore/blob/main/img/LogoTextHorizontalBlack.png?raw=true" width="653px" height="200px">
+    <img alt="rstore logo" src="https://github.com/Akryum/rstore/blob/main/img/LogoTextHorizontalBlack.png?raw=true" width="653px" height="200px">
   </picture>
 </p>
 
