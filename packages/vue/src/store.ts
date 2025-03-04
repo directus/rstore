@@ -21,28 +21,16 @@ export type VueStoreModelApiProxy<
   [TKey in keyof TModel]: VueModelApi<TModel[TKey], TModelDefaults, TModel, WrappedItem<TModel[TKey], TModelDefaults, TModel>>
 }
 
-export interface VueStoreBase<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
-> {
-  cache: Pick<Cache, 'getState' | 'setState' | 'clear'>
-
-  /**
-   * @private
-   */
-  _core: StoreCore<TModel, TModelDefaults>
-}
-
 export type VueStore<
   TModel extends Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
-> = VueStoreBase<TModel, TModelDefaults> & VueStoreModelApiProxy<TModel, TModelDefaults>
+> = StoreCore<TModel, TModelDefaults> & VueStoreModelApiProxy<TModel, TModelDefaults>
 
 export async function createStore<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
 >(options: CreateStoreOptions<TModel, TModelDefaults>): Promise<VueStore<TModel, TModelDefaults>> {
-  const storeCore = await createStoreCore<TModel, TModelDefaults>({
+  const store = await createStoreCore<TModel, TModelDefaults>({
     model: options.model,
     modelDefaults: options.modelDefaults,
     plugins: options.plugins,
@@ -55,22 +43,17 @@ export async function createStore<
 
   const queryCache: Map<keyof TModel, VueModelApi<TModel[keyof TModel], TModelDefaults, TModel, WrappedItem<TModel[keyof TModel], TModelDefaults, TModel>>> = new Map()
 
-  const storeBase: VueStoreBase<TModel, TModelDefaults> = {
-    cache: storeCore.cache,
-    _core: storeCore,
-  }
-
-  const storeProxy = new Proxy(storeBase, {
+  const storeProxy = new Proxy(store, {
     get(_, key) {
-      if (key in storeCore.model) {
+      if (key in store.model) {
         const typeName = key as keyof TModel
         if (!queryCache.has(typeName)) {
-          queryCache.set(typeName, createModelApi(storeCore, storeCore.model[typeName]))
+          queryCache.set(typeName, createModelApi(store, store.model[typeName]))
         }
         return queryCache.get(typeName)
       }
 
-      return Reflect.get(storeBase, key)
+      return Reflect.get(store, key)
     },
   }) as VueStore<TModel, TModelDefaults>
 

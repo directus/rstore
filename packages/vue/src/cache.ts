@@ -134,7 +134,7 @@ export function createCache<
     writeItemForRelation({ type, relationKey, relation, item }) {
       const store = getStore()
       const possibleTypes = Object.keys(relation.to)
-      const nestedItemType = store._core.getType(item, possibleTypes)
+      const nestedItemType = store.getType(item, possibleTypes)
       if (!nestedItemType) {
         throw new Error(`Could not determine type for relation ${type.name}.${String(relationKey)}`)
       }
@@ -143,7 +143,7 @@ export function createCache<
         throw new Error(`Could not determine key for relation ${type.name}.${String(relationKey)}`)
       }
 
-      store._core.processItemParsing(type, item)
+      store.processItemParsing(type, item)
 
       this.writeItem({
         type: nestedItemType,

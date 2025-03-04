@@ -9,6 +9,7 @@ export type {
 export {
   defineItemType,
   defineModelType,
+  definePlugin,
 } from '@rstore/core'
 
 export type {

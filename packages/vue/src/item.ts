@@ -80,10 +80,10 @@ export function wrapItem<
           const result: Array<any> = []
           for (const targetModelName in relation.to) {
             const targetModel = relation.to[targetModelName]
-            const targetType = store._core.model[targetModelName]
+            const targetType = store.model[targetModelName]
             const value = Reflect.get(proxy, targetModel.eq)
             const cacheResultForTarget = (relation.many ? peekMany : peekFirst)({
-              store: store._core,
+              store,
               type: targetType,
               findOptions: {
                 filter: foreignItem => foreignItem[targetModel.on] === value,
