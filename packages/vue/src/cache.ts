@@ -1,6 +1,6 @@
 import type { VueStore } from './store'
 import { type Cache, type Model, type ModelDefaults, type ModelType, pickNonSpecialProps, type ResolvedModelItem, type ResolvedModelType, type WrappedItem } from '@rstore/shared'
-import { ref } from 'vue'
+import { ref, toRaw } from 'vue'
 import { wrapItem } from './item'
 
 export interface CreateCacheOptions<
@@ -156,7 +156,7 @@ export function createCache<
       wrappedItems.delete(getWrappedItemCacheKey(type, key))
     },
     getState() {
-      return state.value
+      return toRaw(state.value)
     },
     setState(value) {
       state.value = value
