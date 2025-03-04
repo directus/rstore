@@ -17,7 +17,8 @@
     "test": "vitest run",
     "test:dev": "vitest",
     "test:types": "pnpm run -r test:types",
-    "release": "pnpm run lint && pnpm run test && pnpm run test:types && pnpm run build && sheep release -b main --force"
+    "copy-readme": "cp README.md ./packages/vue/README.md && cp README.md ./packages/nuxt/README.md",
+    "release": "pnpm run copy-readme && pnpm run lint && pnpm run test && pnpm run test:types && pnpm run build && sheep release -b main --force"
   },
   "devDependencies": {
     "@akryum/sheep": "^0.5.2",
