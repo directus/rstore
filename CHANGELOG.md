@@ -1,6 +1,24 @@
 # Changelog
 
 
+## v0.1.2
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.1.1...v0.1.2)
+
+### 🩹 Fixes
+
+- **vue:** Use toRaw on cache.getState() ([4363c6f](https://github.com/Akryum/rstore/commit/4363c6f))
+- **nuxt:** Missing import for markRaw ([a940213](https://github.com/Akryum/rstore/commit/a940213))
+
+### 🏡 Chore
+
+- Remove unused dev deps ([41d9b5a](https://github.com/Akryum/rstore/commit/41d9b5a))
+- Fix dev script ([045f43f](https://github.com/Akryum/rstore/commit/045f43f))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.1.1
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.1.0...v0.1.1)
