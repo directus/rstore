@@ -5,7 +5,9 @@ import { defineNuxtPlugin } from '#app'
 import * as _model from '#build/$rstore-model'
 // @ts-expect-error virtual file
 import * as _plugins from '#build/$rstore-plugins'
+
 import { createStore } from '@rstore/vue'
+import { markRaw } from 'vue'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
   const plugins = Object.values({ ..._plugins }) as Plugin[]
