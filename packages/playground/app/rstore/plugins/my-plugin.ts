@@ -48,6 +48,7 @@ export default defineRstorePlugin({
     })
 
     hook('fetchRelations', async (payload) => {
+      const store = useStore()
       const payloadResult = payload.getResult()
       const items: any[] = Array.isArray(payloadResult) ? payloadResult : [payloadResult]
       await Promise.all(items.map(async (item) => {
@@ -73,8 +74,7 @@ export default defineRstorePlugin({
 
             await Promise.all(Object.keys(relation.to).map((modelKey) => {
               const relationData = relation.to[modelKey]!
-              // @ts-expect-error @TODO fix type error
-              return payload.store[modelKey as keyof typeof vanillaModel].findMany({
+              return store[modelKey as keyof typeof store.model].findMany({
                 params: {
                   filter: `${relationData.on}:${wrappedItem[relationData.eq]}`,
                 },
