@@ -16,9 +16,11 @@
     "lint": "eslint --cache .",
     "test": "vitest run",
     "test:dev": "vitest",
-    "test:types": "pnpm run -r test:types"
+    "test:types": "pnpm run -r test:types",
+    "release": "pnpm run lint && pnpm run test && pnpm run test:types && pnpm run build && sheep release -b main --force"
   },
   "devDependencies": {
+    "@akryum/sheep": "^0.5.2",
     "@antfu/eslint-config": "^3.12.1",
     "eslint": "^9.17.0",
     "typescript": "^5.7.2",

@@ -20,6 +20,9 @@ importers:
 
   .:
     devDependencies:
+      '@akryum/sheep':
+        specifier: ^0.5.2
+        version: 0.5.2
       '@antfu/eslint-config':
         specifier: ^3.12.1
         version: 3.16.0(@typescript-eslint/utils@8.24.1(eslint@9.21.0(jiti@2.4.2))(typescript@5.7.3))(@vue/compiler-sfc@3.5.13)(eslint@9.21.0(jiti@2.4.2))(typescript@5.7.3)(vitest@3.0.7(@types/debug@4.1.12)(@types/node@22.13.8)(jiti@2.4.2)(lightningcss@1.29.1)(terser@5.39.0)(yaml@2.7.0))
@@ -216,6 +219,10 @@ importers:
         version: 3.5.13(typescript@5.7.3)
 
 packages:
+
+  '@akryum/sheep@0.5.2':
+    resolution: {integrity: sha512-cEsQN8W5IL0gbPD9TDve2+2tCf6yq9xWLEYzNa6RyBTc6T2HxFtAc+n7kj8DkQ649ankAN9W3/AxXahI3pHF4g==}
+    hasBin: true
 
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
@@ -5398,6 +5405,8 @@ packages:
     resolution: {integrity: sha512-bXE4cR/kVZhKZX/RjPEflHaKVhUVl85noU3v6b8apfQEc1x4A+zBxjZ4lN8LqGd6WZ3dl98pY4o717VFmoPp+A==}
 
 snapshots:
+
+  '@akryum/sheep@0.5.2': {}
 
   '@alloc/quick-lru@5.2.0': {}
 
