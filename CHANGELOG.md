@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.1
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.1.0...v0.1.1)
+
+### 🏡 Chore
+
+- Copy readmes ([5423ac9](https://github.com/Akryum/rstore/commit/5423ac9))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.1.0
 
 
