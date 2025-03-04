@@ -82,15 +82,6 @@ importers:
       '@types/node':
         specifier: latest
         version: 22.13.8
-      '@vueuse/core':
-        specifier: ^12.7.0
-        version: 12.7.0(typescript@5.7.3)
-      '@vueuse/nuxt':
-        specifier: ^12.7.0
-        version: 12.7.0(magicast@0.3.5)(nuxt@3.15.4(@parcel/watcher@2.5.1)(@types/node@22.13.8)(db0@0.2.4)(eslint@9.21.0(jiti@2.4.2))(ioredis@5.5.0)(lightningcss@1.29.1)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.34.8)(terser@5.39.0)(typescript@5.7.3)(vite@6.1.1(@types/node@22.13.8)(jiti@2.4.2)(lightningcss@1.29.1)(terser@5.39.0)(yaml@2.7.0))(vue-tsc@2.2.4(typescript@5.7.3))(yaml@2.7.0))(typescript@5.7.3)
-      changelogen:
-        specifier: ^0.5.7
-        version: 0.5.7(magicast@0.3.5)
       eslint:
         specifier: ^9.20.0
         version: 9.21.0(jiti@2.4.2)
