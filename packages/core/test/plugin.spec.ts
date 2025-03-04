@@ -20,6 +20,7 @@ describe('setupPlugin', () => {
 
     expect(mockPlugin.setup).toHaveBeenCalledWith({
       hook: mockHook,
+      addModelDefaults: expect.any(Function),
     })
   })
 
@@ -55,5 +56,100 @@ describe('setupPlugin', () => {
     }
 
     await expect(setupPlugin(mockStore, mockPlugin)).rejects.toThrow('Setup failed')
+  })
+
+  describe('addModelDefaults', () => {
+    describe('addModelDefaults', () => {
+      it('should add model defaults to the store', async () => {
+        const mockHook = vi.fn()
+        const mockStore: StoreCore<Model, ModelDefaults> = {
+          hooks: {
+            hook: mockHook,
+          },
+          modelDefaults: {},
+        } as any
+
+        const mockPlugin: Plugin = {
+          name: 'test',
+          setup: async ({ addModelDefaults }) => {
+            addModelDefaults({
+              computed: {
+                test: () => 'test',
+              },
+            })
+          },
+        }
+
+        await setupPlugin(mockStore, mockPlugin)
+
+        expect(mockStore.modelDefaults.computed).toEqual({
+          test: expect.any(Function),
+        })
+      })
+
+      it('should merge model defaults with existing defaults', async () => {
+        const mockHook = vi.fn()
+        const mockStore: StoreCore<Model, ModelDefaults> = {
+          hooks: {
+            hook: mockHook,
+          },
+          modelDefaults: {
+            computed: {
+              existing: () => 'existing',
+            },
+          },
+        } as any
+
+        const mockPlugin: Plugin = {
+          name: 'test',
+          setup: async ({ addModelDefaults }) => {
+            addModelDefaults({
+              computed: {
+                test: () => 'test',
+              },
+            })
+          },
+        }
+
+        await setupPlugin(mockStore, mockPlugin)
+
+        expect(mockStore.modelDefaults.computed).toEqual({
+          existing: expect.any(Function),
+          test: expect.any(Function),
+        })
+      })
+
+      it('should overwrite existing model defaults if specified', async () => {
+        const mockHook = vi.fn()
+        const mockStore: StoreCore<Model, ModelDefaults> = {
+          hooks: {
+            hook: mockHook,
+          },
+          modelDefaults: {
+            computed: {
+              test: () => 'old',
+            },
+          },
+        } as any
+
+        const mockPlugin: Plugin = {
+          name: 'test',
+          setup: async ({ addModelDefaults }) => {
+            addModelDefaults({
+              computed: {
+                test: () => 'new',
+              },
+            })
+          },
+        }
+
+        await setupPlugin(mockStore, mockPlugin)
+
+        expect(mockStore.modelDefaults.computed).toEqual({
+          test: expect.any(Function),
+        })
+        expect(mockStore.modelDefaults.computed?.test({})).toBe('new')
+      })
+    })
   })
 })

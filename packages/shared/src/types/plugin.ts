@@ -17,5 +17,10 @@ export interface Plugin {
 }
 
 export interface PluginSetupApi {
+  /**
+   * Add options to the model defaults.
+   */
+  addModelDefaults: (modelDefaults: ModelDefaults) => void
+
   hook: Hooks<Model, ModelDefaults>['hook']
 }
