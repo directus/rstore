@@ -26,5 +26,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     store.cache.setState(nuxtApp.payload.state[cacheKey])
   }
 
-  nuxtApp.vueApp.provide('rstore', store)
+  // Inject $rstore
+  return {
+    provide: {
+      rstore: store,
+    },
+  }
 })
