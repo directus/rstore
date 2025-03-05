@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.4
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.1.3...v0.1.4)
+
+### 🚀 Enhancements
+
+- CacheFilterFirst hook readItemsFromCache() ([ca57d13](https://github.com/Akryum/rstore/commit/ca57d13))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.1.3
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.1.2...v0.1.3)
