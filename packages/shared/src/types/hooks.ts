@@ -91,7 +91,7 @@ export interface HookDefinitions<
       key?: string
       findOptions?: FindOptions<TModelType, TModelDefaults, TModel>
       getResult: () => ResolvedModelItemBase<TModelType, TModelDefaults, TModel> | undefined
-      setResult: (result: ResolvedModelItemBase<TModelType, TModelDefaults, TModel>) => void
+      setResult: (result: ResolvedModelItemBase<TModelType, TModelDefaults, TModel> | undefined) => void
       readItemsFromCache: () => Array<ResolvedModelItemBase<TModelType, TModelDefaults, TModel>>
     }
   ) => void
