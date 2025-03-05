@@ -73,21 +73,6 @@ export function peekFirst<
         }).filter(item => filterFn(item))?.[0] ?? null
       }
     }
-    else {
-      // Try with first marker first
-      result = store.cache.readItems({
-        type,
-        marker: force ? undefined : getMarker('first', marker),
-      })?.[0] ?? null
-
-      // Fallback to many marker
-      if (!result) {
-        result = store.cache.readItems({
-          type,
-          marker: getMarker('many', marker),
-        })?.[0] ?? null
-      }
-    }
 
     store.hooks.callHookSync('cacheFilterFirst', {
       store,
@@ -99,6 +84,22 @@ export function peekFirst<
       },
       key,
       findOptions,
+      readItemsFromCache: () => {
+        // Try with first marker first
+        let items = store.cache.readItems({
+          type,
+          marker: force ? undefined : getMarker('first', marker),
+        }) ?? []
+
+        // Fallback to many marker
+        if (!items.length) {
+          items = store.cache.readItems({
+            type,
+            marker: getMarker('many', marker),
+          }) ?? []
+        }
+        return items
+      },
     })
     return {
       result,
