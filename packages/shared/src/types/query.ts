@@ -40,12 +40,11 @@ export interface FindOptions<
   /**
    * Filter the item.
    */
-  filter?: (item: ResolvedModelItem<TModelType, TModelDefaults, TModel>) => boolean & CustomFilterOption<TModelType, TModelDefaults, TModel>
-  // filter?: CustomFilterOption<TModelType, TModelDefaults, TModel>
+  filter?: ((item: ResolvedModelItem<TModelType, TModelDefaults, TModel>) => boolean) | CustomFilterOption<TModelType, TModelDefaults, TModel>
   /**
    * Sort the items.
    */
-  sort?: (a: ResolvedModelItem<TModelType, TModelDefaults, TModel>, b: ResolvedModelItem<TModelType, TModelDefaults, TModel>) => number | CustomSortOption
+  sort?: ((a: ResolvedModelItem<TModelType, TModelDefaults, TModel>, b: ResolvedModelItem<TModelType, TModelDefaults, TModel>) => number) | CustomSortOption
   /**
    * Include the related items.
    */
