@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.6
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.1.5...v0.1.6)
+
+### 🩹 Fixes
+
+- **query:** CustomFilterOption type should be union instead of intersection ([4c362f8](https://github.com/Akryum/rstore/commit/4c362f8))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.1.5
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.1.4...v0.1.5)
