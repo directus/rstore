@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.5
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.1.4...v0.1.5)
+
+### 🩹 Fixes
+
+- CacheFilterFirst hook setResult type ([5d9ca12](https://github.com/Akryum/rstore/commit/5d9ca12))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.1.4
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.1.3...v0.1.4)
