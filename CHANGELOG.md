@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.1.3
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.1.2...v0.1.3)
+
+### 🩹 Fixes
+
+- **cache:** Items not red from cache if filter is not function ([40a7ced](https://github.com/Akryum/rstore/commit/40a7ced))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.1.2
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.1.1...v0.1.2)
