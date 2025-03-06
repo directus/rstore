@@ -1,6 +1,7 @@
 node_modules/
-dist/
+dist
 .idea
 .DS_Store
 .eslintcache
 .nuxt
+.output
