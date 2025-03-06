@@ -81,6 +81,7 @@ export function createQuery<
     }
     catch (e: any) {
       error.value = e
+      console.error(e)
     }
     finally {
       loading.value = false
