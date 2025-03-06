@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.1.8
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.1.7...v0.1.8)
+
+### 🚀 Enhancements
+
+- **vue:** Display load error in console ([6133c13](https://github.com/Akryum/rstore/commit/6133c13))
+
+### 🩹 Fixes
+
+- **nuxt:** Missing convertFunctionsToString ([b0ca559](https://github.com/Akryum/rstore/commit/b0ca559))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.1.7
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.1.6...v0.1.7)
