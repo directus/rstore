@@ -33,7 +33,6 @@
   "scripts": {
     "build": "unbuild",
     "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",
-    "prepublishOnly": "pnpm run build",
     "test:types": "tsc --noEmit"
   },
   "dependencies": {

@@ -46,6 +46,7 @@ export interface Cache<
     key: string
     item: ResolvedModelItemBase<TModelType, TModelDefaults, TModel>
     marker?: string
+    fromWriteItems?: boolean
   }) => void
 
   deleteItem: <TModelType extends ModelType = ModelType>(params: {

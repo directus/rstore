@@ -1,6 +1,5 @@
 <script lang="ts" setup>
 import type { TabsItem } from '@nuxt/ui'
-import { codeToHtml } from 'shiki'
 
 const stats = useStoreStats()
 
@@ -26,13 +25,7 @@ const tab = useLocalStorage('rstore-devtools-tab', '0')
 
 const currentTab = computed(() => tabs[Number.parseInt(tab.value)]!)
 
-const cache = useCache()
-
-const colorMode = useColorMode()
-const cacheHtml = asyncComputed(() => codeToHtml(JSON.stringify(cache.value, null, 2), {
-  lang: 'json',
-  theme: colorMode.value === 'dark' ? 'one-dark-pro' : 'one-light',
-}))
+const cache = useStoreCache()
 </script>
 
 <template>
@@ -50,11 +43,28 @@ const cacheHtml = asyncComputed(() => codeToHtml(JSON.stringify(cache.value, nul
           list: 'border-b-0',
         }"
       />
+
+      <div class="flex-1 flex justify-end items-center gap-1">
+        <template v-if="currentTab.slot === 'history'">
+          <UTooltip text="Clear history">
+            <UButton
+              icon="lucide:trash"
+              size="xs"
+              variant="soft"
+              color="error"
+              @click="clearStoreStats()"
+            />
+          </UTooltip>
+        </template>
+      </div>
     </div>
 
     <div class="overflow-auto flex-1">
       <template v-if="currentTab.slot === 'cache'">
-        <div class="text-xs p-2 [&>.shiki]:!bg-transparent [&>.shiki]:whitespace-pre-wrap" v-html="cacheHtml" />
+        <CodeSnippet
+          :code="cache"
+          class="text-xs p-2"
+        />
       </template>
 
       <template v-if="currentTab.slot === 'history'">

@@ -247,4 +247,25 @@ export interface HookDefinitions<
       key: string
     }
   ) => Awaitable<void>
+
+  afterCacheWrite: <
+    TModelType extends ModelType,
+  > (
+    payload: {
+      store: StoreCore<TModel, TModelDefaults>
+      meta: CustomHookMeta
+      type: ResolvedModelType<TModelType, TModelDefaults, TModel>
+      key?: string
+      result?: Array<ResolvedModelItemBase<TModelType, TModelDefaults, TModel>>
+      marker?: string
+      operation: 'write' | 'delete'
+    }
+  ) => void
+
+  afterCacheReset: (
+    payload: {
+      store: StoreCore<TModel, TModelDefaults>
+      meta: CustomHookMeta
+    }
+  ) => void
 }

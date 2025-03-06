@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import { addImports, addPlugin, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, resolveFiles } from '@nuxt/kit'
+import { setupDevToolsUI } from './devtools'
 
 // Module options TypeScript interface definition
 export interface ModuleOptions {
@@ -19,7 +20,8 @@ export default defineNuxtModule<ModuleOptions>({
   // Default configuration options of the Nuxt module
   defaults: {},
   async setup(options, nuxt) {
-    const { resolve } = createResolver(import.meta.url)
+    const resolver = createResolver(import.meta.url)
+    const { resolve } = resolver
 
     // Auto imports
     const importsFile = resolve('./runtime/imports')
@@ -88,5 +90,7 @@ export const constModel = {
 
     // Do not add the extension since the `.ts` will be transpiled to `.mjs` after `npm run prepack`
     addPlugin(resolve('./runtime/plugin'))
+
+    setupDevToolsUI(nuxt, resolver)
   },
 })

@@ -1,18 +1,13 @@
 <script lang="ts" setup>
 import type { ModelRelation, ResolvedModelType } from '@rstore/shared'
-import { codeToHtml } from 'shiki'
 
 const props = defineProps<{
   item: ResolvedModelType<any, any, any>
 }>()
 
-const cache = useCache()
+const cache = useStoreCache()
 
-const colorMode = useColorMode()
-const cacheHtml = asyncComputed(() => codeToHtml(JSON.stringify((cache.value as any)[props.item.name] ?? {}, null, 2), {
-  lang: 'json',
-  theme: colorMode.value === 'dark' ? 'one-dark-pro' : 'one-light',
-}))
+const cacheCount = computed(() => Object.keys((cache.value as any)[props.item.name] ?? {}).length)
 </script>
 
 <template>
@@ -31,18 +26,22 @@ const cacheHtml = asyncComputed(() => codeToHtml(JSON.stringify((cache.value as 
       >
         <template #default="{ open }">
           <UBadge
-            :label="Object.keys((cache as any)[item.name] ?? {}).length || '0'"
+            :label="cacheCount || '0'"
             variant="subtle"
-            color="neutral"
+            :color="cacheCount ? 'primary' : 'neutral'"
             icon="lucide:database"
             :class="{
-              'outline outline-blue-500': open,
+              'outline outline-green-500': open,
+              'font-bold': cacheCount > 0,
             }"
           />
         </template>
 
         <template #content>
-          <div class="text-xs p-2 max-w-120 max-h-90 overflow-auto [&>.shiki]:!bg-transparent [&>.shiki]:whitespace-pre-wrap" v-html="cacheHtml" />
+          <CodeSnippet
+            :code="(cache as any)[props.item.name] ?? {}"
+            class="text-xs p-2 max-w-120 max-h-90 overflow-auto"
+          />
         </template>
       </UPopover>
     </div>

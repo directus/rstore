@@ -10,8 +10,17 @@ import { createStore } from '@rstore/vue'
 import { markRaw } from 'vue'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
-  const plugins = Object.values({ ..._plugins }) as Plugin[]
+  let plugins = Object.values({ ..._plugins }) as Plugin[]
   const model = { ..._model } as Model
+
+  // Devtools
+  if (import.meta.dev) {
+    const { devtoolsPlugin } = await import('./devtools')
+    plugins = [
+      ...plugins,
+      devtoolsPlugin,
+    ]
+  }
 
   const store = await createStore({
     plugins,

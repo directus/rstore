@@ -70,7 +70,7 @@ export function createCache<
       }
       return Object.values<any>(state.value[type.name] ?? {}).map(item => getWrappedItem(type, item)).filter(Boolean) as WrappedItem<any, any, any>[]
     },
-    writeItem({ type, key, item, marker }) {
+    writeItem({ type, key, item, marker, fromWriteItems }) {
       let itemsForType = state.value[type.name]
       if (!itemsForType) {
         itemsForType = state.value[type.name] = {}
@@ -124,12 +124,34 @@ export function createCache<
       if (marker) {
         mark(marker)
       }
+
+      if (!fromWriteItems) {
+        const store = getStore()
+        store.hooks.callHookSync('afterCacheWrite', {
+          store,
+          meta: {},
+          type,
+          key,
+          result: [item],
+          marker,
+          operation: 'write',
+        })
+      }
     },
     writeItems({ type, items, marker }) {
       for (const { key, value: item } of items) {
-        this.writeItem({ type, key, item })
+        this.writeItem({ type, key, item, fromWriteItems: true })
       }
       mark(marker)
+      const store = getStore()
+      store.hooks.callHookSync('afterCacheWrite', {
+        store,
+        meta: {},
+        type,
+        result: items,
+        marker,
+        operation: 'write',
+      })
     },
     writeItemForRelation({ type, relationKey, relation, item }) {
       const store = getStore()
@@ -154,6 +176,14 @@ export function createCache<
     deleteItem({ type, key }) {
       delete state.value[type.name]?.[key]
       wrappedItems.delete(getWrappedItemCacheKey(type, key))
+      const store = getStore()
+      store.hooks.callHookSync('afterCacheWrite', {
+        store,
+        meta: {},
+        type,
+        key,
+        operation: 'delete',
+      })
     },
     getState() {
       return toRaw(state.value)
@@ -161,10 +191,22 @@ export function createCache<
     setState(value) {
       state.value = value
       wrappedItems.clear()
+
+      const store = getStore()
+      store.hooks.callHookSync('afterCacheReset', {
+        store,
+        meta: {},
+      })
     },
     clear() {
       state.value = {}
       wrappedItems.clear()
+
+      const store = getStore()
+      store.hooks.callHookSync('afterCacheReset', {
+        store,
+        meta: {},
+      })
     },
     // @ts-expect-error private
     _private: {

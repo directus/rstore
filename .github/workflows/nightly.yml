@@ -29,6 +29,6 @@ jobs:
         run: pnpm install
 
       - name: Build
-        run: pnpm run -r prepublishOnly
+        run: pnpm run -r build
 
       - run: pnpx pkg-pr-new publish './packages/*'
