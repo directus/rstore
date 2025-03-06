@@ -1,6 +1,32 @@
 # Changelog
 
 
+## v0.1.7
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.1.6...v0.1.7)
+
+### 🚀 Enhancements
+
+- Nuxt devtools integration ([1e7b7f3](https://github.com/Akryum/rstore/commit/1e7b7f3))
+
+### 🩹 Fixes
+
+- Prepare script breaking pnpm pack ([e1a10ec](https://github.com/Akryum/rstore/commit/e1a10ec))
+- **nuxt:** Import useState from #app ([528e968](https://github.com/Akryum/rstore/commit/528e968))
+
+### 🏡 Chore
+
+- Update gitignore ([c83169b](https://github.com/Akryum/rstore/commit/c83169b))
+- Remove prepack script ([ef6e01f](https://github.com/Akryum/rstore/commit/ef6e01f))
+
+### 🤖 CI
+
+- Nightly job tidying ([0db8905](https://github.com/Akryum/rstore/commit/0db8905))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.1.6
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.1.5...v0.1.6)
