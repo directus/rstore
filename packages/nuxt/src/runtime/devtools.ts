@@ -1,6 +1,6 @@
 import type { StoreHistoryItem } from '../../client/utils/types'
 
-import { useNuxtApp } from '#app'
+import { useNuxtApp, useState } from '#app'
 import { definePlugin } from '@rstore/vue'
 import { createEventHook } from '@vueuse/core'
 
