@@ -1,6 +1,27 @@
 # Changelog
 
 
+## v0.2.0
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.1.8...v0.2.0)
+
+### 🚀 Enhancements
+
+- Specify form validation schema in create/update methods to override model schema ([de40714](https://github.com/Akryum/rstore/commit/de40714))
+
+### 💅 Refactors
+
+- Model type => model ([2ce9c52](https://github.com/Akryum/rstore/commit/2ce9c52))
+
+### 🏡 Chore
+
+- Setup git hooks ([e7ceeee](https://github.com/Akryum/rstore/commit/e7ceeee))
+- Allow version commit messages ([1230b69](https://github.com/Akryum/rstore/commit/1230b69))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.1.8
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.1.7...v0.1.8)
