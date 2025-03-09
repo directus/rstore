@@ -1,4 +1,4 @@
-import type { ModelDefaults, ModelType, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
+import type { Model, ModelDefaults, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { findFirst } from '../../src/query/findFirst'
@@ -7,7 +7,7 @@ interface TestModelDefaults extends ModelDefaults {
   name: string
 }
 
-interface TestModelType extends ModelType {
+interface TestModelType extends Model {
   id: string
 }
 
@@ -25,7 +25,7 @@ vi.mock('../../src/query/peekFirst', () => ({
 
 describe('findFirst', () => {
   let mockStore: StoreCore<any, any>
-  let modelType: ResolvedModelType<any, any, any>
+  let model: ResolvedModel<any, any, any>
 
   beforeEach(() => {
     mockStore = {
@@ -39,7 +39,7 @@ describe('findFirst', () => {
       processItemParsing: vi.fn(),
     } as any
 
-    modelType = {
+    model = {
       getKey: (item: any) => item.id,
     } as any
   })
@@ -47,7 +47,7 @@ describe('findFirst', () => {
   it('should return the first item from the cache by key', async () => {
     const result = await findFirst({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: '1',
     })
 
@@ -57,7 +57,7 @@ describe('findFirst', () => {
   it('should return the first item from the cache by filter', async () => {
     const result = await findFirst({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: {
         filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '2',
       },
@@ -69,7 +69,7 @@ describe('findFirst', () => {
   it('should return null if no item matches the filter', async () => {
     const result = await findFirst({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: {
         filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '3',
       },
@@ -83,7 +83,7 @@ describe('findFirst', () => {
 
     await findFirst({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: '42',
     })
 
@@ -98,12 +98,12 @@ describe('findFirst', () => {
 
     const result = await findFirst({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: '42',
     })
 
     expect(mockStore.cache.writeItem).toHaveBeenCalledWith(expect.objectContaining({
-      type: modelType,
+      model,
       key: '42',
       item: result.result,
     }))
@@ -113,7 +113,7 @@ describe('findFirst', () => {
     mockStore.getFetchPolicy = () => 'no-cache'
     await findFirst({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: '1',
     })
 

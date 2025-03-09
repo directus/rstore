@@ -1,4 +1,4 @@
-import type { Model, Plugin } from '@rstore/shared'
+import type { ModelMap, Plugin } from '@rstore/shared'
 
 import { defineNuxtPlugin } from '#app'
 // @ts-expect-error virtual file
@@ -11,7 +11,7 @@ import { markRaw } from 'vue'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
   let plugins = Object.values({ ..._plugins }) as Plugin[]
-  const model = { ..._model } as Model
+  const models = { ..._model } as ModelMap
 
   // Devtools
   if (import.meta.dev) {
@@ -24,7 +24,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
 
   const store = await createStore({
     plugins,
-    model,
+    models,
   })
 
   const cacheKey = '$svanilla-rstore'

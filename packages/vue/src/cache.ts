@@ -1,51 +1,51 @@
 import type { VueStore } from './store'
-import { type Cache, type Model, type ModelDefaults, type ModelType, pickNonSpecialProps, type ResolvedModelItem, type ResolvedModelType, type WrappedItem } from '@rstore/shared'
+import { type Cache, type Model, type ModelDefaults, type ModelMap, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, type WrappedItem } from '@rstore/shared'
 import { ref, toRaw } from 'vue'
 import { wrapItem } from './item'
 
 export interface CreateCacheOptions<
-  TModel extends Model,
+  TModelMap extends ModelMap,
   TModelDefaults extends ModelDefaults,
 > {
-  getStore: () => VueStore<TModel, TModelDefaults>
+  getStore: () => VueStore<TModelMap, TModelDefaults>
 }
 
 export function createCache<
-  TModel extends Model,
+  TModelMap extends ModelMap,
   TModelDefaults extends ModelDefaults,
 >({
   getStore,
-}: CreateCacheOptions<TModel, TModelDefaults>): Cache {
+}: CreateCacheOptions<TModelMap, TModelDefaults>): Cache {
   const state = ref<Record<string, any>>({
     _markers: {},
   })
 
   const wrappedItems = new Map<string, WrappedItem<any, any, any>>()
 
-  function getWrappedItemCacheKey<TModelType extends ModelType>(
-    type: ResolvedModelType<TModelType, TModelDefaults, TModel>,
+  function getWrappedItemCacheKey<TModel extends Model>(
+    model: ResolvedModel<TModel, TModelDefaults, TModelMap>,
     key: string,
   ) {
-    return `${type.name}:${key}`
+    return `${model.name}:${key}`
   }
 
-  function getWrappedItem<TModelType extends ModelType>(
-    type: ResolvedModelType<TModelType, TModelDefaults, TModel>,
-    item: ResolvedModelItem<TModelType, TModelDefaults, TModel> | null | undefined,
-  ): WrappedItem<TModelType, TModelDefaults, TModel> | undefined {
+  function getWrappedItem<TModel extends Model>(
+    model: ResolvedModel<TModel, TModelDefaults, TModelMap>,
+    item: ResolvedModelItem<TModel, TModelDefaults, TModelMap> | null | undefined,
+  ): WrappedItem<TModel, TModelDefaults, TModelMap> | undefined {
     if (!item) {
       return undefined
     }
-    const key = type.getKey(item)
+    const key = model.getKey(item)
     if (!key) {
       throw new Error('Key is required on item to get wrapped')
     }
-    const cacheKey = getWrappedItemCacheKey(type, key)
+    const cacheKey = getWrappedItemCacheKey(model, key)
     let wrappedItem = wrappedItems.get(cacheKey)
     if (!wrappedItem) {
       wrappedItem = wrapItem({
         store: getStore(),
-        type,
+        model,
         item,
       })
       wrappedItems.set(cacheKey, wrappedItem)
@@ -61,40 +61,40 @@ export function createCache<
   }
 
   return {
-    readItem({ type, key }) {
-      return getWrappedItem(type, state.value[type.name]?.[key])
+    readItem({ model, key }) {
+      return getWrappedItem(model, state.value[model.name]?.[key])
     },
-    readItems({ type, marker }) {
+    readItems({ model, marker }) {
       if (marker && !state.value._markers?.[marker]) {
         return []
       }
-      return Object.values<any>(state.value[type.name] ?? {}).map(item => getWrappedItem(type, item)).filter(Boolean) as WrappedItem<any, any, any>[]
+      return Object.values<any>(state.value[model.name] ?? {}).map(item => getWrappedItem(model, item)).filter(Boolean) as WrappedItem<any, any, any>[]
     },
-    writeItem({ type, key, item, marker, fromWriteItems }) {
-      let itemsForType = state.value[type.name]
+    writeItem({ model, key, item, marker, fromWriteItems }) {
+      let itemsForType = state.value[model.name]
       if (!itemsForType) {
-        itemsForType = state.value[type.name] = {}
+        itemsForType = state.value[model.name] = {}
       }
       const rawData = pickNonSpecialProps(item)
 
       // Handle relations
       const data = {} as Record<string, any>
       for (const key in rawData) {
-        if (key in type.relations) {
-          const relation = type.relations[key]
+        if (key in model.relations) {
+          const relation = model.relations[key]
           const rawItem = rawData[key]
 
           if (relation.many && !Array.isArray(rawItem)) {
-            throw new Error(`Expected array for relation ${type.name}.${key}`)
+            throw new Error(`Expected array for relation ${model.name}.${key}`)
           }
           else if (!relation.many && Array.isArray(rawItem)) {
-            throw new Error(`Expected object for relation ${type.name}.${key}`)
+            throw new Error(`Expected object for relation ${model.name}.${key}`)
           }
 
           if (Array.isArray(rawItem)) {
             for (const nestedItem of rawItem as any[]) {
               this.writeItemForRelation({
-                type,
+                model,
                 relationKey: key,
                 relation,
                 item: nestedItem,
@@ -103,7 +103,7 @@ export function createCache<
           }
           else {
             this.writeItemForRelation({
-              type,
+              model,
               relationKey: key,
               relation,
               item: rawItem,
@@ -130,7 +130,7 @@ export function createCache<
         store.hooks.callHookSync('afterCacheWrite', {
           store,
           meta: {},
-          type,
+          model,
           key,
           result: [item],
           marker,
@@ -138,49 +138,49 @@ export function createCache<
         })
       }
     },
-    writeItems({ type, items, marker }) {
+    writeItems({ model, items, marker }) {
       for (const { key, value: item } of items) {
-        this.writeItem({ type, key, item, fromWriteItems: true })
+        this.writeItem({ model, key, item, fromWriteItems: true })
       }
       mark(marker)
       const store = getStore()
       store.hooks.callHookSync('afterCacheWrite', {
         store,
         meta: {},
-        type,
+        model,
         result: items,
         marker,
         operation: 'write',
       })
     },
-    writeItemForRelation({ type, relationKey, relation, item }) {
+    writeItemForRelation({ model, relationKey, relation, item }) {
       const store = getStore()
       const possibleTypes = Object.keys(relation.to)
-      const nestedItemType = store.getType(item, possibleTypes)
+      const nestedItemType = store.getModel(item, possibleTypes)
       if (!nestedItemType) {
-        throw new Error(`Could not determine type for relation ${type.name}.${String(relationKey)}`)
+        throw new Error(`Could not determine type for relation ${model.name}.${String(relationKey)}`)
       }
       const nestedKey = nestedItemType.getKey(item)
       if (!nestedKey) {
-        throw new Error(`Could not determine key for relation ${type.name}.${String(relationKey)}`)
+        throw new Error(`Could not determine key for relation ${model.name}.${String(relationKey)}`)
       }
 
-      store.processItemParsing(type, item)
+      store.processItemParsing(model, item)
 
       this.writeItem({
-        type: nestedItemType,
+        model: nestedItemType,
         key: nestedKey,
         item,
       })
     },
-    deleteItem({ type, key }) {
-      delete state.value[type.name]?.[key]
-      wrappedItems.delete(getWrappedItemCacheKey(type, key))
+    deleteItem({ model, key }) {
+      delete state.value[model.name]?.[key]
+      wrappedItems.delete(getWrappedItemCacheKey(model, key))
       const store = getStore()
       store.hooks.callHookSync('afterCacheWrite', {
         store,
         meta: {},
-        type,
+        model,
         key,
         operation: 'delete',
       })

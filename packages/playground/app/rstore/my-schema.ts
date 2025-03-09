@@ -3,7 +3,7 @@ import { formatTimeAgo } from '@vueuse/core'
 const reactiveTime = useTimestamp()
 const getTime = () => import.meta.server ? Date.now() : reactiveTime.value
 
-export const Todo = defineItemType<Todo>().modelType({
+export const Todo = defineItemType<Todo>().model({
   name: 'Todo',
   schema: {
     create: createValidationSchemas.todos,
@@ -14,7 +14,7 @@ export const Todo = defineItemType<Todo>().modelType({
   },
 } as const)
 
-export const User = defineItemType<User>().modelType({
+export const User = defineItemType<User>().model({
   name: 'User',
   relations: {
     receivedMessages: {
@@ -41,7 +41,7 @@ export const User = defineItemType<User>().modelType({
   },
 } as const)
 
-export const Bot = defineItemType<Bot>().modelType({
+export const Bot = defineItemType<Bot>().model({
   name: 'Bot',
   relations: {
     receivedMessages: {
@@ -68,7 +68,7 @@ export const Bot = defineItemType<Bot>().modelType({
   },
 } as const)
 
-export const Message = defineItemType<Message>().modelType({
+export const Message = defineItemType<Message>().model({
   name: 'Message',
   relations: {
     author: {

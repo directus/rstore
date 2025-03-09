@@ -1,4 +1,4 @@
-import type { Model } from '@rstore/shared'
+import type { ModelMap } from '@rstore/shared'
 import type { InjectionKey } from 'vue'
 import { defineItemType, type VueStore } from '@rstore/vue'
 import { formatTimeAgo } from '@vueuse/core'
@@ -6,7 +6,7 @@ import { formatTimeAgo } from '@vueuse/core'
 const reactiveTime = useTimestamp()
 const getTime = () => import.meta.server ? Date.now() : reactiveTime.value
 
-const Todo = defineItemType<Todo>().modelType({
+const Todo = defineItemType<Todo>().model({
   name: 'Todo',
   schema: {
     create: createValidationSchemas.todos,
@@ -17,7 +17,7 @@ const Todo = defineItemType<Todo>().modelType({
   },
 } as const)
 
-const User = defineItemType<User>().modelType({
+const User = defineItemType<User>().model({
   name: 'User',
   relations: {
     receivedMessages: {
@@ -44,7 +44,7 @@ const User = defineItemType<User>().modelType({
   },
 } as const)
 
-const Bot = defineItemType<Bot>().modelType({
+const Bot = defineItemType<Bot>().model({
   name: 'Bot',
   relations: {
     receivedMessages: {
@@ -71,7 +71,7 @@ const Bot = defineItemType<Bot>().modelType({
   },
 } as const)
 
-const Message = defineItemType<Message>().modelType({
+const Message = defineItemType<Message>().model({
   name: 'Message',
   relations: {
     author: {
@@ -113,7 +113,7 @@ export const vanillaModel = {
   User,
   Bot,
   Message,
-} as const satisfies Model
+} as const satisfies ModelMap
 
 export const vanillaStoreKey = Symbol('vanillaStore') as InjectionKey<VueStore<typeof vanillaModel>>
 

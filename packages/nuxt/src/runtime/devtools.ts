@@ -66,7 +66,7 @@ export const devtoolsPlugin = definePlugin({
       if (payload.meta.storeHistoryItem) {
         storeStats.value.store.push({
           operation: payload.many ? 'fetchMany' : 'fetchFirst',
-          type: payload.type.name,
+          model: payload.model.name,
           started: payload.meta.storeHistoryItem.started,
           ended: new Date(),
           result: payload.getResult(),
@@ -88,7 +88,7 @@ export const devtoolsPlugin = definePlugin({
       if (payload.meta.storeHistoryItem) {
         storeStats.value.store.push({
           operation: payload.mutation,
-          type: payload.type.name,
+          model: payload.model.name,
           started: payload.meta.storeHistoryItem.started,
           ended: new Date(),
           result: payload.getResult(),

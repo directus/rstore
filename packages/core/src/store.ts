@@ -1,32 +1,32 @@
 import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
-import { type Cache, type FindOptions, get, type Hooks, type Model, type ModelDefaults, type Plugin, set, type StoreCore } from '@rstore/shared'
+import { type Cache, type FindOptions, get, type Hooks, type ModelDefaults, type ModelMap, type Plugin, set, type StoreCore } from '@rstore/shared'
 import { defaultFetchPolicy } from './fetchPolicy'
-import { resolveModel } from './model'
+import { resolveModels } from './model'
 import { setupPlugin } from './plugin'
 
 export interface CreateStoreCoreOptions<
-  TModel extends Model = Model,
+  TModelMap extends ModelMap = ModelMap,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
   cache: Cache
-  model: TModel
+  models: TModelMap
   modelDefaults?: TModelDefaults
   plugins?: Array<Plugin>
-  hooks: Hooks<TModel, TModelDefaults>
+  hooks: Hooks<TModelMap, TModelDefaults>
   findDefaults?: Partial<FindOptions<any, any, any>>
 }
 
 export async function createStoreCore<
-  TModel extends Model = Model,
+  TModelMap extends ModelMap = ModelMap,
   TModelDefaults extends ModelDefaults = ModelDefaults,
->(options: CreateStoreCoreOptions<TModel, TModelDefaults>): Promise<StoreCore<TModel, TModelDefaults>> {
+>(options: CreateStoreCoreOptions<TModelMap, TModelDefaults>): Promise<StoreCore<TModelMap, TModelDefaults>> {
   // Create store
 
-  const model = resolveModel(options.model, options.modelDefaults)
+  const models = resolveModels(options.models, options.modelDefaults)
 
-  const store: StoreCore<TModel, TModelDefaults> = {
+  const store: StoreCore<TModelMap, TModelDefaults> = {
     cache: options.cache,
-    model,
+    models,
     modelDefaults: options.modelDefaults ?? {} as TModelDefaults,
     plugins: options.plugins ?? [],
     hooks: options.hooks,
@@ -34,25 +34,25 @@ export async function createStoreCore<
     getFetchPolicy(value) {
       return value ?? store.findDefaults.fetchPolicy ?? defaultFetchPolicy
     },
-    processItemParsing(type, item) {
+    processItemParsing(model, item) {
       store.hooks.callHookSync('parseItem', {
         store,
         meta: {},
-        type,
+        model,
         item,
         modifyItem: (path, value) => {
           set(item, path, value as any)
         },
       })
     },
-    getType(item, types?) {
+    getModel(item, types?) {
       if (types?.length === 1) {
-        return store.model[types[0]]
+        return store.models[types[0]]
       }
-      for (const key of types ?? Object.keys(store.model)) {
-        const type = store.model[key]
-        if (type.isInstanceOf(item)) {
-          return type
+      for (const key of types ?? Object.keys(store.models)) {
+        const model = store.models[key]
+        if (model.isInstanceOf(item)) {
+          return model
         }
       }
       return null
@@ -78,9 +78,9 @@ export async function createStoreCore<
   // Model hooks
 
   store.hooks.hook('parseItem', (payload) => {
-    if (payload.type.fields) {
-      for (const path in payload.type.fields) {
-        const fieldConfig = payload.type.fields[path]
+    if (payload.model.fields) {
+      for (const path in payload.model.fields) {
+        const fieldConfig = payload.model.fields[path]
         if (fieldConfig.parse) {
           const value = get(payload.item, path as any)
           if (value != null) {

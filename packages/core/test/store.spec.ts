@@ -1,4 +1,4 @@
-import type { Cache, FetchPolicy, Model, ModelDefaults, Plugin } from '@rstore/shared'
+import type { Cache, FetchPolicy, ModelDefaults, ModelMap, Plugin } from '@rstore/shared'
 import type { CreateStoreCoreOptions } from '../src/store'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,7 +11,7 @@ describe('createStoreCore', () => {
   beforeEach(() => {
     options = {
       cache: {} as Cache,
-      model: {} as Model,
+      models: {} as ModelMap,
       modelDefaults: {} as ModelDefaults,
       plugins: [],
       hooks: {
@@ -27,7 +27,7 @@ describe('createStoreCore', () => {
     const store = await createStoreCore(options)
     expect(store).toBeDefined()
     expect(store.cache).toBe(options.cache)
-    expect(store.model).toBeDefined()
+    expect(store.models).toBeDefined()
     expect(store.modelDefaults).toEqual({})
     expect(store.plugins).toEqual([])
     expect(store.hooks).toBe(options.hooks)
@@ -57,7 +57,7 @@ describe('createStoreCore', () => {
   })
 
   it('calls custom field parse', async () => {
-    const model: Model = {
+    const models: ModelMap = {
       Test: {
         name: 'Test',
         fields: {
@@ -67,13 +67,13 @@ describe('createStoreCore', () => {
         },
       },
     }
-    options.model = model
+    options.models = models
     options.hooks = createHooks()
 
     const store = await createStoreCore(options)
     const item = { name: 'test' }
 
-    store.processItemParsing(store.model.Test, item)
+    store.processItemParsing(store.models.Test, item)
 
     expect(item.name).toBe('TEST')
   })
@@ -101,9 +101,9 @@ describe('createStoreCore', () => {
     })
   })
 
-  describe('getType', () => {
-    it('should return the correct type for an item', async () => {
-      const model: Model = {
+  describe('getModel', () => {
+    it('should return the correct model for an item', async () => {
+      const models: ModelMap = {
         Test: {
           name: 'Test',
           isInstanceOf: (item: any) => item.__typename === 'Test',
@@ -113,18 +113,18 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => item.__typename === 'AnotherTest',
         },
       }
-      options.model = model
+      options.models = models
       const store = await createStoreCore(options)
 
       const testItem = { __typename: 'Test' }
       const anotherTestItem = { __typename: 'AnotherTest' }
 
-      expect(store.getType(testItem)).toBe(store.model.Test)
-      expect(store.getType(anotherTestItem)).toBe(store.model.AnotherTest)
+      expect(store.getModel(testItem)).toBe(store.models.Test)
+      expect(store.getModel(anotherTestItem)).toBe(store.models.AnotherTest)
     })
 
-    it('should return the correct type for an item with no typename', async () => {
-      const model: Model = {
+    it('should return the correct model for an item with no typename', async () => {
+      const models: ModelMap = {
         User: {
           name: 'User',
           isInstanceOf: (item: any) => 'username' in item,
@@ -134,33 +134,33 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => 'botname' in item,
         },
       }
-      options.model = model
+      options.models = models
       const store = await createStoreCore(options)
 
       const testItem = { username: 'toto' }
       const anotherTestItem = { botname: 'bender' }
 
-      expect(store.getType(testItem)).toBe(store.model.User)
-      expect(store.getType(anotherTestItem)).toBe(store.model.Bot)
+      expect(store.getModel(testItem)).toBe(store.models.User)
+      expect(store.getModel(anotherTestItem)).toBe(store.models.Bot)
     })
 
-    it('should return null if no type matches the item', async () => {
-      const model: Model = {
+    it('should return null if no model matches the item', async () => {
+      const models: ModelMap = {
         Test: {
           name: 'Test',
           isInstanceOf: (item: any) => item.__typename === 'Test',
         },
       }
-      options.model = model
+      options.models = models
       const store = await createStoreCore(options)
 
       const unknownItem = { __typename: 'Unknown' }
 
-      expect(store.getType(unknownItem)).toBeNull()
+      expect(store.getModel(unknownItem)).toBeNull()
     })
 
     it('should search in only specified types', async () => {
-      const model: Model = {
+      const models: ModelMap = {
         User: {
           name: 'User',
           isInstanceOf: (item: any) => 'username' in item,
@@ -174,17 +174,17 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => 'botname' in item,
         },
       }
-      options.model = model
+      options.models = models
       const store = await createStoreCore(options)
 
       const testItem = { username: 'toto' }
 
-      expect(store.getType(testItem)).toBe(store.model.User)
-      expect(store.getType(testItem, ['User2', 'Bot'])).toBe(store.model.User2)
+      expect(store.getModel(testItem)).toBe(store.models.User)
+      expect(store.getModel(testItem, ['User2', 'Bot'])).toBe(store.models.User2)
     })
 
-    it('should return if only one specified type', async () => {
-      const model: Model = {
+    it('should return if only one specified model', async () => {
+      const models: ModelMap = {
         User: {
           name: 'User',
           isInstanceOf: (item: any) => 'username' in item,
@@ -198,12 +198,12 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => 'fooname' in item,
         },
       }
-      options.model = model
+      options.models = models
       const store = await createStoreCore(options)
 
       const testItem = { username: 'toto' }
 
-      expect(store.getType(testItem, ['Foo'])).toBe(store.model.Foo)
+      expect(store.getModel(testItem, ['Foo'])).toBe(store.models.Foo)
     })
   })
 })

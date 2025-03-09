@@ -1,14 +1,14 @@
-import type { Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType, StoreCore } from '@rstore/shared'
+import type { Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelItem, StoreCore } from '@rstore/shared'
 import type { CreateOptions } from '../../src/mutation/create'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createItem } from '../../src/mutation/create'
 
 describe('createItem', () => {
-  let mockStore: StoreCore<Model, ModelDefaults>
-  let mockType: ResolvedModelType<ModelType, ModelDefaults, Model>
-  let mockItem: Partial<ResolvedModelItem<ModelType, ModelDefaults, Model>>
-  let options: CreateOptions<ModelType, ModelDefaults, Model>
+  let mockStore: StoreCore<ModelMap, ModelDefaults>
+  let mockModel: ResolvedModel<Model, ModelDefaults, ModelMap>
+  let mockItem: Partial<ResolvedModelItem<Model, ModelDefaults, ModelMap>>
+  let options: CreateOptions<Model, ModelDefaults, ModelMap>
 
   beforeEach(() => {
     mockStore = {
@@ -18,39 +18,39 @@ describe('createItem', () => {
         writeItem: vi.fn(),
       },
       mutationHistory: [],
-    } as unknown as StoreCore<Model, ModelDefaults>
+    } as unknown as StoreCore<ModelMap, ModelDefaults>
 
-    mockType = {
+    mockModel = {
       getKey: vi.fn(),
-    } as unknown as ResolvedModelType<ModelType, ModelDefaults, Model>
+    } as unknown as ResolvedModel<Model, ModelDefaults, ModelMap>
 
     mockItem = {}
 
     options = {
       store: mockStore,
-      type: mockType,
+      model: mockModel,
       item: mockItem,
       skipCache: false,
     }
   })
 
   it('should create an item and write it to the cache', async () => {
-    const resultItem = { id: '1' } as ResolvedModelItem<ModelType, ModelDefaults, Model>
+    const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelMap>
     mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
-    mockType.getKey = vi.fn(() => '1')
+    mockModel.getKey = vi.fn(() => '1')
 
     const result = await createItem(options)
 
     expect(result).toEqual(resultItem)
-    expect(mockStore.processItemParsing).toHaveBeenCalledWith(mockType, resultItem)
+    expect(mockStore.processItemParsing).toHaveBeenCalledWith(mockModel, resultItem)
     expect(mockStore.cache.writeItem).toHaveBeenCalledWith({
-      type: mockType,
+      model: mockModel,
       key: '1',
       item: resultItem,
     })
     expect(mockStore.mutationHistory).toContainEqual({
       operation: 'create',
-      type: mockType,
+      model: mockModel,
       payload: mockItem,
     })
   })
@@ -62,26 +62,26 @@ describe('createItem', () => {
   })
 
   it('should throw an error if key is not defined', async () => {
-    const resultItem = { id: '1' } as ResolvedModelItem<ModelType, ModelDefaults, Model>
+    const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelMap>
     mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
-    mockType.getKey = vi.fn(() => undefined)
+    mockModel.getKey = vi.fn(() => undefined)
 
     await expect(createItem(options)).rejects.toThrow('Item creation failed: key is not defined')
   })
 
   it('should skip cache if skipCache is true', async () => {
-    const resultItem = { id: '1' } as ResolvedModelItem<ModelType, ModelDefaults, Model>
+    const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelMap>
     mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
-    mockType.getKey = vi.fn(() => '1')
+    mockModel.getKey = vi.fn(() => '1')
 
     const result = await createItem({ ...options, skipCache: true })
 
     expect(result).toEqual(resultItem)
-    expect(mockStore.processItemParsing).toHaveBeenCalledWith(mockType, resultItem)
+    expect(mockStore.processItemParsing).toHaveBeenCalledWith(mockModel, resultItem)
     expect(mockStore.cache.writeItem).not.toHaveBeenCalled()
     expect(mockStore.mutationHistory).toContainEqual({
       operation: 'create',
-      type: mockType,
+      model: mockModel,
       payload: mockItem,
     })
   })

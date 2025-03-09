@@ -17,7 +17,7 @@ const { data: message } = await store.Message.queryFirst(props.id)
     <UAvatar
       :src="message.author && 'avatar' in message.author ? message.author.avatar : undefined"
       :alt="message.author?.name"
-      :icon="message.author?.$type === 'Bot' ? 'lucide:bot' : undefined"
+      :icon="message.author?.$model === 'Bot' ? 'lucide:bot' : undefined"
     />
     <div class="flex-1 min-w-0 flex flex-col gap-1">
       <div
@@ -29,7 +29,7 @@ const { data: message } = await store.Message.queryFirst(props.id)
         </span>
 
         <UBadge
-          v-if="message.author.$type === 'Bot'"
+          v-if="message.author.$model === 'Bot'"
           icon="lucide:bot"
           color="secondary"
           variant="soft"

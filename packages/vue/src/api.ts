@@ -1,4 +1,4 @@
-import type { CreateFormObject, FindFirstOptions, FindManyOptions, HybridPromise, Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelItemBase, ResolvedModelType, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
+import type { CreateFormObject, FindFirstOptions, FindManyOptions, HybridPromise, Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueQueryReturn } from './query'
@@ -9,59 +9,59 @@ import { markRaw, reactive, toValue } from 'vue'
 import { createQuery } from './query'
 
 export interface VueModelApi<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
-  TItem extends WrappedItem<TModelType, TModelDefaults, TModel>,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
+  TItem extends WrappedItem<TModel, TModelDefaults, TModelMap>,
 > {
   /**
    * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
    */
   peekFirst: (
-    options: MaybeRefOrGetter<string | FindFirstOptions<TModelType, TModelDefaults, TModel>>,
-  ) => WrappedItem<TModelType, TModelDefaults, TModel> | null
+    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelMap>>,
+  ) => WrappedItem<TModel, TModelDefaults, TModelMap> | null
 
   /**
    * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
    */
   findFirst: (
-    options: MaybeRefOrGetter<string | FindFirstOptions<TModelType, TModelDefaults, TModel>>,
-  ) => Promise<WrappedItem<TModelType, TModelDefaults, TModel> | null>
+    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelMap>>,
+  ) => Promise<WrappedItem<TModel, TModelDefaults, TModelMap> | null>
 
   /**
    * Create a reactive query for the first item that matches the given options.
    */
   queryFirst: (
-    options: MaybeRefOrGetter<string | FindFirstOptions<TModelType, TModelDefaults, TModel>>,
-  ) => HybridPromise<VueQueryReturn<TModelType, TModelDefaults, TModel, TItem | null>>
+    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelMap>>,
+  ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelMap, TItem | null>>
 
   /**
    * Find all items that match the query in the cache without fetching the data from the adapter plugins.
    */
   peekMany: (
-    options?: MaybeRefOrGetter<FindManyOptions<TModelType, TModelDefaults, TModel> | undefined>,
-  ) => Array<WrappedItem<TModelType, TModelDefaults, TModel>>
+    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelMap> | undefined>,
+  ) => Array<WrappedItem<TModel, TModelDefaults, TModelMap>>
 
   /**
    * Find all items that match the query.
    */
   findMany: (
-    options?: MaybeRefOrGetter<FindManyOptions<TModelType, TModelDefaults, TModel> | undefined>,
-  ) => Promise<Array<WrappedItem<TModelType, TModelDefaults, TModel>>>
+    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelMap> | undefined>,
+  ) => Promise<Array<WrappedItem<TModel, TModelDefaults, TModelMap>>>
 
   /**
    * Create a reactive query for all items that match the given options.
    */
   queryMany: (
-    options?: MaybeRefOrGetter<FindManyOptions<TModelType, TModelDefaults, TModel> | undefined>,
-  ) => HybridPromise<VueQueryReturn<TModelType, TModelDefaults, TModel, Array<TItem>>>
+    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelMap> | undefined>,
+  ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelMap, Array<TItem>>>
 
   /**
    * Create an item directly. For a more user-friendly way, use `createForm` instead.
    */
   create: (
-    item: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>,
-  ) => Promise<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
+    item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>,
+  ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
 
   /**
    * (Recommended) The form object helps you creating a new item.
@@ -71,80 +71,80 @@ export interface VueModelApi<
       /**
        * Default values set in the form object initially and when it is reset.
        */
-      defaultValues?: () => Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
+      defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
     },
-  ) => CreateFormObject<TModelType, TModelDefaults, TModel> & {
-    $onSaved: EventHookOn<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
+  ) => CreateFormObject<TModel, TModelDefaults, TModelMap> & {
+    $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
   }
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
    */
   update: (
-    item: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>,
+    item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>,
     updateOptions?: {
       key?: string | null
     }
-  ) => Promise<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
+  ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
 
   /**
    * (Recommended) The form object helps you updating an existing item. If the item is not loaded yet, it will be fetched first to pre-fill the form.
    */
   updateForm: (
-    options: string | FindFirstOptions<TModelType, TModelDefaults, TModel>,
+    options: string | FindFirstOptions<TModel, TModelDefaults, TModelMap>,
     formOptions?: {
       /**
        * Default values set in the form object initially and when it is reset.
        *
        * By default `updateForm` will initialize the fields with the existing item data.
        */
-      defaultValues?: () => Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
+      defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
     },
-  ) => Promise<UpdateFormObject<TModelType, TModelDefaults, TModel> & {
+  ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelMap> & {
     $hasChanges: () => boolean
     $changedProps: Partial<{
-      [TKey in keyof ResolvedModelItem<TModelType, TModelDefaults, TModel>]: [
-        newValue: ResolvedModelItem<TModelType, TModelDefaults, TModel>[TKey],
-        oldValue: ResolvedModelItem<TModelType, TModelDefaults, TModel>[TKey],
+      [TKey in keyof ResolvedModelItem<TModel, TModelDefaults, TModelMap>]: [
+        newValue: ResolvedModelItem<TModel, TModelDefaults, TModelMap>[TKey],
+        oldValue: ResolvedModelItem<TModel, TModelDefaults, TModelMap>[TKey],
       ]
     }>
-    $onSaved: EventHookOn<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
+    $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
   }>
 
   /**
    * Find all items that match the query.
    */
   delete: (
-    keyOrItem: string | Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>,
+    keyOrItem: string | Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>,
   ) => Promise<void>
 }
 
 export function createModelApi<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 >(
-  store: StoreCore<TModel, TModelDefaults>,
-  type: ResolvedModelType<TModelType, TModelDefaults, TModel>,
-): VueModelApi<TModel[keyof TModel], TModelDefaults, TModel, WrappedItem<TModel[keyof TModel], TModelDefaults, TModel>> {
-  type Api = VueModelApi<TModel[keyof TModel], TModelDefaults, TModel, WrappedItem<TModel[keyof TModel], TModelDefaults, TModel>>
+  store: StoreCore<TModelMap, TModelDefaults>,
+  model: ResolvedModel<TModel, TModelDefaults, TModelMap>,
+): VueModelApi<TModelMap[keyof TModelMap], TModelDefaults, TModelMap, WrappedItem<TModelMap[keyof TModelMap], TModelDefaults, TModelMap>> {
+  type Api = VueModelApi<TModelMap[keyof TModelMap], TModelDefaults, TModelMap, WrappedItem<TModelMap[keyof TModelMap], TModelDefaults, TModelMap>>
   const api: Api = {
     peekFirst: findOptions => peekFirst({
       store,
-      type,
+      model,
       findOptions: toValue(findOptions),
     }).result,
 
     findFirst: findOptions => findFirst({
       store,
-      type,
+      model,
       findOptions: toValue(findOptions),
     }).then(r => r.result),
 
     queryFirst: options => createQuery({
       store,
-      fetchMethod: options => findFirst({ store, type, findOptions: options! }).then(r => r.result),
-      cacheMethod: options => peekFirst({ store, type, findOptions: options!, force: true }).result,
+      fetchMethod: options => findFirst({ store, model, findOptions: options! }).then(r => r.result),
+      cacheMethod: options => peekFirst({ store, model, findOptions: options!, force: true }).result,
       defaultValue: null,
       // @ts-expect-error @TODO fix type issue with options being a possible string
       options,
@@ -152,27 +152,27 @@ export function createModelApi<
 
     peekMany: findOptions => peekMany({
       store,
-      type,
+      model,
       findOptions: toValue(findOptions),
     }).result,
 
     findMany: findOptions => findMany({
       store,
-      type,
+      model,
       findOptions: toValue(findOptions),
     }).then(r => r.result),
 
     queryMany: options => createQuery({
       store,
-      fetchMethod: options => findMany({ store, type, findOptions: options }).then(r => r.result),
-      cacheMethod: options => peekMany({ store, type, findOptions: options, force: true }).result,
+      fetchMethod: options => findMany({ store, model, findOptions: options }).then(r => r.result),
+      cacheMethod: options => peekMany({ store, model, findOptions: options, force: true }).result,
       defaultValue: [],
       options,
     }),
 
     create: item => createItem({
       store,
-      type,
+      model,
       item,
     }),
 
@@ -199,8 +199,8 @@ export function createModelApi<
           form.$loading = true
           form.$error = null
           try {
-            const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
-            await type.schema.create['~standard'].validate(data)
+            const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+            await model.schema.create['~standard'].validate(data)
             const item = await api.create(data)
             onSaved.trigger(item)
             form.$reset()
@@ -214,7 +214,7 @@ export function createModelApi<
             form.$loading = false
           }
         },
-        $schema: markRaw(type.schema.create),
+        $schema: markRaw(model.schema.create),
         $onSaved: onSaved.on,
       } satisfies TReturn) as TReturn
       return form
@@ -222,7 +222,7 @@ export function createModelApi<
 
     update: (item, updateOptions) => updateItem({
       store,
-      type,
+      model,
       item,
       key: updateOptions?.key,
     }),
@@ -232,7 +232,7 @@ export function createModelApi<
 
       const onSaved = createEventHook()
 
-      async function getFormData(): Promise<ResolvedModelItemBase<TModelType, TModelDefaults, TModel>> {
+      async function getFormData(): Promise<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>> {
         const item = await api.findFirst(options)
 
         if (!item) {
@@ -268,8 +268,8 @@ export function createModelApi<
           form.$loading = true
           form.$error = null
           try {
-            const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
-            await type.schema.update['~standard'].validate(data)
+            const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+            await model.schema.update['~standard'].validate(data)
             const item = await api.update(data)
             onSaved.trigger(item)
             await form.$reset()
@@ -283,7 +283,7 @@ export function createModelApi<
             form.$loading = false
           }
         },
-        $schema: markRaw(type.schema.update),
+        $schema: markRaw(model.schema.update),
         $onSaved: onSaved.on,
       } satisfies TReturn) as TReturn
 
@@ -319,7 +319,7 @@ export function createModelApi<
     delete: (keyOrItem) => {
       let key: string
       if (typeof keyOrItem !== 'string') {
-        const result = type.getKey(keyOrItem)
+        const result = model.getKey(keyOrItem)
         if (!result) {
           throw new Error('Item delete failed: key is not defined')
         }
@@ -331,7 +331,7 @@ export function createModelApi<
 
       return deleteItem({
         store,
-        type,
+        model,
         key,
       })
     },

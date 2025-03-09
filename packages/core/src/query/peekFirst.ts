@@ -1,17 +1,17 @@
-import type { FindFirstOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
+import type { FindFirstOptions, Model, ModelDefaults, ModelMap, QueryResult, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
 import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
 export interface PeekFirstOptions<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 > {
-  store: StoreCore<TModel, TModelDefaults>
+  store: StoreCore<TModelMap, TModelDefaults>
   meta?: CustomHookMeta
-  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
-  findOptions: string | FindFirstOptions<TModelType, TModelDefaults, TModel>
+  model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+  findOptions: string | FindFirstOptions<TModel, TModelDefaults, TModelMap>
   force?: boolean
 }
 
@@ -19,19 +19,19 @@ export interface PeekFirstOptions<
  * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
  */
 export function peekFirst<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 >({
   store,
   meta,
-  type,
+  model,
   findOptions: keyOrOptions,
   force,
-}: PeekFirstOptions<TModelType, TModelDefaults, TModel>): QueryResult<WrappedItem<TModelType, TModelDefaults, TModel> | null> {
+}: PeekFirstOptions<TModel, TModelDefaults, TModelMap>): QueryResult<WrappedItem<TModel, TModelDefaults, TModelMap> | null> {
   meta = meta ?? {}
 
-  const findOptions: FindFirstOptions<TModelType, TModelDefaults, TModel> = typeof keyOrOptions === 'string'
+  const findOptions: FindFirstOptions<TModel, TModelDefaults, TModelMap> = typeof keyOrOptions === 'string'
     ? {
         key: keyOrOptions,
       }
@@ -41,12 +41,12 @@ export function peekFirst<
 
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let result: any
-    let marker = defaultMarker(type, findOptions)
+    let marker = defaultMarker(model, findOptions)
 
     store.hooks.callHookSync('beforeCacheReadFirst', {
       store,
       meta,
-      type,
+      model,
       findOptions,
       setMarker: (value) => {
         marker = value
@@ -54,21 +54,21 @@ export function peekFirst<
     })
 
     if (key) {
-      result = store.cache.readItem({ type, key })
+      result = store.cache.readItem({ model, key })
     }
     else if (typeof findOptions?.filter === 'function') {
       const filterFn = findOptions.filter
 
       // Try with first marker first
       result = store.cache.readItems({
-        type,
+        model,
         marker: force ? undefined : getMarker('first', marker),
       }).filter(item => filterFn(item))?.[0] ?? null
 
       // Fallback to many marker
       if (!result) {
         result = store.cache.readItems({
-          type,
+          model,
           marker: getMarker('many', marker),
         }).filter(item => filterFn(item))?.[0] ?? null
       }
@@ -77,7 +77,7 @@ export function peekFirst<
     store.hooks.callHookSync('cacheFilterFirst', {
       store,
       meta,
-      type,
+      model,
       getResult: () => result,
       setResult: (value) => {
         result = value
@@ -87,14 +87,14 @@ export function peekFirst<
       readItemsFromCache: () => {
         // Try with first marker first
         let items = store.cache.readItems({
-          type,
+          model,
           marker: force ? undefined : getMarker('first', marker),
         }) ?? []
 
         // Fallback to many marker
         if (!items.length) {
           items = store.cache.readItems({
-            type,
+            model,
             marker: getMarker('many', marker),
           }) ?? []
         }

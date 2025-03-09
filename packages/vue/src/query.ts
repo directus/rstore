@@ -1,11 +1,11 @@
-import type { FindOptions, HybridPromise, Model, ModelDefaults, ModelType, StoreCore } from '@rstore/shared'
+import type { FindOptions, HybridPromise, Model, ModelDefaults, ModelMap, StoreCore } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import { computed, ref, shallowRef, toValue, watch } from 'vue'
 
 export interface VueQueryReturn<
-  _TModelType extends ModelType,
-  _TModelDefaults extends ModelDefaults,
   _TModel extends Model,
+  _TModelDefaults extends ModelDefaults,
+  _TModelMap extends ModelMap,
   TResult,
 > {
   data: Ref<TResult>
@@ -14,13 +14,13 @@ export interface VueQueryReturn<
 }
 
 export interface VueCreateQueryOptions<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
-  TOptions extends FindOptions<TModelType, TModelDefaults, TModel>,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
+  TOptions extends FindOptions<TModel, TModelDefaults, TModelMap>,
   TResult,
 > {
-  store: StoreCore<TModel, TModelDefaults>
+  store: StoreCore<TModelMap, TModelDefaults>
   fetchMethod: (options?: TOptions) => Promise<TResult>
   cacheMethod: (options?: TOptions) => TResult
   defaultValue: TResult
@@ -31,10 +31,10 @@ export interface VueCreateQueryOptions<
  * @private
  */
 export function createQuery<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
-  TOptions extends FindOptions<TModelType, TModelDefaults, TModel>,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
+  TOptions extends FindOptions<TModel, TModelDefaults, TModelMap>,
   TResult,
 >({
   store,
@@ -42,7 +42,7 @@ export function createQuery<
   cacheMethod,
   defaultValue,
   options,
-}: VueCreateQueryOptions<TModelType, TModelDefaults, TModel, TOptions, TResult>): HybridPromise<VueQueryReturn<TModelType, TModelDefaults, TModel, TResult>> {
+}: VueCreateQueryOptions<TModel, TModelDefaults, TModelMap, TOptions, TResult>): HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelMap, TResult>> {
   const fetchPolicy = store.getFetchPolicy(toValue(options)?.fetchPolicy)
 
   const result = shallowRef<TResult>(defaultValue)
@@ -56,7 +56,7 @@ export function createQuery<
 
   const error = ref<Error | null>(null)
 
-  const returnObject: VueQueryReturn<TModelType, TModelDefaults, TModel, TResult> = {
+  const returnObject: VueQueryReturn<TModel, TModelDefaults, TModelMap, TResult> = {
     data,
     loading,
     error,
@@ -74,7 +74,7 @@ export function createQuery<
         fetchMethod({
           ...finalOptions,
           fetchPolicy: 'fetch-only',
-        } as FindOptions<TModelType, TModelDefaults, TModel> as any)
+        } as FindOptions<TModel, TModelDefaults, TModelMap> as any)
       }
 
       result.value = await fetchMethod(finalOptions)
@@ -97,7 +97,7 @@ export function createQuery<
     deep: true,
   })
 
-  const promise = load() as HybridPromise<VueQueryReturn<TModelType, TModelDefaults, TModel, TResult>>
+  const promise = load() as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelMap, TResult>>
   Object.assign(promise, returnObject)
   return promise
 }

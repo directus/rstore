@@ -6,9 +6,9 @@ import type { Full, KeysToUnion, Path, PathValue } from './utils'
 
 export type GetKey<TItem> = (item: TItem) => string | undefined | null
 
-export interface CustomModelTypeMeta {}
+export interface CustomModelMeta {}
 
-export interface ModelTypeSchemas<
+export interface ModelSchemas<
   TCreateSchema extends StandardSchemaV1 = StandardSchemaV1,
   TUpdateSchema extends StandardSchemaV1 = StandardSchemaV1,
 > {
@@ -16,10 +16,10 @@ export interface ModelTypeSchemas<
   update?: TUpdateSchema
 }
 
-export interface ModelType<
+export interface Model<
   TItem = any,
   TComputed extends Record<string, any> = Record<string, any>,
-  TSchemas extends ModelTypeSchemas = ModelTypeSchemas,
+  TSchemas extends ModelSchemas = ModelSchemas,
 > {
   /**
    * Name of the model.
@@ -42,7 +42,7 @@ export interface ModelType<
   'getKey'?: GetKey<TItem>
 
   /**
-   * Check if the item is an instance of the model type.
+   * Check if the item is an instance of the model.
    */
   'isInstanceOf'?: (item: any) => boolean
 
@@ -77,7 +77,7 @@ export interface ModelType<
 
   'schema'?: TSchemas
 
-  'meta'?: CustomModelTypeMeta
+  'meta'?: CustomModelMeta
 
   /**
    * @private
@@ -85,102 +85,102 @@ export interface ModelType<
   '~item'?: TItem
 }
 
-export type DefaultIsInstanceOf = (type: ModelType) => (item: any) => boolean
+export type DefaultIsInstanceOf = (model: Model) => (item: any) => boolean
 
 /**
  * Default values for any model.
  */
-export type ModelDefaults = Partial<Pick<ModelType, 'getKey' | 'computed' | 'fields' | 'meta'>> & {
+export type ModelDefaults = Partial<Pick<Model, 'getKey' | 'computed' | 'fields' | 'meta'>> & {
   isInstanceOf?: DefaultIsInstanceOf
 }
 
-export type ModelTypeDataKeys<
-  TModelType extends ModelType,
+export type ModelDataKeys<
+  TModel extends Model,
   TModelDefaults extends ModelDefaults,
-> = keyof TModelType['~item'] | keyof TModelType['computed'] | keyof TModelDefaults['computed']
+> = keyof TModel['~item'] | keyof TModel['computed'] | keyof TModelDefaults['computed']
 
 export interface ModelRelation {
   many?: boolean
 
   to: Record<string, {
     /**
-     * Field name on the current model type.
+     * Field name on the current model.
      */
     on: string
 
     /**
-     * Field name on the target model type.
+     * Field name on the target model.
      */
     eq: string
   }>
 }
 
-export type Model<TModelTypes extends Record<string, ModelType> = Record<string, ModelType>> = TModelTypes
+export type ModelMap<TModelMap extends Record<string, Model> = Record<string, Model>> = TModelMap
 
-export interface ResolvedModelType<
-  TModelType extends ModelType,
+export interface ResolvedModel<
+  TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  _TModel extends Model,
-  TSchemas extends ModelTypeSchemas = ModelTypeSchemas,
+  _TModelMap extends ModelMap,
+  TSchemas extends ModelSchemas = ModelSchemas,
 > {
   'name': string
-  'getKey': NonNullable<TModelType['getKey']>
-  'isInstanceOf': NonNullable<TModelType['isInstanceOf']>
-  'relations': NonNullable<TModelType['relations']>
-  'computed': NonNullable<TModelDefaults['computed'] & TModelType['computed']>
-  'fields': TModelType['fields']
+  'getKey': NonNullable<TModel['getKey']>
+  'isInstanceOf': NonNullable<TModel['isInstanceOf']>
+  'relations': NonNullable<TModel['relations']>
+  'computed': NonNullable<TModelDefaults['computed'] & TModel['computed']>
+  'fields': TModel['fields']
   'schema': Full<TSchemas>
-  'meta'?: CustomModelTypeMeta
-  '~item'?: TModelType['~item']
+  'meta'?: CustomModelMeta
+  '~item'?: TModel['~item']
 }
 
-export type ResolvedModel<
-  TModelTypes extends Record<string, ModelType>,
+export type ResolvedModelMap<
+  TModelMap extends Record<string, Model>,
   TModelDefaults extends ModelDefaults,
 > = {
-  [K in keyof TModelTypes]: ResolvedModelType<TModelTypes[K], TModelDefaults, Model<TModelTypes>>
+  [K in keyof TModelMap]: ResolvedModel<TModelMap[K], TModelDefaults, ModelMap<TModelMap>>
 }
 
 export type ResolvedModelItemBase<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
-> = NonNullable<ResolvedModelType<TModelType, TModelDefaults, TModel>['~item']>
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
+> = NonNullable<ResolvedModel<TModel, TModelDefaults, TModelMap>['~item']>
 
 export type ResolvedModelItem<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
-> = ResolvedModelItemBase<TModelType, TModelDefaults, TModel> & ResolvedRelationItems<TModelType, TModelDefaults, TModel> & ResolvedComputedFields<TModelType, TModelDefaults, TModel>
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
+> = ResolvedModelItemBase<TModel, TModelDefaults, TModelMap> & ResolvedRelationItems<TModel, TModelDefaults, TModelMap> & ResolvedComputedFields<TModel, TModelDefaults, TModelMap>
 
 export type ResolvedRelationItems<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 > = {
-  [K in keyof NonNullable<TModelType['relations']>]: ResolvedRelationItemsForRelation<TModelType, TModelDefaults, TModel, NonNullable<ResolvedModelType<TModelType, TModelDefaults, TModel>['relations']>[K]>
+  [K in keyof NonNullable<TModel['relations']>]: ResolvedRelationItemsForRelation<TModel, TModelDefaults, TModelMap, NonNullable<ResolvedModel<TModel, TModelDefaults, TModelMap>['relations']>[K]>
 }
 
 type ResolvedRelationItemsForRelation<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
   TRelation extends ModelRelation,
 > = TRelation['many'] extends true
-  ? Array<ResolvedRelationItemsForRelationTargetModels<TModelType, TModelDefaults, TModel, TRelation>>
-  : ResolvedRelationItemsForRelationTargetModels<TModelType, TModelDefaults, TModel, TRelation> | undefined
+  ? Array<ResolvedRelationItemsForRelationTargetModels<TModel, TModelDefaults, TModelMap, TRelation>>
+  : ResolvedRelationItemsForRelationTargetModels<TModel, TModelDefaults, TModelMap, TRelation> | undefined
 
 type ResolvedRelationItemsForRelationTargetModels<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
   TRelation extends ModelRelation,
-> = WrappedItem<TModel[KeysToUnion<TRelation['to']>], TModelDefaults, TModel>
+> = WrappedItem<TModelMap[KeysToUnion<TRelation['to']>], TModelDefaults, TModelMap>
 
 type ResolvedComputedFields<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 > = {
-  [K in keyof NonNullable<TModelDefaults['computed'] & TModelType['computed']>]: ReturnType<NonNullable<TModelDefaults['computed'] & TModelType['computed']>[K]>
+  [K in keyof NonNullable<TModelDefaults['computed'] & TModel['computed']>]: ReturnType<NonNullable<TModelDefaults['computed'] & TModel['computed']>[K]>
 }

@@ -1,4 +1,4 @@
-import type { ModelDefaults, ModelType, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
+import type { Model, ModelDefaults, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { peekFirst } from '../../src/query/peekFirst'
@@ -7,13 +7,13 @@ interface TestModelDefaults extends ModelDefaults {
   name: string
 }
 
-interface TestModelType extends ModelType {
+interface TestModelType extends Model {
   id: string
 }
 
 describe('peekFirst', () => {
   let mockStore: StoreCore<any, any>
-  let modelType: ResolvedModelType<any, any, any>
+  let model: ResolvedModel<any, any, any>
 
   beforeEach(() => {
     mockStore = {
@@ -25,7 +25,7 @@ describe('peekFirst', () => {
       getFetchPolicy: () => 'cache-first',
     } as any
 
-    modelType = {
+    model = {
       getKey: (item: any) => item.id,
     } as any
   })
@@ -33,7 +33,7 @@ describe('peekFirst', () => {
   it('should return the first item from the cache by key', () => {
     const result = peekFirst({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: '1',
     })
 
@@ -43,7 +43,7 @@ describe('peekFirst', () => {
   it('should return the first item from the cache by filter', () => {
     const result = peekFirst({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: {
         filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '2',
       },
@@ -55,7 +55,7 @@ describe('peekFirst', () => {
   it('should return null if no item matches the filter', () => {
     const result = peekFirst({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: {
         filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '3',
       },
@@ -69,7 +69,7 @@ describe('peekFirst', () => {
 
     peekFirst({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: '1',
     })
 

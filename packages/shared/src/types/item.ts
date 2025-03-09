@@ -1,28 +1,28 @@
-import type { Model, ModelDefaults, ModelType, ResolvedModelItem } from './model'
+import type { Model, ModelDefaults, ModelMap, ResolvedModelItem } from './model'
 import type { UpdateFormObject } from './mutation'
 
 /**
  * The object is wrapped by the store with additional props and can be used to update the data.
  */
 export interface WrappedItemBase<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 > {
   /**
    * Name of the model.
    */
-  $type: TModelType['name']
+  $model: TModel['name']
 
   /**
    * (Recommended) The form object helps you updating the item.
    */
-  $updateForm: (options?: WrappedItemEditOptions<TModelType, TModelDefaults, TModel>) => Promise<UpdateFormObject<TModelType, TModelDefaults, TModel>>
+  $updateForm: (options?: WrappedItemEditOptions<TModel, TModelDefaults, TModelMap>) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelMap>>
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
    */
-  $update: (data: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>) => Promise<void>
+  $update: (data: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>) => Promise<void>
 
   /**
    * Delete the item.
@@ -34,17 +34,17 @@ export interface WrappedItemBase<
  * The object is wrapped by the store with additional props and can be used to update the data.
  */
 export type WrappedItem<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
-> = WrappedItemBase<TModelType, TModelDefaults, TModel> & ResolvedModelItem<TModelType, TModelDefaults, TModel>
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
+> = WrappedItemBase<TModel, TModelDefaults, TModelMap> & ResolvedModelItem<TModel, TModelDefaults, TModelMap>
 
 /* eslint-disable unused-imports/no-unused-vars */
 
 export interface WrappedItemEditOptions<
-  TModelType extends ModelType = ModelType,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
   TModel extends Model = Model,
+  TModelDefaults extends ModelDefaults = ModelDefaults,
+  TModelMap extends ModelMap = ModelMap,
 > {
   // to be extended
 }

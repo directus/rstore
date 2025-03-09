@@ -1,5 +1,5 @@
 import type { WrappedItem } from './item'
-import type { Model, ModelDefaults, ModelRelation, ModelType, ResolvedModelItemBase, ResolvedModelType } from './model'
+import type { Model, ModelDefaults, ModelMap, ModelRelation, ResolvedModel, ResolvedModelItemBase } from './model'
 
 /*
 
@@ -16,7 +16,7 @@ Example:
 
 If there wasn't a marker, the cache would return a list with the single user that was specifically fetched in step 1.
 
-4. See that there is no marker for this list (by default taking into account: type.name, params object, filter object) => return empty list
+4. See that there is no marker for this list (by default taking into account: model.name, params object, filter object) => return empty list
 5. Cache miss => fetch all users
 
 */
@@ -24,56 +24,56 @@ If there wasn't a marker, the cache would return a list with the single user tha
 export interface CustomCacheState {}
 
 export interface WriteItem<
-  TModelType extends ModelType = ModelType,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
   TModel extends Model = Model,
+  TModelDefaults extends ModelDefaults = ModelDefaults,
+  TModelMap extends ModelMap = ModelMap,
 > {
   key: string
-  value: ResolvedModelItemBase<TModelType, TModelDefaults, TModel>
+  value: ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>
 }
 
 export interface Cache<
-  TModel extends Model = Model,
+  TModelMap extends ModelMap = ModelMap,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
-  readItem: <TModelType extends ModelType = ModelType>(params: {
-    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
+  readItem: <TModel extends Model = Model>(params: {
+    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
     key: string
-  }) => WrappedItem<TModelType, TModelDefaults, TModel> | undefined
+  }) => WrappedItem<TModel, TModelDefaults, TModelMap> | undefined
 
-  writeItem: <TModelType extends ModelType = ModelType>(params: {
-    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
+  writeItem: <TModel extends Model = Model>(params: {
+    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
     key: string
-    item: ResolvedModelItemBase<TModelType, TModelDefaults, TModel>
+    item: ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>
     marker?: string
     fromWriteItems?: boolean
   }) => void
 
-  deleteItem: <TModelType extends ModelType = ModelType>(params: {
-    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
+  deleteItem: <TModel extends Model = Model>(params: {
+    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
     key: string
   }) => void
 
-  readItems: <TModelType extends ModelType = ModelType>(params: {
-    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
+  readItems: <TModel extends Model = Model>(params: {
+    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
     /**
      * Marker to consider that the corresponding list was already fetched once. Allow returning empty list if marker is not found.
      */
     marker?: string
-  }) => Array<WrappedItem<TModelType, TModelDefaults, TModel>>
+  }) => Array<WrappedItem<TModel, TModelDefaults, TModelMap>>
 
-  writeItems: <TModelType extends ModelType = ModelType>(params: {
-    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
-    items: Array<WriteItem<TModelType, TModelDefaults, TModel>>
+  writeItems: <TModel extends Model = Model>(params: {
+    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+    items: Array<WriteItem<TModel, TModelDefaults, TModelMap>>
     /**
      * Marker to consider that the corresponding list was already fetched once.
      */
     marker: string
   }) => void
 
-  writeItemForRelation: <TModelType extends ModelType = ModelType>(params: {
-    type: ResolvedModelType<TModelType, TModelDefaults, TModel>
-    relationKey: keyof ResolvedModelItemBase<TModelType, TModelDefaults, TModel>['relations']
+  writeItemForRelation: <TModel extends Model = Model>(params: {
+    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+    relationKey: keyof ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>['relations']
     relation: ModelRelation
     item: any
   }) => void

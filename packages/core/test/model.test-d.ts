@@ -1,17 +1,17 @@
 import { describe, expectTypeOf, test } from 'vitest'
 import { defineItemType } from '../src'
 
-describe('typed model type', () => {
+describe('typed model', () => {
   test('defineItemType', () => {
     interface MyObj {
       id: string
       name: string
     }
 
-    const modelType = defineItemType<MyObj>().modelType({
+    const model = defineItemType<MyObj>().model({
       name: 'MyObj',
     })
 
-    expectTypeOf(modelType['~item']).toMatchTypeOf<MyObj>()
+    expectTypeOf(model['~item']).toMatchTypeOf<MyObj>()
   })
 })

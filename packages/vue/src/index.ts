@@ -8,7 +8,7 @@ export type {
 
 export {
   defineItemType,
-  defineModelType,
+  defineModel,
   definePlugin,
 } from '@rstore/core'
 
@@ -16,7 +16,7 @@ export type {
   CustomCacheState,
   CustomFilterOption,
   CustomHookMeta,
-  CustomModelTypeMeta,
+  CustomModelMeta,
   CustomParams,
   CustomSortOption,
 } from '@rstore/shared'

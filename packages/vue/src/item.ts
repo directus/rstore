@@ -1,40 +1,40 @@
-import type { Model, ModelDefaults, ModelType, ResolvedModelItem, ResolvedModelType, WrappedItem, WrappedItemBase, WrappedItemEditOptions } from '@rstore/shared'
+import type { Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelItem, WrappedItem, WrappedItemBase, WrappedItemEditOptions } from '@rstore/shared'
 import type { VueModelApi } from './api'
 import type { VueStore } from './store'
 import { peekFirst, peekMany } from '@rstore/core'
 
 export interface WrapItemOptions<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 > {
-  store: VueStore<TModel, TModelDefaults>
-  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
-  item: ResolvedModelItem<TModelType, TModelDefaults, TModel>
+  store: VueStore<TModelMap, TModelDefaults>
+  model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+  item: ResolvedModelItem<TModel, TModelDefaults, TModelMap>
 }
 
 export function wrapItem<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 >({
   store,
-  type,
+  model,
   item,
-}: WrapItemOptions<TModelType, TModelDefaults, TModel>): WrappedItemBase<TModelType, TModelDefaults, TModel> {
-  function getApi(): VueModelApi<TModelType, TModelDefaults, TModel, WrappedItem<TModelType, TModelDefaults, TModel>> {
-    return store[type.name]
+}: WrapItemOptions<TModel, TModelDefaults, TModelMap>): WrappedItemBase<TModel, TModelDefaults, TModelMap> {
+  function getApi(): VueModelApi<TModel, TModelDefaults, TModelMap, WrappedItem<TModel, TModelDefaults, TModelMap>> {
+    return store[model.name]
   }
 
   const proxy = new Proxy(item, {
     get: (target, key) => {
       switch (key) {
-        case '$type':
-          return (type.name) satisfies WrappedItemBase<TModelType, TModelDefaults, TModel>['$type']
+        case '$model':
+          return (model.name) satisfies WrappedItemBase<TModel, TModelDefaults, TModelMap>['$model']
 
         case '$updateForm':
-          return ((options?: WrappedItemEditOptions<TModelType, TModelDefaults, TModel>) => {
-            const key = type.getKey(item)
+          return ((options?: WrappedItemEditOptions<TModel, TModelDefaults, TModelMap>) => {
+            const key = model.getKey(item)
             if (!key) {
               throw new Error('Key is required on item to update')
             }
@@ -44,47 +44,47 @@ export function wrapItem<
               defaultValues: options?.defaultValues,
             })
             return form
-          }) satisfies WrappedItemBase<TModelType, TModelDefaults, TModel>['$updateForm']
+          }) satisfies WrappedItemBase<TModel, TModelDefaults, TModelMap>['$updateForm']
 
         case '$update':
-          return ((data: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>) => {
-            const key = type.getKey(item)
+          return ((data: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>) => {
+            const key = model.getKey(item)
             return getApi().update(data, {
               key,
             })
-          }) satisfies WrappedItemBase<TModelType, TModelDefaults, TModel>['$update']
+          }) satisfies WrappedItemBase<TModel, TModelDefaults, TModelMap>['$update']
 
         case '$delete':
           return (() => {
-            const key = type.getKey(item)
+            const key = model.getKey(item)
             if (!key) {
               throw new Error('Key is required on item to delete')
             }
             return getApi().delete(key)
-          }) satisfies WrappedItemBase<TModelType, TModelDefaults, TModel>['$delete']
+          }) satisfies WrappedItemBase<TModel, TModelDefaults, TModelMap>['$delete']
       }
 
       // Resolve computed properties
-      if (key in type.computed) {
-        return type.computed[key as string](proxy)
+      if (key in model.computed) {
+        return model.computed[key as string](proxy)
       }
 
       // Resolve related items in the cache
-      if (key in type.relations) {
+      if (key in model.relations) {
         if (Reflect.has(target, key)) {
           // @TODO resolve references
           return Reflect.get(target, key)
         }
         else {
-          const relation = type.relations[key as string]
+          const relation = model.relations[key as string]
           const result: Array<any> = []
           for (const targetModelName in relation.to) {
             const targetModel = relation.to[targetModelName]
-            const targetType = store.model[targetModelName]
+            const targetType = store.models[targetModelName]
             const value = Reflect.get(proxy, targetModel.eq)
             const cacheResultForTarget = (relation.many ? peekMany : peekFirst)({
               store,
-              type: targetType,
+              model: targetType,
               findOptions: {
                 filter: foreignItem => foreignItem[targetModel.on] === value,
               },
@@ -121,15 +121,15 @@ export function wrapItem<
 
 declare module '@rstore/shared' {
   export interface WrappedItemEditOptions<
-    TModelType extends ModelType = ModelType,
-    TModelDefaults extends ModelDefaults = ModelDefaults,
     TModel extends Model = Model,
+    TModelDefaults extends ModelDefaults = ModelDefaults,
+    TModelMap extends ModelMap = ModelMap,
   > {
     /**
      * Default values set in the form object initially and when it is reset.
      *
      * By default `updateForm` will initialize the fields with the existing item data.
      */
-    defaultValues?: () => Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
+    defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
   }
 }

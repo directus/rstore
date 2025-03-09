@@ -1,8 +1,8 @@
-import type { DefaultIsInstanceOf, Full, GetKey, ModelDefaults, ModelType, ModelTypeSchemas, ResolvedModel } from '@rstore/shared'
+import type { DefaultIsInstanceOf, Full, GetKey, Model, ModelDefaults, ModelSchemas, ResolvedModelMap } from '@rstore/shared'
 
 export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
 
-export const defaultIsInstanceOf: DefaultIsInstanceOf = type => item => item.__typename === type.name
+export const defaultIsInstanceOf: DefaultIsInstanceOf = model => item => item.__typename === model.name
 
 /**
  * Allow typing the model item type thanks to currying.
@@ -12,24 +12,24 @@ export function defineItemType<
 >() {
   return {
     /**
-     * Define a typed model type.
+     * Define a typed model.
      */
-    modelType: <
+    model: <
       TComputed extends Record<string, any>,
-      TSchemas extends ModelTypeSchemas,
-      TModelType extends ModelType<TItem, TComputed, TSchemas> = ModelType<TItem, TComputed, TSchemas>,
-    > (model: TModelType): TModelType & { '~item': TItem } => model as any,
+      TSchemas extends ModelSchemas,
+      TModel extends Model<TItem, TComputed, TSchemas> = Model<TItem, TComputed, TSchemas>,
+    > (model: TModel): TModel & { '~item': TItem } => model as any,
   }
 }
 
 /**
- * Define an untyped model type.
+ * Define an untyped model.
  */
-export function defineModelType(model: ModelType): ModelType {
+export function defineModel(model: Model): Model {
   return model
 }
 
-const emptySchemas: Full<ModelTypeSchemas> = {
+const emptySchemas: Full<ModelSchemas> = {
   create: {
     '~standard': {
       validate: value => ({ value }),
@@ -46,44 +46,44 @@ const emptySchemas: Full<ModelTypeSchemas> = {
   },
 }
 
-export function resolveModel<
-  TModelTypes extends Record<string, ModelType>,
+export function resolveModels<
+  TModelMap extends Record<string, Model>,
   TModelDefaults extends ModelDefaults,
->(types: TModelTypes, defaults?: TModelDefaults): ResolvedModel<TModelTypes, TModelDefaults> {
-  const resolved = {} as ResolvedModel<TModelTypes, TModelDefaults>
+>(models: TModelMap, defaults?: TModelDefaults): ResolvedModelMap<TModelMap, TModelDefaults> {
+  const resolved = {} as ResolvedModelMap<TModelMap, TModelDefaults>
 
-  for (const key in types) {
-    const type = types[key]
+  for (const key in models) {
+    const model = models[key]
 
     const fields = defaults?.fields ?? {}
-    if (type.fields) {
-      for (const path in type.fields) {
+    if (model.fields) {
+      for (const path in model.fields) {
         if (fields[path]) {
-          Object.assign(fields[path], type.fields[path])
+          Object.assign(fields[path], model.fields[path])
         }
         else {
-          fields[path] = type.fields[path]
+          fields[path] = model.fields[path]
         }
       }
     }
 
     resolved[key] = {
-      name: type.name,
-      getKey: item => (type.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
-      isInstanceOf: item => type.isInstanceOf?.(item) || defaults?.isInstanceOf?.(type)(item) || defaultIsInstanceOf(type)(item),
-      relations: type.relations ?? {},
+      name: model.name,
+      getKey: item => (model.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
+      isInstanceOf: item => model.isInstanceOf?.(item) || defaults?.isInstanceOf?.(model)(item) || defaultIsInstanceOf(model)(item),
+      relations: model.relations ?? {},
       computed: {
         ...defaults?.computed,
-        ...type.computed,
+        ...model.computed,
       },
       fields,
       schema: {
-        create: type.schema?.create ?? emptySchemas.create,
-        update: type.schema?.update ?? emptySchemas.update,
+        create: model.schema?.create ?? emptySchemas.create,
+        update: model.schema?.update ?? emptySchemas.update,
       },
       meta: {
         ...defaults?.meta,
-        ...type.meta,
+        ...model.meta,
       },
     }
   }

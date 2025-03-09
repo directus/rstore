@@ -27,7 +27,7 @@ export default defineNuxtModule<ModuleOptions>({
     const importsFile = resolve('./runtime/imports')
     addImports([
       'defineItemType',
-      'defineModelType',
+      'defineModel',
       'defineRstorePlugin',
       'useStore',
     ].map(name => ({ from: importsFile, name })))
@@ -70,11 +70,11 @@ export default defineNuxtModule<ModuleOptions>({
             exported: matches.map(match => match.split(' ')[2]),
           }
         }).filter(Boolean) as { file: string, exported: string[] }[]
-        return `import type { Model } from '@rstore/shared'
+        return `import type { ModelMap } from '@rstore/shared'
 ${data.map(({ file, exported }) => `import { ${exported.join(', ')} } from '${file}'`).join('\n')}
 export const constModel = {
   ${data.map(({ exported }) => exported.map(name => `${name},`).join('\n')).join('\n')}
-} as const satisfies Model`
+} as const satisfies ModelMap`
       },
     })
 

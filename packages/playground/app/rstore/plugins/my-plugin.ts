@@ -18,13 +18,13 @@ export default defineRstorePlugin({
     })
 
     hook('fetchFirst', async (payload) => {
-      if (payload.type.meta?.path) {
+      if (payload.model.meta?.path) {
         if (payload.key) {
-          const result = await $fetch(`/api/rest/${payload.type.meta.path}/${payload.key}`)
+          const result = await $fetch(`/api/rest/${payload.model.meta.path}/${payload.key}`)
           payload.setResult(result)
         }
         else {
-          const result: any = await $fetch(`/api/rest/${payload.type.meta.path}`, {
+          const result: any = await $fetch(`/api/rest/${payload.model.meta.path}`, {
             method: 'GET',
             query: payload.findOptions?.params,
           })
@@ -33,13 +33,13 @@ export default defineRstorePlugin({
       }
     })
     // hook('beforeCacheReadMany', (payload) => {
-    //   payload.setMarker(`many:${payload.type.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
+    //   payload.setMarker(`many:${payload.model.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
     // })
     hook('fetchMany', async (payload) => {
-      // payload.setMarker(`many:${payload.type.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
+      // payload.setMarker(`many:${payload.model.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
 
-      if (payload.type.meta?.path) {
-        const result = await $fetch(`/api/rest/${payload.type.meta.path}`, {
+      if (payload.model.meta?.path) {
+        const result = await $fetch(`/api/rest/${payload.model.meta.path}`, {
           method: 'GET',
           query: payload.findOptions?.params,
         })
@@ -52,10 +52,10 @@ export default defineRstorePlugin({
       const payloadResult = payload.getResult()
       const items: any[] = Array.isArray(payloadResult) ? payloadResult : [payloadResult]
       await Promise.all(items.map(async (item) => {
-        const key = payload.type.getKey(item)
+        const key = payload.model.getKey(item)
         if (key) {
           const wrappedItem = payload.store.cache.readItem({
-            type: payload.type,
+            model: payload.model,
             key,
           })
           if (!wrappedItem) {
@@ -67,14 +67,14 @@ export default defineRstorePlugin({
               continue
             }
 
-            const relation = payload.type.relations[relationKey]
+            const relation = payload.model.relations[relationKey]
             if (!relation) {
-              throw new Error(`Relation "${relationKey}" does not exist on model "${payload.type.name}"`)
+              throw new Error(`Relation "${relationKey}" does not exist on model "${payload.model.name}"`)
             }
 
             await Promise.all(Object.keys(relation.to).map((modelKey) => {
               const relationData = relation.to[modelKey]!
-              return store[modelKey as keyof typeof store.model].findMany({
+              return store[modelKey as keyof typeof store.models].findMany({
                 params: {
                   filter: `${relationData.on}:${wrappedItem[relationData.eq]}`,
                 },
@@ -86,8 +86,8 @@ export default defineRstorePlugin({
     })
 
     hook('createItem', async (payload) => {
-      if (payload.type.meta?.path) {
-        const result = await $fetch(`/api/rest/${payload.type.meta.path}`, {
+      if (payload.model.meta?.path) {
+        const result = await $fetch(`/api/rest/${payload.model.meta.path}`, {
           method: 'POST',
           body: payload.item,
         })
@@ -96,8 +96,8 @@ export default defineRstorePlugin({
     })
 
     hook('updateItem', async (payload) => {
-      if (payload.type.meta?.path) {
-        const result = await $fetch(`/api/rest/${payload.type.meta.path}/${payload.key}`, {
+      if (payload.model.meta?.path) {
+        const result = await $fetch(`/api/rest/${payload.model.meta.path}/${payload.key}`, {
           method: 'PATCH',
           body: {
             ...payload.item,
@@ -109,8 +109,8 @@ export default defineRstorePlugin({
     })
 
     hook('deleteItem', async (payload) => {
-      if (payload.type.meta?.path) {
-        await $fetch(`/api/rest/${payload.type.meta.path}/${payload.key}`, {
+      if (payload.model.meta?.path) {
+        await $fetch(`/api/rest/${payload.model.meta.path}/${payload.key}`, {
           method: 'DELETE',
         })
       }
@@ -128,7 +128,7 @@ export default defineRstorePlugin({
       if (payload.meta.storeHistoryItem) {
         storeStats.value.store.push({
           operation: payload.many ? 'fetchMany' : 'fetchFirst',
-          type: payload.type.name,
+          model: payload.model.name,
           started: payload.meta.storeHistoryItem.started,
           ended: new Date(),
           result: payload.getResult(),
@@ -149,7 +149,7 @@ export default defineRstorePlugin({
       if (payload.meta.storeHistoryItem) {
         storeStats.value.store.push({
           operation: payload.mutation,
-          type: payload.type.name,
+          model: payload.model.name,
           started: payload.meta.storeHistoryItem.started,
           ended: new Date(),
           result: payload.getResult(),

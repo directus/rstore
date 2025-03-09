@@ -1,10 +1,10 @@
-import type { ResolvedModelType } from '@rstore/shared'
+import type { ResolvedModel } from '@rstore/shared'
 import { describe, expect, it } from 'vitest'
 import { defaultMarker, getMarker } from '../src'
 
 describe('defaultMarker', () => {
   it('should generate marker with empty findOptions', () => {
-    const type: ResolvedModelType<any, any, any> = {
+    const model: ResolvedModel<any, any, any> = {
       name: 'TestType',
       computed: {},
       fields: {},
@@ -13,12 +13,12 @@ describe('defaultMarker', () => {
       relations: [],
       schema: {} as any,
     }
-    const result = defaultMarker(type)
+    const result = defaultMarker(model)
     expect(result).toBe('TestType:{}:{}')
   })
 
   it('should generate marker with findOptions', () => {
-    const type: ResolvedModelType<any, any, any> = {
+    const model: ResolvedModel<any, any, any> = {
       name: 'TestType',
       computed: {},
       fields: {},
@@ -28,12 +28,12 @@ describe('defaultMarker', () => {
       schema: {} as any,
     }
     const findOptions = { filter: { id: 1 } }
-    const result = defaultMarker(type, findOptions as any)
+    const result = defaultMarker(model, findOptions as any)
     expect(result).toBe('TestType:{"filter":{"id":1}}:{"id":1}')
   })
 
   it('should generate marker with findOptions and non-function filter', () => {
-    const type: ResolvedModelType<any, any, any> = {
+    const model: ResolvedModel<any, any, any> = {
       name: 'TestType',
       computed: {},
       fields: {},
@@ -43,12 +43,12 @@ describe('defaultMarker', () => {
       schema: {} as any,
     }
     const findOptions = { filter: { id: 1 }, sort: 'asc' }
-    const result = defaultMarker(type, findOptions as any)
+    const result = defaultMarker(model, findOptions as any)
     expect(result).toBe('TestType:{"filter":{"id":1},"sort":"asc"}:{"id":1}')
   })
 
   it('should generate marker with findOptions and function filter and params', () => {
-    const type: ResolvedModelType<any, any, any> = {
+    const model: ResolvedModel<any, any, any> = {
       name: 'TestType',
       computed: {},
       fields: {},
@@ -58,7 +58,7 @@ describe('defaultMarker', () => {
       schema: {} as any,
     }
     const findOptions = { filter: () => true, params: { foo: 'bar' } }
-    const result = defaultMarker(type, findOptions)
+    const result = defaultMarker(model, findOptions)
     expect(result).toBe('TestType:{"params":{"foo":"bar"}}:{}')
   })
 })

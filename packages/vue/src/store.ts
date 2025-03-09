@@ -1,37 +1,37 @@
-import type { FindOptions, Model, ModelDefaults, Plugin, StoreCore, WrappedItem } from '@rstore/shared'
+import type { FindOptions, ModelDefaults, ModelMap, Plugin, StoreCore, WrappedItem } from '@rstore/shared'
 import { createStoreCore } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createModelApi, type VueModelApi } from './api'
 import { createCache } from './cache'
 
 export interface CreateStoreOptions<
-  TModel extends Model = Model,
+  TModelMap extends ModelMap = ModelMap,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
-  model: TModel
+  models: TModelMap
   modelDefaults?: TModelDefaults
   plugins: Array<Plugin>
   findDefaults?: Partial<FindOptions<any, any, any>>
 }
 
 export type VueStoreModelApiProxy<
-  TModel extends Model,
+  TModelMap extends ModelMap,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > = {
-  [TKey in keyof TModel]: VueModelApi<TModel[TKey], TModelDefaults, TModel, WrappedItem<TModel[TKey], TModelDefaults, TModel>>
+  [TKey in keyof TModelMap]: VueModelApi<TModelMap[TKey], TModelDefaults, TModelMap, WrappedItem<TModelMap[TKey], TModelDefaults, TModelMap>>
 }
 
 export type VueStore<
-  TModel extends Model,
+  TModelMap extends ModelMap,
   TModelDefaults extends ModelDefaults = ModelDefaults,
-> = StoreCore<TModel, TModelDefaults> & VueStoreModelApiProxy<TModel, TModelDefaults>
+> = StoreCore<TModelMap, TModelDefaults> & VueStoreModelApiProxy<TModelMap, TModelDefaults>
 
 export async function createStore<
-  TModel extends Model,
+  TModelMap extends ModelMap,
   TModelDefaults extends ModelDefaults,
->(options: CreateStoreOptions<TModel, TModelDefaults>): Promise<VueStore<TModel, TModelDefaults>> {
-  const store = await createStoreCore<TModel, TModelDefaults>({
-    model: options.model,
+>(options: CreateStoreOptions<TModelMap, TModelDefaults>): Promise<VueStore<TModelMap, TModelDefaults>> {
+  const store = await createStoreCore<TModelMap, TModelDefaults>({
+    models: options.models,
     modelDefaults: options.modelDefaults,
     plugins: options.plugins,
     cache: createCache({
@@ -41,21 +41,21 @@ export async function createStore<
     findDefaults: options.findDefaults,
   })
 
-  const queryCache: Map<keyof TModel, VueModelApi<TModel[keyof TModel], TModelDefaults, TModel, WrappedItem<TModel[keyof TModel], TModelDefaults, TModel>>> = new Map()
+  const queryCache: Map<keyof TModelMap, VueModelApi<TModelMap[keyof TModelMap], TModelDefaults, TModelMap, WrappedItem<TModelMap[keyof TModelMap], TModelDefaults, TModelMap>>> = new Map()
 
   const storeProxy = new Proxy(store, {
     get(_, key) {
-      if (key in store.model) {
-        const typeName = key as keyof TModel
+      if (key in store.models) {
+        const typeName = key as keyof TModelMap
         if (!queryCache.has(typeName)) {
-          queryCache.set(typeName, createModelApi(store, store.model[typeName]))
+          queryCache.set(typeName, createModelApi(store, store.models[typeName]))
         }
         return queryCache.get(typeName)
       }
 
       return Reflect.get(store, key)
     },
-  }) as VueStore<TModel, TModelDefaults>
+  }) as VueStore<TModelMap, TModelDefaults>
 
   /**
    * Access the store in sub objects like the cache to avoid circular dependencies.

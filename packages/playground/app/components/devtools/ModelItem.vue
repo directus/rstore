@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import type { ModelRelation, ResolvedModelType } from '@rstore/shared'
+import type { ModelRelation, ResolvedModel } from '@rstore/shared'
 import { codeToHtml } from 'shiki'
 
 const props = defineProps<{
-  item: ResolvedModelType<any, any, any>
+  item: ResolvedModel<any, any, any>
 }>()
 
 const cache = useCache()

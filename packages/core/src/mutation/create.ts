@@ -1,36 +1,36 @@
 import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
-import { type Model, type ModelDefaults, type ModelType, pickNonSpecialProps, type ResolvedModelItem, type ResolvedModelType, set, type StoreCore } from '@rstore/shared'
+import { type Model, type ModelDefaults, type ModelMap, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, set, type StoreCore } from '@rstore/shared'
 
 export interface CreateOptions<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 > {
-  store: StoreCore<TModel, TModelDefaults>
-  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
-  item: Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
+  store: StoreCore<TModelMap, TModelDefaults>
+  model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+  item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
   skipCache?: boolean
 }
 
 export async function createItem<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 >({
   store,
-  type,
+  model,
   item,
   skipCache,
-}: CreateOptions<TModelType, TModelDefaults, TModel>): Promise<ResolvedModelItem<TModelType, TModelDefaults, TModel>> {
+}: CreateOptions<TModel, TModelDefaults, TModelMap>): Promise<ResolvedModelItem<TModel, TModelDefaults, TModelMap>> {
   const meta: CustomHookMeta = {}
 
-  item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModelType, TModelDefaults, TModel>>
-  let result: ResolvedModelItem<TModelType, TModelDefaults, TModel> | undefined
+  item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+  let result: ResolvedModelItem<TModel, TModelDefaults, TModelMap> | undefined
 
   await store.hooks.callHook('beforeMutation', {
     store,
     meta,
-    type,
+    model,
     mutation: 'create',
     item,
     modifyItem: (path: any, value: any) => {
@@ -44,7 +44,7 @@ export async function createItem<
   await store.hooks.callHook('createItem', {
     store,
     meta,
-    type,
+    model,
     item,
     getResult: () => result,
     setResult: (newResult) => {
@@ -55,7 +55,7 @@ export async function createItem<
   await store.hooks.callHook('afterMutation', {
     store,
     meta,
-    type,
+    model,
     mutation: 'create',
     item,
     getResult: () => result,
@@ -65,14 +65,14 @@ export async function createItem<
   })
 
   if (result) {
-    store.processItemParsing(type, result)
+    store.processItemParsing(model, result)
 
     if (!skipCache) {
-      const key = type.getKey(result)
+      const key = model.getKey(result)
 
       if (key) {
         store.cache.writeItem({
-          type,
+          model,
           key,
           item: result,
         })
@@ -88,7 +88,7 @@ export async function createItem<
 
   store.mutationHistory.push({
     operation: 'create',
-    type,
+    model,
     payload: item,
   })
 

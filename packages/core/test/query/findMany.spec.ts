@@ -1,4 +1,4 @@
-import type { ModelDefaults, ModelType, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
+import type { Model, ModelDefaults, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { findMany } from '../../src/query/findMany'
@@ -7,7 +7,7 @@ interface TestModelDefaults extends ModelDefaults {
   name: string
 }
 
-interface TestModelType extends ModelType {
+interface TestModelType extends Model {
   id: string
 }
 
@@ -22,7 +22,7 @@ vi.mock('../../src/query/peekMany', () => ({
 
 describe('findMany', () => {
   let mockStore: StoreCore<any, any>
-  let modelType: ResolvedModelType<any, any, any>
+  let model: ResolvedModel<any, any, any>
 
   beforeEach(() => {
     mockStore = {
@@ -35,7 +35,7 @@ describe('findMany', () => {
       processItemParsing: vi.fn(),
     } as any
 
-    modelType = {
+    model = {
       getKey: (item: any) => item.id,
     } as any
   })
@@ -43,7 +43,7 @@ describe('findMany', () => {
   it('should return items from the cache by filter', async () => {
     const result = await findMany({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: {
         filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '2',
       },
@@ -55,7 +55,7 @@ describe('findMany', () => {
   it('should return an empty array if no items match the filter', async () => {
     const result = await findMany({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: {
         filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '3',
       },
@@ -69,7 +69,7 @@ describe('findMany', () => {
 
     await findMany({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: {
         params: {
           email: '42',
@@ -88,7 +88,7 @@ describe('findMany', () => {
 
     const result = await findMany({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: {
         params: {
           email: '42',
@@ -97,7 +97,7 @@ describe('findMany', () => {
     })
 
     expect(mockStore.cache.writeItems).toHaveBeenCalledWith(expect.objectContaining({
-      type: modelType,
+      model,
       items: [{ key: '42', value: result.result[0] }],
       marker: expect.any(String),
     }))
@@ -107,7 +107,7 @@ describe('findMany', () => {
     mockStore.getFetchPolicy = () => 'no-cache'
     await findMany({
       store: mockStore,
-      type: modelType,
+      model,
       findOptions: {
         params: {
           email: '42',

@@ -1,33 +1,33 @@
-import type { FindManyOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, WrappedItem, WriteItem } from '@rstore/shared'
+import type { FindManyOptions, Model, ModelDefaults, ModelMap, QueryResult, ResolvedModel, StoreCore, WrappedItem, WriteItem } from '@rstore/shared'
 import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekMany } from './peekMany'
 
 export interface FindManyParams<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 > {
-  store: StoreCore<TModel, TModelDefaults>
+  store: StoreCore<TModelMap, TModelDefaults>
   meta?: CustomHookMeta
-  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
-  findOptions?: FindManyOptions<TModelType, TModelDefaults, TModel>
+  model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+  findOptions?: FindManyOptions<TModel, TModelDefaults, TModelMap>
 }
 
 /**
  * Find all items that match the query.
  */
 export async function findMany<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 >({
   store,
   meta,
-  type,
+  model,
   findOptions,
-}: FindManyParams<TModelType, TModelDefaults, TModel>): Promise<QueryResult<Array<WrappedItem<TModelType, TModelDefaults, TModel>>>> {
+}: FindManyParams<TModel, TModelDefaults, TModelMap>): Promise<QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelMap>>>> {
   meta = meta ?? {}
 
   findOptions = findOptions ?? {}
@@ -40,7 +40,7 @@ export async function findMany<
     const peekManyResult = peekMany({
       store,
       meta,
-      type,
+      model,
       findOptions,
     })
     result = peekManyResult.result
@@ -49,13 +49,13 @@ export async function findMany<
 
   if (!result?.length && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
     if (!marker) {
-      marker = defaultMarker(type, findOptions)
+      marker = defaultMarker(model, findOptions)
     }
 
     await store.hooks.callHook('beforeFetch', {
       store,
       meta,
-      type,
+      model,
       findOptions,
       many: true,
       updateFindOptions: (value) => {
@@ -66,7 +66,7 @@ export async function findMany<
     await store.hooks.callHook('fetchMany', {
       store,
       meta,
-      type,
+      model,
       findOptions,
       getResult: () => result,
       setResult: (value) => {
@@ -80,7 +80,7 @@ export async function findMany<
     await store.hooks.callHook('afterFetch', {
       store,
       meta,
-      type,
+      model,
       findOptions,
       many: true,
       getResult: () => result,
@@ -91,23 +91,23 @@ export async function findMany<
 
     if (result) {
       for (const item of result) {
-        store.processItemParsing(type, item)
+        store.processItemParsing(model, item)
       }
     }
 
     if (fetchPolicy !== 'no-cache') {
       const items = result
-      const writes: Array<WriteItem<TModelType, TModelDefaults, TModel>> = []
+      const writes: Array<WriteItem<TModel, TModelDefaults, TModelMap>> = []
       for (const item of items) {
-        const key = type.getKey(item)
+        const key = model.getKey(item)
         if (!key) {
-          console.warn(`Key is undefined for ${type.name}. Item was not written to cache.`)
+          console.warn(`Key is undefined for ${model.name}. Item was not written to cache.`)
           continue
         }
         writes.push({ key, value: item })
       }
-      store.cache.writeItems<TModelType>({
-        type,
+      store.cache.writeItems<TModel>({
+        model,
         items: writes,
         marker: getMarker('many', marker),
       })
@@ -118,7 +118,7 @@ export async function findMany<
     await store.hooks.callHook('fetchRelations', {
       store,
       meta,
-      type,
+      model,
       findOptions,
       many: true,
       getResult: () => result,

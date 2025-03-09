@@ -1,36 +1,36 @@
-import type { FindFirstOptions, Model, ModelDefaults, ModelType, QueryResult, ResolvedModelType, StoreCore, WrappedItem } from '@rstore/shared'
+import type { FindFirstOptions, Model, ModelDefaults, ModelMap, QueryResult, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
 import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekFirst } from './peekFirst'
 
 export interface FindFirstParams<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 > {
-  store: StoreCore<TModel, TModelDefaults>
+  store: StoreCore<TModelMap, TModelDefaults>
   meta?: CustomHookMeta
-  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
-  findOptions: string | FindFirstOptions<TModelType, TModelDefaults, TModel>
+  model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+  findOptions: string | FindFirstOptions<TModel, TModelDefaults, TModelMap>
 }
 
 /**
  * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
  */
 export async function findFirst<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 >({
   store,
   meta,
-  type,
+  model,
   findOptions: keyOrOptions,
-}: FindFirstParams<TModelType, TModelDefaults, TModel>): Promise<QueryResult<WrappedItem<TModelType, TModelDefaults, TModel> | null>> {
+}: FindFirstParams<TModel, TModelDefaults, TModelMap>): Promise<QueryResult<WrappedItem<TModel, TModelDefaults, TModelMap> | null>> {
   meta = meta ?? {}
 
-  const findOptions: FindFirstOptions<TModelType, TModelDefaults, TModel> = typeof keyOrOptions === 'string'
+  const findOptions: FindFirstOptions<TModel, TModelDefaults, TModelMap> = typeof keyOrOptions === 'string'
     ? {
         key: keyOrOptions,
       }
@@ -44,7 +44,7 @@ export async function findFirst<
     const peekResult = peekFirst({
       store,
       meta,
-      type,
+      model,
       findOptions,
     })
     result = peekResult.result
@@ -53,13 +53,13 @@ export async function findFirst<
 
   if (!result && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
     if (!marker) {
-      marker = defaultMarker(type, findOptions)
+      marker = defaultMarker(model, findOptions)
     }
 
     await store.hooks.callHook('beforeFetch', {
       store,
       meta,
-      type,
+      model,
       key: findOptions.key,
       findOptions,
       many: false,
@@ -71,7 +71,7 @@ export async function findFirst<
     await store.hooks.callHook('fetchFirst', {
       store,
       meta,
-      type,
+      model,
       key: findOptions.key,
       findOptions,
       getResult: () => result,
@@ -86,7 +86,7 @@ export async function findFirst<
     await store.hooks.callHook('afterFetch', {
       store,
       meta,
-      type,
+      model,
       key: findOptions.key,
       findOptions,
       many: false,
@@ -97,16 +97,16 @@ export async function findFirst<
     })
 
     if (result) {
-      store.processItemParsing(type, result)
+      store.processItemParsing(model, result)
 
       if (fetchPolicy !== 'no-cache') {
-        const key = type.getKey(result)
+        const key = model.getKey(result)
         if (!key) {
-          console.warn(`Key is undefined for ${type.name}. Item was not written to cache.`)
+          console.warn(`Key is undefined for ${model.name}. Item was not written to cache.`)
         }
         else {
           store.cache.writeItem({
-            type,
+            model,
             key,
             item: result,
             marker: getMarker('first', marker),
@@ -120,7 +120,7 @@ export async function findFirst<
     await store.hooks.callHook('fetchRelations', {
       store,
       meta,
-      type,
+      model,
       key: findOptions.key,
       findOptions,
       many: false,

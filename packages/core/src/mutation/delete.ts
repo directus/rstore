@@ -1,33 +1,33 @@
-import type { Model, ModelDefaults, ModelType, ResolvedModelType, StoreCore } from '@rstore/shared'
+import type { Model, ModelDefaults, ModelMap, ResolvedModel, StoreCore } from '@rstore/shared'
 import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
 
 export interface DeleteOptions<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 > {
-  store: StoreCore<TModel, TModelDefaults>
-  type: ResolvedModelType<TModelType, TModelDefaults, TModel>
+  store: StoreCore<TModelMap, TModelDefaults>
+  model: ResolvedModel<TModel, TModelDefaults, TModelMap>
   key: string
   skipCache?: boolean
 }
 
 export async function deleteItem<
-  TModelType extends ModelType,
-  TModelDefaults extends ModelDefaults,
   TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelMap extends ModelMap,
 >({
   store,
-  type,
+  model,
   key,
   skipCache,
-}: DeleteOptions<TModelType, TModelDefaults, TModel>): Promise<void> {
+}: DeleteOptions<TModel, TModelDefaults, TModelMap>): Promise<void> {
   const meta: CustomHookMeta = {}
 
   await store.hooks.callHook('beforeMutation', {
     store,
     meta,
-    type,
+    model,
     mutation: 'delete',
     key,
     modifyItem: () => {},
@@ -37,14 +37,14 @@ export async function deleteItem<
   await store.hooks.callHook('deleteItem', {
     store,
     meta,
-    type,
+    model,
     key,
   })
 
   await store.hooks.callHook('afterMutation', {
     store,
     meta,
-    type,
+    model,
     mutation: 'delete',
     key,
     getResult: () => undefined,
@@ -53,14 +53,14 @@ export async function deleteItem<
 
   if (!skipCache) {
     store.cache.deleteItem({
-      type,
+      model,
       key,
     })
   }
 
   store.mutationHistory.push({
     operation: 'delete',
-    type,
+    model,
     key,
   })
 }

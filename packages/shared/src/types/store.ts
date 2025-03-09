@@ -1,22 +1,22 @@
 import type { Hooks } from '../utils/hooks'
 import type { Cache } from './cache'
-import type { Model, ModelDefaults, ModelType, ResolvedModel, ResolvedModelType } from './model'
+import type { Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelMap } from './model'
 import type { MutationOperation } from './mutation'
 import type { Plugin } from './plugin'
 import type { FetchPolicy, FindOptions } from './query'
 
 export interface StoreCore<
-  TModel extends Model,
+  TModelMap extends ModelMap,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
-  cache: Cache<TModel, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults>
+  cache: Cache<TModelMap, TModelDefaults>
+  models: ResolvedModelMap<TModelMap, TModelDefaults>
   modelDefaults: TModelDefaults
   plugins: Array<Plugin>
-  hooks: Hooks<TModel, TModelDefaults>
+  hooks: Hooks<TModelMap, TModelDefaults>
   findDefaults: Partial<FindOptions<any, any, any>>
   getFetchPolicy: (value: FetchPolicy | null | undefined) => FetchPolicy
-  processItemParsing: <TModelType extends ModelType> (type: ResolvedModelType<TModelType, TModelDefaults, TModel>, item: any) => void
-  getType: (item: any, types?: string[]) => ResolvedModelType<ModelType, ModelDefaults, Model> | null
-  mutationHistory: Array<MutationOperation<any, TModelDefaults, TModel>>
+  processItemParsing: <TModel extends Model> (model: ResolvedModel<TModel, TModelDefaults, TModelMap>, item: any) => void
+  getModel: (item: any, types?: string[]) => ResolvedModel<Model, ModelDefaults, ModelMap> | null
+  mutationHistory: Array<MutationOperation<any, TModelDefaults, TModelMap>>
 }
