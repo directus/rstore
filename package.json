@@ -18,12 +18,15 @@
     "test:dev": "vitest",
     "test:types": "pnpm run -r test:types",
     "copy-readme": "cp README.md ./packages/vue/README.md && cp README.md ./packages/nuxt/README.md",
-    "release": "pnpm run copy-readme && pnpm run lint && pnpm run test && pnpm run test:types && pnpm run build && sheep release -b main --force"
+    "release": "pnpm run copy-readme && pnpm run lint && pnpm run test && pnpm run test:types && pnpm run build && sheep release -b main --force",
+    "postinstall": "simple-git-hooks"
   },
   "devDependencies": {
     "@akryum/sheep": "^0.5.2",
     "@antfu/eslint-config": "^3.12.1",
     "eslint": "^9.17.0",
+    "lint-staged": "^15.4.3",
+    "simple-git-hooks": "^2.11.1",
     "typescript": "^5.7.2",
     "vitest": "catalog:"
   },
@@ -31,6 +34,7 @@
     "onlyBuiltDependencies": [
       "@parcel/watcher",
       "esbuild",
+      "simple-git-hooks",
       "vue-demi"
     ],
     "overrides": {
@@ -39,5 +43,14 @@
       "@tailwindcss/vite": "4.0.7",
       "tailwindcss": "4.0.7"
     }
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged && pnpm run test && pnpm run test:types",
+    "commit-msg": "node scripts/verify-commit.js"
+  },
+  "lint-staged": {
+    "*": [
+      "eslint --fix"
+    ]
   }
 }
