@@ -17,7 +17,7 @@ export interface WrappedItemBase<
   /**
    * (Recommended) The form object helps you updating the item.
    */
-  $updateForm: (options?: WrappedItemEditOptions<TModel, TModelDefaults, TModelMap>) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelMap>>
+  $updateForm: (options?: WrappedItemUpdateFormOptions<TModel, TModelDefaults, TModelMap>) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelMap>>
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
@@ -41,7 +41,7 @@ export type WrappedItem<
 
 /* eslint-disable unused-imports/no-unused-vars */
 
-export interface WrappedItemEditOptions<
+export interface WrappedItemUpdateFormOptions<
   TModel extends Model = Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
   TModelMap extends ModelMap = ModelMap,

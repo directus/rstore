@@ -1,4 +1,4 @@
-import type { CreateFormObject, FindFirstOptions, FindManyOptions, HybridPromise, Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
+import type { CreateFormObject, FindFirstOptions, FindManyOptions, HybridPromise, Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueQueryReturn } from './query'
@@ -72,6 +72,13 @@ export interface VueModelApi<
        * Default values set in the form object initially and when it is reset.
        */
       defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+
+      /**
+       * Schema to validate the form object.
+       *
+       * @default model.schema.create
+       */
+      schema?: StandardSchemaV1
     },
   ) => CreateFormObject<TModel, TModelDefaults, TModelMap> & {
     $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
@@ -99,6 +106,13 @@ export interface VueModelApi<
        * By default `updateForm` will initialize the fields with the existing item data.
        */
       defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+
+      /**
+       * Schema to validate the form object.
+       *
+       * @default model.schema.update
+       */
+      schema?: StandardSchemaV1
     },
   ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelMap> & {
     $hasChanges: () => boolean
@@ -214,7 +228,7 @@ export function createModelApi<
             form.$loading = false
           }
         },
-        $schema: markRaw(model.schema.create),
+        $schema: markRaw(formOptions?.schema ?? model.schema.create),
         $onSaved: onSaved.on,
       } satisfies TReturn) as TReturn
       return form
@@ -283,7 +297,7 @@ export function createModelApi<
             form.$loading = false
           }
         },
-        $schema: markRaw(model.schema.update),
+        $schema: markRaw(formOptions?.schema ?? model.schema.update),
         $onSaved: onSaved.on,
       } satisfies TReturn) as TReturn
 

@@ -1,7 +1,8 @@
-import type { Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelItem, WrappedItem, WrappedItemBase, WrappedItemEditOptions } from '@rstore/shared'
+import type { Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelItem, StandardSchemaV1, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions } from '@rstore/shared'
 import type { VueModelApi } from './api'
 import type { VueStore } from './store'
 import { peekFirst, peekMany } from '@rstore/core'
+import { markRaw } from 'vue'
 
 export interface WrapItemOptions<
   TModel extends Model,
@@ -33,16 +34,19 @@ export function wrapItem<
           return (model.name) satisfies WrappedItemBase<TModel, TModelDefaults, TModelMap>['$model']
 
         case '$updateForm':
-          return ((options?: WrappedItemEditOptions<TModel, TModelDefaults, TModelMap>) => {
+          return (async (options?: WrappedItemUpdateFormOptions<TModel, TModelDefaults, TModelMap>) => {
             const key = model.getKey(item)
             if (!key) {
               throw new Error('Key is required on item to update')
             }
-            const form = getApi().updateForm({
+            const form = await getApi().updateForm({
               key,
             }, {
               defaultValues: options?.defaultValues,
             })
+            if (options?.schema) {
+              form.$schema = markRaw(options.schema)
+            }
             return form
           }) satisfies WrappedItemBase<TModel, TModelDefaults, TModelMap>['$updateForm']
 
@@ -120,7 +124,7 @@ export function wrapItem<
 }
 
 declare module '@rstore/shared' {
-  export interface WrappedItemEditOptions<
+  export interface WrappedItemUpdateFormOptions<
     TModel extends Model = Model,
     TModelDefaults extends ModelDefaults = ModelDefaults,
     TModelMap extends ModelMap = ModelMap,
@@ -131,5 +135,12 @@ declare module '@rstore/shared' {
      * By default `updateForm` will initialize the fields with the existing item data.
      */
     defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+
+    /**
+     * Schema to validate the form object.
+     *
+     * @default model.schema.update
+     */
+    schema?: StandardSchemaV1
   }
 }
