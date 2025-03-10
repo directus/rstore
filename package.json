@@ -27,9 +27,11 @@
   "devDependencies": {
     "@akryum/sheep": "^0.5.2",
     "@antfu/eslint-config": "^3.12.1",
+    "@tailwindcss/vite": "4.0.7",
     "eslint": "^9.17.0",
     "lint-staged": "^15.4.3",
     "simple-git-hooks": "^2.11.1",
+    "tailwindcss": "4.0.7",
     "typescript": "^5.7.2",
     "vitepress": "^1.6.3",
     "vitest": "catalog:",

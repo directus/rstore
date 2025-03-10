@@ -1,3 +1,4 @@
+import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vitepress'
 
 // https://vitepress.dev/reference/site-config
@@ -10,6 +11,7 @@ export default defineConfig({
 
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
+      { text: 'Changelog', link: 'https://github.com/Akryum/rstore/blob/main/CHANGELOG.md' },
     ],
 
     sidebar: {
@@ -65,4 +67,10 @@ export default defineConfig({
   },
 
   lastUpdated: true,
+
+  vite: {
+    plugins: [
+      tailwindcss(),
+    ],
+  },
 })

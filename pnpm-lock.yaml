@@ -26,6 +26,9 @@ importers:
       '@antfu/eslint-config':
         specifier: ^3.12.1
         version: 3.16.0(@typescript-eslint/utils@8.26.0(eslint@9.22.0(jiti@2.4.2))(typescript@5.7.3))(@vue/compiler-sfc@3.5.13)(eslint@9.22.0(jiti@2.4.2))(typescript@5.7.3)(vitest@3.0.8(@types/debug@4.1.12)(@types/node@22.13.10)(jiti@2.4.2)(lightningcss@1.29.2)(terser@5.39.0)(yaml@2.7.0))
+      '@tailwindcss/vite':
+        specifier: 4.0.7
+        version: 4.0.7(vite@5.4.14(@types/node@22.13.10)(lightningcss@1.29.2)(terser@5.39.0))
       eslint:
         specifier: ^9.17.0
         version: 9.22.0(jiti@2.4.2)
@@ -35,6 +38,9 @@ importers:
       simple-git-hooks:
         specifier: ^2.11.1
         version: 2.11.1
+      tailwindcss:
+        specifier: 4.0.7
+        version: 4.0.7
       typescript:
         specifier: ^5.7.2
         version: 5.7.3
@@ -7963,6 +7969,14 @@ snapshots:
       lightningcss: 1.29.2
       postcss: 8.5.3
       tailwindcss: 4.0.7
+
+  '@tailwindcss/vite@4.0.7(vite@5.4.14(@types/node@22.13.10)(lightningcss@1.29.2)(terser@5.39.0))':
+    dependencies:
+      '@tailwindcss/node': 4.0.7
+      '@tailwindcss/oxide': 4.0.7
+      lightningcss: 1.29.2
+      tailwindcss: 4.0.7
+      vite: 5.4.14(@types/node@22.13.10)(lightningcss@1.29.2)(terser@5.39.0)
 
   '@tailwindcss/vite@4.0.7(vite@6.2.1(@types/node@22.13.10)(jiti@2.4.2)(lightningcss@1.29.2)(terser@5.39.0)(yaml@2.7.0))':
     dependencies:

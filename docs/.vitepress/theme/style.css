@@ -1,3 +1,7 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
 /**
  * Customize default theme styling by overriding CSS variables:
  * https://github.com/vuejs/vitepress/blob/main/src/client/theme-default/styles/vars.css
@@ -140,6 +144,8 @@
   }
 
   .VPHero {
+    padding-bottom: 0 !important;
+
     & > .container {
       flex-direction: column-reverse;
       align-items: center;
@@ -151,6 +157,11 @@
 
     .actions {
       justify-content: center !important;
+      @apply gap-6;
+
+      .VPButton {
+        @apply w-40;
+      }
     }
 
     .image-container {
@@ -164,6 +175,7 @@
 .VPHero {
   .image-bg {
     opacity: 0.75;
+    @apply animate-pulse;
   }
 
   .heading {
@@ -218,3 +230,57 @@
     }
   }
 }
+
+/* Features */
+
+.VPHomeFeatures {
+  h2 {
+    margin: 0 !important;
+    padding: 0 !important;
+    border: none !important;
+  }
+}
+
+/* Animations */
+
+.animate-grow-fade {
+  animation: grow-fade 3s linear infinite both;
+}
+
+@keyframes grow-fade {
+  0% {
+    opacity: 0;
+    transform: scale(0.9);
+  }
+  20% {
+    opacity: 0.7;
+  }
+  100% {
+    opacity: 0;
+    transform: scale(2);
+  }
+}
+
+.animate-pipe-down {
+  animation: pipe-down 3s linear both infinite;
+}
+
+@keyframes pipe-down {
+  0% {
+    transform: translateY(0);
+    opacity: 0;
+  }
+  20% {
+    transform: translateY(50%);
+    opacity: 1;
+  }
+  40% {
+    transform: translateY(100%);
+    opacity: 0.5;
+  }
+  100% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+}
+
