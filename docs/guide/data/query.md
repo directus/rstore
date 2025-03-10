@@ -14,6 +14,16 @@ The `queryFirst` and `queryMany` composables return an object with the following
 
 - `refresh`: a function that can be called to refresh the data.
 
+The composables also return a promise so they can be used with async setup.
+
+```vue
+<script setup>
+const store = useStore()
+// Plays nice with Nuxt SSR!
+const { data: todos } = await store.Todo.queryMany()
+</script>
+```
+
 ### Query first
 
 Composable function that reads the first item that matches the key or the filter in the cache and fetches it if not found.
@@ -166,3 +176,80 @@ const { data: todos } = store.Todo.queryMany({
 * `fetch-only` means that the query will only fetch the data from the adapter plugins. The data will be stored in the cache when the query is resolved.
 * `cache-only` means that the query will only fetch the data from the cache.
 * `no-cache` means that the query will not use the cache and only fetch the data from the adapter plugins. No data will be stored in the cache.
+
+## Items list
+
+Usually we write list item components that are used to display a list of items. It is recommended to only pass the key to the list item component and then use `queryFirst` to fetch the data in the list item component. By default the fetch policy is `cache-first`, so the data will be red from the cache in the item component and no unnecessary requests will be made for each items.
+
+The benefits are that the data is co-located with the component that uses it and there is no need to specify the types of the item prop again (usually a simple `id: string | number` is enough). The item component is also easier to potentially reuse in totally different contexts.
+
+::: code-group
+
+```vue [TodoList.vue]
+<script lang="ts" setup>
+const store = useStore()
+const { data: todos } = await store.Todo.queryMany()
+</script>
+
+<template>
+  <!-- Only pass the id here -->
+  <TodoItem
+    v-for="{ id } in todos"
+    :id
+    :key="id"
+  />
+</template>
+```
+
+```vue [TodoItem.vue]
+<script lang="ts" setup>
+const props = defineProps<{
+  // Easy to type prop
+  id: string
+}>()
+
+const store = useStore()
+// No additional request is made here, the data is read from the cache
+const { data: todo } = await store.Todo.queryFirst(props.id)
+// Enjoy inferred types here too!
+</script>
+```
+
+:::
+
+## Co-locating queries
+
+The best of both worlds! You can co-locate the queries with the components that use them, while still enjoying the benefits of a centralized store thanks to the cache -- letting it deduplicating and synchronizing all components. This is a powerful pattern that improves the independence of components and thus their maintainability.
+
+::: code-group
+
+```vue [AppHeader.vue]
+<script lang="ts" setup>
+const store = useStore()
+// The query is co-located with the component, not in a store somewhere else
+const { data: user } = await store.User.queryFirst('user-id')
+</script>
+
+<template>
+  <div>
+    <h1>{{ user.name }}</h1>
+  </div>
+</template>
+```
+
+```vue [UserProfile.vue]
+<script lang="ts" setup>
+const store = useStore()
+// The centralized cache ensures that the data is up to date here too
+const { data: user } = await store.User.queryFirst('user-id')
+</script>
+
+<template>
+  <div>
+    <h1>{{ user.name }}</h1>
+    <p>{{ user.email }}</p>
+  </div>
+</template>
+```
+
+:::

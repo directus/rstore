@@ -4,13 +4,16 @@ rstore is a data store allowing you to handle all data in your application.
 
 Define a data model and then run queries or execute mutations (create, update and delete) on your data.
 
-Its main features are:
+**FEATURES**
 
 - **Normalized reactive cache** to ensure all components are up-to-date
+- **Co-locate queries** within the components that need them
 - **Fully adaptable** with plugins to fetch from any source (REST, GraphQL...)
 - **Scale down** to small prototypes and **scale up** to big enterprise apps
 - Query API designed for **local-first** and **realtime**
+- **Form API** to handle form state and validation
 - **TypeScript support** with full autocomplete
+- **Nuxt module** with devtools
 
 [Learn more](./learn-more.md)
 
