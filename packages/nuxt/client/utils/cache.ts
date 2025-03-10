@@ -4,7 +4,7 @@ export const useStoreCache = createSharedComposable(() => {
   const store = useNonNullRstore()
 
   function getCache() {
-    return toRaw(store.value.cache.getState())
+    return toRaw(store.value.$cache.getState())
   }
 
   const cache = shallowRef(getCache())

@@ -31,11 +31,11 @@ export function peekMany<
 }: PeekManyOptions<TModel, TModelDefaults, TModelList>): QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelList>>> {
   meta = meta ?? {}
 
-  const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
+  const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let marker = defaultMarker(model, findOptions)
 
-    store.hooks.callHookSync('beforeCacheReadMany', {
+    store.$hooks.callHookSync('beforeCacheReadMany', {
       store,
       meta,
       model,
@@ -45,7 +45,7 @@ export function peekMany<
       },
     })
 
-    let result = store.cache.readItems({
+    let result = store.$cache.readItems({
       model,
       marker: force ? undefined : getMarker('many', marker),
     })
@@ -57,7 +57,7 @@ export function peekMany<
       result = result.filter(item => filterFn(item))
     }
 
-    store.hooks.callHookSync('cacheFilterMany', {
+    store.$hooks.callHookSync('cacheFilterMany', {
       store,
       meta,
       model,

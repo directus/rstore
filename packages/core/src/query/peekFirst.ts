@@ -37,13 +37,13 @@ export function peekFirst<
       }
     : keyOrOptions
   const key = findOptions?.key
-  const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
+  const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
 
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let result: any
     let marker = defaultMarker(model, findOptions)
 
-    store.hooks.callHookSync('beforeCacheReadFirst', {
+    store.$hooks.callHookSync('beforeCacheReadFirst', {
       store,
       meta,
       model,
@@ -54,27 +54,27 @@ export function peekFirst<
     })
 
     if (key) {
-      result = store.cache.readItem({ model, key })
+      result = store.$cache.readItem({ model, key })
     }
     else if (typeof findOptions?.filter === 'function') {
       const filterFn = findOptions.filter
 
       // Try with first marker first
-      result = store.cache.readItems({
+      result = store.$cache.readItems({
         model,
         marker: force ? undefined : getMarker('first', marker),
       }).filter(item => filterFn(item))?.[0] ?? null
 
       // Fallback to many marker
       if (!result) {
-        result = store.cache.readItems({
+        result = store.$cache.readItems({
           model,
           marker: getMarker('many', marker),
         }).filter(item => filterFn(item))?.[0] ?? null
       }
     }
 
-    store.hooks.callHookSync('cacheFilterFirst', {
+    store.$hooks.callHookSync('cacheFilterFirst', {
       store,
       meta,
       model,
@@ -86,14 +86,14 @@ export function peekFirst<
       findOptions,
       readItemsFromCache: () => {
         // Try with first marker first
-        let items = store.cache.readItems({
+        let items = store.$cache.readItems({
           model,
           marker: force ? undefined : getMarker('first', marker),
         }) ?? []
 
         // Fallback to many marker
         if (!items.length) {
-          items = store.cache.readItems({
+          items = store.$cache.readItems({
             model,
             marker: getMarker('many', marker),
           }) ?? []

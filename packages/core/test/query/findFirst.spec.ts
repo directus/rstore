@@ -29,14 +29,14 @@ describe('findFirst', () => {
 
   beforeEach(() => {
     mockStore = {
-      cache: {
+      $cache: {
         readItem: ({ key }: any) => ({ id: key, name: 'Test Item' }),
         readItems: () => [{ id: '1', name: 'Test Item 1' }, { id: '2', name: 'Test Item 2' }],
         writeItem: vi.fn(),
       },
-      hooks: createHooks(),
-      getFetchPolicy: () => 'cache-first',
-      processItemParsing: vi.fn(),
+      $hooks: createHooks(),
+      $getFetchPolicy: () => 'cache-first',
+      $processItemParsing: vi.fn(),
     } as any
 
     model = {
@@ -79,7 +79,7 @@ describe('findFirst', () => {
   })
 
   it('should call hooks with correct context', async () => {
-    const callHookSpy = vi.spyOn(mockStore.hooks, 'callHook')
+    const callHookSpy = vi.spyOn(mockStore.$hooks, 'callHook')
 
     await findFirst({
       store: mockStore,
@@ -91,8 +91,8 @@ describe('findFirst', () => {
   })
 
   it('should write item to cache if fetch policy allows', async () => {
-    mockStore.getFetchPolicy = () => 'cache-and-fetch'
-    mockStore.hooks.hook('fetchFirst', (payload) => {
+    mockStore.$getFetchPolicy = () => 'cache-and-fetch'
+    mockStore.$hooks.hook('fetchFirst', (payload) => {
       payload.setResult({ id: '42' })
     })
 
@@ -102,7 +102,7 @@ describe('findFirst', () => {
       findOptions: '42',
     })
 
-    expect(mockStore.cache.writeItem).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mockStore.$cache.writeItem).toHaveBeenCalledWith(expect.objectContaining({
       model,
       key: '42',
       item: result.result,
@@ -110,13 +110,13 @@ describe('findFirst', () => {
   })
 
   it('should not write item to cache if fetch policy is no-cache', async () => {
-    mockStore.getFetchPolicy = () => 'no-cache'
+    mockStore.$getFetchPolicy = () => 'no-cache'
     await findFirst({
       store: mockStore,
       model,
       findOptions: '1',
     })
 
-    expect(mockStore.cache.writeItem).not.toHaveBeenCalled()
+    expect(mockStore.$cache.writeItem).not.toHaveBeenCalled()
   })
 })

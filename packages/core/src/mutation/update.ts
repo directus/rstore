@@ -34,7 +34,7 @@ export async function updateItem<
     throw new Error('Item update failed: key is not defined')
   }
 
-  await store.hooks.callHook('beforeMutation', {
+  await store.$hooks.callHook('beforeMutation', {
     store,
     meta,
     model,
@@ -62,7 +62,7 @@ export async function updateItem<
     result = pickNonSpecialProps(result) as ResolvedModelItem<TModel, TModelDefaults, TModelList>
   }
 
-  await store.hooks.callHook('updateItem', {
+  await store.$hooks.callHook('updateItem', {
     store,
     meta,
     model,
@@ -74,7 +74,7 @@ export async function updateItem<
     },
   })
 
-  await store.hooks.callHook('afterMutation', {
+  await store.$hooks.callHook('afterMutation', {
     store,
     meta,
     model,
@@ -88,10 +88,10 @@ export async function updateItem<
   })
 
   if (result) {
-    store.processItemParsing(model, result)
+    store.$processItemParsing(model, result)
 
     if (!skipCache) {
-      store.cache.writeItem({
+      store.$cache.writeItem({
         model,
         key,
         item: result,
@@ -102,7 +102,7 @@ export async function updateItem<
     throw new Error('Item update failed: result is nullish')
   }
 
-  store.mutationHistory.push({
+  store.$mutationHistory.push({
     operation: 'update',
     model,
     key,

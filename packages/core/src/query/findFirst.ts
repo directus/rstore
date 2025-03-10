@@ -35,7 +35,7 @@ export async function findFirst<
         key: keyOrOptions,
       }
     : keyOrOptions
-  const fetchPolicy = store.getFetchPolicy(findOptions?.fetchPolicy)
+  const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
 
   let result: any
   let marker: string | undefined
@@ -56,7 +56,7 @@ export async function findFirst<
       marker = defaultMarker(model, findOptions)
     }
 
-    await store.hooks.callHook('beforeFetch', {
+    await store.$hooks.callHook('beforeFetch', {
       store,
       meta,
       model,
@@ -68,7 +68,7 @@ export async function findFirst<
       },
     })
 
-    await store.hooks.callHook('fetchFirst', {
+    await store.$hooks.callHook('fetchFirst', {
       store,
       meta,
       model,
@@ -83,7 +83,7 @@ export async function findFirst<
       },
     })
 
-    await store.hooks.callHook('afterFetch', {
+    await store.$hooks.callHook('afterFetch', {
       store,
       meta,
       model,
@@ -97,7 +97,7 @@ export async function findFirst<
     })
 
     if (result) {
-      store.processItemParsing(model, result)
+      store.$processItemParsing(model, result)
 
       if (fetchPolicy !== 'no-cache') {
         const key = model.getKey(result)
@@ -105,7 +105,7 @@ export async function findFirst<
           console.warn(`Key is undefined for ${model.name}. Item was not written to cache.`)
         }
         else {
-          store.cache.writeItem({
+          store.$cache.writeItem({
             model,
             key,
             item: result,
@@ -117,7 +117,7 @@ export async function findFirst<
   }
 
   if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
-    await store.hooks.callHook('fetchRelations', {
+    await store.$hooks.callHook('fetchRelations', {
       store,
       meta,
       model,

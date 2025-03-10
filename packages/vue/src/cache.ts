@@ -125,7 +125,7 @@ export function createCache<
 
       if (!fromWriteItems) {
         const store = getStore()
-        store.hooks.callHookSync('afterCacheWrite', {
+        store.$hooks.callHookSync('afterCacheWrite', {
           store,
           meta: {},
           model,
@@ -142,7 +142,7 @@ export function createCache<
       }
       mark(marker)
       const store = getStore()
-      store.hooks.callHookSync('afterCacheWrite', {
+      store.$hooks.callHookSync('afterCacheWrite', {
         store,
         meta: {},
         model,
@@ -154,7 +154,7 @@ export function createCache<
     writeItemForRelation({ model, relationKey, relation, item }) {
       const store = getStore()
       const possibleTypes = Object.keys(relation.to)
-      const nestedItemType = store.getModel(item, possibleTypes)
+      const nestedItemType = store.$getModel(item, possibleTypes)
       if (!nestedItemType) {
         throw new Error(`Could not determine type for relation ${model.name}.${String(relationKey)}`)
       }
@@ -163,7 +163,7 @@ export function createCache<
         throw new Error(`Could not determine key for relation ${model.name}.${String(relationKey)}`)
       }
 
-      store.processItemParsing(model, item)
+      store.$processItemParsing(model, item)
 
       this.writeItem({
         model: nestedItemType,
@@ -175,7 +175,7 @@ export function createCache<
       delete state.value[model.name]?.[key]
       wrappedItems.delete(getWrappedItemCacheKey(model, key))
       const store = getStore()
-      store.hooks.callHookSync('afterCacheWrite', {
+      store.$hooks.callHookSync('afterCacheWrite', {
         store,
         meta: {},
         model,
@@ -191,7 +191,7 @@ export function createCache<
       wrappedItems.clear()
 
       const store = getStore()
-      store.hooks.callHookSync('afterCacheReset', {
+      store.$hooks.callHookSync('afterCacheReset', {
         store,
         meta: {},
       })
@@ -201,7 +201,7 @@ export function createCache<
       wrappedItems.clear()
 
       const store = getStore()
-      store.hooks.callHookSync('afterCacheReset', {
+      store.$hooks.callHookSync('afterCacheReset', {
         store,
         meta: {},
       })

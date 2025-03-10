@@ -44,7 +44,7 @@ export function createQuery<
   defaultValue,
   options,
 }: VueCreateQueryOptions<TModel, TModelDefaults, TModelList, TOptions, TResult>): HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TResult>> {
-  const fetchPolicy = store.getFetchPolicy(toValue(options)?.fetchPolicy)
+  const fetchPolicy = store.$getFetchPolicy(toValue(options)?.fetchPolicy)
 
   const result = shallowRef<TResult>(defaultValue)
 

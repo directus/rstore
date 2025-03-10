@@ -16,12 +16,12 @@ describe('updateItem', () => {
 
   beforeEach(() => {
     mockStore = {
-      hooks: createHooks(),
-      processItemParsing: vi.fn(),
-      cache: {
+      $hooks: createHooks(),
+      $processItemParsing: vi.fn(),
+      $cache: {
         writeItem: vi.fn(),
       },
-      mutationHistory: [],
+      $mutationHistory: [],
     } as unknown as StoreCore<ModelList, ModelDefaults>
 
     mockModel = {
@@ -40,19 +40,19 @@ describe('updateItem', () => {
 
   it('should update an item and write it to the cache', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
-    mockStore.hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
+    mockStore.$hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockModel.getKey = vi.fn(() => '1')
 
     const result = await updateItem(options)
 
     expect(result).toEqual(resultItem)
-    expect(mockStore.processItemParsing).toHaveBeenCalledWith(mockModel, resultItem)
-    expect(mockStore.cache.writeItem).toHaveBeenCalledWith({
+    expect(mockStore.$processItemParsing).toHaveBeenCalledWith(mockModel, resultItem)
+    expect(mockStore.$cache.writeItem).toHaveBeenCalledWith({
       model: mockModel,
       key: '1',
       item: resultItem,
     })
-    expect(mockStore.mutationHistory).toContainEqual({
+    expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'update',
       model: mockModel,
       key: '1',
@@ -62,7 +62,7 @@ describe('updateItem', () => {
 
   it('should update an item with specific key', async () => {
     const resultItem = { id: '1', text: 'foo' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
-    mockStore.hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
+    mockStore.$hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockItem.text = 'foo'
 
     const result = await updateItem({
@@ -71,12 +71,12 @@ describe('updateItem', () => {
     })
 
     expect(result).toEqual(resultItem)
-    expect(mockStore.cache.writeItem).toHaveBeenCalledWith({
+    expect(mockStore.$cache.writeItem).toHaveBeenCalledWith({
       model: mockModel,
       key: '1',
       item: resultItem,
     })
-    expect(mockStore.mutationHistory).toContainEqual({
+    expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'update',
       model: mockModel,
       key: '1',
@@ -92,7 +92,7 @@ describe('updateItem', () => {
 
   it('should throw an error if key is not defined', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
-    mockStore.hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
+    mockStore.$hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockModel.getKey = vi.fn(() => undefined)
 
     await expect(updateItem(options)).rejects.toThrow('Item update failed: key is not defined')
@@ -100,15 +100,15 @@ describe('updateItem', () => {
 
   it('should skip cache if skipCache is true', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
-    mockStore.hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
+    mockStore.$hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockModel.getKey = vi.fn(() => '1')
 
     const result = await updateItem({ ...options, skipCache: true })
 
     expect(result).toEqual(resultItem)
-    expect(mockStore.processItemParsing).toHaveBeenCalledWith(mockModel, resultItem)
-    expect(mockStore.cache.writeItem).not.toHaveBeenCalled()
-    expect(mockStore.mutationHistory).toContainEqual({
+    expect(mockStore.$processItemParsing).toHaveBeenCalledWith(mockModel, resultItem)
+    expect(mockStore.$cache.writeItem).not.toHaveBeenCalled()
+    expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'update',
       model: mockModel,
       key: '1',

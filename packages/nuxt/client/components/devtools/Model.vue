@@ -6,7 +6,7 @@ const store = useNonNullRstore()
 const search = ref('')
 
 const filteredTypes = computed(() => {
-  return store.value.models.filter((model) => {
+  return store.value.$models.filter((model) => {
     return model.name.toLowerCase().includes(search.value.toLowerCase())
   }).sort((a, b) => a.name.localeCompare(b.name)) as ResolvedModel<Model, ModelDefaults, ModelList>[]
 })

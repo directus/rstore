@@ -14,33 +14,33 @@ export async function setupPlugin<
   TModelDefaults extends ModelDefaults,
 >(store: StoreCore<TModelList, TModelDefaults>, plugin: Plugin) {
   await plugin.setup({
-    hook: store.hooks.hook,
+    hook: store.$hooks.hook,
 
     addModelDefaults(modelDefaults) {
       for (const key of Object.keys(modelDefaults) as Array<keyof ModelDefaults>) {
         const value = modelDefaults[key] as any
         if (value) {
           if (mergedModelDefaultsFields.includes(key)) {
-            if (!store.modelDefaults[key]) {
-              store.modelDefaults[key] = {} as any
+            if (!store.$modelDefaults[key]) {
+              store.$modelDefaults[key] = {} as any
             }
-            Object.assign(store.modelDefaults[key] as any, value)
+            Object.assign(store.$modelDefaults[key] as any, value)
           }
           else if (deepMergedModelDefaultsFields.includes(key)) {
-            if (!store.modelDefaults[key]) {
-              store.modelDefaults[key] = {} as any
+            if (!store.$modelDefaults[key]) {
+              store.$modelDefaults[key] = {} as any
             }
             for (const fieldKey in value) {
               // @ts-expect-error typescript is annoying
-              if (!store.modelDefaults[key][fieldKey]) {
+              if (!store.$modelDefaults[key][fieldKey]) {
                 // @ts-expect-error typescript is annoying
-                store.modelDefaults[key][fieldKey] = {} as any
+                store.$modelDefaults[key][fieldKey] = {} as any
               }
-              Object.assign((store.modelDefaults[key] as any)[fieldKey], value[fieldKey])
+              Object.assign((store.$modelDefaults[key] as any)[fieldKey], value[fieldKey])
             }
           }
           else {
-            store.modelDefaults[key] = value
+            store.$modelDefaults[key] = value
           }
         }
       }

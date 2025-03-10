@@ -24,7 +24,7 @@ export async function deleteItem<
 }: DeleteOptions<TModel, TModelDefaults, TModelList>): Promise<void> {
   const meta: CustomHookMeta = {}
 
-  await store.hooks.callHook('beforeMutation', {
+  await store.$hooks.callHook('beforeMutation', {
     store,
     meta,
     model,
@@ -34,14 +34,14 @@ export async function deleteItem<
     setItem: () => {},
   })
 
-  await store.hooks.callHook('deleteItem', {
+  await store.$hooks.callHook('deleteItem', {
     store,
     meta,
     model,
     key,
   })
 
-  await store.hooks.callHook('afterMutation', {
+  await store.$hooks.callHook('afterMutation', {
     store,
     meta,
     model,
@@ -52,13 +52,13 @@ export async function deleteItem<
   })
 
   if (!skipCache) {
-    store.cache.deleteItem({
+    store.$cache.deleteItem({
       model,
       key,
     })
   }
 
-  store.mutationHistory.push({
+  store.$mutationHistory.push({
     operation: 'delete',
     model,
     key,

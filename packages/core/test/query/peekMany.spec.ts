@@ -17,11 +17,11 @@ describe('peekMany', () => {
 
   beforeEach(() => {
     mockStore = {
-      cache: {
+      $cache: {
         readItems: () => [{ id: '1', name: 'Test Item 1' }, { id: '2', name: 'Test Item 2' }],
       },
-      hooks: createHooks(),
-      getFetchPolicy: () => 'cache-first',
+      $hooks: createHooks(),
+      $getFetchPolicy: () => 'cache-first',
     } as any
 
     model = {
@@ -63,7 +63,7 @@ describe('peekMany', () => {
   })
 
   it('should call hooks with correct context', () => {
-    const callHookSyncSpy = vi.spyOn(mockStore.hooks, 'callHookSync')
+    const callHookSyncSpy = vi.spyOn(mockStore.$hooks, 'callHookSync')
 
     peekMany({
       store: mockStore,

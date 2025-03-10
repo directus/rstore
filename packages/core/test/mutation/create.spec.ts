@@ -12,12 +12,13 @@ describe('createItem', () => {
 
   beforeEach(() => {
     mockStore = {
-      hooks: createHooks(),
+      $hooks: createHooks(),
       processItemParsing: vi.fn(),
-      cache: {
+      $cache: {
         writeItem: vi.fn(),
       },
-      mutationHistory: [],
+      $mutationHistory: [],
+      $processItemParsing: vi.fn(),
     } as unknown as StoreCore<ModelList, ModelDefaults>
 
     mockModel = {
@@ -36,19 +37,19 @@ describe('createItem', () => {
 
   it('should create an item and write it to the cache', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
-    mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
+    mockStore.$hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockModel.getKey = vi.fn(() => '1')
 
     const result = await createItem(options)
 
     expect(result).toEqual(resultItem)
-    expect(mockStore.processItemParsing).toHaveBeenCalledWith(mockModel, resultItem)
-    expect(mockStore.cache.writeItem).toHaveBeenCalledWith({
+    expect(mockStore.$processItemParsing).toHaveBeenCalledWith(mockModel, resultItem)
+    expect(mockStore.$cache.writeItem).toHaveBeenCalledWith({
       model: mockModel,
       key: '1',
       item: resultItem,
     })
-    expect(mockStore.mutationHistory).toContainEqual({
+    expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'create',
       model: mockModel,
       payload: mockItem,
@@ -56,14 +57,14 @@ describe('createItem', () => {
   })
 
   it('should throw an error if result is nullish', async () => {
-    mockStore.hooks.callHook = vi.fn(async () => {}) as any
+    mockStore.$hooks.callHook = vi.fn(async () => {}) as any
 
     await expect(createItem(options)).rejects.toThrow('Item creation failed: result is nullish')
   })
 
   it('should throw an error if key is not defined', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
-    mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
+    mockStore.$hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockModel.getKey = vi.fn(() => undefined)
 
     await expect(createItem(options)).rejects.toThrow('Item creation failed: key is not defined')
@@ -71,15 +72,15 @@ describe('createItem', () => {
 
   it('should skip cache if skipCache is true', async () => {
     const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
-    mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
+    mockStore.$hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockModel.getKey = vi.fn(() => '1')
 
     const result = await createItem({ ...options, skipCache: true })
 
     expect(result).toEqual(resultItem)
-    expect(mockStore.processItemParsing).toHaveBeenCalledWith(mockModel, resultItem)
-    expect(mockStore.cache.writeItem).not.toHaveBeenCalled()
-    expect(mockStore.mutationHistory).toContainEqual({
+    expect(mockStore.$processItemParsing).toHaveBeenCalledWith(mockModel, resultItem)
+    expect(mockStore.$cache.writeItem).not.toHaveBeenCalled()
+    expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'create',
       model: mockModel,
       payload: mockItem,

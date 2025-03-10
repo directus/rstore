@@ -27,7 +27,7 @@ export async function createItem<
   item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
   let result: ResolvedModelItem<TModel, TModelDefaults, TModelList> | undefined
 
-  await store.hooks.callHook('beforeMutation', {
+  await store.$hooks.callHook('beforeMutation', {
     store,
     meta,
     model,
@@ -41,7 +41,7 @@ export async function createItem<
     },
   })
 
-  await store.hooks.callHook('createItem', {
+  await store.$hooks.callHook('createItem', {
     store,
     meta,
     model,
@@ -52,7 +52,7 @@ export async function createItem<
     },
   })
 
-  await store.hooks.callHook('afterMutation', {
+  await store.$hooks.callHook('afterMutation', {
     store,
     meta,
     model,
@@ -65,13 +65,13 @@ export async function createItem<
   })
 
   if (result) {
-    store.processItemParsing(model, result)
+    store.$processItemParsing(model, result)
 
     if (!skipCache) {
       const key = model.getKey(result)
 
       if (key) {
-        store.cache.writeItem({
+        store.$cache.writeItem({
           model,
           key,
           item: result,
@@ -86,7 +86,7 @@ export async function createItem<
     throw new Error('Item creation failed: result is nullish')
   }
 
-  store.mutationHistory.push({
+  store.$mutationHistory.push({
     operation: 'create',
     model,
     payload: item,

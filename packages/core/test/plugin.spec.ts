@@ -6,7 +6,7 @@ describe('setupPlugin', () => {
   it('should call plugin.setup with the correct hook', async () => {
     const mockHook = vi.fn()
     const mockStore: StoreCore<ModelList, ModelDefaults> = {
-      hooks: {
+      $hooks: {
         hook: mockHook,
       },
     } as any
@@ -27,7 +27,7 @@ describe('setupPlugin', () => {
   it('should handle async plugin setup', async () => {
     const mockHook = vi.fn()
     const mockStore: StoreCore<ModelList, ModelDefaults> = {
-      hooks: {
+      $hooks: {
         hook: mockHook,
       },
     } as any
@@ -45,7 +45,7 @@ describe('setupPlugin', () => {
   it('should throw if plugin setup fails', async () => {
     const mockHook = vi.fn()
     const mockStore: StoreCore<ModelList, ModelDefaults> = {
-      hooks: {
+      $hooks: {
         hook: mockHook,
       },
     } as any
@@ -63,10 +63,10 @@ describe('setupPlugin', () => {
       it('should add model defaults to the store', async () => {
         const mockHook = vi.fn()
         const mockStore: StoreCore<ModelList, ModelDefaults> = {
-          hooks: {
+          $hooks: {
             hook: mockHook,
           },
-          modelDefaults: {},
+          $modelDefaults: {},
         } as any
 
         const mockPlugin: Plugin = {
@@ -82,7 +82,7 @@ describe('setupPlugin', () => {
 
         await setupPlugin(mockStore, mockPlugin)
 
-        expect(mockStore.modelDefaults.computed).toEqual({
+        expect(mockStore.$modelDefaults.computed).toEqual({
           test: expect.any(Function),
         })
       })
@@ -90,10 +90,10 @@ describe('setupPlugin', () => {
       it('should merge model defaults with existing defaults', async () => {
         const mockHook = vi.fn()
         const mockStore: StoreCore<ModelList, ModelDefaults> = {
-          hooks: {
+          $hooks: {
             hook: mockHook,
           },
-          modelDefaults: {
+          $modelDefaults: {
             computed: {
               existing: () => 'existing',
             },
@@ -113,7 +113,7 @@ describe('setupPlugin', () => {
 
         await setupPlugin(mockStore, mockPlugin)
 
-        expect(mockStore.modelDefaults.computed).toEqual({
+        expect(mockStore.$modelDefaults.computed).toEqual({
           existing: expect.any(Function),
           test: expect.any(Function),
         })
@@ -122,10 +122,10 @@ describe('setupPlugin', () => {
       it('should overwrite existing model defaults if specified', async () => {
         const mockHook = vi.fn()
         const mockStore: StoreCore<ModelList, ModelDefaults> = {
-          hooks: {
+          $hooks: {
             hook: mockHook,
           },
-          modelDefaults: {
+          $modelDefaults: {
             computed: {
               test: () => 'old',
             },
@@ -145,10 +145,10 @@ describe('setupPlugin', () => {
 
         await setupPlugin(mockStore, mockPlugin)
 
-        expect(mockStore.modelDefaults.computed).toEqual({
+        expect(mockStore.$modelDefaults.computed).toEqual({
           test: expect.any(Function),
         })
-        expect(mockStore.modelDefaults.computed?.test({})).toBe('new')
+        expect(mockStore.$modelDefaults.computed?.test({})).toBe('new')
       })
     })
   })

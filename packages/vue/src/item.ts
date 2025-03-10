@@ -84,7 +84,7 @@ export function wrapItem<
           const result: Array<any> = []
           for (const targetModelName in relation.to) {
             const targetModel = relation.to[targetModelName]
-            const targetType = store.models.find(m => m.name === targetModelName)
+            const targetType = store.$models.find(m => m.name === targetModelName)
             if (!targetType) {
               throw new Error(`Model "${targetModelName}" does not exist in the store`)
             }

@@ -30,11 +30,11 @@ export default defineNuxtPlugin(async (nuxtApp) => {
   const cacheKey = '$svanilla-rstore'
 
   nuxtApp.hook('app:rendered', () => {
-    nuxtApp.payload.state[cacheKey] = markRaw(store.cache.getState())
+    nuxtApp.payload.state[cacheKey] = markRaw(store.$cache.getState())
   })
 
   if (import.meta.client && nuxtApp.payload.state[cacheKey]) {
-    store.cache.setState(nuxtApp.payload.state[cacheKey])
+    store.$cache.setState(nuxtApp.payload.state[cacheKey])
   }
 
   // Inject $rstore

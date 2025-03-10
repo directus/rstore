@@ -43,11 +43,11 @@ export async function createStore<
 
   const queryCache: Map<string, VueModelApi<Model, TModelDefaults, TModelList, WrappedItem<Model, TModelDefaults, TModelList>>> = new Map()
 
-  const modelNames = store.models.map(m => m.name)
+  const modelNames = store.$models.map(m => m.name)
 
   function getApi(key: string) {
     if (!queryCache.has(key)) {
-      const model = store.models.find(m => m.name === key)
+      const model = store.$models.find(m => m.name === key)
       if (!model) {
         throw new Error(`Model ${key} not found`)
       }

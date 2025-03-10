@@ -26,13 +26,13 @@ describe('findMany', () => {
 
   beforeEach(() => {
     mockStore = {
-      cache: {
+      $cache: {
         readItems: () => [{ id: '1', name: 'Test Item 1' }, { id: '2', name: 'Test Item 2' }],
         writeItems: vi.fn(),
       },
-      hooks: createHooks(),
-      getFetchPolicy: () => 'cache-first',
-      processItemParsing: vi.fn(),
+      $hooks: createHooks(),
+      $getFetchPolicy: () => 'cache-first',
+      $processItemParsing: vi.fn(),
     } as any
 
     model = {
@@ -65,7 +65,7 @@ describe('findMany', () => {
   })
 
   it('should call hooks with correct context', async () => {
-    const callHookSpy = vi.spyOn(mockStore.hooks, 'callHook')
+    const callHookSpy = vi.spyOn(mockStore.$hooks, 'callHook')
 
     await findMany({
       store: mockStore,
@@ -81,8 +81,8 @@ describe('findMany', () => {
   })
 
   it('should write items to cache if fetch policy allows', async () => {
-    mockStore.getFetchPolicy = () => 'cache-and-fetch'
-    mockStore.hooks.hook('fetchMany', (payload) => {
+    mockStore.$getFetchPolicy = () => 'cache-and-fetch'
+    mockStore.$hooks.hook('fetchMany', (payload) => {
       payload.setResult([{ id: '42', name: 'Fetched Item' }])
     })
 
@@ -96,7 +96,7 @@ describe('findMany', () => {
       },
     })
 
-    expect(mockStore.cache.writeItems).toHaveBeenCalledWith(expect.objectContaining({
+    expect(mockStore.$cache.writeItems).toHaveBeenCalledWith(expect.objectContaining({
       model,
       items: [{ key: '42', value: result.result[0] }],
       marker: expect.any(String),
@@ -104,7 +104,7 @@ describe('findMany', () => {
   })
 
   it('should not write items to cache if fetch policy is no-cache', async () => {
-    mockStore.getFetchPolicy = () => 'no-cache'
+    mockStore.$getFetchPolicy = () => 'no-cache'
     await findMany({
       store: mockStore,
       model,
@@ -115,6 +115,6 @@ describe('findMany', () => {
       },
     })
 
-    expect(mockStore.cache.writeItems).not.toHaveBeenCalled()
+    expect(mockStore.$cache.writeItems).not.toHaveBeenCalled()
   })
 })

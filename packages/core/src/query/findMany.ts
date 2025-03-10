@@ -31,7 +31,7 @@ export async function findMany<
   meta = meta ?? {}
 
   findOptions = findOptions ?? {}
-  const fetchPolicy = store.getFetchPolicy(findOptions.fetchPolicy)
+  const fetchPolicy = store.$getFetchPolicy(findOptions.fetchPolicy)
 
   let result: any
   let marker: string | undefined
@@ -52,7 +52,7 @@ export async function findMany<
       marker = defaultMarker(model, findOptions)
     }
 
-    await store.hooks.callHook('beforeFetch', {
+    await store.$hooks.callHook('beforeFetch', {
       store,
       meta,
       model,
@@ -63,7 +63,7 @@ export async function findMany<
       },
     })
 
-    await store.hooks.callHook('fetchMany', {
+    await store.$hooks.callHook('fetchMany', {
       store,
       meta,
       model,
@@ -77,7 +77,7 @@ export async function findMany<
       },
     })
 
-    await store.hooks.callHook('afterFetch', {
+    await store.$hooks.callHook('afterFetch', {
       store,
       meta,
       model,
@@ -91,7 +91,7 @@ export async function findMany<
 
     if (result) {
       for (const item of result) {
-        store.processItemParsing(model, item)
+        store.$processItemParsing(model, item)
       }
     }
 
@@ -106,7 +106,7 @@ export async function findMany<
         }
         writes.push({ key, value: item })
       }
-      store.cache.writeItems<TModel>({
+      store.$cache.writeItems<TModel>({
         model,
         items: writes,
         marker: getMarker('many', marker),
@@ -115,7 +115,7 @@ export async function findMany<
   }
 
   if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
-    await store.hooks.callHook('fetchRelations', {
+    await store.$hooks.callHook('fetchRelations', {
       store,
       meta,
       model,

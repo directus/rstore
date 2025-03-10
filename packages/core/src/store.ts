@@ -24,17 +24,17 @@ export async function createStoreCore<
   const models = resolveModels(options.models, options.modelDefaults)
 
   const store: StoreCore<TModelList, TModelDefaults> = {
-    cache: options.cache,
-    models,
-    modelDefaults: options.modelDefaults ?? {} as TModelDefaults,
-    plugins: options.plugins ?? [],
-    hooks: options.hooks,
-    findDefaults: options.findDefaults ?? {},
-    getFetchPolicy(value) {
-      return value ?? store.findDefaults.fetchPolicy ?? defaultFetchPolicy
+    $cache: options.cache,
+    $models: models,
+    $modelDefaults: options.modelDefaults ?? {} as TModelDefaults,
+    $plugins: options.plugins ?? [],
+    $hooks: options.hooks,
+    $findDefaults: options.findDefaults ?? {},
+    $getFetchPolicy(value) {
+      return value ?? store.$findDefaults.fetchPolicy ?? defaultFetchPolicy
     },
-    processItemParsing(model, item) {
-      store.hooks.callHookSync('parseItem', {
+    $processItemParsing(model, item) {
+      store.$hooks.callHookSync('parseItem', {
         store,
         meta: {},
         model,
@@ -44,11 +44,11 @@ export async function createStoreCore<
         },
       })
     },
-    getModel(item, modelNames?) {
+    $getModel(item, modelNames?) {
       if (modelNames?.length === 1) {
-        return store.models.find(m => m.name === modelNames[0]) ?? null
+        return store.$models.find(m => m.name === modelNames[0]) ?? null
       }
-      const models = modelNames ? store.models.filter(m => modelNames?.includes(m.name)) : store.models
+      const models = modelNames ? store.$models.filter(m => modelNames?.includes(m.name)) : store.$models
       for (const model of models) {
         if (model.isInstanceOf(item)) {
           return model
@@ -56,12 +56,12 @@ export async function createStoreCore<
       }
       return null
     },
-    mutationHistory: [],
+    $mutationHistory: [],
   }
 
   // Setup plugins
 
-  for (const plugin of store.plugins) {
+  for (const plugin of store.$plugins) {
     await setupPlugin(store, plugin)
   }
 
@@ -69,14 +69,14 @@ export async function createStoreCore<
 
   const meta: CustomHookMeta = {}
 
-  await store.hooks.callHook('init', {
+  await store.$hooks.callHook('init', {
     store,
     meta,
   })
 
   // Model hooks
 
-  store.hooks.hook('parseItem', (payload) => {
+  store.$hooks.hook('parseItem', (payload) => {
     if (payload.model.fields) {
       for (const path in payload.model.fields) {
         const fieldConfig = payload.model.fields[path]

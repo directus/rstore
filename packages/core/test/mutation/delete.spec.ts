@@ -10,11 +10,11 @@ describe('deleteItem', () => {
 
   beforeEach(() => {
     mockStore = {
-      hooks: createHooks(),
-      cache: {
+      $hooks: createHooks(),
+      $cache: {
         deleteItem: vi.fn(),
       },
-      mutationHistory: [],
+      $mutationHistory: [],
     } as any
 
     mockModel = {} as any
@@ -23,7 +23,7 @@ describe('deleteItem', () => {
 
   it('should call deleteItem hook', async () => {
     const spy = vi.fn()
-    mockStore.hooks.hook('deleteItem', ({ store, model, key }) => spy({ store, model, key }))
+    mockStore.$hooks.hook('deleteItem', ({ store, model, key }) => spy({ store, model, key }))
 
     await deleteItem({
       store: mockStore,
@@ -46,7 +46,7 @@ describe('deleteItem', () => {
       skipCache: false,
     })
 
-    expect(mockStore.cache.deleteItem).toHaveBeenCalledWith({
+    expect(mockStore.$cache.deleteItem).toHaveBeenCalledWith({
       model: mockModel,
       key: mockKey,
     })
@@ -60,7 +60,7 @@ describe('deleteItem', () => {
       skipCache: true,
     })
 
-    expect(mockStore.cache.deleteItem).not.toHaveBeenCalled()
+    expect(mockStore.$cache.deleteItem).not.toHaveBeenCalled()
   })
 
   it('should push delete operation to mutationHistory', async () => {
@@ -70,7 +70,7 @@ describe('deleteItem', () => {
       key: mockKey,
     })
 
-    expect(mockStore.mutationHistory).toContainEqual({
+    expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'delete',
       model: mockModel,
       key: mockKey,

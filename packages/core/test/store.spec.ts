@@ -26,12 +26,12 @@ describe('createStoreCore', () => {
   it('should create a store with default options', async () => {
     const store = await createStoreCore(options)
     expect(store).toBeDefined()
-    expect(store.cache).toBe(options.cache)
-    expect(store.models).toBeDefined()
-    expect(store.modelDefaults).toEqual({})
-    expect(store.plugins).toEqual([])
-    expect(store.hooks).toBe(options.hooks)
-    expect(store.findDefaults).toEqual({})
+    expect(store.$cache).toBe(options.cache)
+    expect(store.$models).toBeDefined()
+    expect(store.$modelDefaults).toEqual({})
+    expect(store.$plugins).toEqual([])
+    expect(store.$hooks).toBe(options.hooks)
+    expect(store.$findDefaults).toEqual({})
   })
 
   it('should call setup for each plugin', async () => {
@@ -73,7 +73,7 @@ describe('createStoreCore', () => {
     const store = await createStoreCore(options)
     const item = { name: 'test' }
 
-    store.processItemParsing(store.models[0], item)
+    store.$processItemParsing(store.$models[0], item)
 
     expect(item.name).toBe('TEST')
   })
@@ -81,14 +81,14 @@ describe('createStoreCore', () => {
   describe('getFetchPolicy', () => {
     it('should return default fetch policy if no value is provided', async () => {
       const store = await createStoreCore(options)
-      const fetchPolicy = store.getFetchPolicy(undefined)
+      const fetchPolicy = store.$getFetchPolicy(undefined)
       expect(fetchPolicy).toBe(defaultFetchPolicy)
     })
 
     it('should return provided fetch policy if value is provided', async () => {
       const customFetchPolicy = 'some-policy' as FetchPolicy
       const store = await createStoreCore(options)
-      const fetchPolicy = store.getFetchPolicy(customFetchPolicy)
+      const fetchPolicy = store.$getFetchPolicy(customFetchPolicy)
       expect(fetchPolicy).toBe(customFetchPolicy)
     })
 
@@ -96,7 +96,7 @@ describe('createStoreCore', () => {
       const customFetchPolicy = 'find-default-policy' as FetchPolicy
       options.findDefaults = { fetchPolicy: customFetchPolicy }
       const store = await createStoreCore(options)
-      const fetchPolicy = store.getFetchPolicy(undefined)
+      const fetchPolicy = store.$getFetchPolicy(undefined)
       expect(fetchPolicy).toBe(customFetchPolicy)
     })
   })
@@ -119,8 +119,8 @@ describe('createStoreCore', () => {
       const testItem = { __typename: 'Test' }
       const anotherTestItem = { __typename: 'AnotherTest' }
 
-      expect(store.getModel(testItem)).toBe(store.models[0])
-      expect(store.getModel(anotherTestItem)).toBe(store.models[1])
+      expect(store.$getModel(testItem)).toBe(store.$models[0])
+      expect(store.$getModel(anotherTestItem)).toBe(store.$models[1])
     })
 
     it('should return the correct model for an item with no typename', async () => {
@@ -140,8 +140,8 @@ describe('createStoreCore', () => {
       const testItem = { username: 'toto' }
       const anotherTestItem = { botname: 'bender' }
 
-      expect(store.getModel(testItem)).toBe(store.models[0])
-      expect(store.getModel(anotherTestItem)).toBe(store.models[1])
+      expect(store.$getModel(testItem)).toBe(store.$models[0])
+      expect(store.$getModel(anotherTestItem)).toBe(store.$models[1])
     })
 
     it('should return null if no model matches the item', async () => {
@@ -156,7 +156,7 @@ describe('createStoreCore', () => {
 
       const unknownItem = { __typename: 'Unknown' }
 
-      expect(store.getModel(unknownItem)).toBeNull()
+      expect(store.$getModel(unknownItem)).toBeNull()
     })
 
     it('should search in only specified types', async () => {
@@ -179,8 +179,8 @@ describe('createStoreCore', () => {
 
       const testItem = { username: 'toto' }
 
-      expect(store.getModel(testItem)).toBe(store.models[0])
-      expect(store.getModel(testItem, ['User2', 'Bot'])).toBe(store.models[1])
+      expect(store.$getModel(testItem)).toBe(store.$models[0])
+      expect(store.$getModel(testItem, ['User2', 'Bot'])).toBe(store.$models[1])
     })
 
     it('should return if only one specified model', async () => {
@@ -203,7 +203,7 @@ describe('createStoreCore', () => {
 
       const testItem = { username: 'toto' }
 
-      expect(store.getModel(testItem, ['Foo'])).toBe(store.models[2])
+      expect(store.$getModel(testItem, ['Foo'])).toBe(store.$models[2])
     })
   })
 })
