@@ -269,3 +269,19 @@ const { data: user } = await store.User.queryFirst('user-id')
 ```
 
 :::
+
+## Fetching relations
+
+You can pass an `include` option to the query to fetch related data. The `include` option is an object where the keys are the names of the relations. Learn more about how to define relations [here](../model/relations.md).
+
+```ts
+const { data: comments } = store.comments.queryMany({
+  include: {
+    author: true,
+  },
+})
+```
+
+The cache will automatically resolve the relations as soon as the data is available in the cache.
+
+Plugins hooked on the `fetchRelations` hook will also be called to potentially fetch the data of the relations. See [Plugin hooks](../plugin/hooks.md#fetching-relations) for more details.
