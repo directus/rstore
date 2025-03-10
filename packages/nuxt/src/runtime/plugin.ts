@@ -27,7 +27,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
     models,
   })
 
-  const cacheKey = '$svanilla-rstore'
+  const cacheKey = '$srstore'
 
   nuxtApp.hook('app:rendered', () => {
     nuxtApp.payload.state[cacheKey] = markRaw(store.$cache.getState())
