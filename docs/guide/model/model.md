@@ -3,34 +3,67 @@
 The structure of your data is presented in rstore with Models:
 
 ```ts
-const models: ModelMap = {
-  Todo: { name: 'todos' },
-  User: { name: 'users' },
+import type { ModelList } from '@rstore/vue'
+
+const models: ModelList = [
+  { name: 'todos' },
+  { name: 'users' },
   // more models...
-}
+]
 ```
 
 Each Model defines information about the related item type. The only mandatory property is `name`, which can be different from the key in the model map (see the above example).
 
 Various applications can have different models based on their specific requirements. For instance, a blogging platform might include a `Post` model to denote a blog entry and a `Comment` model for user feedback. Conversely, a project management tool might feature models such as `Task`, `Project`, or `Milestone`.
 
+::: code-group
+
+```js{2-5} [rstore.js]
+const store = await createStore({
+  models: [
+    { name: 'todos' },
+    { name: 'users' },
+  ],
+  plugins: [],
+})
+```
+
+```ts{2-5} [rstore.ts]
+const store = await createStore({
+  models: [
+    defineItemType<Todo>().model({ name: 'todos' } as const),
+    defineItemType<User>().model({ name: 'users' } as const),
+  ] as const,
+  plugins: [],
+})
+```
+
+:::
+
 ## Defining a Model
 
 For JavaScript, you can use the `defineModel` utility function to define a model with auto-completion in your IDE:
 
-```ts
-import { defineModel } from '@rstore/vue'
+```js
+import { createStore, defineModel } from '@rstore/vue'
 
-const Todo = defineModel({
+const todoModel = defineModel({
   name: 'todos',
   // other properties...
+})
+
+const store = await createStore({
+  models: [
+    todoModel
+  ],
+  plugins: [],
 })
 ```
 
 For TypeScript, you should use the `defineItemType` utility function instead to specify the type of the item, then call `model` on it:
 
 ```ts
-import { defineItemType } from '@rstore/vue'
+import { createStore, defineItemType } from '@rstore/vue'
 
 interface TodoType {
   id: string
@@ -38,10 +71,17 @@ interface TodoType {
   completed: boolean
 }
 
-const Todo = defineItemType<TodoType>().model({
+const todoModel = defineItemType<TodoType>().model({
   name: 'todos',
   // other properties...
 } as const)
+
+const store = await createStore({
+  models: [
+    todoModel
+  ] as const,
+  plugins: [],
+})
 ```
 
 ::: info
@@ -63,7 +103,7 @@ By default, rstore will try to use the `id` or `_id` property of the item as the
 You can override this behavior by specifying the `getKey` method on the model:
 
 ```ts
-const Todo = defineModel({
+const todoModel = defineModel({
   name: 'todos',
   getKey: item => item.customId,
 })
@@ -88,7 +128,7 @@ export {}
 In the model, you can add the metadata to the `meta` property:
 
 ```ts
-const Todo = defineModel({
+const todoModel = defineModel({
   name: 'Todo',
   meta: {
     path: '/todos',
@@ -109,7 +149,7 @@ The field configuration can have the following properties:
 Example:
 
 ```ts
-const Todo = defineModel({
+const todoModel = defineModel({
   name: 'todos',
   fields: {
     createdAt: {
@@ -131,7 +171,7 @@ You can define computed fields in the model. Computed fields are not stored in t
 For example, you can define a `fullName` computed field that concatenates the `firstName` and `lastName` fields:
 
 ```ts
-const User = defineModel({
+const userModel = defineModel({
   name: 'users',
   computed: {
     fullName: item => `${item.firstName} ${item.lastName}`,
@@ -144,7 +184,7 @@ You can then use the computed field in your application just like any other fiel
 ```ts
 const store = useStore()
 
-const { data: user } = store.User.queryFirst('some-id')
+const { data: user } = store.users.queryFirst('some-id')
 
 watchEffect(() => {
   console.log(user.value?.fullName) // This is a computed field
@@ -161,7 +201,7 @@ You can specify the schema for the `create` and `update` operations. The schema 
 ```ts
 import { z } from 'zod'
 
-const Todo = defineModel({
+const todoModel = defineModel({
   name: 'todos',
   schema: {
     create: z.object({
@@ -183,7 +223,7 @@ You can then use the `$schema` property of the form objects to validate the data
 
 <script setup>
 const store = useStore()
-const createTodo = store.Todo.createForm()
+const createTodo = store.todos.createForm()
 </script>
 
 <template>

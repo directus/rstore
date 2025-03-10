@@ -25,12 +25,12 @@ interface User {
   name: string
 }
 
-const User = defineItemType<User>().model({
+const userModel = defineItemType<User>().model({
   name: 'users',
   relations: {
     profile: {
       to: {
-        Profile: {
+        profiles: {
           on: 'userId', // Profile.userId
           eq: 'id', // User.id
         },
@@ -52,12 +52,12 @@ interface User {
   name: string
 }
 
-const User = defineItemType<User>().model({
+const userModel = defineItemType<User>().model({
   name: 'users',
   relations: {
     posts: {
       to: {
-        Post: {
+        posts: {
           on: 'userId', // Post.userId
           eq: 'id', // User.id
         },
@@ -78,12 +78,12 @@ interface User {
   name: string
 }
 
-const User = defineItemType<User>().model({
+const userModel = defineItemType<User>().model({
   name: 'users',
   relations: {
     receivedMessages: {
       to: {
-        Message: {
+        messages: {
           on: 'recipientId', // Message.recipientId
           eq: 'id', // User.id
         },
@@ -92,7 +92,7 @@ const User = defineItemType<User>().model({
     },
     sentMessages: {
       to: {
-        Message: {
+        messages: {
           on: 'senderId', // Message.senderId
           eq: 'id', // User.id
         },
@@ -109,12 +109,12 @@ interface Message {
   recipientId: string
 }
 
-const Message = defineItemType<Message>().model({
+const messageModel = defineItemType<Message>().model({
   name: 'messages',
   relations: {
     sender: {
       to: {
-        User: {
+        users: {
           on: 'senderId', // Message.senderId
           eq: 'id', // User.id
         },
@@ -122,7 +122,7 @@ const Message = defineItemType<Message>().model({
     },
     recipient: {
       to: {
-        User: {
+        users: {
           on: 'recipientId', // Message.recipientId
           eq: 'id', // User.id
         },
@@ -148,16 +148,16 @@ interface Comment {
   authorId: string
 }
 
-const Comment = defineItemType<Comment>().model({
+const commentModel = defineItemType<Comment>().model({
   name: 'comments',
   relations: {
     post: {
       to: {
-        Post: {
+        posts: {
           on: 'id', // Post.id
           eq: 'postId', // Comment.postId
         },
-        ImagePost: {
+        imagesPosts: {
           on: 'id', // ImagePost.id
           eq: 'postId', // Comment.postId
         },
@@ -165,11 +165,11 @@ const Comment = defineItemType<Comment>().model({
     },
     user: {
       to: {
-        User: {
+        users: {
           on: 'id', // User.id
           eq: 'authorId', // Comment.authorId
         },
-        Bot: {
+        bots: {
           on: 'id', // Bot.id
           eq: 'authorId', // Comment.authorId
         },
@@ -178,3 +178,7 @@ const Comment = defineItemType<Comment>().model({
   },
 } as const)
 ```
+
+::: info
+Support for matching relations on multiple fields is coming soon.
+:::

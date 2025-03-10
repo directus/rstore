@@ -1,5 +1,21 @@
 # Querying Data
 
+For each model, the store a set of functions to query the data. It can be accessed by using the model name: `store.<model_name>.<method>`.
+
+Here are some examples:
+
+```ts{3-4,8-9}
+const store = await createStore({
+  models: [
+    { name: 'Todo' },
+    { name: 'users' },
+  ],
+  plugins: [],
+})
+const { data: todos } = store.Todo.queryMany()
+const { data: users } = store.users.queryMany()
+```
+
 ## Query composables
 
 The query composables are the recommended way to fetch data from the server. They are designed to be used in a Vue component and return a reactive result to be used in the components.

@@ -40,13 +40,13 @@ pnpm i @rstore/vue
 ```js [src/rstore/model.js]
 import { defineModel } from '@rstore/vue'
 
-export const Todo = defineModel({
+export const todoModel = defineModel({
   name: 'todos',
 })
 ```
 
 ```ts [src/rstore/model.ts]
-import type { ModelMap } from '@rstore/vue'
+import type { ModelList } from '@rstore/vue'
 import { defineItemType } from '@rstore/vue'
 
 // Item type
@@ -59,14 +59,13 @@ export interface Todo {
 }
 
 // Model
-const Todo = defineItemType<Todo>().model({
+const todoModel = defineItemType<Todo>().model({
   name: 'todos',
 } as const)
 
-// Model with all types
-export const models = {
-  Todo,
-} as const satisfies ModelMap
+export const models = [
+  todoModel,
+] as const satisfies ModelList
 ```
 
 :::
@@ -159,14 +158,14 @@ In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and 
 
 ```js [src/rstore/index.js]
 import { createStore } from '@rstore/vue'
-import { Todo } from './model'
+import { todoModel } from './model'
 import myPlugin from './plugin'
 
 export async function rstore(app) {
   const store = await createStore({
-    models: {
-      Todo,
-    },
+    models: [
+      todoModel,
+    ],
     plugins: [
       myPlugin,
     ],
@@ -257,7 +256,7 @@ import { useStore } from '@/rstore'
 
 const store = useStore()
 
-const { data: todos } = store.Todo.queryMany()
+const { data: todos } = store.todos.queryMany()
 </script>
 
 <template>
@@ -303,20 +302,45 @@ export default defineNuxtConfig({
 ::: code-group
 
 ```ts [app/rstore/todo.ts]
-// Model
-export const Todo = defineItemType<Todo>().model({
+// One Model
+export default defineItemType<Todo>().model({
   name: 'todos',
 } as const)
 ```
 
+```ts [app/rstore/multiple.ts]
+// Multiple Models
+export default [
+  defineItemType<User>().model({
+    name: 'users',
+  } as const),
+
+  defineItemType<Bot>().model({
+    name: 'bots',
+  } as const),
+]
+```
+
 ```ts [shared/types/model.ts]
-// Item type
+// Item types
+
 export interface Todo {
   id: string
   text: string
   completed: boolean
   createdAt: Date
   updatedAt?: Date
+}
+
+export interface User {
+  id: string
+  name: string
+  email: string
+}
+
+export interface Bot {
+  id: string
+  name: string
 }
 ```
 
@@ -327,7 +351,7 @@ If you are using TypeScript, don't forget to add `as const` to enable type safet
 :::
 
 ::: warning FILE SCANNING
-The rstore module will only scan exported variables in files in the `rstore` folder and not in nested folders. If you want to split the models in multiple folders, you need to re-export each variables (currently the module is looking for `export const` expressions) or use Nuxt layers (recommended).
+The rstore module will only scan exported defaults in files in the `rstore` folder and not in nested folders. If you want to split the models in multiple folders, you need to re-export each variables (currently the module is looking for `export default` expressions) or use Nuxt layers (recommended).
 :::
 
 3. Create a plugin to interact with an API in the `rstore/plugins` folder:
@@ -406,7 +430,7 @@ In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and 
 <script setup>
 const store = useStore()
 
-const { data: todos } = await store.Todo.queryMany()
+const { data: todos } = await store.todos.queryMany()
 </script>
 
 <template>
