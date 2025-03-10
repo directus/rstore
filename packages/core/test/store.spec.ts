@@ -11,7 +11,7 @@ describe('createStoreCore', () => {
   beforeEach(() => {
     options = {
       cache: {} as Cache,
-      models: {} as ModelList,
+      models: [] as ModelList,
       modelDefaults: {} as ModelDefaults,
       plugins: [],
       hooks: {

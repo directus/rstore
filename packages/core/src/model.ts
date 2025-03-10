@@ -52,8 +52,10 @@ export function resolveModels<
 >(models: TModelList, defaults?: TModelDefaults): ResolvedModelList<TModelList, TModelDefaults> {
   const resolved = [] as ResolvedModelList<TModelList, TModelDefaults>
 
-  for (const key in models) {
-    const model = models[key]
+  for (const model of models) {
+    if (model.name.startsWith('$')) {
+      throw new Error(`Model name "${model.name}" cannot start with "$"`)
+    }
 
     const fields = defaults?.fields ?? {}
     if (model.fields) {
