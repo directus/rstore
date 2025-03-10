@@ -11,8 +11,11 @@ async function toggle() {
     return
   }
 
-  await store.Todo.update({
-    id: todo.value.id,
+  // await store.Todo.update({
+  //   id: todo.value.id,
+  //   completed: !todo.value.completed,
+  // })
+  await todo.value.$update({
     completed: !todo.value.completed,
   })
 }
