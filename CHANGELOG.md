@@ -1,6 +1,40 @@
 # Changelog
 
 
+## v0.3.0
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.2.1...v0.3.0)
+
+### 🚀 Enhancements
+
+- Throw error if model name starts with $ ([06d944e](https://github.com/Akryum/rstore/commit/06d944e))
+- **vue:** Store.$model('model_name') ([c0dc3b5](https://github.com/Akryum/rstore/commit/c0dc3b5))
+
+### 🩹 Fixes
+
+- **nuxt:** Payload key ([d7baee2](https://github.com/Akryum/rstore/commit/d7baee2))
+
+### 💅 Refactors
+
+- Models is now an array of models ([0d0977f](https://github.com/Akryum/rstore/commit/0d0977f))
+- Store native props now starts with $ ([e586006](https://github.com/Akryum/rstore/commit/e586006))
+
+### 📖 Documentation
+
+- Fix logo ([719a620](https://github.com/Akryum/rstore/commit/719a620))
+- Add link to website ([20e07c3](https://github.com/Akryum/rstore/commit/20e07c3))
+- More! ([0fa12ca](https://github.com/Akryum/rstore/commit/0fa12ca))
+- Update GitHub Link ([598179e](https://github.com/Akryum/rstore/commit/598179e))
+- Fix light theme colors ([488e349](https://github.com/Akryum/rstore/commit/488e349))
+- Updates ([029a57c](https://github.com/Akryum/rstore/commit/029a57c))
+- Mutations ([9819f11](https://github.com/Akryum/rstore/commit/9819f11))
+- Plugins ([e3be918](https://github.com/Akryum/rstore/commit/e3be918))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+- Alexandre Chopin ([@alexchopin](http://github.com/alexchopin))
+
 ## v0.2.1
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.2.0...v0.2.1)
