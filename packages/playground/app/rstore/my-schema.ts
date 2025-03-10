@@ -3,104 +3,96 @@ import { formatTimeAgo } from '@vueuse/core'
 const reactiveTime = useTimestamp()
 const getTime = () => import.meta.server ? Date.now() : reactiveTime.value
 
-export const Todo = defineItemType<Todo>().model({
-  name: 'Todo',
-  schema: {
-    create: createValidationSchemas.todos,
-    update: updateValidationSchemas.todos,
-  },
-  meta: {
-    path: 'todos',
-  },
-} as const)
+// Multiple models
+export default [
+  defineItemType<User>().model({
+    name: 'User',
+    relations: {
+      receivedMessages: {
+        to: {
+          Message: {
+            on: 'recipientId',
+            eq: 'id',
+          },
+        },
+        many: true,
+      },
+      sentMessages: {
+        to: {
+          Message: {
+            on: 'authorId',
+            eq: 'id',
+          },
+        },
+        many: true,
+      },
+    },
+    meta: {
+      path: 'users',
+    },
+  } as const),
 
-export const User = defineItemType<User>().model({
-  name: 'User',
-  relations: {
-    receivedMessages: {
-      to: {
-        Message: {
-          on: 'recipientId',
-          eq: 'id',
+  defineItemType<Bot>().model({
+    name: 'Bot',
+    relations: {
+      receivedMessages: {
+        to: {
+          Message: {
+            on: 'recipientId',
+            eq: 'id',
+          },
         },
+        many: true,
       },
-      many: true,
-    },
-    sentMessages: {
-      to: {
-        Message: {
-          on: 'authorId',
-          eq: 'id',
+      sentMessages: {
+        to: {
+          Message: {
+            on: 'authorId',
+            eq: 'id',
+          },
         },
+        many: true,
       },
-      many: true,
     },
-  },
-  meta: {
-    path: 'users',
-  },
-} as const)
+    meta: {
+      path: 'bots',
+    },
+  } as const),
 
-export const Bot = defineItemType<Bot>().model({
-  name: 'Bot',
-  relations: {
-    receivedMessages: {
-      to: {
-        Message: {
-          on: 'recipientId',
-          eq: 'id',
+  defineItemType<Message>().model({
+    name: 'Message',
+    relations: {
+      author: {
+        to: {
+          User: {
+            on: 'id',
+            eq: 'authorId',
+          },
+          Bot: {
+            on: 'id',
+            eq: 'authorId',
+          },
         },
       },
-      many: true,
-    },
-    sentMessages: {
-      to: {
-        Message: {
-          on: 'authorId',
-          eq: 'id',
-        },
-      },
-      many: true,
-    },
-  },
-  meta: {
-    path: 'bots',
-  },
-} as const)
-
-export const Message = defineItemType<Message>().model({
-  name: 'Message',
-  relations: {
-    author: {
-      to: {
-        User: {
-          on: 'id',
-          eq: 'authorId',
-        },
-        Bot: {
-          on: 'id',
-          eq: 'authorId',
+      recipient: {
+        to: {
+          User: {
+            on: 'id',
+            eq: 'recipientId',
+          },
+          Bot: {
+            on: 'id',
+            eq: 'recipientId',
+          },
         },
       },
     },
-    recipient: {
-      to: {
-        User: {
-          on: 'id',
-          eq: 'recipientId',
-        },
-        Bot: {
-          on: 'id',
-          eq: 'recipientId',
-        },
-      },
+    computed: {
+      extract: message => `${message.text.slice(0, 10)}... (+${message.text.length - 10} chars)`,
+      timeAgo: message => formatTimeAgo(message.createdAt, {}, getTime()),
     },
-  },
-  computed: {
-    extract: message => `${message.text.slice(0, 10)}... (+${message.text.length - 10} chars)`,
-    timeAgo: message => formatTimeAgo(message.createdAt, {}, getTime()),
-  },
-  meta: {
-    path: 'messages',
-  },
-} as const)
+    meta: {
+      path: 'messages',
+    },
+  } as const),
+]

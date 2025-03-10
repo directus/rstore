@@ -1,21 +1,21 @@
 import type { VueStore } from './store'
-import { type Cache, type Model, type ModelDefaults, type ModelMap, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, type WrappedItem } from '@rstore/shared'
+import { type Cache, type Model, type ModelDefaults, type ModelList, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, type WrappedItem } from '@rstore/shared'
 import { ref, toRaw } from 'vue'
 import { wrapItem } from './item'
 
 export interface CreateCacheOptions<
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
   TModelDefaults extends ModelDefaults,
 > {
-  getStore: () => VueStore<TModelMap, TModelDefaults>
+  getStore: () => VueStore<TModelList, TModelDefaults>
 }
 
 export function createCache<
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
   TModelDefaults extends ModelDefaults,
 >({
   getStore,
-}: CreateCacheOptions<TModelMap, TModelDefaults>): Cache {
+}: CreateCacheOptions<TModelList, TModelDefaults>): Cache {
   const state = ref<Record<string, any>>({
     _markers: {},
   })
@@ -23,16 +23,16 @@ export function createCache<
   const wrappedItems = new Map<string, WrappedItem<any, any, any>>()
 
   function getWrappedItemCacheKey<TModel extends Model>(
-    model: ResolvedModel<TModel, TModelDefaults, TModelMap>,
+    model: ResolvedModel<TModel, TModelDefaults, TModelList>,
     key: string,
   ) {
     return `${model.name}:${key}`
   }
 
   function getWrappedItem<TModel extends Model>(
-    model: ResolvedModel<TModel, TModelDefaults, TModelMap>,
-    item: ResolvedModelItem<TModel, TModelDefaults, TModelMap> | null | undefined,
-  ): WrappedItem<TModel, TModelDefaults, TModelMap> | undefined {
+    model: ResolvedModel<TModel, TModelDefaults, TModelList>,
+    item: ResolvedModelItem<TModel, TModelDefaults, TModelList> | null | undefined,
+  ): WrappedItem<TModel, TModelDefaults, TModelList> | undefined {
     if (!item) {
       return undefined
     }
@@ -71,10 +71,8 @@ export function createCache<
       return Object.values<any>(state.value[model.name] ?? {}).map(item => getWrappedItem(model, item)).filter(Boolean) as WrappedItem<any, any, any>[]
     },
     writeItem({ model, key, item, marker, fromWriteItems }) {
-      let itemsForType = state.value[model.name]
-      if (!itemsForType) {
-        itemsForType = state.value[model.name] = {}
-      }
+      state.value[model.name] ??= {}
+      const itemsForType = state.value[model.name]
       const rawData = pickNonSpecialProps(item)
 
       // Handle relations

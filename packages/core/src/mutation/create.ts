@@ -1,31 +1,31 @@
 import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
-import { type Model, type ModelDefaults, type ModelMap, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, set, type StoreCore } from '@rstore/shared'
+import { type Model, type ModelDefaults, type ModelList, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, set, type StoreCore } from '@rstore/shared'
 
 export interface CreateOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 > {
-  store: StoreCore<TModelMap, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults, TModelMap>
-  item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+  store: StoreCore<TModelList, TModelDefaults>
+  model: ResolvedModel<TModel, TModelDefaults, TModelList>
+  item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
   skipCache?: boolean
 }
 
 export async function createItem<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 >({
   store,
   model,
   item,
   skipCache,
-}: CreateOptions<TModel, TModelDefaults, TModelMap>): Promise<ResolvedModelItem<TModel, TModelDefaults, TModelMap>> {
+}: CreateOptions<TModel, TModelDefaults, TModelList>): Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>> {
   const meta: CustomHookMeta = {}
 
-  item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
-  let result: ResolvedModelItem<TModel, TModelDefaults, TModelMap> | undefined
+  item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  let result: ResolvedModelItem<TModel, TModelDefaults, TModelList> | undefined
 
   await store.hooks.callHook('beforeMutation', {
     store,

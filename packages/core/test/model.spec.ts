@@ -1,4 +1,4 @@
-import type { Model, ModelDefaults, ModelMap } from '@rstore/shared'
+import type { Model, ModelDefaults, ModelList } from '@rstore/shared'
 import { describe, expect, it } from 'vitest'
 import { defaultGetKey, defaultIsInstanceOf, resolveModels } from '../src/model'
 
@@ -41,18 +41,18 @@ describe('default isInstanceOf', () => {
 
 describe('model', () => {
   it('should resolve model with defaults', () => {
-    const modelTypes: ModelMap = {
-      TestModel: {
+    const modelTypes: ModelList = [
+      {
         name: 'TestModel',
         meta: {
           path: '/test',
         },
       },
-      Test2: {
+      {
         name: 'Test2',
         getKey: (item: any) => item.id,
       },
-    }
+    ]
     const defaults: ModelDefaults = {
       getKey: (item: any) => `${item.id}$default`,
       meta: {
@@ -60,20 +60,20 @@ describe('model', () => {
       },
     }
     const resolved = resolveModels(modelTypes, defaults)
-    expect(resolved.TestModel.getKey({ id: 'foo' })).toBe(defaults.getKey?.({ id: 'foo' }))
-    expect(resolved.TestModel.meta).toEqual({
+    expect(resolved[0].getKey({ id: 'foo' })).toBe(defaults.getKey?.({ id: 'foo' }))
+    expect(resolved[0].meta).toEqual({
       path: '/test',
       test: 'meow',
     })
-    expect(resolved.Test2.getKey({ id: 'foo' })).toBe(modelTypes.Test2.getKey?.({ id: 'foo' }))
-    expect(resolved.Test2.meta).toEqual({
+    expect(resolved[1].getKey({ id: 'foo' })).toBe(modelTypes[1].getKey?.({ id: 'foo' }))
+    expect(resolved[1].meta).toEqual({
       test: 'meow',
     })
   })
 
   it('should resolve all model props', () => {
-    const modelTypes: ModelMap = {
-      TestModel: {
+    const modelTypes: ModelList = [
+      {
         name: 'TestModel',
         getKey: (item: any) => item.id,
         relations: {
@@ -114,12 +114,12 @@ describe('model', () => {
           test: 'meow',
         },
       },
-    }
+    ]
 
     const resolved = resolveModels(modelTypes)
 
-    expect(resolved.TestModel.getKey({ id: 'foo' })).toBe(modelTypes.TestModel.getKey?.({ id: 'foo' }))
-    expect(resolved.TestModel.relations).toEqual({
+    expect(resolved[0].getKey({ id: 'foo' })).toBe(modelTypes[0].getKey?.({ id: 'foo' }))
+    expect(resolved[0].relations).toEqual({
       test: {
         to: {
           Test2: {
@@ -129,21 +129,21 @@ describe('model', () => {
         },
       },
     })
-    expect(resolved.TestModel.computed.calc).toBeTypeOf('function')
-    expect(resolved.TestModel.fields!.createdAt.parse).toBeTypeOf('function')
-    expect(resolved.TestModel.schema.create['~standard'].vendor).toBe('rstore')
-    expect(resolved.TestModel.schema.update['~standard'].vendor).toBe('rstore')
-    expect(resolved.TestModel.meta).toEqual({
+    expect(resolved[0].computed.calc).toBeTypeOf('function')
+    expect(resolved[0].fields!.createdAt.parse).toBeTypeOf('function')
+    expect(resolved[0].schema.create['~standard'].vendor).toBe('rstore')
+    expect(resolved[0].schema.update['~standard'].vendor).toBe('rstore')
+    expect(resolved[0].meta).toEqual({
       test: 'meow',
     })
   })
 
   it('should resolve all default props', () => {
-    const modelTypes: ModelMap = {
-      TestModel: {
+    const modelTypes: ModelList = [
+      {
         name: 'TestModel',
       },
-    }
+    ]
 
     const defaults: ModelDefaults = {
       getKey: (item: any) => item.id,
@@ -162,13 +162,13 @@ describe('model', () => {
 
     const resolved = resolveModels(modelTypes, defaults)
 
-    expect(resolved.TestModel.getKey({ id: 0 })).toBe(defaults.getKey?.({ id: 0 }))
-    expect(resolved.TestModel.relations).toEqual({})
-    expect(resolved.TestModel.computed.calc).toBeTypeOf('function')
-    expect(resolved.TestModel.fields!.createdAt.parse).toBeTypeOf('function')
-    expect(resolved.TestModel.schema.create['~standard'].vendor).toBe('rstore')
-    expect(resolved.TestModel.schema.update['~standard'].vendor).toBe('rstore')
-    expect(resolved.TestModel.meta).toEqual({
+    expect(resolved[0].getKey({ id: 0 })).toBe(defaults.getKey?.({ id: 0 }))
+    expect(resolved[0].relations).toEqual({})
+    expect(resolved[0].computed.calc).toBeTypeOf('function')
+    expect(resolved[0].fields!.createdAt.parse).toBeTypeOf('function')
+    expect(resolved[0].schema.create['~standard'].vendor).toBe('rstore')
+    expect(resolved[0].schema.update['~standard'].vendor).toBe('rstore')
+    expect(resolved[0].meta).toEqual({
       test: 'meow',
     })
   })

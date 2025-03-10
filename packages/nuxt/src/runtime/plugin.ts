@@ -1,8 +1,8 @@
-import type { ModelMap, Plugin } from '@rstore/shared'
+import type { ModelList, Plugin } from '@rstore/shared'
 
 import { defineNuxtPlugin } from '#app'
 // @ts-expect-error virtual file
-import * as _model from '#build/$rstore-model'
+import _models from '#build/$rstore-model'
 // @ts-expect-error virtual file
 import * as _plugins from '#build/$rstore-plugins'
 
@@ -11,7 +11,7 @@ import { markRaw } from 'vue'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
   let plugins = Object.values({ ..._plugins }) as Plugin[]
-  const models = { ..._model } as ModelMap
+  const models = _models as ModelList
 
   // Devtools
   if (import.meta.dev) {

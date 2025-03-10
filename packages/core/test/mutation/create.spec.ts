@@ -1,14 +1,14 @@
-import type { Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelItem, StoreCore } from '@rstore/shared'
+import type { Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, StoreCore } from '@rstore/shared'
 import type { CreateOptions } from '../../src/mutation/create'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createItem } from '../../src/mutation/create'
 
 describe('createItem', () => {
-  let mockStore: StoreCore<ModelMap, ModelDefaults>
-  let mockModel: ResolvedModel<Model, ModelDefaults, ModelMap>
-  let mockItem: Partial<ResolvedModelItem<Model, ModelDefaults, ModelMap>>
-  let options: CreateOptions<Model, ModelDefaults, ModelMap>
+  let mockStore: StoreCore<ModelList, ModelDefaults>
+  let mockModel: ResolvedModel<Model, ModelDefaults, ModelList>
+  let mockItem: Partial<ResolvedModelItem<Model, ModelDefaults, ModelList>>
+  let options: CreateOptions<Model, ModelDefaults, ModelList>
 
   beforeEach(() => {
     mockStore = {
@@ -18,11 +18,11 @@ describe('createItem', () => {
         writeItem: vi.fn(),
       },
       mutationHistory: [],
-    } as unknown as StoreCore<ModelMap, ModelDefaults>
+    } as unknown as StoreCore<ModelList, ModelDefaults>
 
     mockModel = {
       getKey: vi.fn(),
-    } as unknown as ResolvedModel<Model, ModelDefaults, ModelMap>
+    } as unknown as ResolvedModel<Model, ModelDefaults, ModelList>
 
     mockItem = {}
 
@@ -35,7 +35,7 @@ describe('createItem', () => {
   })
 
   it('should create an item and write it to the cache', async () => {
-    const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelMap>
+    const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
     mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockModel.getKey = vi.fn(() => '1')
 
@@ -62,7 +62,7 @@ describe('createItem', () => {
   })
 
   it('should throw an error if key is not defined', async () => {
-    const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelMap>
+    const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
     mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockModel.getKey = vi.fn(() => undefined)
 
@@ -70,7 +70,7 @@ describe('createItem', () => {
   })
 
   it('should skip cache if skipCache is true', async () => {
-    const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelMap>
+    const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
     mockStore.hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
     mockModel.getKey = vi.fn(() => '1')
 

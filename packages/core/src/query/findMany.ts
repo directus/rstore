@@ -1,4 +1,4 @@
-import type { FindManyOptions, Model, ModelDefaults, ModelMap, QueryResult, ResolvedModel, StoreCore, WrappedItem, WriteItem } from '@rstore/shared'
+import type { FindManyOptions, Model, ModelDefaults, ModelList, QueryResult, ResolvedModel, StoreCore, WrappedItem, WriteItem } from '@rstore/shared'
 import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
@@ -7,12 +7,12 @@ import { peekMany } from './peekMany'
 export interface FindManyParams<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 > {
-  store: StoreCore<TModelMap, TModelDefaults>
+  store: StoreCore<TModelList, TModelDefaults>
   meta?: CustomHookMeta
-  model: ResolvedModel<TModel, TModelDefaults, TModelMap>
-  findOptions?: FindManyOptions<TModel, TModelDefaults, TModelMap>
+  model: ResolvedModel<TModel, TModelDefaults, TModelList>
+  findOptions?: FindManyOptions<TModel, TModelDefaults, TModelList>
 }
 
 /**
@@ -21,13 +21,13 @@ export interface FindManyParams<
 export async function findMany<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 >({
   store,
   meta,
   model,
   findOptions,
-}: FindManyParams<TModel, TModelDefaults, TModelMap>): Promise<QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelMap>>>> {
+}: FindManyParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelList>>>> {
   meta = meta ?? {}
 
   findOptions = findOptions ?? {}
@@ -97,7 +97,7 @@ export async function findMany<
 
     if (fetchPolicy !== 'no-cache') {
       const items = result
-      const writes: Array<WriteItem<TModel, TModelDefaults, TModelMap>> = []
+      const writes: Array<WriteItem<TModel, TModelDefaults, TModelList>> = []
       for (const item of items) {
         const key = model.getKey(item)
         if (!key) {

@@ -115,12 +115,18 @@ export interface ModelRelation {
   }>
 }
 
-export type ModelMap<TModelMap extends Record<string, Model> = Record<string, Model>> = TModelMap
+export type ModelList<TModels extends Array<Model> = Array<Model>> = TModels
+
+export type ModelNameMap<TModels extends ModelList> = {
+  [M in TModels[number] as M['name']]: M
+}
+
+export type ModelByName<TModels extends ModelList, TName extends string, TNameMap extends ModelNameMap<TModels> = ModelNameMap<TModels>> = TName extends keyof TNameMap ? TNameMap[TName] : never
 
 export interface ResolvedModel<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  _TModelMap extends ModelMap,
+  _TModelList extends ModelList,
   TSchemas extends ModelSchemas = ModelSchemas,
 > {
   'name': string
@@ -134,53 +140,53 @@ export interface ResolvedModel<
   '~item'?: TModel['~item']
 }
 
-export type ResolvedModelMap<
-  TModelMap extends Record<string, Model>,
+export type ResolvedModelList<
+  TModelList extends ModelList,
   TModelDefaults extends ModelDefaults,
 > = {
-  [K in keyof TModelMap]: ResolvedModel<TModelMap[K], TModelDefaults, ModelMap<TModelMap>>
+  [K in keyof TModelList]: ResolvedModel<TModelList[K], TModelDefaults, TModelList>
 }
 
 export type ResolvedModelItemBase<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
-> = NonNullable<ResolvedModel<TModel, TModelDefaults, TModelMap>['~item']>
+  TModelList extends ModelList,
+> = NonNullable<ResolvedModel<TModel, TModelDefaults, TModelList>['~item']>
 
 export type ResolvedModelItem<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
-> = ResolvedModelItemBase<TModel, TModelDefaults, TModelMap> & ResolvedRelationItems<TModel, TModelDefaults, TModelMap> & ResolvedComputedFields<TModel, TModelDefaults, TModelMap>
+  TModelList extends ModelList,
+> = ResolvedModelItemBase<TModel, TModelDefaults, TModelList> & ResolvedRelationItems<TModel, TModelDefaults, TModelList> & ResolvedComputedFields<TModel, TModelDefaults, TModelList>
 
 export type ResolvedRelationItems<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 > = {
-  [K in keyof NonNullable<TModel['relations']>]: ResolvedRelationItemsForRelation<TModel, TModelDefaults, TModelMap, NonNullable<ResolvedModel<TModel, TModelDefaults, TModelMap>['relations']>[K]>
+  [K in keyof NonNullable<TModel['relations']>]: ResolvedRelationItemsForRelation<TModel, TModelDefaults, TModelList, NonNullable<ResolvedModel<TModel, TModelDefaults, TModelList>['relations']>[K]>
 }
 
 type ResolvedRelationItemsForRelation<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
   TRelation extends ModelRelation,
 > = TRelation['many'] extends true
-  ? Array<ResolvedRelationItemsForRelationTargetModels<TModel, TModelDefaults, TModelMap, TRelation>>
-  : ResolvedRelationItemsForRelationTargetModels<TModel, TModelDefaults, TModelMap, TRelation> | undefined
+  ? Array<ResolvedRelationItemsForRelationTargetModels<TModel, TModelDefaults, TModelList, TRelation>>
+  : ResolvedRelationItemsForRelationTargetModels<TModel, TModelDefaults, TModelList, TRelation> | undefined
 
 type ResolvedRelationItemsForRelationTargetModels<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
   TRelation extends ModelRelation,
-> = WrappedItem<TModelMap[KeysToUnion<TRelation['to']>], TModelDefaults, TModelMap>
+> = ModelByName<TModelList, KeysToUnion<TRelation['to']>> extends Model ? WrappedItem<ModelByName<TModelList, KeysToUnion<TRelation['to']>>, TModelDefaults, TModelList> : never
 
 type ResolvedComputedFields<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 > = {
   [K in keyof NonNullable<TModelDefaults['computed'] & TModel['computed']>]: ReturnType<NonNullable<TModelDefaults['computed'] & TModel['computed']>[K]>
 }

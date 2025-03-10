@@ -1,4 +1,4 @@
-import type { DefaultIsInstanceOf, Full, GetKey, Model, ModelDefaults, ModelSchemas, ResolvedModelMap } from '@rstore/shared'
+import type { DefaultIsInstanceOf, Full, GetKey, Model, ModelDefaults, ModelList, ModelSchemas, ResolvedModelList } from '@rstore/shared'
 
 export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
 
@@ -47,10 +47,10 @@ const emptySchemas: Full<ModelSchemas> = {
 }
 
 export function resolveModels<
-  TModelMap extends Record<string, Model>,
+  TModelList extends ModelList,
   TModelDefaults extends ModelDefaults,
->(models: TModelMap, defaults?: TModelDefaults): ResolvedModelMap<TModelMap, TModelDefaults> {
-  const resolved = {} as ResolvedModelMap<TModelMap, TModelDefaults>
+>(models: TModelList, defaults?: TModelDefaults): ResolvedModelList<TModelList, TModelDefaults> {
+  const resolved = [] as ResolvedModelList<TModelList, TModelDefaults>
 
   for (const key in models) {
     const model = models[key]
@@ -67,7 +67,7 @@ export function resolveModels<
       }
     }
 
-    resolved[key] = {
+    resolved.push({
       name: model.name,
       getKey: item => (model.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
       isInstanceOf: item => model.isInstanceOf?.(item) || defaults?.isInstanceOf?.(model)(item) || defaultIsInstanceOf(model)(item),
@@ -85,7 +85,7 @@ export function resolveModels<
         ...defaults?.meta,
         ...model.meta,
       },
-    }
+    })
   }
   return resolved
 }

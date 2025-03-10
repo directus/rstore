@@ -1,13 +1,13 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { Model, ModelDefaults, ModelMap, ResolvedModelItem } from './model'
+import type { Model, ModelDefaults, ModelList, ResolvedModelItem } from './model'
 
 export interface CustomParams {}
 
 export interface CustomFilterOption<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 > {}
 
 export interface CustomSortOption {}
@@ -31,7 +31,7 @@ export type FetchPolicy = 'cache-first' | 'cache-and-fetch' | 'fetch-only' | 'ca
 export interface FindOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 > {
   /**
    * Parameters sent to the adapter plugins. Usually used for filtering and sorting the data in the backend.
@@ -40,11 +40,11 @@ export interface FindOptions<
   /**
    * Filter the item.
    */
-  filter?: ((item: ResolvedModelItem<TModel, TModelDefaults, TModelMap>) => boolean) | CustomFilterOption<TModel, TModelDefaults, TModelMap>
+  filter?: ((item: ResolvedModelItem<TModel, TModelDefaults, TModelList>) => boolean) | CustomFilterOption<TModel, TModelDefaults, TModelList>
   /**
    * Sort the items.
    */
-  sort?: ((a: ResolvedModelItem<TModel, TModelDefaults, TModelMap>, b: ResolvedModelItem<TModel, TModelDefaults, TModelMap>) => number) | CustomSortOption
+  sort?: ((a: ResolvedModelItem<TModel, TModelDefaults, TModelList>, b: ResolvedModelItem<TModel, TModelDefaults, TModelList>) => number) | CustomSortOption
   /**
    * Include the related items.
    */
@@ -71,8 +71,8 @@ export interface FindOptions<
 export interface FindFirstOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
-> extends FindOptions<TModel, TModelDefaults, TModelMap> {
+  TModelList extends ModelList,
+> extends FindOptions<TModel, TModelDefaults, TModelList> {
   /**
    * Key of the item. Usually used for fetching the item by its key (e.g. ID).
    */
@@ -82,8 +82,8 @@ export interface FindFirstOptions<
 export interface FindManyOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
-> extends FindOptions<TModel, TModelDefaults, TModelMap> {
+  TModelList extends ModelList,
+> extends FindOptions<TModel, TModelDefaults, TModelList> {
   // nothing here yet
 }
 

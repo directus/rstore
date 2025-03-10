@@ -1,23 +1,23 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
-import type { Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelItem } from './model'
+import type { Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem } from './model'
 
 export interface MutationOperation<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 > {
   operation: 'create' | 'update' | 'delete'
-  model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+  model: ResolvedModel<TModel, TModelDefaults, TModelList>
   key?: string
-  payload?: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+  payload?: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 }
 
 export type CreateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 > = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['schema']>['create']>> & {
-  $save: () => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+  $save: () => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
   $reset: () => void
   $schema: NonNullable<NonNullable<TModel['schema']>['create']>
   $error: Error | null
@@ -27,9 +27,9 @@ export type CreateFormObject<
 export type UpdateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 > = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['schema']>['update']>> & {
-  $save: () => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+  $save: () => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
   $reset: () => Promise<void>
   $schema: NonNullable<NonNullable<TModel['schema']>['update']>
   $error: Error | null

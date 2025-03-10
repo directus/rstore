@@ -1,4 +1,4 @@
-import type { CreateFormObject, FindFirstOptions, FindManyOptions, HybridPromise, Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
+import type { CreateFormObject, FindFirstOptions, FindManyOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueQueryReturn } from './query'
@@ -11,57 +11,57 @@ import { createQuery } from './query'
 export interface VueModelApi<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
-  TItem extends WrappedItem<TModel, TModelDefaults, TModelMap>,
+  TModelList extends ModelList,
+  TItem extends WrappedItem<TModel, TModelDefaults, TModelList>,
 > {
   /**
    * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
    */
   peekFirst: (
-    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelMap>>,
-  ) => WrappedItem<TModel, TModelDefaults, TModelMap> | null
+    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
+  ) => WrappedItem<TModel, TModelDefaults, TModelList> | null
 
   /**
    * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
    */
   findFirst: (
-    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelMap>>,
-  ) => Promise<WrappedItem<TModel, TModelDefaults, TModelMap> | null>
+    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
+  ) => Promise<WrappedItem<TModel, TModelDefaults, TModelList> | null>
 
   /**
    * Create a reactive query for the first item that matches the given options.
    */
   queryFirst: (
-    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelMap>>,
-  ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelMap, TItem | null>>
+    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
+  ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TItem | null>>
 
   /**
    * Find all items that match the query in the cache without fetching the data from the adapter plugins.
    */
   peekMany: (
-    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelMap> | undefined>,
-  ) => Array<WrappedItem<TModel, TModelDefaults, TModelMap>>
+    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelList> | undefined>,
+  ) => Array<WrappedItem<TModel, TModelDefaults, TModelList>>
 
   /**
    * Find all items that match the query.
    */
   findMany: (
-    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelMap> | undefined>,
-  ) => Promise<Array<WrappedItem<TModel, TModelDefaults, TModelMap>>>
+    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelList> | undefined>,
+  ) => Promise<Array<WrappedItem<TModel, TModelDefaults, TModelList>>>
 
   /**
    * Create a reactive query for all items that match the given options.
    */
   queryMany: (
-    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelMap> | undefined>,
-  ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelMap, Array<TItem>>>
+    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelList> | undefined>,
+  ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, Array<TItem>>>
 
   /**
    * Create an item directly. For a more user-friendly way, use `createForm` instead.
    */
   create: (
-    item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>,
-  ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+    item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>,
+  ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 
   /**
    * (Recommended) The form object helps you creating a new item.
@@ -71,7 +71,7 @@ export interface VueModelApi<
       /**
        * Default values set in the form object initially and when it is reset.
        */
-      defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+      defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 
       /**
        * Schema to validate the form object.
@@ -80,32 +80,32 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => CreateFormObject<TModel, TModelDefaults, TModelMap> & {
-    $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+  ) => CreateFormObject<TModel, TModelDefaults, TModelList> & {
+    $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
   }
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
    */
   update: (
-    item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>,
+    item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>,
     updateOptions?: {
       key?: string | null
     }
-  ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+  ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 
   /**
    * (Recommended) The form object helps you updating an existing item. If the item is not loaded yet, it will be fetched first to pre-fill the form.
    */
   updateForm: (
-    options: string | FindFirstOptions<TModel, TModelDefaults, TModelMap>,
+    options: string | FindFirstOptions<TModel, TModelDefaults, TModelList>,
     formOptions?: {
       /**
        * Default values set in the form object initially and when it is reset.
        *
        * By default `updateForm` will initialize the fields with the existing item data.
        */
-      defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+      defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 
       /**
        * Schema to validate the form object.
@@ -114,34 +114,34 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelMap> & {
+  ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelList> & {
     $hasChanges: () => boolean
     $changedProps: Partial<{
-      [TKey in keyof ResolvedModelItem<TModel, TModelDefaults, TModelMap>]: [
-        newValue: ResolvedModelItem<TModel, TModelDefaults, TModelMap>[TKey],
-        oldValue: ResolvedModelItem<TModel, TModelDefaults, TModelMap>[TKey],
+      [TKey in keyof ResolvedModelItem<TModel, TModelDefaults, TModelList>]: [
+        newValue: ResolvedModelItem<TModel, TModelDefaults, TModelList>[TKey],
+        oldValue: ResolvedModelItem<TModel, TModelDefaults, TModelList>[TKey],
       ]
     }>
-    $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+    $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
   }>
 
   /**
    * Find all items that match the query.
    */
   delete: (
-    keyOrItem: string | Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>,
+    keyOrItem: string | Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>,
   ) => Promise<void>
 }
 
 export function createModelApi<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 >(
-  store: StoreCore<TModelMap, TModelDefaults>,
-  model: ResolvedModel<TModel, TModelDefaults, TModelMap>,
-): VueModelApi<TModelMap[keyof TModelMap], TModelDefaults, TModelMap, WrappedItem<TModelMap[keyof TModelMap], TModelDefaults, TModelMap>> {
-  type Api = VueModelApi<TModelMap[keyof TModelMap], TModelDefaults, TModelMap, WrappedItem<TModelMap[keyof TModelMap], TModelDefaults, TModelMap>>
+  store: StoreCore<TModelList, TModelDefaults>,
+  model: ResolvedModel<TModel, TModelDefaults, TModelList>,
+): VueModelApi<TModel, TModelDefaults, TModelList, WrappedItem<TModel, TModelDefaults, TModelList>> {
+  type Api = VueModelApi<TModel, TModelDefaults, TModelList, WrappedItem<TModel, TModelDefaults, TModelList>>
   const api: Api = {
     peekFirst: findOptions => peekFirst({
       store,
@@ -213,7 +213,7 @@ export function createModelApi<
           form.$loading = true
           form.$error = null
           try {
-            const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+            const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
             await model.schema.create['~standard'].validate(data)
             const item = await api.create(data)
             onSaved.trigger(item)
@@ -246,7 +246,7 @@ export function createModelApi<
 
       const onSaved = createEventHook()
 
-      async function getFormData(): Promise<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>> {
+      async function getFormData(): Promise<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>> {
         const item = await api.findFirst(options)
 
         if (!item) {
@@ -282,7 +282,7 @@ export function createModelApi<
           form.$loading = true
           form.$error = null
           try {
-            const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>
+            const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
             await model.schema.update['~standard'].validate(data)
             const item = await api.update(data)
             onSaved.trigger(item)

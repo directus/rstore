@@ -1,14 +1,14 @@
 <script lang="ts" setup>
-import type { Model, ModelDefaults, ModelMap, ResolvedModel } from '@rstore/shared'
+import type { Model, ModelDefaults, ModelList, ResolvedModel } from '@rstore/shared'
 
 const store = useStore()
 
 const search = ref('')
 
 const filteredTypes = computed(() => {
-  return Object.keys(store.models).filter((key) => {
-    return key.toLowerCase().includes(search.value.toLowerCase())
-  }).sort().map(key => (store.models as any)[key]) as ResolvedModel<Model, ModelDefaults, ModelMap>[]
+  return store.models.filter((model) => {
+    return model.name.toLowerCase().includes(search.value.toLowerCase())
+  }).sort((a, b) => a.name.localeCompare(b.name)) as ResolvedModel<Model, ModelDefaults, ModelList>[]
 })
 </script>
 

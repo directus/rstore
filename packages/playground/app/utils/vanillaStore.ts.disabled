@@ -1,4 +1,4 @@
-import type { ModelMap } from '@rstore/shared'
+import type { ModelList } from '@rstore/shared'
 import type { InjectionKey } from 'vue'
 import { defineItemType, type VueStore } from '@rstore/vue'
 import { formatTimeAgo } from '@vueuse/core'
@@ -113,7 +113,7 @@ export const vanillaModel = {
   User,
   Bot,
   Message,
-} as const satisfies ModelMap
+} as const satisfies ModelList
 
 export const vanillaStoreKey = Symbol('vanillaStore') as InjectionKey<VueStore<typeof vanillaModel>>
 

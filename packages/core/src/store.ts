@@ -1,30 +1,29 @@
-import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
-import { type Cache, type FindOptions, get, type Hooks, type ModelDefaults, type ModelMap, type Plugin, set, type StoreCore } from '@rstore/shared'
+import { type Cache, type CustomHookMeta, type FindOptions, get, type Hooks, type ModelDefaults, type ModelList, type Plugin, set, type StoreCore } from '@rstore/shared'
 import { defaultFetchPolicy } from './fetchPolicy'
 import { resolveModels } from './model'
 import { setupPlugin } from './plugin'
 
 export interface CreateStoreCoreOptions<
-  TModelMap extends ModelMap = ModelMap,
+  TModelList extends ModelList = ModelList,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
   cache: Cache
-  models: TModelMap
+  models: TModelList
   modelDefaults?: TModelDefaults
   plugins?: Array<Plugin>
-  hooks: Hooks<TModelMap, TModelDefaults>
+  hooks: Hooks<TModelList, TModelDefaults>
   findDefaults?: Partial<FindOptions<any, any, any>>
 }
 
 export async function createStoreCore<
-  TModelMap extends ModelMap = ModelMap,
+  TModelList extends ModelList = ModelList,
   TModelDefaults extends ModelDefaults = ModelDefaults,
->(options: CreateStoreCoreOptions<TModelMap, TModelDefaults>): Promise<StoreCore<TModelMap, TModelDefaults>> {
+>(options: CreateStoreCoreOptions<TModelList, TModelDefaults>): Promise<StoreCore<TModelList, TModelDefaults>> {
   // Create store
 
   const models = resolveModels(options.models, options.modelDefaults)
 
-  const store: StoreCore<TModelMap, TModelDefaults> = {
+  const store: StoreCore<TModelList, TModelDefaults> = {
     cache: options.cache,
     models,
     modelDefaults: options.modelDefaults ?? {} as TModelDefaults,
@@ -45,12 +44,12 @@ export async function createStoreCore<
         },
       })
     },
-    getModel(item, types?) {
-      if (types?.length === 1) {
-        return store.models[types[0]]
+    getModel(item, modelNames?) {
+      if (modelNames?.length === 1) {
+        return store.models.find(m => m.name === modelNames[0]) ?? null
       }
-      for (const key of types ?? Object.keys(store.models)) {
-        const model = store.models[key]
+      const models = modelNames ? store.models.filter(m => modelNames?.includes(m.name)) : store.models
+      for (const model of models) {
         if (model.isInstanceOf(item)) {
           return model
         }

@@ -47,7 +47,10 @@ export default defineNuxtModule<ModuleOptions>({
         const files = (await Promise.all(rstoreDirs.map((dir) => {
           return resolveFiles(dir, ['./*{.ts,.js}'])
         }))).flat()
-        return files.map(file => `export * from '${file}'`).join('\n')
+        return `${files.map((file, index) => `import M${index} from '${file}'`).join('\n')}
+export default [
+  ${files.map((file, index) => `...Array.isArray(M${index}) ? M${index} : [M${index}],`).join('\n')}
+]`
       },
     })
 
@@ -57,24 +60,24 @@ export default defineNuxtModule<ModuleOptions>({
         const files = (await Promise.all(rstoreDirs.map((dir) => {
           return resolveFiles(dir, ['./*{.ts,.js}'])
         }))).flat()
-        const data = files.map((file) => {
+        const filesWithDefaultExport = files.map((file) => {
           const content = fs.readFileSync(file, 'utf-8')
-          // Find all `export const` statements
-          const matches = content.match(/export const (\w+)/g)
-          if (!matches) {
-            console.warn(`No exported constants found in ${file}`)
+          // Find `export default` statements
+          if (!/export default/.test(content)) {
+            console.warn(`No exported default found in ${file}`)
             return null
           }
-          return {
-            file,
-            exported: matches.map(match => match.split(' ')[2]),
-          }
-        }).filter(Boolean) as { file: string, exported: string[] }[]
-        return `import type { ModelMap } from '@rstore/shared'
-${data.map(({ file, exported }) => `import { ${exported.join(', ')} } from '${file}'`).join('\n')}
-export const constModel = {
-  ${data.map(({ exported }) => exported.map(name => `${name},`).join('\n')).join('\n')}
-} as const satisfies ModelMap`
+          return file
+        }).filter(Boolean) as string[]
+        return `import type { ModelList } from '@rstore/shared'
+${filesWithDefaultExport.map((file, index) => `import M${index} from '${file}'`).join('\n')}
+type EnsureArray<T> = T extends any[] ? T : [T]
+function ensureArray<T>(value: T): EnsureArray<T> {
+  return Array.isArray(value) ? value : [value]
+}
+export const constModels = [
+  ${filesWithDefaultExport.map((file, index) => `...ensureArray(M${index}),`).join('\n')}
+] as const satisfies ModelList`
       },
     })
 

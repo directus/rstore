@@ -1,5 +1,5 @@
 import type { Hooks } from '../utils/hooks.js'
-import type { ModelDefaults, ModelMap } from './model.js'
+import type { ModelDefaults, ModelList } from './model.js'
 import type { Awaitable } from './utils.js'
 
 export interface Plugin {
@@ -22,5 +22,5 @@ export interface PluginSetupApi {
    */
   addModelDefaults: (modelDefaults: ModelDefaults) => void
 
-  hook: Hooks<ModelMap, ModelDefaults>['hook']
+  hook: Hooks<ModelList, ModelDefaults>['hook']
 }

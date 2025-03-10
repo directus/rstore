@@ -32,7 +32,7 @@
     "client:build": "nuxi generate client",
     "client:dev": "nuxi dev client --port 3300",
     "client:prepare": "nuxi prepare client",
-    "prepare:all": "pnpm run dev:prepare && pnpm run client:prepare",
+    "prepare:all": "nuxi prepare playground && pnpm run dev:prepare && pnpm run client:prepare",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest watch"

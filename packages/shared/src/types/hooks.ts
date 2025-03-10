@@ -1,4 +1,4 @@
-import type { Model, ModelDefaults, ModelMap, ResolvedModel, ResolvedModelItemBase } from './model'
+import type { Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItemBase } from './model'
 import type { FindOptions } from './query'
 import type { StoreCore } from './store'
 import type { Awaitable, Path, PathValue } from './utils'
@@ -8,12 +8,12 @@ import type { Awaitable, Path, PathValue } from './utils'
 export interface CustomHookMeta {}
 
 export interface HookDefinitions<
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
   TModelDefaults extends ModelDefaults,
 > {
   init: (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
     }
   ) => Awaitable<void>
@@ -22,13 +22,13 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key?: string
-      findOptions?: FindOptions<TModel, TModelDefaults, TModelMap>
+      findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
       many: boolean
-      updateFindOptions: (findOptions: FindOptions<TModel, TModelDefaults, TModelMap>) => void
+      updateFindOptions: (findOptions: FindOptions<TModel, TModelDefaults, TModelList>) => void
     }
   ) => Awaitable<void>
 
@@ -36,14 +36,14 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key?: string
-      findOptions?: FindOptions<TModel, TModelDefaults, TModelMap>
+      findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
       many: boolean
-      getResult: () => Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>> | ResolvedModelItemBase<TModel, TModelDefaults, TModelMap> | undefined
-      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>) => void
+      getResult: () => Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>> | ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined
+      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>) => void
     }
   ) => Awaitable<void>
 
@@ -54,13 +54,13 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key?: string
-      findOptions?: FindOptions<TModel, TModelDefaults, TModelMap>
-      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelMap> | undefined
-      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>) => void
+      findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
+      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined
+      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>) => void
       setMarker: (marker: string) => void
     }
   ) => Awaitable<void>
@@ -69,11 +69,11 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key?: string
-      findOptions?: FindOptions<TModel, TModelDefaults, TModelMap>
+      findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
       setMarker: (marker: string) => void
     }
   ) => void
@@ -85,14 +85,14 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key?: string
-      findOptions?: FindOptions<TModel, TModelDefaults, TModelMap>
-      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelMap> | undefined
-      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelMap> | undefined) => void
-      readItemsFromCache: () => Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>>
+      findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
+      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined
+      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined) => void
+      readItemsFromCache: () => Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
     }
   ) => void
 
@@ -103,12 +103,12 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
-      findOptions?: FindOptions<TModel, TModelDefaults, TModelMap>
-      getResult: () => Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>>
-      setResult: (result: Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>>) => void
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
+      findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
+      getResult: () => Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
+      setResult: (result: Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>) => void
       setMarker: (marker: string) => void
     }
   ) => Awaitable<void>
@@ -117,11 +117,11 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key?: string
-      findOptions?: FindOptions<TModel, TModelDefaults, TModelMap>
+      findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
       setMarker: (marker: string) => void
     }
   ) => void
@@ -133,12 +133,12 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
-      findOptions?: FindOptions<TModel, TModelDefaults, TModelMap>
-      getResult: () => Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>>
-      setResult: (result: Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>>) => void
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
+      findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
+      getResult: () => Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
+      setResult: (result: Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>) => void
     }
   ) => void
 
@@ -146,13 +146,13 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key?: string
-      findOptions: FindOptions<TModel, TModelDefaults, TModelMap> & NonNullable<FindOptions<TModel, TModelDefaults, TModelMap>['include']>
+      findOptions: FindOptions<TModel, TModelDefaults, TModelList> & NonNullable<FindOptions<TModel, TModelDefaults, TModelList>['include']>
       many: boolean
-      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>
+      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelList>
     }
   ) => Awaitable<void>
 
@@ -163,11 +163,11 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
-      item: ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>
-      modifyItem: <TItem extends ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
+      item: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>
+      modifyItem: <TItem extends ResolvedModelItemBase<TModel, TModelDefaults, TModelList>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
     }
   ) => void
 
@@ -175,13 +175,13 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key?: string
-      item?: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>>
-      modifyItem: <TItem extends ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
-      setItem: (item: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>>) => void
+      item?: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
+      modifyItem: <TItem extends ResolvedModelItemBase<TModel, TModelDefaults, TModelList>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
+      setItem: (item: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>) => void
       mutation: 'create' | 'update' | 'delete'
     }
   ) => Awaitable<void>
@@ -190,14 +190,14 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key?: string
-      item?: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>>
+      item?: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
       mutation: 'create' | 'update' | 'delete'
-      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelMap> | undefined
-      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>) => void
+      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined
+      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>) => void
     }
   ) => Awaitable<void>
 
@@ -208,12 +208,12 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
-      item: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>>
-      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelMap> | undefined
-      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>) => void
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
+      item: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
+      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined
+      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>) => void
     }
   ) => Awaitable<void>
 
@@ -224,13 +224,13 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key: string
-      item: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>>
-      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelMap> | undefined
-      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>) => void
+      item: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
+      getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined
+      setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>) => void
     }
   ) => Awaitable<void>
 
@@ -241,9 +241,9 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key: string
     }
   ) => Awaitable<void>
@@ -252,11 +252,11 @@ export interface HookDefinitions<
     TModel extends Model,
   > (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
-      model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
       key?: string
-      result?: Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>>
+      result?: Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
       marker?: string
       operation: 'write' | 'delete'
     }
@@ -264,7 +264,7 @@ export interface HookDefinitions<
 
   afterCacheReset: (
     payload: {
-      store: StoreCore<TModelMap, TModelDefaults>
+      store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
     }
   ) => void

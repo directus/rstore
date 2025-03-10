@@ -1,6 +1,6 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { Model, ModelDefaults, ModelMap } from '@rstore/shared'
+import type { Model, ModelDefaults, ModelList } from '@rstore/shared'
 
 declare module '@rstore/vue' {
   export interface CustomModelMeta {
@@ -10,7 +10,7 @@ declare module '@rstore/vue' {
   export interface CustomFilterOption<
     TModel extends Model,
     TModelDefaults extends ModelDefaults,
-    TModelMap extends ModelMap,
+    TModelList extends ModelList,
   > {
     email?: string
   }

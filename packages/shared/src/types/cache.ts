@@ -1,5 +1,5 @@
 import type { WrappedItem } from './item'
-import type { Model, ModelDefaults, ModelMap, ModelRelation, ResolvedModel, ResolvedModelItemBase } from './model'
+import type { Model, ModelDefaults, ModelList, ModelRelation, ResolvedModel, ResolvedModelItemBase } from './model'
 
 /*
 
@@ -26,45 +26,45 @@ export interface CustomCacheState {}
 export interface WriteItem<
   TModel extends Model = Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
-  TModelMap extends ModelMap = ModelMap,
+  TModelList extends ModelList = ModelList,
 > {
   key: string
-  value: ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>
+  value: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>
 }
 
 export interface Cache<
-  TModelMap extends ModelMap = ModelMap,
+  TModelList extends ModelList = ModelList,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
   readItem: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+    model: ResolvedModel<TModel, TModelDefaults, TModelList>
     key: string
-  }) => WrappedItem<TModel, TModelDefaults, TModelMap> | undefined
+  }) => WrappedItem<TModel, TModelDefaults, TModelList> | undefined
 
   writeItem: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+    model: ResolvedModel<TModel, TModelDefaults, TModelList>
     key: string
-    item: ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>
+    item: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>
     marker?: string
     fromWriteItems?: boolean
   }) => void
 
   deleteItem: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+    model: ResolvedModel<TModel, TModelDefaults, TModelList>
     key: string
   }) => void
 
   readItems: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
+    model: ResolvedModel<TModel, TModelDefaults, TModelList>
     /**
      * Marker to consider that the corresponding list was already fetched once. Allow returning empty list if marker is not found.
      */
     marker?: string
-  }) => Array<WrappedItem<TModel, TModelDefaults, TModelMap>>
+  }) => Array<WrappedItem<TModel, TModelDefaults, TModelList>>
 
   writeItems: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
-    items: Array<WriteItem<TModel, TModelDefaults, TModelMap>>
+    model: ResolvedModel<TModel, TModelDefaults, TModelList>
+    items: Array<WriteItem<TModel, TModelDefaults, TModelList>>
     /**
      * Marker to consider that the corresponding list was already fetched once.
      */
@@ -72,8 +72,8 @@ export interface Cache<
   }) => void
 
   writeItemForRelation: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelMap>
-    relationKey: keyof ResolvedModelItemBase<TModel, TModelDefaults, TModelMap>['relations']
+    model: ResolvedModel<TModel, TModelDefaults, TModelList>
+    relationKey: keyof ResolvedModelItemBase<TModel, TModelDefaults, TModelList>['relations']
     relation: ModelRelation
     item: any
   }) => void

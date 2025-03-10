@@ -1,4 +1,4 @@
-import type { Model, ModelDefaults, ModelMap, ResolvedModelItem } from './model'
+import type { Model, ModelDefaults, ModelList, ResolvedModelItem } from './model'
 import type { UpdateFormObject } from './mutation'
 
 /**
@@ -7,7 +7,7 @@ import type { UpdateFormObject } from './mutation'
 export interface WrappedItemBase<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
+  TModelList extends ModelList,
 > {
   /**
    * Name of the model.
@@ -17,12 +17,12 @@ export interface WrappedItemBase<
   /**
    * (Recommended) The form object helps you updating the item.
    */
-  $updateForm: (options?: WrappedItemUpdateFormOptions<TModel, TModelDefaults, TModelMap>) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelMap>>
+  $updateForm: (options?: WrappedItemUpdateFormOptions<TModel, TModelDefaults, TModelList>) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelList>>
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
    */
-  $update: (data: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelMap>>) => Promise<void>
+  $update: (data: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>) => Promise<void>
 
   /**
    * Delete the item.
@@ -36,15 +36,15 @@ export interface WrappedItemBase<
 export type WrappedItem<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelMap extends ModelMap,
-> = WrappedItemBase<TModel, TModelDefaults, TModelMap> & ResolvedModelItem<TModel, TModelDefaults, TModelMap>
+  TModelList extends ModelList,
+> = WrappedItemBase<TModel, TModelDefaults, TModelList> & ResolvedModelItem<TModel, TModelDefaults, TModelList>
 
 /* eslint-disable unused-imports/no-unused-vars */
 
 export interface WrappedItemUpdateFormOptions<
   TModel extends Model = Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
-  TModelMap extends ModelMap = ModelMap,
+  TModelList extends ModelList = ModelList,
 > {
   // to be extended
 }
