@@ -49,7 +49,7 @@
   --vp-c-default-3: var(--vp-c-gray-3);
   --vp-c-default-soft: var(--vp-c-gray-soft);
 
-  --vp-c-brand-1: #00FF62;
+  --vp-c-brand-1: #00a445;
   --vp-c-brand-2: #00C84D;
   --vp-c-brand-3: #56A875;
   --vp-c-brand-soft: rgb(0, 255, 98, 0.16);
@@ -71,6 +71,10 @@
 }
 
 .dark {
+  --vp-c-brand-1: #00FF62;
+  --vp-c-brand-2: #00C84D;
+  --vp-c-brand-3: #56A875;
+  
   --vp-c-gutter: #25252A;
   --vp-c-divider: var(--vp-c-gutter);
 }
@@ -81,14 +85,19 @@
 
 :root {
   --vp-button-brand-border: transparent;
-  --vp-button-brand-text: var(--vp-c-black);
+  --vp-button-brand-text: var(--vp-c-white);
   --vp-button-brand-bg: var(--vp-c-brand-1);
   --vp-button-brand-hover-border: transparent;
-  --vp-button-brand-hover-text: var(--vp-c-black);
+  --vp-button-brand-hover-text: var(--vp-c-white);
   --vp-button-brand-hover-bg: var(--vp-c-brand-2);
   --vp-button-brand-active-border: transparent;
   --vp-button-brand-active-text: var(--vp-c-white);
   --vp-button-brand-active-bg: var(--vp-c-brand-1);
+}
+
+.dark {
+  --vp-button-brand-text: var(--vp-c-black);
+  --vp-button-brand-hover-text: var(--vp-c-black);
 }
 
 /**
@@ -99,7 +108,7 @@
   --vp-home-hero-name-color: transparent;
   --vp-home-hero-name-background: -webkit-linear-gradient(
     120deg,
-    #00FF62 50%,
+    #00a445 50%,
     #00B184
   );
 
@@ -109,6 +118,14 @@
     #00B184 50%
   );
   --vp-home-hero-image-filter: blur(44px);
+}
+
+.dark {
+  --vp-home-hero-name-background: -webkit-linear-gradient(
+    120deg,
+    #00FF62 50%,
+    #00B184
+  );
 }
 
 @media (min-width: 640px) {
