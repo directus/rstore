@@ -19,6 +19,9 @@
     "test:types": "pnpm run -r test:types",
     "copy-readme": "cp README.md ./packages/vue/README.md && cp README.md ./packages/nuxt/README.md",
     "release": "pnpm run copy-readme && pnpm run lint && pnpm run test && pnpm run test:types && pnpm run build && sheep release -b main --force",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs",
     "postinstall": "simple-git-hooks"
   },
   "devDependencies": {
@@ -28,7 +31,9 @@
     "lint-staged": "^15.4.3",
     "simple-git-hooks": "^2.11.1",
     "typescript": "^5.7.2",
-    "vitest": "catalog:"
+    "vitepress": "^1.6.3",
+    "vitest": "catalog:",
+    "vue": "^3.2.29"
   },
   "pnpm": {
     "onlyBuiltDependencies": [

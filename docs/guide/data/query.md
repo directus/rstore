@@ -1,0 +1,168 @@
+# Querying Data
+
+## Query composables
+
+The query composables are the recommended way to fetch data from the server. They are designed to be used in a Vue component and return a reactive result to be used in the components.
+
+The `queryFirst` and `queryMany` composables return an object with the following properties:
+
+- `data`: a ref that contains the data.
+
+- `loading`: a ref that indicates whether the data is being fetched.
+
+- `error`: a ref that contains the error if the data could not be fetched.
+
+- `refresh`: a function that can be called to refresh the data.
+
+### Query first
+
+Composable function that reads the first item that matches the key or the filter in the cache and fetches it if not found.
+
+```ts
+const someKey = ref('some-key')
+
+const { data: todo } = store.Todo.queryFirst(someKey)
+```
+With filtering:
+
+```ts
+const email = ref('cat@acme.com')
+
+const { data: someUsers } = store.User.queryFirst(() => ({
+  filter: item => item.email === email.value,
+  params: {
+    email: email.value,
+  },
+}))
+```
+
+::: info
+Why specify the `params` in the query? The `params` are used to fetch the data from the server. By design, we want to compute the result also on the client side -- hence the `filter` function. The `params` are used to fetch the data from the server and are accessible in the [Plugin hooks](../plugin/hooks.md).
+
+---
+
+We can also create our own convention for the `params` and `filter`. For example, we could turn the `filter` option into an object that is both used to filter the data in the cache and to fetch the data from the server, using [plugin hooks](../plugin/hooks.md).
+:::
+
+### Query many
+
+Composable function that reads all items that match the (optional) filter in the cache and fetches them if not found.
+
+```ts
+const { data: todos } = store.Todo.queryMany()
+
+const email = ref('@acme.com')
+const { data: someUsers } = store.User.queryMany(() => ({
+  filter: item => item.email.endsWith(email.value),
+  params: {
+    email: {
+      $like: `%${email.value}`,
+    },
+  },
+}))
+```
+
+## Cache read
+
+### Peek first
+
+Read the first item that matches the key or the filter in the cache without doing any fetching.
+
+```ts
+const result = store.Todo.peekFirst('some-key')
+```
+
+With filtering:
+
+```ts
+const result = store.User.peekFirst({
+  filter: item => item.email === 'cat@acme.com',
+})
+```
+
+### Peek many
+
+Read all items that match the (optional) filter in the cache without doing any fetching.
+
+```ts
+const todos = store.Todo.peekMany()
+
+const someUsers = store.User.peekMany({
+  filter: item => item.email.endsWith('@acme.com'),
+})
+```
+
+## Simple queries
+
+### Find first
+
+Find the first item that matches the key or the filter in the cache or fetches it if not found.
+
+```ts
+const todo = store.Todo.findFirst('some-key')
+```
+With filtering:
+
+```ts
+const someUsers = store.User.findFirst({
+  filter: item => item.email === 'cat@acme.com',
+  params: {
+    email: 'cat@acme.com',
+  },
+})
+```
+
+### Find many
+
+Find all items that match the (optional) filter in the cache or fetches them if not found.
+
+```ts
+const todos = store.Todo.findMany()
+
+const someUsers = store.User.findMany({
+  filter: item => item.email.endsWith('@acme.com'),
+  params: {
+    email: {
+      $like: '%@acme.com',
+    },
+  },
+})
+```
+
+## Fetch Policy
+
+The fetch policy determines how the data is fetched from the server. The default fetch policy is `cache-first`, which means that the data is fetched from the cache first and then from the server if not found.
+
+The fetch policy can be set globally in the store or per query.
+
+### Global fetch policy
+
+The global fetch policy can be set in the store configuration using `findDefaults`:
+
+```ts
+const store = createStore({
+  models,
+  plugins,
+  findDefaults: {
+    fetchPolicy: 'cache-first',
+  },
+})
+```
+
+### Per query fetch policy
+
+The fetch policy can be set per query using the `fetchPolicy` option:
+
+```ts
+const { data: todos } = store.Todo.queryMany({
+  fetchPolicy: 'fetch-only',
+})
+```
+
+### Possible fetch policies
+
+* `cache-first` (default) means that the query will first try to fetch the data from the cache. If the data is not found in the cache, it will fetch the data from the adapter plugins.
+* `cache-and-fetch` means that the query will first try to fetch the data from the cache. It will then fetch the data from the adapter plugins and update the cache.
+* `fetch-only` means that the query will only fetch the data from the adapter plugins. The data will be stored in the cache when the query is resolved.
+* `cache-only` means that the query will only fetch the data from the cache.
+* `no-cache` means that the query will not use the cache and only fetch the data from the adapter plugins. No data will be stored in the cache.

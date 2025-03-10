@@ -5,3 +5,7 @@ dist
 .eslintcache
 .nuxt
 .output
+
+# Vitepress
+docs/.vitepress/dist
+docs/.vitepress/cache
