@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.2.1
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.2.0...v0.2.1)
+
+### 🚀 Enhancements
+
+- **vue:** Refresh() ([3bb42b1](https://github.com/Akryum/rstore/commit/3bb42b1))
+
+### 📖 Documentation
+
+- Init ([e33205c](https://github.com/Akryum/rstore/commit/e33205c))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.2.0
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.1.8...v0.2.0)
