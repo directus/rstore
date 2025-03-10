@@ -54,7 +54,7 @@ export default defineRstorePlugin({
       await Promise.all(items.map(async (item) => {
         const key = payload.model.getKey(item)
         if (key) {
-          const wrappedItem = payload.store.cache.readItem({
+          const wrappedItem = payload.store.$cache.readItem({
             model: payload.model,
             key,
           })
@@ -72,9 +72,9 @@ export default defineRstorePlugin({
               throw new Error(`Relation "${relationKey}" does not exist on model "${payload.model.name}"`)
             }
 
-            await Promise.all(Object.keys(relation.to).map((modelKey) => {
-              const relationData = relation.to[modelKey]!
-              return store[modelKey as keyof typeof store.models].findMany({
+            await Promise.all(Object.keys(relation.to).map((modelName) => {
+              const relationData = relation.to[modelName]!
+              return store.$model(modelName).findMany({
                 params: {
                   filter: `${relationData.on}:${wrappedItem[relationData.eq]}`,
                 },

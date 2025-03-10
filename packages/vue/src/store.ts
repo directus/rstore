@@ -22,9 +22,11 @@ export type VueStoreModelApiProxy<
 }
 
 export type VueStore<
-  TModelList extends ModelList,
+  TModelList extends ModelList = ModelList,
   TModelDefaults extends ModelDefaults = ModelDefaults,
-> = StoreCore<TModelList, TModelDefaults> & VueStoreModelApiProxy<TModelList, TModelDefaults>
+> = StoreCore<TModelList, TModelDefaults> & VueStoreModelApiProxy<TModelList, TModelDefaults> & {
+  $model: (modelName: string) => VueModelApi<any, TModelDefaults, TModelList, WrappedItem<any, TModelDefaults, TModelList>>
+}
 
 export async function createStore<
   TModelList extends ModelList,
@@ -43,8 +45,6 @@ export async function createStore<
 
   const queryCache: Map<string, VueModelApi<Model, TModelDefaults, TModelList, WrappedItem<Model, TModelDefaults, TModelList>>> = new Map()
 
-  const modelNames = store.$models.map(m => m.name)
-
   function getApi(key: string) {
     if (!queryCache.has(key)) {
       const model = store.$models.find(m => m.name === key)
@@ -58,8 +58,12 @@ export async function createStore<
 
   const storeProxy = new Proxy(store, {
     get(_, key) {
-      if (typeof key === 'string' && modelNames.includes(key)) {
+      if (typeof key === 'string' && key !== 'then' && !key.startsWith('$')) {
         return getApi(key)
+      }
+
+      if (key === '$model') {
+        return (modelName: string) => getApi(modelName)
       }
 
       return Reflect.get(store, key)
