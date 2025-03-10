@@ -64,6 +64,11 @@ export default defineConfig({
     },
 
     outline: 'deep',
+
+    footer: {
+      message: 'Released under the MIT License.',
+      copyright: 'Copyright © 2025-present Guillaume Chau',
+    },
   },
 
   lastUpdated: true,
