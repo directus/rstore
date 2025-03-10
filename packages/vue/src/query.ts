@@ -11,6 +11,7 @@ export interface VueQueryReturn<
   data: Ref<TResult>
   loading: Ref<boolean>
   error: Ref<Error | null>
+  refresh: () => HybridPromise<VueQueryReturn<_TModel, _TModelDefaults, _TModelMap, TResult>>
 }
 
 export interface VueCreateQueryOptions<
@@ -60,6 +61,7 @@ export function createQuery<
     data,
     loading,
     error,
+    refresh,
   }
 
   async function load() {
@@ -97,7 +99,16 @@ export function createQuery<
     deep: true,
   })
 
-  const promise = load() as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelMap, TResult>>
+  let promise = load() as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelMap, TResult>>
   Object.assign(promise, returnObject)
+
+  function refresh() {
+    if (!loading.value) {
+      promise = load() as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelMap, TResult>>
+      Object.assign(promise, returnObject)
+    }
+    return promise
+  }
+
   return promise
 }
