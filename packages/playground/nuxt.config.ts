@@ -1,4 +1,5 @@
 import { resolve } from 'node:path'
+import process from 'node:process'
 import { startSubprocess } from '@nuxt/devtools-kit'
 import { defineNuxtModule } from 'nuxt/kit'
 
@@ -47,6 +48,12 @@ export default defineNuxtConfig({
   nitro: {
     experimental: {
       websocket: true,
+    },
+  },
+
+  runtimeConfig: {
+    public: {
+      wsEndpoint: process.env.WS_ENDPOINT || '/_ws',
     },
   },
 })
