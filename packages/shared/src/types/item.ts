@@ -28,6 +28,8 @@ export interface WrappedItemBase<
    * Delete the item.
    */
   $delete: () => Promise<void>
+
+  $getKey: () => string
 }
 
 /**

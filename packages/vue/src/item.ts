@@ -33,6 +33,15 @@ export function wrapItem<
         case '$model':
           return (model.name) satisfies WrappedItemBase<TModel, TModelDefaults, TModelList>['$model']
 
+        case '$getKey':
+          return () => {
+            const key = model.getKey(item)
+            if (!key) {
+              throw new Error('Key is undefined on item')
+            }
+            return key
+          }
+
         case '$updateForm':
           return (async (options?: WrappedItemUpdateFormOptions<TModel, TModelDefaults, TModelList>) => {
             const key = model.getKey(item)

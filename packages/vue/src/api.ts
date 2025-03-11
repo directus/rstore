@@ -131,6 +131,10 @@ export interface VueModelApi<
   delete: (
     keyOrItem: string | Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>,
   ) => Promise<void>
+
+  getKey: (
+    item: ResolvedModelItem<TModel, TModelDefaults, TModelList>,
+  ) => string | null | undefined
 }
 
 export function createModelApi<
@@ -349,6 +353,8 @@ export function createModelApi<
         key,
       })
     },
+
+    getKey: item => model.getKey(item),
   }
   return api
 }
