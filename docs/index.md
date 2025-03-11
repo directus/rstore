@@ -38,29 +38,29 @@ import VPFeatures from 'vitepress/dist/client/theme-default/components/VPFeature
     <img src="/directus-dark.svg" alt="directus logo" class="w-full">
   </picture> -->
   <div class="relative">
-    <div class="absolute bottom-full h-50 w-1 bg-gradient-to-b from-transparent via-30% via-transparent to-[#9068f2] left-15.5">
-      <div class="absolute inset-0 animate-pipe-down">
-        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full"></div>
+    <div class="absolute bottom-[calc(100%-2px)] h-50 w-2 bg-gradient-to-b from-transparent via-30% via-transparent to-[#b175eb] left-15">
+      <div class="absolute top-0 left-0.5 w-full h-full animate-pipe-down">
+        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full blur-[2px]"></div>
       </div>
-      <div class="absolute inset-0 animate-pipe-down" style="animation-delay: -0.5s;">
-        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full"></div>
+      <div class="absolute top-0 left-0.5 w-full h-full animate-pipe-down" style="animation-delay: -0.5s;">
+        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full blur-[2px]"></div>
       </div>
-      <div class="absolute inset-0 animate-pipe-down" style="animation-delay: -1s;">
-        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full"></div>
+      <div class="absolute top-0 left-0.5 w-full h-full animate-pipe-down" style="animation-delay: -1s;">
+        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full blur-[2px]"></div>
       </div>
-      <div class="absolute inset-0 animate-pipe-down" style="animation-delay: -1.5s;">
-        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full"></div>
+      <div class="absolute top-0 left-0.5 w-full h-full animate-pipe-down" style="animation-delay: -1.5s;">
+        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full blur-[2px]"></div>
       </div>
-      <div class="absolute inset-0 animate-pipe-down" style="animation-delay: -2s;">
-        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full"></div>
+      <div class="absolute top-0 left-0.5 w-full h-full animate-pipe-down" style="animation-delay: -2s;">
+        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full blur-[2px]"></div>
       </div>
-      <div class="absolute inset-0 animate-pipe-down" style="animation-delay: -2.5s;">
-        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full"></div>
+      <div class="absolute top-0 left-0.5 w-full h-full animate-pipe-down" style="animation-delay: -2.5s;">
+        <div class="absolute top-0 size-1 bg-black dark:bg-white rounded-full blur-[2px]"></div>
       </div>
     </div>
-    <div class="absolute border-12 border-[#9068f2] rounded-full inset-0 blur-sm animate-grow-fade"></div>
-    <div class="absolute border-12 border-[#9068f2] rounded-full inset-0 blur-sm animate-grow-fade" style="animation-delay: -1s;"></div>
-    <div class="absolute border-12 border-[#9068f2] rounded-full inset-0 blur-sm animate-grow-fade" style="animation-delay: -2s;"></div>
+    <div class="absolute border-5 border-[#9068f2] rounded-full blur-xs inset-0 animate-grow-fade"></div>
+    <div class="absolute border-5 border-[#9068f2] rounded-full blur-xs inset-0 animate-grow-fade" style="animation-delay: -1s;"></div>
+    <div class="absolute border-5 border-[#9068f2] rounded-full blur-xs inset-0 animate-grow-fade" style="animation-delay: -2s;"></div>
     <a href="https://directus.io" target="_blank" class="block relative">
       <img src="/directus-logo-stacked.png" alt="directus logo" class="size-32 rounded-full">
     </a>
