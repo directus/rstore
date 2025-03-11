@@ -70,7 +70,6 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
               },
             ]"
             content-orientation="vertical"
-            class="min-w-200 flex-1"
           />
 
           <div class="flex-1" />
