@@ -122,7 +122,7 @@ import VPFeatures from 'vitepress/dist/client/theme-default/components/VPFeature
 
 <div class="text-center flex flex-col m-12 gap-2 items-center">
 
-# Sponsors
+## Sponsors
 
 [💚 Become a sponsor!](https://github.com/sponsors/Akryum)
 
