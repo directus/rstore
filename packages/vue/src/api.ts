@@ -1,11 +1,11 @@
-import type { CreateFormObject, FindFirstOptions, FindManyOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
+import type { CreateFormObject, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueQueryReturn } from './query'
-import { createItem, deleteItem, findFirst, findMany, peekFirst, peekMany, updateItem } from '@rstore/core'
+import { createItem, deleteItem, findFirst, findMany, peekFirst, peekMany, subscribe, unsubscribe, updateItem } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
-import { createEventHook } from '@vueuse/core'
-import { markRaw, reactive, toValue } from 'vue'
+import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
+import { markRaw, reactive, toValue, watch } from 'vue'
 import { createQuery } from './query'
 
 export interface VueModelApi<
@@ -131,6 +131,12 @@ export interface VueModelApi<
   delete: (
     keyOrItem: string | Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>,
   ) => Promise<void>
+
+  subscribe: (
+    keyOrFindOptions?: MaybeRefOrGetter<string | FindOptions<TModel, TModelDefaults, TModelList> | undefined>,
+  ) => Promise<{
+    unsubscribe: () => Promise<void>
+  }>
 
   getKey: (
     item: ResolvedModelItem<TModel, TModelDefaults, TModelList>,
@@ -352,6 +358,66 @@ export function createModelApi<
         model,
         key,
       })
+    },
+
+    subscribe: async (keyOrFindOptions) => {
+      if (store.$isServer) {
+        return {
+          unsubscribe: () => Promise.resolve(),
+        }
+      }
+
+      const meta: CustomHookMeta = {}
+
+      let subscriptionId: string | undefined
+      let previousKey: string | undefined
+      let previousFindOptions: FindOptions<TModel, TModelDefaults, TModelList> | undefined
+
+      async function unsub() {
+        if (subscriptionId) {
+          unsubscribe({
+            store,
+            meta,
+            model,
+            subscriptionId,
+            key: previousKey,
+            findOptions: previousFindOptions,
+          })
+          subscriptionId = undefined
+          previousKey = undefined
+          previousFindOptions = undefined
+        }
+      }
+
+      async function sub(optionsValue: string | FindOptions<TModel, TModelDefaults, TModelList> | undefined) {
+        await unsub()
+
+        subscriptionId = crypto.randomUUID()
+
+        const key = previousKey = typeof optionsValue === 'string' ? optionsValue : undefined
+        const findOptions = previousFindOptions = typeof optionsValue === 'object' ? optionsValue : undefined
+
+        await subscribe({
+          store,
+          meta,
+          model,
+          subscriptionId,
+          key,
+          findOptions,
+        })
+      }
+
+      watch(() => toValue(keyOrFindOptions), async (optionsValue) => {
+        await sub(optionsValue)
+      }, {
+        immediate: true,
+      })
+
+      tryOnScopeDispose(unsub)
+
+      return {
+        unsubscribe: unsub,
+      }
     },
 
     getKey: item => model.getKey(item),

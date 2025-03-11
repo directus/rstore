@@ -4,7 +4,8 @@ import type { Model, ModelDefaults, ModelList } from '@rstore/shared'
 
 declare module '@rstore/vue' {
   export interface CustomModelMeta {
-    path: string
+    path?: string
+    websocketTopic?: string
   }
 
   export interface CustomFilterOption<

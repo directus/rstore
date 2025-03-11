@@ -63,6 +63,11 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
                   },
                 ],
               },
+              {
+                label: 'Chat',
+                icon: 'lucide:message-circle',
+                to: '/chat',
+              },
             ]"
             content-orientation="vertical"
             class="min-w-200 flex-1"

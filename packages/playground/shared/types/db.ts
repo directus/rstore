@@ -28,3 +28,11 @@ export interface Todo {
   createdAt: Date
   updatedAt?: Date
 }
+
+export interface ChatMessage {
+  id: string
+  userName: string
+  userAvatar: string
+  text: string
+  createdAt: Date
+}

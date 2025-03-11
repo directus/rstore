@@ -1,3 +1,5 @@
+import { faker } from '@faker-js/faker'
+
 export default defineRstorePlugin({
   name: 'my-rstore-plugin',
 
@@ -159,5 +161,75 @@ export default defineRstorePlugin({
         })
       }
     })
+
+    if (import.meta.client) {
+      const ws = useWebSocket('/_ws')
+
+      const userName = faker.internet.username()
+      const userAvatar = faker.image.avatar()
+
+      hook('createItem', (payload) => {
+        if (payload.model.meta?.websocketTopic) {
+          const newItem = {
+            __typename: payload.model.name,
+            id: crypto.randomUUID(),
+            userName,
+            userAvatar,
+            text: payload.item.text,
+            createdAt: new Date(),
+          } as ChatMessage & { __typename: string }
+          ws.send(JSON.stringify({
+            type: 'publish',
+            topic: payload.model.meta.websocketTopic,
+            payload: newItem,
+          } satisfies WebsocketMessage))
+          payload.setResult(newItem)
+        }
+      })
+
+      hook('subscribe', (payload) => {
+        if (payload.model.meta?.websocketTopic) {
+          ws.send(JSON.stringify({
+            type: 'subscribe',
+            topic: payload.model.meta.websocketTopic,
+          } satisfies WebsocketMessage))
+        }
+      })
+
+      hook('unsubscribe', (payload) => {
+        if (payload.model.meta?.websocketTopic) {
+          ws.send(JSON.stringify({
+            type: 'unsubscribe',
+            topic: payload.model.meta.websocketTopic,
+          } satisfies WebsocketMessage))
+        }
+      })
+
+      hook('init', (payload) => {
+        watch(ws.data, async (data: string) => {
+          try {
+            const message = JSON.parse(data) as { item: any }
+            if (message.item) {
+              const { item } = message
+              const model = payload.store.$getModel(item)
+              if (model) {
+                const key = model.getKey(item)
+                if (!key) {
+                  throw new Error(`Key not found for model ${model.name}`)
+                }
+                payload.store.$cache.writeItem({
+                  model,
+                  key,
+                  item,
+                })
+              }
+            }
+          }
+          catch (e) {
+            console.error('Error parsing WebSocket message', e)
+          }
+        })
+      })
+    }
   },
 })

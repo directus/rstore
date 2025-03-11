@@ -268,4 +268,33 @@ export interface HookDefinitions<
       meta: CustomHookMeta
     }
   ) => void
+
+  subscribe: <
+    TModel extends Model,
+  > (
+    payload: {
+      store: StoreCore<TModelList, TModelDefaults>
+      meta: CustomHookMeta
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
+      /**
+       * The subscription ID is used to identify the subscription for unsubscribing.
+       */
+      subscriptionId: string
+      key?: string
+      findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
+    }
+  ) => Awaitable<void>
+
+  unsubscribe: <
+    TModel extends Model,
+  > (
+    payload: {
+      store: StoreCore<TModelList, TModelDefaults>
+      meta: CustomHookMeta
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
+      subscriptionId: string
+      key?: string
+      findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
+    }
+  ) => Awaitable<void>
 }
