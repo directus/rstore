@@ -79,9 +79,9 @@ export function resolveModels<
         ...model.computed,
       },
       fields,
-      schema: {
-        create: model.schema?.create ?? emptySchemas.create,
-        update: model.schema?.update ?? emptySchemas.update,
+      formSchema: {
+        create: model.formSchema?.create ?? emptySchemas.create,
+        update: model.formSchema?.update ?? emptySchemas.update,
       },
       meta: {
         ...defaults?.meta,

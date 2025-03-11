@@ -11,7 +11,7 @@ describe('defaultMarker', () => {
       getKey: () => '',
       isInstanceOf: () => true,
       relations: [],
-      schema: {} as any,
+      formSchema: {} as any,
     }
     const result = defaultMarker(model)
     expect(result).toBe('TestType:{}:{}')
@@ -25,7 +25,7 @@ describe('defaultMarker', () => {
       getKey: () => '',
       isInstanceOf: () => true,
       relations: [],
-      schema: {} as any,
+      formSchema: {} as any,
     }
     const findOptions = { filter: { id: 1 } }
     const result = defaultMarker(model, findOptions as any)
@@ -40,7 +40,7 @@ describe('defaultMarker', () => {
       getKey: () => '',
       isInstanceOf: () => true,
       relations: [],
-      schema: {} as any,
+      formSchema: {} as any,
     }
     const findOptions = { filter: { id: 1 }, sort: 'asc' }
     const result = defaultMarker(model, findOptions as any)
@@ -55,7 +55,7 @@ describe('defaultMarker', () => {
       getKey: () => '',
       isInstanceOf: () => true,
       relations: [],
-      schema: {} as any,
+      formSchema: {} as any,
     }
     const findOptions = { filter: () => true, params: { foo: 'bar' } }
     const result = defaultMarker(model, findOptions)

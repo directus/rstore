@@ -94,7 +94,7 @@ describe('model', () => {
             parse: value => new Date(value),
           },
         },
-        schema: {
+        formSchema: {
           create: {
             '~standard': {
               validate: value => ({ value }),
@@ -131,8 +131,8 @@ describe('model', () => {
     })
     expect(resolved[0].computed.calc).toBeTypeOf('function')
     expect(resolved[0].fields!.createdAt.parse).toBeTypeOf('function')
-    expect(resolved[0].schema.create['~standard'].vendor).toBe('rstore')
-    expect(resolved[0].schema.update['~standard'].vendor).toBe('rstore')
+    expect(resolved[0].formSchema.create['~standard'].vendor).toBe('rstore')
+    expect(resolved[0].formSchema.update['~standard'].vendor).toBe('rstore')
     expect(resolved[0].meta).toEqual({
       test: 'meow',
     })
@@ -166,8 +166,8 @@ describe('model', () => {
     expect(resolved[0].relations).toEqual({})
     expect(resolved[0].computed.calc).toBeTypeOf('function')
     expect(resolved[0].fields!.createdAt.parse).toBeTypeOf('function')
-    expect(resolved[0].schema.create['~standard'].vendor).toBe('rstore')
-    expect(resolved[0].schema.update['~standard'].vendor).toBe('rstore')
+    expect(resolved[0].formSchema.create['~standard'].vendor).toBe('rstore')
+    expect(resolved[0].formSchema.update['~standard'].vendor).toBe('rstore')
     expect(resolved[0].meta).toEqual({
       test: 'meow',
     })

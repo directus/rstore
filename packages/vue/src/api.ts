@@ -214,7 +214,7 @@ export function createModelApi<
           form.$error = null
           try {
             const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-            await model.schema.create['~standard'].validate(data)
+            await model.formSchema.create['~standard'].validate(data)
             const item = await api.create(data)
             onSaved.trigger(item)
             form.$reset()
@@ -228,7 +228,7 @@ export function createModelApi<
             form.$loading = false
           }
         },
-        $schema: markRaw(formOptions?.schema ?? model.schema.create),
+        $schema: markRaw(formOptions?.schema ?? model.formSchema.create),
         $onSaved: onSaved.on,
       } satisfies TReturn) as TReturn
       return form
@@ -283,7 +283,7 @@ export function createModelApi<
           form.$error = null
           try {
             const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-            await model.schema.update['~standard'].validate(data)
+            await model.formSchema.update['~standard'].validate(data)
             const item = await api.update(data)
             onSaved.trigger(item)
             await form.$reset()
@@ -297,7 +297,7 @@ export function createModelApi<
             form.$loading = false
           }
         },
-        $schema: markRaw(formOptions?.schema ?? model.schema.update),
+        $schema: markRaw(formOptions?.schema ?? model.formSchema.update),
         $onSaved: onSaved.on,
       } satisfies TReturn) as TReturn
 

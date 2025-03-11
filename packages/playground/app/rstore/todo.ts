@@ -1,7 +1,7 @@
 // Single model
 export default defineItemType<Todo>().model({
   name: 'Todo',
-  schema: {
+  formSchema: {
     create: createValidationSchemas.todos,
     update: updateValidationSchemas.todos,
   },

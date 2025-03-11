@@ -75,7 +75,7 @@ export interface Model<
     }
   }
 
-  'schema'?: TSchemas
+  'formSchema'?: TSchemas
 
   'meta'?: CustomModelMeta
 
@@ -135,7 +135,7 @@ export interface ResolvedModel<
   'relations': NonNullable<TModel['relations']>
   'computed': NonNullable<TModelDefaults['computed'] & TModel['computed']>
   'fields': TModel['fields']
-  'schema': Full<TSchemas>
+  'formSchema': Full<TSchemas>
   'meta'?: CustomModelMeta
   '~item'?: TModel['~item']
 }

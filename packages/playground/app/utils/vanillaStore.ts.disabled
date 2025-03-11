@@ -8,7 +8,7 @@ const getTime = () => import.meta.server ? Date.now() : reactiveTime.value
 
 const Todo = defineItemType<Todo>().model({
   name: 'Todo',
-  schema: {
+  formSchema: {
     create: createValidationSchemas.todos,
     update: updateValidationSchemas.todos,
   },

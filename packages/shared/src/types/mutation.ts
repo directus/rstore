@@ -16,10 +16,10 @@ export type CreateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['schema']>['create']>> & {
+> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['create']>> & {
   $save: () => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
   $reset: () => void
-  $schema: NonNullable<NonNullable<TModel['schema']>['create']>
+  $schema: NonNullable<NonNullable<TModel['formSchema']>['create']>
   $error: Error | null
   $loading: boolean
 }
@@ -28,10 +28,10 @@ export type UpdateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['schema']>['update']>> & {
+> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['update']>> & {
   $save: () => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
   $reset: () => Promise<void>
-  $schema: NonNullable<NonNullable<TModel['schema']>['update']>
+  $schema: NonNullable<NonNullable<TModel['formSchema']>['update']>
   $error: Error | null
   $loading: boolean
 }

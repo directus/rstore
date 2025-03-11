@@ -203,7 +203,7 @@ import { z } from 'zod'
 
 const todoModel = defineDataModel({
   name: 'todos',
-  schema: {
+  formSchema: {
     create: z.object({
       title: z.string().min(1),
       completed: z.boolean().default(false),
