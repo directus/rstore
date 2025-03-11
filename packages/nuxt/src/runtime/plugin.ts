@@ -25,6 +25,7 @@ export default defineNuxtPlugin(async (nuxtApp) => {
   const store = await createStore({
     plugins,
     models,
+    isServer: !!import.meta.server,
   })
 
   const cacheKey = '$srstore'

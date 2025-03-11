@@ -12,6 +12,7 @@ export interface CreateStoreOptions<
   modelDefaults?: TModelDefaults
   plugins: Array<Plugin>
   findDefaults?: Partial<FindOptions<any, any, any>>
+  isServer?: boolean
 }
 
 export type VueStoreModelApiProxy<
@@ -45,6 +46,7 @@ export async function createStore<
     }),
     hooks: createHooks(),
     findDefaults: options.findDefaults,
+    isServer: options.isServer,
   })
 
   const privateStore = store as unknown as PrivateVueStore

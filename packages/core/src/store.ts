@@ -13,6 +13,7 @@ export interface CreateStoreCoreOptions<
   plugins?: Array<Plugin>
   hooks: Hooks<TModelList, TModelDefaults>
   findDefaults?: Partial<FindOptions<any, any, any>>
+  isServer?: boolean
 }
 
 export async function createStoreCore<
@@ -57,6 +58,7 @@ export async function createStoreCore<
       return null
     },
     $mutationHistory: [],
+    $isServer: options.isServer ?? false,
   }
 
   // Setup plugins
