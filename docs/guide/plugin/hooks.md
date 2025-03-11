@@ -376,14 +376,16 @@ hook('cacheFilterFirst', (payload) => {
 
 Let's see an example in which we consider `filter` to be an object that is used to filter the data in the cache and to fetch the data from the server.
 
-```ts
+::: code-group
+
+```ts [Vue]
 hook('cacheFilterFirst', (payload) => {
   const { key, findOptions } = payload
 
   if (findOptions.filter && typeof findOptions.filter === 'object') {
     // Implement our own filtering logic reused on the models
     const item = payload.readItemsFromCache().find((item) => {
-      for (const [key, value] of Object.entries(findOptions.params.filter)) {
+      for (const [key, value] of Object.entries(findOptions.filter)) {
         if (item[key] !== value) {
           return false
         }
@@ -412,6 +414,42 @@ hook('fetchFirst', async (payload) => {
   }
 })
 ```
+
+```ts [Nuxt]
+hook('cacheFilterFirst', (payload) => {
+  const { key, findOptions } = payload
+
+  if (findOptions.filter && typeof findOptions.filter === 'object') {
+    // Implement our own filtering logic reused on the models
+    const item = payload.readItemsFromCache().find((item) => {
+      for (const [key, value] of Object.entries(findOptions.filter)) {
+        if (item[key] !== value) {
+          return false
+        }
+      }
+      return true
+    })
+    payload.setResult(item)
+  }
+})
+
+hook('fetchFirst', async (payload) => {
+  const { key, findOptions } = payload
+
+  if (findOptions.filter && typeof findOptions.filter === 'object') {
+    // Implement our own fetching logic reused on the models
+    const result = await $fetch(`/api/${payload.model.name}/${key}`, {
+      method: 'POST',
+      body: {
+        filter: findOptions.filter
+      },
+    })
+    payload.setResult(result)
+  }
+})
+```
+
+:::
 
 With this we can now use the `filter` find option as an object:
 
@@ -477,14 +515,16 @@ hook('cacheFilterMany', (payload) => {
 
 Example:
 
-```ts
+::: code-group
+
+```ts [Vue]
 hook('cacheFilterMany', (payload) => {
   const { findOptions } = payload
 
   if (findOptions.filter && typeof findOptions.filter === 'object') {
     // Implement our own filtering logic reused on the models
     const items = payload.getResult().filter((item) => {
-      for (const [key, value] of Object.entries(findOptions.params.filter)) {
+      for (const [key, value] of Object.entries(findOptions.filter)) {
         if (item[key] !== value) {
           return false
         }
@@ -514,6 +554,42 @@ hook('fetchMany', async (payload) => {
 })
 ```
 
+```ts [Nuxt]
+hook('cacheFilterMany', (payload) => {
+  const { findOptions } = payload
+
+  if (findOptions.filter && typeof findOptions.filter === 'object') {
+    // Implement our own filtering logic reused on the models
+    const items = payload.getResult().filter((item) => {
+      for (const [key, value] of Object.entries(findOptions.filter)) {
+        if (item[key] !== value) {
+          return false
+        }
+      }
+      return true
+    })
+    payload.setResult(items)
+  }
+})
+
+hook('fetchMany', async (payload) => {
+  const { findOptions } = payload
+
+  if (findOptions.filter && typeof findOptions.filter === 'object') {
+    // Implement our own fetching logic reused on the models
+    const result = await $fetch(`/api/${payload.model.name}`, {
+      method: 'POST',
+      body: {
+        filter: findOptions.filter
+      },
+    })
+    payload.setResult(result)
+  }
+})
+```
+
+:::
+
 With this we can now use the `filter` find option as an object:
 
 Before:
@@ -539,6 +615,24 @@ const { data: users } = store.users.queryMany(() => ({
   // and to fetch the data from the server
   filter: { email: email.value },
 }))
+```
+
+If you are using TypeScript, you can augment the `` interface to customize the type of the `filter` find option:
+
+```ts
+import type { Model, ModelDefaults, ModelList } from '@rstore/shared'
+
+declare module '@rstore/vue' {
+  export interface CustomFilterOption<
+    TModel extends Model,
+    TModelDefaults extends ModelDefaults,
+    TModelList extends ModelList,
+  > {
+    email?: string
+  }
+}
+
+export {}
 ```
 
 ## Advanced usage
