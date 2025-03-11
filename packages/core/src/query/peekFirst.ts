@@ -29,7 +29,7 @@ export function peekFirst<
   findOptions: keyOrOptions,
   force,
 }: PeekFirstOptions<TModel, TModelDefaults, TModelList>): QueryResult<WrappedItem<TModel, TModelDefaults, TModelList> | null> {
-  meta = meta ?? {}
+  meta ??= {}
 
   const findOptions: FindFirstOptions<TModel, TModelDefaults, TModelList> = typeof keyOrOptions === 'string'
     ? {

@@ -28,7 +28,7 @@ export async function findFirst<
   model,
   findOptions: keyOrOptions,
 }: FindFirstParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<WrappedItem<TModel, TModelDefaults, TModelList> | null>> {
-  meta = meta ?? {}
+  meta ??= {}
 
   const findOptions: FindFirstOptions<TModel, TModelDefaults, TModelList> = typeof keyOrOptions === 'string'
     ? {

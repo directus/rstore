@@ -28,7 +28,7 @@ export async function findMany<
   model,
   findOptions,
 }: FindManyParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelList>>>> {
-  meta = meta ?? {}
+  meta ??= {}
 
   findOptions = findOptions ?? {}
   const fetchPolicy = store.$getFetchPolicy(findOptions.fetchPolicy)

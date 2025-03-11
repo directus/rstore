@@ -29,7 +29,7 @@ export function peekMany<
   findOptions,
   force,
 }: PeekManyOptions<TModel, TModelDefaults, TModelList>): QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelList>>> {
-  meta = meta ?? {}
+  meta ??= {}
 
   const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
