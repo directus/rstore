@@ -1,6 +1,28 @@
 # Changelog
 
 
+## v0.4.0
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.3.0...v0.4.0)
+
+### 💅 Refactors
+
+- defineModel -> defineDataModel ([4f9a12e](https://github.com/Akryum/rstore/commit/4f9a12e))
+
+### 📖 Documentation
+
+- Home page ([9509ab8](https://github.com/Akryum/rstore/commit/9509ab8))
+- Footer ([3656a91](https://github.com/Akryum/rstore/commit/3656a91))
+- Remove example files ([ae7ce07](https://github.com/Akryum/rstore/commit/ae7ce07))
+- Update homepage ([e0c3b59](https://github.com/Akryum/rstore/commit/e0c3b59))
+- Update home page animation ([332dcf0](https://github.com/Akryum/rstore/commit/332dcf0))
+- Typo ([0c45e1c](https://github.com/Akryum/rstore/commit/0c45e1c))
+- Update cache read hooks ([b1ed837](https://github.com/Akryum/rstore/commit/b1ed837))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.3.0
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.2.1...v0.3.0)

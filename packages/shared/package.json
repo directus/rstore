@@ -1,7 +1,7 @@
 {
   "name": "@rstore/shared",
   "type": "module",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Common utilities and types for rstore",
   "repository": {
     "url": "https://github.com/Akryum/rstore.git",
