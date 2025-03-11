@@ -12,11 +12,6 @@ export default defineWebSocketHandler({
     else if (data.type === 'publish') {
       peer.publish(data.topic, JSON.stringify({ item: data.payload }))
     }
-    peer.peers.forEach((p) => {
-      if (p !== peer) {
-        p.send(message)
-      }
-    })
   },
   close() {
     // noop
