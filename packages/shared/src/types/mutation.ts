@@ -12,14 +12,32 @@ export interface MutationOperation<
   payload?: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 }
 
+export interface CreateFormObjectBase<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+> {
+  $save: () => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  $reset: () => void
+  $schema: NonNullable<NonNullable<TModel['formSchema']>['create']>
+  $error: Error | null
+  $loading: boolean
+}
+
 export type CreateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['create']>> & {
+> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['create']>> & Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>> & CreateFormObjectBase<TModel, TModelDefaults, TModelList>
+
+export interface UpdateFormObjectBase<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+> {
   $save: () => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-  $reset: () => void
-  $schema: NonNullable<NonNullable<TModel['formSchema']>['create']>
+  $reset: () => Promise<void>
+  $schema: NonNullable<NonNullable<TModel['formSchema']>['update']>
   $error: Error | null
   $loading: boolean
 }
@@ -28,10 +46,4 @@ export type UpdateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['update']>> & {
-  $save: () => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-  $reset: () => Promise<void>
-  $schema: NonNullable<NonNullable<TModel['formSchema']>['update']>
-  $error: Error | null
-  $loading: boolean
-}
+> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['update']>> & Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>> & UpdateFormObjectBase<TModel, TModelDefaults, TModelList>

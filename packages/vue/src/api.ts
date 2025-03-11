@@ -1,4 +1,4 @@
-import type { CreateFormObject, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
+import type { CreateFormObject, CreateFormObjectBase, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueQueryReturn } from './query'
@@ -7,6 +7,29 @@ import { pickNonSpecialProps } from '@rstore/shared'
 import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
 import { markRaw, reactive, toValue, watch } from 'vue'
 import { createQuery } from './query'
+
+interface CreateFormObjectAdditional<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+> {
+  $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+}
+
+interface UpdateFormObjectAdditional<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+> {
+  $hasChanges: () => boolean
+  $changedProps: Partial<{
+    [TKey in keyof ResolvedModelItem<TModel, TModelDefaults, TModelList>]: [
+      newValue: ResolvedModelItem<TModel, TModelDefaults, TModelList>[TKey],
+      oldValue: ResolvedModelItem<TModel, TModelDefaults, TModelList>[TKey],
+    ]
+  }>
+  $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+}
 
 export interface VueModelApi<
   TModel extends Model,
@@ -80,9 +103,7 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => CreateFormObject<TModel, TModelDefaults, TModelList> & {
-    $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-  }
+  ) => CreateFormObject<TModel, TModelDefaults, TModelList> & CreateFormObjectAdditional<TModel, TModelDefaults, TModelList>
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
@@ -114,16 +135,7 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelList> & {
-    $hasChanges: () => boolean
-    $changedProps: Partial<{
-      [TKey in keyof ResolvedModelItem<TModel, TModelDefaults, TModelList>]: [
-        newValue: ResolvedModelItem<TModel, TModelDefaults, TModelList>[TKey],
-        oldValue: ResolvedModelItem<TModel, TModelDefaults, TModelList>[TKey],
-      ]
-    }>
-    $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-  }>
+  ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelList> & UpdateFormObjectAdditional<TModel, TModelDefaults, TModelList>>
 
   /**
    * Find all items that match the query.
@@ -240,7 +252,7 @@ export function createModelApi<
         },
         $schema: markRaw(formOptions?.schema ?? model.formSchema.create),
         $onSaved: onSaved.on,
-      } satisfies TReturn) as TReturn
+      } satisfies CreateFormObjectBase<TModel, TModelDefaults, TModelList> & CreateFormObjectAdditional<TModel, TModelDefaults, TModelList>) as TReturn
       return form
     },
 
