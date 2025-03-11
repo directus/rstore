@@ -26,21 +26,21 @@ const icons = {
   <div class="p-1 bg-gray-500/10 hover:bg-gray-500/20 rounded-md">
     <div class="flex items-start gap-1 text-xs font-mono">
       <div class="flex-1">
-        <UIcon
-          :name="icons[props.item.operation]"
-          class="mr-1 relative top-px"
-          :class="{
-            'text-blue-500': ['fetchFirst', 'fetchMany'].includes(item.operation),
-            'text-orange-500': ['create', 'update', 'delete'].includes(item.operation),
-          }"
-        />
         <span
-          class="mr-0.5"
+          class="mr-0.5 space-x-1"
           :class="{
             'text-blue-500': ['fetchFirst', 'fetchMany'].includes(item.operation),
-            'text-orange-500': ['create', 'update', 'delete'].includes(item.operation),
+            'text-orange-500': ['create', 'update'].includes(item.operation),
+            'text-red-500': ['delete'].includes(item.operation),
+            'text-gray-500': ['cacheWrite'].includes(item.operation),
           }"
-        >{{ item.operation }}</span>
+        >
+          <UIcon
+            :name="icons[props.item.operation]"
+            class="relative top-0.5"
+          />
+          <span>{{ item.operation }}</span>
+        </span>
         <span class="font-bold">{{ item.model }}</span>
         <span>(</span>
         <span v-if="item.key" class="text-emerald-500">{{ item.key }}</span>
