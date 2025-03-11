@@ -5,7 +5,7 @@ layout: home
 hero:
   name: "Reactive Data Store"
   # text: "Reactive store"
-  tagline: Local-first & extendable
+  tagline: That handles all your data needs
   image:
     light: /LogoTextHorizontalBlack.svg
     dark: /LogoTextHorizontalWhite.svg
@@ -66,7 +66,7 @@ import VPFeatures from 'vitepress/dist/client/theme-default/components/VPFeature
     </a>
   </div>
 
-  <div class="italic relative z-10 text-[#9068f2] text-sm">
+  <div class="italic relative z-10 text-[#9068f2] text-sm backdrop-blur-sm px-4 py-2 rounded-full">
     powered by rstore
   </div>
 
