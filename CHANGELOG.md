@@ -1,6 +1,27 @@
 # Changelog
 
 
+## v0.5.0
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.4.0...v0.5.0)
+
+### 🚀 Enhancements
+
+- AddModel and removeModel ([e5688ad](https://github.com/Akryum/rstore/commit/e5688ad))
+
+### 🩹 Fixes
+
+- Use own $schema in form object ([cbc40fe](https://github.com/Akryum/rstore/commit/cbc40fe))
+- Better model name check ([260bb0c](https://github.com/Akryum/rstore/commit/260bb0c))
+
+### 💅 Refactors
+
+- Model.schema -> model.formSchema ([d29b714](https://github.com/Akryum/rstore/commit/d29b714))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.4.0
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.3.0...v0.4.0)
