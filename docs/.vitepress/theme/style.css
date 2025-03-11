@@ -53,6 +53,8 @@
   --vp-c-default-3: var(--vp-c-gray-3);
   --vp-c-default-soft: var(--vp-c-gray-soft);
 
+  --c-brand: #00FF62;
+
   --vp-c-brand-1: #00a445;
   --vp-c-brand-2: #00C84D;
   --vp-c-brand-3: #56A875;
@@ -238,6 +240,22 @@
     margin: 0 !important;
     padding: 0 !important;
     border: none !important;
+  }
+}
+
+.VPFeature {
+  @apply !bg-transparent !border-2 !border-(--vp-c-brand-1)/20 outline-4 outline-(--vp-c-brand-1)/5;
+
+  article {
+    @apply items-center text-center;
+  }
+
+  .icon {
+    @apply !bg-(--vp-c-brand-1)/5 !rounded-full;
+  }
+
+  h2 {
+    @apply text-(--vp-c-brand-1);
   }
 }
 
