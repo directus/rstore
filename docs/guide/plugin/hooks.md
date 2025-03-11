@@ -271,7 +271,7 @@ Within callbacks to this hook, you can use any of the store methods to fetch the
 Example model:
 
 ```ts
-const commentModel = defineModel({
+const commentModel = defineDataModel({
   name: 'Comment',
   relations: {
     author: {

@@ -38,9 +38,9 @@ pnpm i @rstore/vue
 ::: code-group
 
 ```js [src/rstore/model.js]
-import { defineModel } from '@rstore/vue'
+import { defineDataModel } from '@rstore/vue'
 
-export const todoModel = defineModel({
+export const todoModel = defineDataModel({
   name: 'todos',
 })
 ```

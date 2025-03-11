@@ -27,7 +27,7 @@ export default defineNuxtModule<ModuleOptions>({
     const importsFile = resolve('./runtime/imports')
     addImports([
       'defineItemType',
-      'defineModel',
+      'defineDataModel',
       'defineRstorePlugin',
       'useStore',
     ].map(name => ({ from: importsFile, name })))

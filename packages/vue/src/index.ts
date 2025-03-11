@@ -7,8 +7,8 @@ export type {
 } from './store'
 
 export {
+  defineDataModel,
   defineItemType,
-  defineModel,
   definePlugin,
 } from '@rstore/core'
 

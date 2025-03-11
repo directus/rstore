@@ -25,7 +25,7 @@ export function defineItemType<
 /**
  * Define an untyped model.
  */
-export function defineModel(model: Model): Model {
+export function defineDataModel(model: Model): Model {
   return model
 }
 

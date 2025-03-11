@@ -42,12 +42,12 @@ const store = await createStore({
 
 ## Defining a Model
 
-For JavaScript, you can use the `defineModel` utility function to define a model with auto-completion in your IDE:
+For JavaScript, you can use the `defineDataModel` utility function to define a model with auto-completion in your IDE:
 
 ```js
-import { createStore, defineModel } from '@rstore/vue'
+import { createStore, defineDataModel } from '@rstore/vue'
 
-const todoModel = defineModel({
+const todoModel = defineDataModel({
   name: 'todos',
   // other properties...
 })
@@ -103,7 +103,7 @@ By default, rstore will try to use the `id` or `_id` property of the item as the
 You can override this behavior by specifying the `getKey` method on the model:
 
 ```ts
-const todoModel = defineModel({
+const todoModel = defineDataModel({
   name: 'todos',
   getKey: item => item.customId,
 })
@@ -128,7 +128,7 @@ export {}
 In the model, you can add the metadata to the `meta` property:
 
 ```ts
-const todoModel = defineModel({
+const todoModel = defineDataModel({
   name: 'Todo',
   meta: {
     path: '/todos',
@@ -149,7 +149,7 @@ The field configuration can have the following properties:
 Example:
 
 ```ts
-const todoModel = defineModel({
+const todoModel = defineDataModel({
   name: 'todos',
   fields: {
     createdAt: {
@@ -171,7 +171,7 @@ You can define computed fields in the model. Computed fields are not stored in t
 For example, you can define a `fullName` computed field that concatenates the `firstName` and `lastName` fields:
 
 ```ts
-const userModel = defineModel({
+const userModel = defineDataModel({
   name: 'users',
   computed: {
     fullName: item => `${item.firstName} ${item.lastName}`,
@@ -201,7 +201,7 @@ You can specify the schema for the `create` and `update` operations. The schema 
 ```ts
 import { z } from 'zod'
 
-const todoModel = defineModel({
+const todoModel = defineDataModel({
   name: 'todos',
   schema: {
     create: z.object({
