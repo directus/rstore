@@ -3,8 +3,11 @@ const props = defineProps<{
   item: StoreHistoryItem
 }>()
 
-const startedAgo = useTimeAgo(() => props.item.started)
+const startedAgo = useTimeAgo(() => props.item.started ?? props.item.ended)
 const duration = computed(() => {
+  if (!props.item.started) {
+    return null
+  }
   const diff = props.item.ended.getTime() - props.item.started.getTime()
   return diff < 1000 ? `${diff}ms` : `${(diff / 1000).toFixed(2)}s`
 })
@@ -15,6 +18,7 @@ const icons = {
   create: 'lucide:plus',
   update: 'lucide:pen',
   delete: 'lucide:trash',
+  cacheWrite: 'lucide:database',
 }
 </script>
 
@@ -95,7 +99,7 @@ const icons = {
       </div>
       <div class="flex items-baseline gap-2 pt-0.5 pr-0.5">
         <span class="opacity-50 font-sans">{{ startedAgo }}</span>
-        <span>{{ duration }}</span>
+        <span v-if="duration">{{ duration }}</span>
       </div>
     </div>
   </div>

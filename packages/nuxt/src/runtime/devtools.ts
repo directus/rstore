@@ -99,6 +99,18 @@ export const devtoolsPlugin = definePlugin({
         historyUpdated.trigger()
       }
     })
+
+    hook('afterCacheWrite', (payload) => {
+      storeStats.value.store.push({
+        operation: 'cacheWrite',
+        model: payload.model.name,
+        ended: new Date(),
+        result: payload.result,
+        key: payload.key,
+        server: import.meta.server,
+      })
+      historyUpdated.trigger()
+    })
   },
 })
 

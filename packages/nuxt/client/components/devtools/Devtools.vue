@@ -26,6 +26,8 @@ const tab = useLocalStorage('rstore-devtools-tab', '0')
 const currentTab = computed(() => tabs[Number.parseInt(tab.value)]!)
 
 const cache = useStoreCache()
+
+const showCacheOps = useLocalStorage('rstore-devtools-show-cache-ops', false)
 </script>
 
 <template>
@@ -44,8 +46,15 @@ const cache = useStoreCache()
         }"
       />
 
-      <div class="flex-1 flex justify-end items-center gap-1">
+      <div class="flex-1 flex justify-end items-center gap-2">
         <template v-if="currentTab.slot === 'history'">
+          <USwitch
+            v-model="showCacheOps"
+            size="xs"
+            label="Cache"
+            class="text-xs"
+          />
+
           <UTooltip text="Clear history">
             <UButton
               icon="lucide:trash"
@@ -70,7 +79,7 @@ const cache = useStoreCache()
       <template v-if="currentTab.slot === 'history'">
         <div class="flex flex-col-reverse p-1 gap-1">
           <DevtoolsHistoryItem
-            v-for="(item, index) in stats.store"
+            v-for="(item, index) in showCacheOps ? stats.store : stats.store.filter((item) => !item.operation.startsWith('cache'))"
             :key="index"
             :item
           />

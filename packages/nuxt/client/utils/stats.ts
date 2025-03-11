@@ -3,7 +3,7 @@ import { useDevtoolsClient } from '@nuxt/devtools-kit/iframe-client'
 export function useStoreStats() {
   const client = useDevtoolsClient()
 
-  const stats = computed(() => client.value?.host.nuxt.$rstoreDevtoolsStats())
+  const stats = computed(() => client.value?.host.nuxt.$rstoreDevtoolsStats() as { store: StoreHistoryItem[] })
 
   client.value?.host.nuxt.$rstoreHistoryUpdated?.on(() => {
     triggerRef(stats)
