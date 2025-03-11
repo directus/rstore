@@ -106,11 +106,13 @@ export async function findMany<
         }
         writes.push({ key, value: item })
       }
-      store.$cache.writeItems<TModel>({
-        model,
-        items: writes,
-        marker: getMarker('many', marker),
-      })
+      if (writes.length) {
+        store.$cache.writeItems<TModel>({
+          model,
+          items: writes,
+          marker: getMarker('many', marker),
+        })
+      }
     }
   }
 
