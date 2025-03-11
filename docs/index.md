@@ -79,7 +79,7 @@ import VPFeatures from 'vitepress/dist/client/theme-default/components/VPFeature
     {
       icon: '🪲',
       title: 'Squashed Bugs',
-      details: 'The reactive normalized cache ensure all components are up-to-date all the time.'
+      details: 'The reactive normalized cache ensures all components are up-to-date all the time.'
     },
     {
       icon: '⚡',
