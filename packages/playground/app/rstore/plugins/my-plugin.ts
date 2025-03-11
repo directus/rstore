@@ -187,30 +187,55 @@ export default defineRstorePlugin({
         }
       })
 
+      const topics = new Set<string>()
+
       hook('subscribe', (payload) => {
         if (payload.model.meta?.websocketTopic) {
-          ws.send(JSON.stringify({
-            type: 'subscribe',
-            topic: payload.model.meta.websocketTopic,
-          } satisfies WebsocketMessage))
+          // @TODO make this work on cloudflare
+          // ws.send(JSON.stringify({
+          //   type: 'subscribe',
+          //   topic: payload.model.meta.websocketTopic,
+          // } satisfies WebsocketMessage))
+          topics.add(payload.model.meta.websocketTopic)
         }
       })
 
       hook('unsubscribe', (payload) => {
         if (payload.model.meta?.websocketTopic) {
-          ws.send(JSON.stringify({
-            type: 'unsubscribe',
-            topic: payload.model.meta.websocketTopic,
-          } satisfies WebsocketMessage))
+          // @TODO make this work on cloudflare
+          // ws.send(JSON.stringify({
+          //   type: 'unsubscribe',
+          //   topic: payload.model.meta.websocketTopic,
+          // } satisfies WebsocketMessage))
+          topics.delete(payload.model.meta.websocketTopic)
         }
       })
 
       hook('init', (payload) => {
-        watch(ws.data, async (data: string) => {
+        watch(ws.data, async (data: Blob) => {
           try {
-            const message = JSON.parse(data) as { item: any }
-            if (message.item) {
-              const { item } = message
+            // @TODO make this work on cloudflare
+            // const message = JSON.parse(data) as { item: any }
+            // if (message.item) {
+            //   const { item } = message
+            //   const model = payload.store.$getModel(item)
+            //   if (model) {
+            //     const key = model.getKey(item)
+            //     if (!key) {
+            //       throw new Error(`Key not found for model ${model.name}`)
+            //     }
+            //     payload.store.$cache.writeItem({
+            //       model,
+            //       key,
+            //       item,
+            //     })
+            //   }
+            // }
+            const message = JSON.parse(await data.text()) as WebsocketMessage
+            // eslint-disable-next-line no-console
+            console.log('WebSocket message', message)
+            if (message.type === 'publish' && topics.has(message.topic)) {
+              const item = message.payload
               const model = payload.store.$getModel(item)
               if (model) {
                 const key = model.getKey(item)
