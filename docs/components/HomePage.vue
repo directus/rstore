@@ -102,8 +102,8 @@ const heroHover = ref(false)
       <div class="pointer-events-none absolute -inset-8 opacity-0 scale-50 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 ease-in-out">
         <div class="text-center bg-[#b175eb] size-full rounded-full flex flex-col items-center justify-center p-4 leading-none text-black tracking-tight">
           <img src="/directus-black.svg" alt="directus logo" class="size-10 mb-2">
-          <div><b class="text-xl">Directus Next</b></div>
-          <div>is powered by<br><b>rstore</b>!</div>
+          <div><b class="text-xl">Directus</b></div>
+          <div>powered by<br><b>rstore</b></div>
         </div>
       </div>
     </div>
