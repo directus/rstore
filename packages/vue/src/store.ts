@@ -56,9 +56,11 @@ export async function createStore<
     return queryCache.get(key)
   }
 
+  const modelNames = new Set(store.$models.map(m => m.name))
+
   const storeProxy = new Proxy(store, {
     get(_, key) {
-      if (typeof key === 'string' && key !== 'then' && !key.startsWith('$')) {
+      if (typeof key === 'string' && modelNames.has(key)) {
         return getApi(key)
       }
 
