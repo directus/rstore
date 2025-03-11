@@ -1,5 +1,7 @@
 export {
+  addModel,
   createStore,
+  removeModel,
 } from './store'
 
 export type {

@@ -1,4 +1,4 @@
-import type { DefaultIsInstanceOf, Full, GetKey, Model, ModelDefaults, ModelList, ModelSchemas, ResolvedModelList } from '@rstore/shared'
+import type { DefaultIsInstanceOf, Full, GetKey, Model, ModelDefaults, ModelList, ModelSchemas, ResolvedModel, ResolvedModelList } from '@rstore/shared'
 
 export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
 
@@ -46,6 +46,48 @@ const emptySchemas: Full<ModelSchemas> = {
   },
 }
 
+export function resolveModel<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+>(model: TModel, defaults?: TModelDefaults): ResolvedModel<TModel, TModelDefaults, TModelList> {
+  if (model.name.startsWith('$')) {
+    throw new Error(`Model name "${model.name}" cannot start with "$"`)
+  }
+
+  const fields = defaults?.fields ?? {}
+  if (model.fields) {
+    for (const path in model.fields) {
+      if (fields[path]) {
+        Object.assign(fields[path], model.fields[path])
+      }
+      else {
+        fields[path] = model.fields[path]
+      }
+    }
+  }
+
+  return {
+    name: model.name,
+    getKey: item => (model.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
+    isInstanceOf: item => model.isInstanceOf?.(item) || defaults?.isInstanceOf?.(model)(item) || defaultIsInstanceOf(model)(item),
+    relations: model.relations ?? {},
+    computed: {
+      ...defaults?.computed,
+      ...model.computed,
+    },
+    fields,
+    formSchema: {
+      create: model.formSchema?.create ?? emptySchemas.create,
+      update: model.formSchema?.update ?? emptySchemas.update,
+    },
+    meta: {
+      ...defaults?.meta,
+      ...model.meta,
+    },
+  }
+}
+
 export function resolveModels<
   TModelList extends ModelList,
   TModelDefaults extends ModelDefaults,
@@ -53,41 +95,7 @@ export function resolveModels<
   const resolved = [] as ResolvedModelList<TModelList, TModelDefaults>
 
   for (const model of models) {
-    if (model.name.startsWith('$')) {
-      throw new Error(`Model name "${model.name}" cannot start with "$"`)
-    }
-
-    const fields = defaults?.fields ?? {}
-    if (model.fields) {
-      for (const path in model.fields) {
-        if (fields[path]) {
-          Object.assign(fields[path], model.fields[path])
-        }
-        else {
-          fields[path] = model.fields[path]
-        }
-      }
-    }
-
-    resolved.push({
-      name: model.name,
-      getKey: item => (model.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
-      isInstanceOf: item => model.isInstanceOf?.(item) || defaults?.isInstanceOf?.(model)(item) || defaultIsInstanceOf(model)(item),
-      relations: model.relations ?? {},
-      computed: {
-        ...defaults?.computed,
-        ...model.computed,
-      },
-      fields,
-      formSchema: {
-        create: model.formSchema?.create ?? emptySchemas.create,
-        update: model.formSchema?.update ?? emptySchemas.update,
-      },
-      meta: {
-        ...defaults?.meta,
-        ...model.meta,
-      },
-    })
+    resolved.push(resolveModel(model, defaults))
   }
   return resolved
 }

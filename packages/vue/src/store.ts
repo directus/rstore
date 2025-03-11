@@ -1,5 +1,5 @@
 import type { FindOptions, Model, ModelDefaults, ModelList, Plugin, StoreCore, WrappedItem } from '@rstore/shared'
-import { createStoreCore } from '@rstore/core'
+import { createStoreCore, resolveModel } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createModelApi, type VueModelApi } from './api'
 import { createCache } from './cache'
@@ -28,6 +28,10 @@ export type VueStore<
   $model: (modelName: string) => VueModelApi<any, TModelDefaults, TModelList, WrappedItem<any, TModelDefaults, TModelList>>
 }
 
+interface PrivateVueStore {
+  $_modelNames: Set<string>
+}
+
 export async function createStore<
   TModelList extends ModelList,
   TModelDefaults extends ModelDefaults,
@@ -43,6 +47,8 @@ export async function createStore<
     findDefaults: options.findDefaults,
   })
 
+  const privateStore = store as unknown as PrivateVueStore
+
   const queryCache: Map<string, VueModelApi<Model, TModelDefaults, TModelList, WrappedItem<Model, TModelDefaults, TModelList>>> = new Map()
 
   function getApi(key: string) {
@@ -56,11 +62,11 @@ export async function createStore<
     return queryCache.get(key)
   }
 
-  const modelNames = new Set(store.$models.map(m => m.name))
+  privateStore.$_modelNames = new Set(store.$models.map(m => m.name))
 
   const storeProxy = new Proxy(store, {
     get(_, key) {
-      if (typeof key === 'string' && modelNames.has(key)) {
+      if (typeof key === 'string' && privateStore.$_modelNames.has(key)) {
         return getApi(key)
       }
 
@@ -80,4 +86,27 @@ export async function createStore<
   }
 
   return storeProxy
+}
+
+export function addModel(store: VueStore, model: Model) {
+  const privateStore = store as unknown as PrivateVueStore
+
+  if (privateStore.$_modelNames.has(model.name)) {
+    throw new Error(`Model ${model.name} already exists`)
+  }
+
+  store.$models.push(resolveModel(model, store.$modelDefaults))
+  privateStore.$_modelNames.add(model.name)
+}
+
+export function removeModel(store: VueStore, modelName: string) {
+  const privateStore = store as unknown as PrivateVueStore
+
+  const index = store.$models.findIndex(m => m.name === modelName)
+  if (index === -1) {
+    throw new Error(`Model ${modelName} not found`)
+  }
+
+  store.$models.splice(index, 1)
+  privateStore.$_modelNames.delete(modelName)
 }
