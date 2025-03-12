@@ -136,7 +136,7 @@ updateTodo.$onSaved(() => emit('close'))
 Both `createForm` and `updateForm` methods will by default validate the data using the model's schemas [see more info here](../model/model.md#schema-validation). You can override the schema by passing a new schema to the form object:
 
 ```ts
-import { z } from 'zod'
+import * as z from 'zod'
 
 const createTodo = store.todos.createForm({
   schema: z.object({
