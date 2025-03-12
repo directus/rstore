@@ -259,6 +259,12 @@
   }
 }
 
+/* Footer */
+
+footer.VPFooter {
+  display: block !important;
+}
+
 /* Animations */
 
 .animate-grow-fade {

@@ -1,7 +1,6 @@
 <script lang="ts" setup>
 import { useElementSize } from '@vueuse/core'
-import VPButton from 'vitepress/dist/client/theme-default/components/VPButton.vue'
-import VPFeatures from 'vitepress/dist/client/theme-default/components/VPFeatures.vue'
+import { VPButton, VPFeatures } from 'vitepress/theme'
 import { ref, useTemplateRef, watch } from 'vue'
 
 const heroEl = useTemplateRef('hero')
