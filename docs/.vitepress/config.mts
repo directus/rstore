@@ -30,6 +30,7 @@ export default defineConfig({
           items: [
             { text: 'Model', link: '/guide/model/model' },
             { text: 'Relations', link: '/guide/model/relations' },
+            { text: 'Federation', link: '/guide/model/federation' },
             { text: 'Defaults', link: '/guide/model/model-defaults' },
           ],
         },
