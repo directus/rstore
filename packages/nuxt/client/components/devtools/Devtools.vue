@@ -3,7 +3,7 @@ import type { TabsItem } from '@nuxt/ui'
 
 const tabs: Array<TabsItem> = [
   {
-    label: 'Model',
+    label: 'Models',
     slot: 'model',
     icon: 'lucide:boxes',
   },
