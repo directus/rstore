@@ -1,4 +1,4 @@
-import type { StoreHistoryItem } from '../../client/utils/types'
+import type { StoreHistoryItem, StoreSubscriptionItem } from '../../client/utils/types'
 
 import { useNuxtApp, useState } from '#app'
 import { definePlugin } from '@rstore/vue'
@@ -6,7 +6,8 @@ import { createEventHook } from '@vueuse/core'
 
 function useStoreStats() {
   return useState('$rstore-devtools-stats', () => ({
-    store: [] as StoreHistoryItem[],
+    history: [] as StoreHistoryItem[],
+    subscriptions: [] as StoreSubscriptionItem[],
   }))
 }
 
@@ -49,10 +50,11 @@ export const devtoolsPlugin = definePlugin({
     // History
 
     nuxtApp.$rstoreDevtoolsStats = () => storeStats.value
+
     const historyUpdated = nuxtApp.$rstoreHistoryUpdated = createEventHook()
 
     nuxtApp.$rstoreDevtoolsStatsClear = () => {
-      storeStats.value.store = []
+      storeStats.value.history = []
       historyUpdated.trigger()
     }
 
@@ -64,7 +66,7 @@ export const devtoolsPlugin = definePlugin({
 
     hook('afterFetch', (payload) => {
       if (payload.meta.storeHistoryItem) {
-        storeStats.value.store.push({
+        storeStats.value.history.push({
           operation: payload.many ? 'fetchMany' : 'fetchFirst',
           model: payload.model.name,
           started: payload.meta.storeHistoryItem.started,
@@ -86,7 +88,7 @@ export const devtoolsPlugin = definePlugin({
 
     hook('afterMutation', (payload) => {
       if (payload.meta.storeHistoryItem) {
-        storeStats.value.store.push({
+        storeStats.value.history.push({
           operation: payload.mutation,
           model: payload.model.name,
           started: payload.meta.storeHistoryItem.started,
@@ -101,7 +103,7 @@ export const devtoolsPlugin = definePlugin({
     })
 
     hook('afterCacheWrite', (payload) => {
-      storeStats.value.store.push({
+      storeStats.value.history.push({
         operation: 'cacheWrite',
         model: payload.model.name,
         ended: new Date(),
@@ -110,6 +112,27 @@ export const devtoolsPlugin = definePlugin({
         server: import.meta.server,
       })
       historyUpdated.trigger()
+    })
+
+    const subscriptionsUpdated = nuxtApp.$rstoreSubscriptionsUpdated = createEventHook()
+
+    hook('subscribe', (payload) => {
+      storeStats.value.subscriptions.push({
+        id: payload.subscriptionId,
+        model: payload.model.name,
+        key: payload.key,
+        findOptions: convertFunctionsToString(payload.findOptions),
+        started: new Date(),
+      })
+      subscriptionsUpdated.trigger()
+    })
+
+    hook('unsubscribe', (payload) => {
+      const index = storeStats.value.subscriptions.findIndex(item => item.id === payload.subscriptionId)
+      if (index !== -1) {
+        storeStats.value.subscriptions.splice(index, 1)
+        subscriptionsUpdated.trigger()
+      }
     })
   },
 })

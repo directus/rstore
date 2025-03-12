@@ -22,7 +22,7 @@ const tabs: Array<TabsItem> = [
   },
 ]
 
-const tab = useLocalStorage('rstore-devtools-tab', '0')
+const tab = useLocalStorage('rstore-devtools-tab-demo', '0')
 
 const currentTab = computed(() => tabs[Number.parseInt(tab.value)]!)
 

@@ -32,6 +32,7 @@ const filteredTypes = computed(() => {
         :key="item.name"
         :item
       />
+      <div class="flex-none h-1" />
     </div>
   </div>
 </template>

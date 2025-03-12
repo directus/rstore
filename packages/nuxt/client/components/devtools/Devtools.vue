@@ -1,9 +1,12 @@
 <script lang="ts" setup>
 import type { TabsItem } from '@nuxt/ui'
 
-const stats = useStoreStats()
-
 const tabs: Array<TabsItem> = [
+  {
+    label: 'Model',
+    slot: 'model',
+    icon: 'lucide:boxes',
+  },
   {
     label: 'Cache',
     slot: 'cache',
@@ -15,17 +18,19 @@ const tabs: Array<TabsItem> = [
     icon: 'lucide:history',
   },
   {
-    label: 'Model',
-    slot: 'model',
-    icon: 'lucide:boxes',
+    label: 'Subscriptions',
+    slot: 'subscriptions',
+    icon: 'lucide:bell',
   },
 ]
 
 const tab = useLocalStorage('rstore-devtools-tab', '0')
 
-const currentTab = computed(() => tabs[Number.parseInt(tab.value)]!)
+const currentTab = computed(() => tabs[Number.parseInt(tab.value)] ?? tabs[0])
 
 const cache = useStoreCache()
+
+const stats = useStoreStats()
 
 const showCacheOps = useLocalStorage('rstore-devtools-show-cache-ops', false)
 </script>
@@ -79,7 +84,7 @@ const showCacheOps = useLocalStorage('rstore-devtools-show-cache-ops', false)
       <template v-if="currentTab.slot === 'history'">
         <div class="flex flex-col-reverse p-1 gap-1">
           <DevtoolsHistoryItem
-            v-for="(item, index) in showCacheOps ? stats.store : stats.store.filter((item) => !item.operation.startsWith('cache'))"
+            v-for="(item, index) in showCacheOps ? stats.history : stats.history.filter((item) => !item.operation.startsWith('cache'))"
             :key="index"
             :item
           />
@@ -88,6 +93,10 @@ const showCacheOps = useLocalStorage('rstore-devtools-show-cache-ops', false)
 
       <template v-if="currentTab.slot === 'model'">
         <DevtoolsModel />
+      </template>
+
+      <template v-if="currentTab.slot === 'subscriptions'">
+        <DevtoolsSubscriptions />
       </template>
     </div>
   </div>

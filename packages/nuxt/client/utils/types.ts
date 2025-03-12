@@ -11,3 +11,11 @@ export interface StoreHistoryItem {
   ended: Date
   server?: boolean
 }
+
+export interface StoreSubscriptionItem {
+  id: string
+  model: string
+  key?: string
+  findOptions?: FindOptions<any, any, any>
+  started: Date
+}
