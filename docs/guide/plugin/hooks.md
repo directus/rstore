@@ -635,6 +635,128 @@ declare module '@rstore/vue' {
 export {}
 ```
 
+## Subscriptions
+
+### subscribe
+
+This hook is called when rstore needs to subscribe to a data model.
+
+```ts
+hook('subscribe', (payload) => {
+  console.log(
+    payload.store, // The store instance
+    payload.meta,
+    payload.model, // The current model
+    payload.subscriptionId, // The unique ID of the subscription to help track it
+    payload.key, // The key passed to the query
+    payload.findOptions, // The find options passed to the query
+  )
+})
+```
+
+### unsubscribe
+
+This hook is called when rstore needs to unsubscribe from a data model.
+
+```ts
+hook('unsubscribe', (payload) => {
+  console.log(
+    payload.store, // The store instance
+    payload.meta,
+    payload.model, // The current model
+    payload.subscriptionId, // The unique ID of the subscription to help track it
+    payload.key, // The key passed to the query
+    payload.findOptions, // The find options passed to the query
+  )
+})
+```
+
+### Websocket example
+
+This example shows how to use the `subscribe` and `unsubscribe` hooks to manage WebSocket subscriptions. A topic counter is used to keep track of how many subscriptions are active for each topic. When the count reaches zero, the WebSocket unsubscribes from the topic.
+
+```ts
+import { useWebSocket } from '@vueuse/core'
+
+export default definePlugin({
+  name: 'my-ws-plugin',
+
+  setup({ hook }) {
+    const ws = useWebSocket('/_ws')
+
+    const countPerTopic: Record<string, number> = {}
+
+    hook('subscribe', (payload) => {
+      if (payload.model.meta?.websocketTopic) {
+        const topic = payload.model.meta.websocketTopic
+
+        countPerTopic[topic] ??= 0
+
+        // If the topic is not already subscribed, subscribe to it
+        if (countPerTopic[topic] === 0) {
+          ws.send(JSON.stringify({
+            type: 'subscribe',
+            topic,
+          } satisfies WebsocketMessage))
+        }
+
+        countPerTopic[topic]++
+      }
+    })
+
+    hook('unsubscribe', (payload) => {
+      if (payload.model.meta?.websocketTopic) {
+        const topic = payload.model.meta.websocketTopic
+
+        countPerTopic[topic] ??= 1
+        countPerTopic[topic]--
+
+        // If the topic is no longer subscribed, unsubscribe from it
+        if (countPerTopic[topic] === 0) {
+          ws.send(JSON.stringify({
+            type: 'unsubscribe',
+            topic,
+          } satisfies WebsocketMessage))
+        }
+      }
+    })
+
+    hook('init', (payload) => {
+      watch(ws.data, async (data: string) => {
+        try {
+          // Parse the message
+          const message = JSON.parse(data) as { item: any }
+
+          if (message.item) {
+            const { item } = message
+
+            // Retrieve the model from the store
+            const model = payload.store.$getModel(item)
+            if (model) {
+              // Compute the key for the item
+              const key = model.getKey(item)
+              if (!key) {
+                throw new Error(`Key not found for model ${model.name}`)
+              }
+
+              // Write the item to the cache
+              payload.store.$cache.writeItem({
+                model,
+                key,
+                item,
+              })
+            }
+          }
+        }
+        catch (e) {
+          console.error('Error parsing WebSocket message', e)
+        }
+      })
+    })
+  },
+})
+```
+
 ## Advanced usage
 
 ### init

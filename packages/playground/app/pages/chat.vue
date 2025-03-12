@@ -4,7 +4,6 @@ const store = useStore()
 // const { data: messages } = store.ChatMessage.queryMany({
 //   fetchPolicy: 'cache-only',
 // })
-
 // store.ChatMessage.subscribe()
 
 const { data: messages } = store.ChatMessage.liveQueryMany({
