@@ -23,7 +23,7 @@ store.ChatMessage.subscribe({
 The `subscribe` method returns a function that can be called to unsubscribe from the store. This is useful when you want to stop listening for changes in the data store. Futhermore, the subscription will be automatically removed when the current component is unmounted.
 
 ```ts
-const unsubscribe = store.ChatMessage.subscribe()
+const { unsubscribe } = store.ChatMessage.subscribe()
 
 // ...
 
