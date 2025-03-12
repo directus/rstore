@@ -436,7 +436,7 @@ In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and 
 <script setup>
 const store = useStore()
 
-const { data: todos } = await store.todos.queryMany()
+const { data: todos } = await store.todos.fetchMany()
 </script>
 
 <template>
