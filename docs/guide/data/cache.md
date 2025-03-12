@@ -29,9 +29,3 @@ store.$cache.writeItem({
   item,
 })
 ```
-
-<!-- ## Clear
-
-```ts
-store.$cache.clear() -->
-```
