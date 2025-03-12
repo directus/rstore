@@ -189,21 +189,33 @@ export default defineRstorePlugin({
         }
       })
 
+      const countPerTopic: Record<string, number> = {}
+
       hook('subscribe', (payload) => {
         if (payload.model.meta?.websocketTopic) {
-          ws.send(JSON.stringify({
-            type: 'subscribe',
-            topic: payload.model.meta.websocketTopic,
-          } satisfies WebsocketMessage))
+          const topic = payload.model.meta.websocketTopic
+          countPerTopic[topic] ??= 0
+          if (countPerTopic[topic] === 0) {
+            ws.send(JSON.stringify({
+              type: 'subscribe',
+              topic,
+            } satisfies WebsocketMessage))
+          }
+          countPerTopic[topic]++
         }
       })
 
       hook('unsubscribe', (payload) => {
         if (payload.model.meta?.websocketTopic) {
-          ws.send(JSON.stringify({
-            type: 'unsubscribe',
-            topic: payload.model.meta.websocketTopic,
-          } satisfies WebsocketMessage))
+          const topic = payload.model.meta.websocketTopic
+          countPerTopic[topic] ??= 1
+          countPerTopic[topic]--
+          if (countPerTopic[topic] === 0) {
+            ws.send(JSON.stringify({
+              type: 'unsubscribe',
+              topic,
+            } satisfies WebsocketMessage))
+          }
         }
       })
 
