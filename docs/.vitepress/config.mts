@@ -38,7 +38,7 @@ export default defineConfig({
             { text: 'Mutation', link: '/guide/data/mutation' },
             { text: 'Form Object', link: '/guide/data/form' },
             { text: 'Subscriptions', link: '/guide/data/live' },
-            // { text: 'Cache', link: '/guide/data/cache' },
+            { text: 'Cache', link: '/guide/data/cache' },
           ],
         },
         {
