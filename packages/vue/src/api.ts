@@ -1,6 +1,7 @@
 import type { CreateFormObject, CreateFormObjectBase, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
+import type { VueLiveQueryReturn } from './live'
 import type { VueQueryReturn } from './query'
 import { createItem, deleteItem, findFirst, findMany, peekFirst, peekMany, subscribe, unsubscribe, updateItem } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
@@ -149,6 +150,14 @@ export interface VueModelApi<
   ) => Promise<{
     unsubscribe: () => Promise<void>
   }>
+
+  liveQueryFirst: (
+    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
+  ) => HybridPromise<VueLiveQueryReturn<TModel, TModelDefaults, TModelList, TItem | null>>
+
+  liveQueryMany: (
+    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelList> | undefined>,
+  ) => HybridPromise<VueLiveQueryReturn<TModel, TModelDefaults, TModelList, Array<TItem>>>
 
   getKey: (
     item: ResolvedModelItem<TModel, TModelDefaults, TModelList>,
@@ -430,6 +439,16 @@ export function createModelApi<
       return {
         unsubscribe: unsub,
       }
+    },
+
+    liveQueryFirst: (options) => {
+      api.subscribe(options)
+      return api.queryFirst(options)
+    },
+
+    liveQueryMany: (options) => {
+      api.subscribe(options)
+      return api.queryMany(options)
     },
 
     getKey: item => model.getKey(item),

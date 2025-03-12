@@ -1,11 +1,16 @@
 <script lang="ts" setup>
 const store = useStore()
 
-const { data: messages } = store.ChatMessage.queryMany({
+// const { data: messages } = store.ChatMessage.queryMany({
+//   fetchPolicy: 'cache-only',
+// })
+
+// store.ChatMessage.subscribe()
+
+const { data: messages } = store.ChatMessage.liveQueryMany({
   fetchPolicy: 'cache-only',
 })
 
-store.ChatMessage.subscribe()
 const createChatMessage = store.ChatMessage.createForm()
 
 const input = useTemplateRef('input')
