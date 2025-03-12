@@ -1,6 +1,43 @@
 # Changelog
 
 
+## v0.5.1
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.5.0...v0.5.1)
+
+### 🚀 Enhancements
+
+- GetKey methods ([de42243](https://github.com/Akryum/rstore/commit/de42243))
+- IsServer ([ddd2553](https://github.com/Akryum/rstore/commit/ddd2553))
+- Subscriptions ([e68b66c](https://github.com/Akryum/rstore/commit/e68b66c))
+- **devtools:** Show cache writes ([db0de73](https://github.com/Akryum/rstore/commit/db0de73))
+- **devtools:** Improved history item design ([acf065f](https://github.com/Akryum/rstore/commit/acf065f))
+- Live queries ([0361cca](https://github.com/Akryum/rstore/commit/0361cca))
+- **devtools:** Subscriptions ([d554862](https://github.com/Akryum/rstore/commit/d554862))
+- **devtools:** More empty states ([8af50ee](https://github.com/Akryum/rstore/commit/8af50ee))
+
+### 🩹 Fixes
+
+- Form object types not including item props if no schema ([21ced4a](https://github.com/Akryum/rstore/commit/21ced4a))
+- Don't write to cache if no items ([124f014](https://github.com/Akryum/rstore/commit/124f014))
+
+### 💅 Refactors
+
+- Use nullish coalescing assignment ([2e6f0ff](https://github.com/Akryum/rstore/commit/2e6f0ff))
+
+### 📖 Documentation
+
+- Add more details in the readme ([c47c334](https://github.com/Akryum/rstore/commit/c47c334))
+- Fix home title ([650fcb6](https://github.com/Akryum/rstore/commit/650fcb6))
+- New home page ([66cdfc8](https://github.com/Akryum/rstore/commit/66cdfc8))
+- Cleanup homepage ([d3293c7](https://github.com/Akryum/rstore/commit/d3293c7))
+- Subscriptions ([c5d2bce](https://github.com/Akryum/rstore/commit/c5d2bce))
+- Cache ([2dc60be](https://github.com/Akryum/rstore/commit/2dc60be))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.5.0
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.4.0...v0.5.0)
