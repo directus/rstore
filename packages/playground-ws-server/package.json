@@ -1,4 +1,5 @@
 {
+  "name": "rstore-playground-ws-server",
   "private": true,
   "scripts": {
     "build": "nitro build",
