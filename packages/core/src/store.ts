@@ -14,6 +14,7 @@ export interface CreateStoreCoreOptions<
   hooks: Hooks<TModelList, TModelDefaults>
   findDefaults?: Partial<FindOptions<any, any, any>>
   isServer?: boolean
+  transformStore?: (store: StoreCore<TModelList, TModelDefaults>) => StoreCore<TModelList, TModelDefaults>
 }
 
 export async function createStoreCore<
@@ -24,7 +25,7 @@ export async function createStoreCore<
 
   const models = resolveModels(options.models, options.modelDefaults)
 
-  const store: StoreCore<TModelList, TModelDefaults> = {
+  let store: StoreCore<TModelList, TModelDefaults> = {
     $cache: options.cache,
     $models: models,
     $modelDefaults: options.modelDefaults ?? {} as TModelDefaults,
@@ -59,6 +60,10 @@ export async function createStoreCore<
     },
     $mutationHistory: [],
     $isServer: options.isServer ?? false,
+  }
+
+  if (options.transformStore) {
+    store = options.transformStore(store)
   }
 
   // Setup plugins

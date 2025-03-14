@@ -37,57 +37,53 @@ export async function createStore<
   TModelList extends ModelList,
   TModelDefaults extends ModelDefaults,
 >(options: CreateStoreOptions<TModelList, TModelDefaults>): Promise<VueStore<TModelList, TModelDefaults>> {
-  const store = await createStoreCore<TModelList, TModelDefaults>({
+  let storeProxy = undefined as unknown as VueStore<TModelList, TModelDefaults>
+
+  return createStoreCore<TModelList, TModelDefaults>({
     models: options.models,
     modelDefaults: options.modelDefaults,
     plugins: options.plugins,
     cache: createCache({
-      getStore,
+      getStore: () => storeProxy,
     }),
     hooks: createHooks(),
     findDefaults: options.findDefaults,
     isServer: options.isServer,
-  })
+    transformStore: (store) => {
+      const privateStore = store as unknown as PrivateVueStore
 
-  const privateStore = store as unknown as PrivateVueStore
+      const queryCache: Map<string, VueModelApi<Model, TModelDefaults, TModelList, WrappedItem<Model, TModelDefaults, TModelList>>> = new Map()
 
-  const queryCache: Map<string, VueModelApi<Model, TModelDefaults, TModelList, WrappedItem<Model, TModelDefaults, TModelList>>> = new Map()
-
-  function getApi(key: string) {
-    if (!queryCache.has(key)) {
-      const model = store.$models.find(m => m.name === key)
-      if (!model) {
-        throw new Error(`Model ${key} not found`)
-      }
-      queryCache.set(key, createModelApi(store, model))
-    }
-    return queryCache.get(key)
-  }
-
-  privateStore.$_modelNames = new Set(store.$models.map(m => m.name))
-
-  const storeProxy = new Proxy(store, {
-    get(_, key) {
-      if (typeof key === 'string' && privateStore.$_modelNames.has(key)) {
-        return getApi(key)
+      function getApi(key: string) {
+        if (!queryCache.has(key)) {
+          const model = storeProxy.$models.find(m => m.name === key)
+          if (!model) {
+            throw new Error(`Model ${key} not found`)
+          }
+          queryCache.set(key, createModelApi(storeProxy, model))
+        }
+        return queryCache.get(key)
       }
 
-      if (key === '$model') {
-        return (modelName: string) => getApi(modelName)
-      }
+      privateStore.$_modelNames = new Set(store.$models.map(m => m.name))
 
-      return Reflect.get(store, key)
+      storeProxy = new Proxy(store, {
+        get(_, key) {
+          if (typeof key === 'string' && privateStore.$_modelNames.has(key)) {
+            return getApi(key)
+          }
+
+          if (key === '$model') {
+            return (modelName: string) => getApi(modelName)
+          }
+
+          return Reflect.get(store, key)
+        },
+      }) as VueStore<TModelList, TModelDefaults>
+
+      return storeProxy
     },
-  }) as VueStore<TModelList, TModelDefaults>
-
-  /**
-   * Access the store in sub objects like the cache to avoid circular dependencies.
-   */
-  function getStore() {
-    return storeProxy
-  }
-
-  return storeProxy
+  }) as Promise<VueStore<TModelList, TModelDefaults>>
 }
 
 export function addModel(store: VueStore, model: Model) {
