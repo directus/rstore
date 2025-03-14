@@ -12,7 +12,7 @@ export interface FindFirstParams<
   store: StoreCore<TModelList, TModelDefaults>
   meta?: CustomHookMeta
   model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  findOptions: string | FindFirstOptions<TModel, TModelDefaults, TModelList>
+  findOptions: string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>
 }
 
 /**
@@ -30,7 +30,7 @@ export async function findFirst<
 }: FindFirstParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<WrappedItem<TModel, TModelDefaults, TModelList> | null>> {
   meta ??= {}
 
-  const findOptions: FindFirstOptions<TModel, TModelDefaults, TModelList> = typeof keyOrOptions === 'string'
+  const findOptions: FindFirstOptions<TModel, TModelDefaults, TModelList> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
     ? {
         key: keyOrOptions,
       }

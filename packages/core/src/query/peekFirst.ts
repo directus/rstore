@@ -11,7 +11,7 @@ export interface PeekFirstOptions<
   store: StoreCore<TModelList, TModelDefaults>
   meta?: CustomHookMeta
   model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  findOptions: string | FindFirstOptions<TModel, TModelDefaults, TModelList>
+  findOptions: string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>
   force?: boolean
 }
 
@@ -31,7 +31,7 @@ export function peekFirst<
 }: PeekFirstOptions<TModel, TModelDefaults, TModelList>): QueryResult<WrappedItem<TModel, TModelDefaults, TModelList> | null> {
   meta ??= {}
 
-  const findOptions: FindFirstOptions<TModel, TModelDefaults, TModelList> = typeof keyOrOptions === 'string'
+  const findOptions: FindFirstOptions<TModel, TModelDefaults, TModelList> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
     ? {
         key: keyOrOptions,
       }

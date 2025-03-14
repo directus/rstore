@@ -42,21 +42,21 @@ export interface VueModelApi<
    * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
    */
   peekFirst: (
-    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
+    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
   ) => WrappedItem<TModel, TModelDefaults, TModelList> | null
 
   /**
    * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
    */
   findFirst: (
-    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
+    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
   ) => Promise<WrappedItem<TModel, TModelDefaults, TModelList> | null>
 
   /**
    * Create a reactive query for the first item that matches the given options.
    */
   queryFirst: (
-    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
+    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
   ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TItem | null>>
 
   /**
@@ -112,7 +112,7 @@ export interface VueModelApi<
   update: (
     item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>,
     updateOptions?: {
-      key?: string | null
+      key?: string | number | null
     }
   ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 
@@ -120,7 +120,7 @@ export interface VueModelApi<
    * (Recommended) The form object helps you updating an existing item. If the item is not loaded yet, it will be fetched first to pre-fill the form.
    */
   updateForm: (
-    options: string | FindFirstOptions<TModel, TModelDefaults, TModelList>,
+    options: string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>,
     formOptions?: {
       /**
        * Default values set in the form object initially and when it is reset.
@@ -142,17 +142,17 @@ export interface VueModelApi<
    * Find all items that match the query.
    */
   delete: (
-    keyOrItem: string | Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>,
+    keyOrItem: string | number | Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>,
   ) => Promise<void>
 
   subscribe: (
-    keyOrFindOptions?: MaybeRefOrGetter<string | FindOptions<TModel, TModelDefaults, TModelList> | undefined>,
+    keyOrFindOptions?: MaybeRefOrGetter<string | number | FindOptions<TModel, TModelDefaults, TModelList> | undefined>,
   ) => Promise<{
     unsubscribe: () => Promise<void>
   }>
 
   liveQueryFirst: (
-    options: MaybeRefOrGetter<string | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
+    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
   ) => HybridPromise<VueLiveQueryReturn<TModel, TModelDefaults, TModelList, TItem | null>>
 
   liveQueryMany: (
@@ -161,7 +161,7 @@ export interface VueModelApi<
 
   getKey: (
     item: ResolvedModelItem<TModel, TModelDefaults, TModelList>,
-  ) => string | null | undefined
+  ) => string | number | null | undefined
 }
 
 export function createModelApi<
@@ -362,7 +362,7 @@ export function createModelApi<
     },
 
     delete: (keyOrItem) => {
-      let key: string
+      let key: string | number | number
       if (typeof keyOrItem !== 'string') {
         const result = model.getKey(keyOrItem)
         if (!result) {
@@ -391,7 +391,7 @@ export function createModelApi<
       const meta: CustomHookMeta = {}
 
       let subscriptionId: string | undefined
-      let previousKey: string | undefined
+      let previousKey: string | number | undefined
       let previousFindOptions: FindOptions<TModel, TModelDefaults, TModelList> | undefined
 
       async function unsub() {
@@ -410,7 +410,7 @@ export function createModelApi<
         }
       }
 
-      async function sub(optionsValue: string | FindOptions<TModel, TModelDefaults, TModelList> | undefined) {
+      async function sub(optionsValue: string | number | FindOptions<TModel, TModelDefaults, TModelList> | undefined) {
         await unsub()
 
         subscriptionId = crypto.randomUUID()

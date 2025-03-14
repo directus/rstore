@@ -25,7 +25,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key?: string
+      key?: string | number
       findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
       many: boolean
       updateFindOptions: (findOptions: FindOptions<TModel, TModelDefaults, TModelList>) => void
@@ -39,7 +39,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key?: string
+      key?: string | number
       findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
       many: boolean
       getResult: () => Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>> | ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined
@@ -57,7 +57,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key?: string
+      key?: string | number
       findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
       getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined
       setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>) => void
@@ -72,7 +72,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key?: string
+      key?: string | number
       findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
       setMarker: (marker: string) => void
     }
@@ -88,7 +88,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key?: string
+      key?: string | number
       findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
       getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined
       setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined) => void
@@ -120,7 +120,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key?: string
+      key?: string | number
       findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
       setMarker: (marker: string) => void
     }
@@ -149,7 +149,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key?: string
+      key?: string | number
       findOptions: FindOptions<TModel, TModelDefaults, TModelList> & NonNullable<FindOptions<TModel, TModelDefaults, TModelList>['include']>
       many: boolean
       getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelList>
@@ -178,7 +178,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key?: string
+      key?: string | number
       item?: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
       modifyItem: <TItem extends ResolvedModelItemBase<TModel, TModelDefaults, TModelList>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
       setItem: (item: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>) => void
@@ -193,7 +193,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key?: string
+      key?: string | number
       item?: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
       mutation: 'create' | 'update' | 'delete'
       getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined
@@ -227,7 +227,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key: string
+      key: string | number
       item: Partial<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
       getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TModelList> | undefined
       setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>) => void
@@ -244,7 +244,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key: string
+      key: string | number
     }
   ) => Awaitable<void>
 
@@ -255,7 +255,7 @@ export interface HookDefinitions<
       store: StoreCore<TModelList, TModelDefaults>
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
-      key?: string
+      key?: string | number
       result?: Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
       marker?: string
       operation: 'write' | 'delete'
@@ -280,7 +280,7 @@ export interface HookDefinitions<
        * The subscription ID is used to identify the subscription for unsubscribing.
        */
       subscriptionId: string
-      key?: string
+      key?: string | number
       findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
     }
   ) => Awaitable<void>
@@ -293,7 +293,7 @@ export interface HookDefinitions<
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TModelList>
       subscriptionId: string
-      key?: string
+      key?: string | number
       findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
     }
   ) => Awaitable<void>

@@ -28,7 +28,7 @@ export interface WriteItem<
   TModelDefaults extends ModelDefaults = ModelDefaults,
   TModelList extends ModelList = ModelList,
 > {
-  key: string
+  key: string | number
   value: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>
 }
 
@@ -38,12 +38,12 @@ export interface Cache<
 > {
   readItem: <TModel extends Model = Model>(params: {
     model: ResolvedModel<TModel, TModelDefaults, TModelList>
-    key: string
+    key: string | number
   }) => WrappedItem<TModel, TModelDefaults, TModelList> | undefined
 
   writeItem: <TModel extends Model = Model>(params: {
     model: ResolvedModel<TModel, TModelDefaults, TModelList>
-    key: string
+    key: string | number
     item: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>
     marker?: string
     fromWriteItems?: boolean
@@ -51,7 +51,7 @@ export interface Cache<
 
   deleteItem: <TModel extends Model = Model>(params: {
     model: ResolvedModel<TModel, TModelDefaults, TModelList>
-    key: string
+    key: string | number
   }) => void
 
   readItems: <TModel extends Model = Model>(params: {

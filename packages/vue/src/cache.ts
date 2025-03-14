@@ -24,7 +24,7 @@ export function createCache<
 
   function getWrappedItemCacheKey<TModel extends Model>(
     model: ResolvedModel<TModel, TModelDefaults, TModelList>,
-    key: string,
+    key: string | number,
   ) {
     return `${model.name}:${key}`
   }

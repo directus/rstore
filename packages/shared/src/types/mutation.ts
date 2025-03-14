@@ -8,7 +8,7 @@ export interface MutationOperation<
 > {
   operation: 'create' | 'update' | 'delete'
   model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  key?: string
+  key?: string | number
   payload?: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 }
 

@@ -8,7 +8,7 @@ export interface DeleteOptions<
 > {
   store: StoreCore<TModelList, TModelDefaults>
   model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  key: string
+  key: string | number
   skipCache?: boolean
 }
 

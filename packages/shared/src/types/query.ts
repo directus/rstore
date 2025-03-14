@@ -76,7 +76,7 @@ export interface FindFirstOptions<
   /**
    * Key of the item. Usually used for fetching the item by its key (e.g. ID).
    */
-  key?: string
+  key?: string | number
 }
 
 export interface FindManyOptions<

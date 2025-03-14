@@ -8,7 +8,7 @@ export interface SubscribeOptions<
   store: StoreCore<TModelList, TModelDefaults>
   model: ResolvedModel<TModel, TModelDefaults, TModelList>
   subscriptionId: string
-  key?: string
+  key?: string | number
   findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
   meta?: CustomHookMeta
 }

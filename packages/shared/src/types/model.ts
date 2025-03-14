@@ -4,7 +4,7 @@ import type { Full, KeysToUnion, Path, PathValue } from './utils'
 
 /* eslint-disable unused-imports/no-unused-vars */
 
-export type GetKey<TItem> = (item: TItem) => string | undefined | null
+export type GetKey<TItem> = (item: TItem) => string | number | undefined | null
 
 export interface CustomModelMeta {}
 

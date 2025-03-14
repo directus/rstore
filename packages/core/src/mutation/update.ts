@@ -10,7 +10,7 @@ export interface UpdateOptions<
   store: StoreCore<TModelList, TModelDefaults>
   model: ResolvedModel<TModel, TModelDefaults, TModelList>
   item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-  key?: string | null
+  key?: string | number | null
   skipCache?: boolean
 }
 
