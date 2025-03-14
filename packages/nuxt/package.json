@@ -17,6 +17,10 @@
       "types": "./dist/types.d.ts",
       "import": "./dist/module.mjs",
       "require": "./dist/module.cjs"
+    },
+    "./api": {
+      "types": "./dist/runtime/api.d.ts",
+      "import": "./dist/runtime/api.js"
     }
   },
   "main": "./dist/module.cjs",

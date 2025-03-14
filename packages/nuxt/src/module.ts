@@ -2,6 +2,13 @@ import fs from 'node:fs'
 import { addImports, addPlugin, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, resolveFiles } from '@nuxt/kit'
 import { setupDevToolsUI } from './devtools'
 
+declare module '@nuxt/schema' {
+  export interface NuxtOptions {
+    _rstoreModelImports?: Set<string>
+    _rstorePluginImports?: Set<string>
+  }
+}
+
 // Module options TypeScript interface definition
 export interface ModuleOptions {
   /**
@@ -38,15 +45,38 @@ export default defineNuxtModule<ModuleOptions>({
       options.rstoreDirs = [resolve(nuxt.options.srcDir, 'rstore')]
     }
 
-    const rstoreDirs = options.rstoreDirs as string[]
-    const rstorePluginDirs = rstoreDirs.map(dir => resolve(dir, 'plugins'))
+    const rstoreModelDirs = options.rstoreDirs as string[]
+    const rstorePluginDirs = rstoreModelDirs.map(dir => resolve(dir, 'plugins'))
+
+    async function resolveModelFiles() {
+      let files = (await Promise.all(rstoreModelDirs.map((dir) => {
+        return resolveFiles(dir, ['./*{.ts,.js}'])
+      }))).flat()
+      files = files.map((file) => {
+        const content = fs.readFileSync(file, 'utf-8')
+        // Find `export default` statements
+        if (!/export default/.test(content)) {
+          console.warn(`No exported default found in ${file}`)
+          return null
+        }
+        return file
+      }).filter(Boolean) as string[]
+      files.push(...nuxt.options._rstoreModelImports ?? [])
+      return files
+    }
+
+    async function resolvePluginFiles() {
+      const files = (await Promise.all(rstorePluginDirs.map((dir) => {
+        return resolveFiles(dir, ['./*{.ts,.js}'])
+      }))).flat()
+      files.push(...nuxt.options._rstorePluginImports ?? [])
+      return files
+    }
 
     addTemplate({
       filename: '$rstore-model.ts',
       getContents: async () => {
-        const files = (await Promise.all(rstoreDirs.map((dir) => {
-          return resolveFiles(dir, ['./*{.ts,.js}'])
-        }))).flat()
+        const files = await resolveModelFiles()
         return `${files.map((file, index) => `import M${index} from '${file}'`).join('\n')}
 export default [
   ${files.map((file, index) => `...Array.isArray(M${index}) ? M${index} : [M${index}],`).join('\n')}
@@ -57,26 +87,15 @@ export default [
     addTypeTemplate({
       filename: '$rstore-model-const.d.ts',
       getContents: async () => {
-        const files = (await Promise.all(rstoreDirs.map((dir) => {
-          return resolveFiles(dir, ['./*{.ts,.js}'])
-        }))).flat()
-        const filesWithDefaultExport = files.map((file) => {
-          const content = fs.readFileSync(file, 'utf-8')
-          // Find `export default` statements
-          if (!/export default/.test(content)) {
-            console.warn(`No exported default found in ${file}`)
-            return null
-          }
-          return file
-        }).filter(Boolean) as string[]
+        const files = await resolveModelFiles()
         return `import type { ModelList } from '@rstore/shared'
-${filesWithDefaultExport.map((file, index) => `import M${index} from '${file}'`).join('\n')}
+${files.map((file, index) => `import M${index} from '${file}'`).join('\n')}
 type EnsureArray<T> = T extends any[] ? T : [T]
 function ensureArray<T>(value: T): EnsureArray<T> {
   return Array.isArray(value) ? value : [value]
 }
 export const constModels = [
-  ${filesWithDefaultExport.map((file, index) => `...ensureArray(M${index}),`).join('\n')}
+  ${files.map((file, index) => `...ensureArray(M${index}),`).join('\n')}
 ] as const satisfies ModelList`
       },
     })
@@ -84,9 +103,7 @@ export const constModels = [
     addTemplate({
       filename: '$rstore-plugins.ts',
       getContents: async () => {
-        const files = (await Promise.all(rstorePluginDirs.map((dir) => {
-          return resolveFiles(dir, ['./*{.ts,.js}'])
-        }))).flat()
+        const files = await resolvePluginFiles()
         return files.map((file, index) => `export { default as Plugin_${index} } from '${file}'`).join('\n')
       },
     })
