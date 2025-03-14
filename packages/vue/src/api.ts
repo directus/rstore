@@ -364,7 +364,7 @@ export function createModelApi<
 
     delete: (keyOrItem) => {
       let key: string | number | number
-      if (typeof keyOrItem !== 'string') {
+      if (typeof keyOrItem !== 'string' && typeof keyOrItem !== 'number') {
         const result = model.getKey(keyOrItem)
         if (!result) {
           throw new Error('Item delete failed: key is not defined')
@@ -416,7 +416,7 @@ export function createModelApi<
 
         subscriptionId = crypto.randomUUID()
 
-        const key = previousKey = typeof optionsValue === 'string' ? optionsValue : undefined
+        const key = previousKey = typeof optionsValue === 'string' || typeof optionsValue === 'number' ? optionsValue : undefined
         const findOptions = previousFindOptions = typeof optionsValue === 'object' ? optionsValue : undefined
 
         await subscribe({
