@@ -338,10 +338,6 @@ export function createModelApi<
           return Reflect.get(target, key)
         },
         set(target, key, value) {
-          if (typeof key === 'string' && key.startsWith('$')) {
-            throw new Error('Cannot set special props')
-          }
-
           if (typeof key === 'string' && key in form) {
             const oldValue = initialData[key]
             if (value !== oldValue) {
