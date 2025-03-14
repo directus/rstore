@@ -1,6 +1,44 @@
 # Changelog
 
 
+## v0.5.2
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.5.1...v0.5.2)
+
+### 🚀 Enhancements
+
+- Allow number key ([0283aad](https://github.com/Akryum/rstore/commit/0283aad))
+- **nuxt:** AddModelImport and addPluginImport ([807d859](https://github.com/Akryum/rstore/commit/807d859))
+- **vue:** Only send changed props in update form ([3163845](https://github.com/Akryum/rstore/commit/3163845))
+
+### 🩹 Fixes
+
+- **devtools:** Tab label ([be636f1](https://github.com/Akryum/rstore/commit/be636f1))
+- Transform store so it's the same in hooks ([d948346](https://github.com/Akryum/rstore/commit/d948346))
+- Remove check for special keys in update form object ([19b60e8](https://github.com/Akryum/rstore/commit/19b60e8))
+- **vue:** Number item key checks ([e55f5a9](https://github.com/Akryum/rstore/commit/e55f5a9))
+
+### 📖 Documentation
+
+- Link to demo playground ([937a556](https://github.com/Akryum/rstore/commit/937a556))
+- Missing destructure ([7f45dc1](https://github.com/Akryum/rstore/commit/7f45dc1))
+- Fix cache page empty codeblock ([8a17b8f](https://github.com/Akryum/rstore/commit/8a17b8f))
+- Links to directus ([1923d6e](https://github.com/Akryum/rstore/commit/1923d6e))
+- Federation ([1e9e391](https://github.com/Akryum/rstore/commit/1e9e391))
+
+### 🌊 Types
+
+- Add generics to CustomParams and CustomSortOption ([d9e2712](https://github.com/Akryum/rstore/commit/d9e2712))
+
+### 🏡 Chore
+
+- Add name to playground ws server ([79ff206](https://github.com/Akryum/rstore/commit/79ff206))
+- Add playground-drizzle ([43308b1](https://github.com/Akryum/rstore/commit/43308b1))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.5.1
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.5.0...v0.5.1)
