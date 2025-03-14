@@ -2,7 +2,11 @@
 
 import type { Model, ModelDefaults, ModelList, ResolvedModelItem } from './model'
 
-export interface CustomParams {}
+export interface CustomParams<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+> {}
 
 export interface CustomFilterOption<
   TModel extends Model,
@@ -10,7 +14,11 @@ export interface CustomFilterOption<
   TModelList extends ModelList,
 > {}
 
-export interface CustomSortOption {}
+export interface CustomSortOption<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+> {}
 
 /**
  * Fetch policy for the query.
@@ -36,7 +44,7 @@ export interface FindOptions<
   /**
    * Parameters sent to the adapter plugins. Usually used for filtering and sorting the data in the backend.
    */
-  params?: CustomParams
+  params?: CustomParams<TModel, TModelDefaults, TModelList>
   /**
    * Filter the item.
    */
@@ -44,7 +52,7 @@ export interface FindOptions<
   /**
    * Sort the items.
    */
-  sort?: ((a: ResolvedModelItem<TModel, TModelDefaults, TModelList>, b: ResolvedModelItem<TModel, TModelDefaults, TModelList>) => number) | CustomSortOption
+  sort?: ((a: ResolvedModelItem<TModel, TModelDefaults, TModelList>, b: ResolvedModelItem<TModel, TModelDefaults, TModelList>) => number) | CustomSortOption<TModel, TModelDefaults, TModelList>
   /**
    * Include the related items.
    */
