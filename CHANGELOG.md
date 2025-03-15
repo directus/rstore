@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.5.4
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.5.3...v0.5.4)
+
+### 🩹 Fixes
+
+- **nuxt-drizzle:** Dynamic import of '@rstore/nuxt/api' in case it is not installed yet ([6519ac5](https://github.com/Akryum/rstore/commit/6519ac5))
+
+### 📖 Documentation
+
+- Remove demo link (temporary) ([6bd9ac8](https://github.com/Akryum/rstore/commit/6bd9ac8))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.5.3
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.5.2...v0.5.3)
