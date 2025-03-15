@@ -11,7 +11,7 @@
 <p align="center">
   <a href="https://rstore.akryum.dev">Documentation</a> |
   <a href="https://nightly.akryum.dev/Akryum/rstore">Nightly releases</a> |
-  <a href="https://rstore-playground.pages.dev">Demo</a> |
+  <!-- <a href="https://rstore-playground.pages.dev">Demo</a> | -->
   <a href="./CONTRIBUTING.md">Contributing guide</a>
 </p>
 

@@ -12,7 +12,7 @@ export default defineConfig({
 
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
-      { text: 'Demo', link: 'https://rstore-playground.pages.dev/' },
+      // { text: 'Demo', link: 'https://rstore-playground.pages.dev/' },
       { text: 'Changelog', link: 'https://github.com/Akryum/rstore/blob/main/CHANGELOG.md' },
     ],
 
