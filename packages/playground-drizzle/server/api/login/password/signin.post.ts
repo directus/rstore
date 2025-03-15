@@ -3,7 +3,7 @@ import { Scrypt } from 'lucia'
 
 export default defineEventHandler(async (event) => {
   const lucia = event.context.lucia
-  const db = event.context.db
+  const db = useDrizzle()
   const formData = await readFormData(event)
   const username = formData.get('username')
   const password = formData.get('password')

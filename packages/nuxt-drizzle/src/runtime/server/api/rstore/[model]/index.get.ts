@@ -4,7 +4,7 @@ export default defineEventHandler(async (event) => {
 
   const query = getQuery(event) as RstoreDrizzleQueryParams
 
-  const q = useDrizzle().select().from(table as any)
+  const q = rstoreUseDrizzle().select().from(table as any)
 
   if (query.where) {
     try {

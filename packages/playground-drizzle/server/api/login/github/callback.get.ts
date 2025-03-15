@@ -4,7 +4,7 @@ import { generateId } from 'lucia'
 
 export default defineEventHandler(async (event) => {
   const lucia = event.context.lucia
-  const db = event.context.db
+  const db = useDrizzle()
   const query = getQuery(event)
   const code = query.code?.toString() ?? null
   const state = query.state?.toString() ?? null

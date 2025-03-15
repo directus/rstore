@@ -37,7 +37,6 @@
     "client:dev": "nuxi dev client --port 3300",
     "client:prepare": "nuxi prepare client",
     "prepare:all": "nuxi prepare playground && pnpm run dev:prepare && pnpm run client:prepare",
-    "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest watch"
   },
@@ -51,7 +50,6 @@
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.28",
     "@nuxt/devtools": "^2.0.0",
-    "@nuxt/eslint-config": "^1.0.1",
     "@nuxt/module-builder": "^0.8.4",
     "@nuxt/schema": "^3.15.4",
     "@nuxt/test-utils": "^3.15.4",
@@ -59,7 +57,6 @@
     "@types/node": "latest",
     "@vueuse/core": "^12.7.0",
     "@vueuse/nuxt": "^12.7.0",
-    "eslint": "^9.20.0",
     "nuxt": "^3.15.4",
     "shiki": "^3.1.0",
     "typescript": "~5.7.3",

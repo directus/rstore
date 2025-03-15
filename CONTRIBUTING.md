@@ -24,6 +24,7 @@ This mono-repo contains the following packages:
 | [@rstore/shared](./packages/shared) | Common types and utils |
 | [@rstore/vue](./packages/vue) | Vue integration |
 | [@rstore/nuxt](./packages/nuxt) | Nuxt integration |
+| [@rstore/nuxt-drizzle](./packages/nuxt-drizzle) | Nuxt + Drizzle integration |
 | [playground](./packages/playground) | Playground app |
 
 ## Local dev setup

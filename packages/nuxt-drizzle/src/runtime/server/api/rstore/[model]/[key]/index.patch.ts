@@ -4,7 +4,7 @@ export default defineEventHandler(async (event) => {
   const body = await readBody(event)
 
   const where = getDrizzleKeyWhere(key, primaryKeys, table)
-  const q = useDrizzle().update(table as any).set(body).where(where)
+  const q = rstoreUseDrizzle().update(table as any).set(body).where(where)
 
   const dialect = getDrizzleDialect()
   if (dialect === 'pg' || dialect === 'sqlite') {
@@ -13,7 +13,7 @@ export default defineEventHandler(async (event) => {
   }
   else {
     await q
-    const select = await useDrizzle().select().from(table as any).where(where).limit(1)
+    const select = await rstoreUseDrizzle().select().from(table as any).where(where).limit(1)
     return select[0]
   }
 })

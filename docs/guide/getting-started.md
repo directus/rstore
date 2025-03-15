@@ -443,3 +443,9 @@ const { data: todos } = await store.todos.queryMany()
   <pre>{{ todos }}</pre>
 </template>
 ```
+
+Open the Nuxt devtools and check the `rstore` tab:
+
+![Devtools screenshot of the models tab](./img/nuxt-devtools1.png)
+
+![Devtools screenshot of the history tab](./img/nuxt-devtools2.png)

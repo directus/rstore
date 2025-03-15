@@ -1,29 +1,64 @@
-import type { Model, ModelRelation } from '@rstore/shared'
+import type { CustomModelMeta, Model, ModelRelation } from '@rstore/shared'
 import type { Config as DrizzleKitConfig } from 'drizzle-kit'
+import fs from 'node:fs'
+import { addImportsDir, addServerScanDir, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule, updateTemplates, useLogger } from '@nuxt/kit'
 import { addModelImport, addPluginImport } from '@rstore/nuxt/api'
 import { createTableRelationsHelpers, getTableName, is, isTable, Many, One, Relations, type Table, type TableConfig } from 'drizzle-orm'
 import { createJiti } from 'jiti'
-import { addImportsDir, addServerScanDir, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, updateTemplates } from 'nuxt/kit'
 import path from 'pathe'
+
+declare module '@rstore/shared' {
+  export interface CustomModelMeta {
+    scopeId?: string
+    table?: string
+    primaryKeys?: string[]
+  }
+}
 
 export interface ModuleOptions {
   drizzleConfigPath?: string
+
+  // @TODO make this work
+  // It looks like `addServerTemplate` isn't processed by nitro's autoimport correctly
+  // /**
+  //  * Import name for the function that returns the drizzle instance
+  //  *
+  //  * @default 'useDrizzle'
+  //  */
+  // drizzleImport?: string
 }
 
 export default defineNuxtModule<ModuleOptions>({
   meta: {
-    name: 'rstoreDrizzle',
+    name: 'rstore-nuxt-drizzle',
     configKey: 'rstoreDrizzle',
   },
+  defaults: {},
   async setup(options, nuxt) {
+    const log = useLogger('rstore-drizzle')
     const { resolve } = createResolver(import.meta.url)
+
+    if (!hasNuxtModule('@rstore/nuxt')) {
+      await installModule('@rstore/nuxt')
+    }
+
+    // Add files to nuxt app
+    addServerScanDir(resolve('./runtime/server'))
+    addImportsDir(resolve('./runtime/utils'))
+
     const jiti = createJiti(import.meta.url, {
       moduleCache: false,
     })
 
     const drizzleConfigPath = options.drizzleConfigPath ?? 'drizzle.config.ts'
+    const drizzleConfigFullPath = path.resolve(nuxt.options.rootDir, drizzleConfigPath)
 
-    const drizzleConfig = (await jiti.import(path.resolve(nuxt.options.rootDir, drizzleConfigPath)) as { default: DrizzleKitConfig }).default
+    if (!fs.existsSync(drizzleConfigFullPath)) {
+      log.warn(`Drizzle config not found, skipping drizzle module (looking for ${drizzleConfigPath})`)
+      return
+    }
+
+    const drizzleConfig = (await jiti.import(drizzleConfigFullPath) as { default: DrizzleKitConfig }).default
     if (!drizzleConfig) {
       throw new Error('No drizzle config found')
     }
@@ -278,19 +313,18 @@ export default defineNuxtModule<ModuleOptions>({
       getContents: async () => {
         jiti.cache = {}
         const models = await getModelsFormDrizzleSchema()
-        const modelMetas: Record<string, CustomModelMeta> = {}
+        const modelMetas: Record<string, CustomModelMeta | undefined> = {}
         for (const model of models) {
           modelMetas[model.name] = model.meta
         }
 
         return `import * as schema from '${drizzleSchemaPath}'
+
 export const tables = schema
 export const modelMetas = ${JSON.stringify(modelMetas, null, 2)}
 export const dialect = '${drizzleConfig.dialect}'`
       },
     })
-
-    addServerScanDir(resolve('./runtime/server'))
 
     addTemplate({
       filename: '$rstore-drizzle-models.js',
@@ -345,8 +379,6 @@ export default [
         })
       })
     }
-
-    addImportsDir(resolve('./runtime/utils'))
 
     addModelImport(nuxt, '#build/$rstore-drizzle-models.js')
 

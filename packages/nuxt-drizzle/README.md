@@ -44,8 +44,6 @@ Define a data model and then run queries or execute mutations (create, update an
 - **TypeScript support** with full autocomplete
 - **Nuxt module** with devtools
 
-![Devtools screenshot](./docs/guide/img/nuxt-devtools2.png)
-
 # Sponsors
 
 [💚 Become a sponsor!](https://github.com/sponsors/Akryum)

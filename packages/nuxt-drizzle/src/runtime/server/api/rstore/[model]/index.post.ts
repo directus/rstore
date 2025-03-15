@@ -5,7 +5,7 @@ export default defineEventHandler(async (event) => {
   const { table } = getDrizzleTableFromModel(modelName)
   const body = await readBody(event)
 
-  const q = useDrizzle().insert(table as any).values(body)
+  const q = rstoreUseDrizzle().insert(table as any).values(body)
 
   const dialect = getDrizzleDialect()
   if (dialect === 'pg' || dialect === 'sqlite') {
@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
     // @ts-expect-error specific to mysql
     const result = await q.$returningId()
     const primaryKey = result[0]
-    const select = await useDrizzle().select().from(table as any).where(and(
+    const select = await rstoreUseDrizzle().select().from(table as any).where(and(
       ...Object.entries(primaryKey).map(([key, value]) => {
         return eq(table[key as keyof typeof table] as Table, value)
       }),

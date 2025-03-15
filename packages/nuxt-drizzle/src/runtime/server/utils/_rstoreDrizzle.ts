@@ -1,6 +1,7 @@
 import type { CustomModelMeta } from '@rstore/vue'
 import type { Column, Dialect, Table } from 'drizzle-orm'
-import type { RstoreDrizzleCondition } from '~~/modules/runtime/utils/types'
+import type { PgDatabase } from 'drizzle-orm/pg-core'
+import type { RstoreDrizzleCondition } from '../../utils/types'
 // @ts-expect-error virtual file
 import { dialect, modelMetas, tables } from '$rstore-drizzle-server-utils.js'
 import * as drizzle from 'drizzle-orm'
@@ -69,4 +70,11 @@ export function getDrizzleKeyWhere(key: string, primaryKeys: string[], table: Ta
       statusMessage: 'No key in route parameters',
     })
   }
+}
+
+// for the type, I picked PgDatabase but it can be any
+// afaik drizzle-orm doesn't have a generic type for the database
+export function rstoreUseDrizzle(): PgDatabase<any> {
+  // @ts-expect-error auto import
+  return useDrizzle()
 }

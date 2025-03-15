@@ -11,6 +11,7 @@ export default defineNuxtConfig({
 
   modules: [
     '@rstore/nuxt',
+    '@rstore/nuxt-drizzle',
     '@nuxt/ui',
     '@vueuse/nuxt',
     '@nuxthub/core',
