@@ -546,9 +546,9 @@ The model names are infered from the exported variable names in the drizzle sche
 You can use [nitro middlewares](https://nitro.build/guide/routing#middleware) to add authentication to the API, for example in a `server/middleware/auth.ts` file.
 :::
 
-### Filter
+### Filtering
 
-You can use the `params.where` option of any [query](./data/query.md) to filter the results using drizzle's operators such as `eq`, `gt`, `lt`, etc. (which are auto-imported).
+You can use the `params.where` option of any [query](./data/query.md) to filter the results using drizzle's operators such as `eq`, `gt`, `lt`, etc. (which are auto-imported). Since rstore is local-first, it will also compute the where clause on the client side.
 
 The supported operators are defined [here](https://github.com/Akryum/rstore/blob/main/packages/nuxt-drizzle/src/runtime/utils/types.ts#L5) ([drizzle docs](https://orm.drizzle.team/docs/operators)).
 
