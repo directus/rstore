@@ -2,7 +2,6 @@ import type { CustomModelMeta, Model, ModelRelation } from '@rstore/shared'
 import type { Config as DrizzleKitConfig } from 'drizzle-kit'
 import fs from 'node:fs'
 import { addImportsDir, addServerScanDir, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule, updateTemplates, useLogger } from '@nuxt/kit'
-import { addModelImport, addPluginImport } from '@rstore/nuxt/api'
 import { createTableRelationsHelpers, getTableName, is, isTable, Many, One, Relations, type Table, type TableConfig } from 'drizzle-orm'
 import { createJiti } from 'jiti'
 import path from 'pathe'
@@ -379,6 +378,8 @@ export default [
         })
       })
     }
+
+    const { addModelImport, addPluginImport } = await import('@rstore/nuxt/api')
 
     addModelImport(nuxt, '#build/$rstore-drizzle-models.js')
 
