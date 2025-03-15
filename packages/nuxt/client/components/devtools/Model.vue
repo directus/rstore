@@ -34,7 +34,7 @@ const filteredTypes = computed(() => {
         />
       </div>
 
-      <div class="flex-1 overlfow-auto min-h-0 flex flex-col p-1 gap-1">
+      <div class="flex-1 overflow-auto min-h-0 flex flex-col p-1 gap-1">
         <DevtoolsModelItem
           v-for="item in filteredTypes"
           :key="item.name"
