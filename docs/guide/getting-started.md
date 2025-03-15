@@ -449,3 +449,99 @@ Open the Nuxt devtools and check the `rstore` tab:
 ![Devtools screenshot of the models tab](./img/nuxt-devtools1.png)
 
 ![Devtools screenshot of the history tab](./img/nuxt-devtools2.png)
+
+## Nuxt + Drizzle
+
+In case you are using [Drizzle](https://orm.drizzle.team), you can install the `@rstore/nuxt-drizzle` module instead of `@rstore/nuxt` to automatically generate the models and plugins from your drizzle schema.
+
+```sh
+npm i @rstore/nuxt-drizzle
+```
+
+```ts [nuxt.config.ts]
+export default defineNuxtConfig({
+  modules: [
+    '@rstore/nuxt-drizzle',
+  ],
+})
+```
+
+::: warning Important Notice
+
+Make sure to export a function called `useDrizzle` that returns the drizzle instance in your server utils so it can be auto-imported in the generated API.
+
+Example:
+
+```ts
+// server/utils/drizzle.ts
+
+import { drizzle } from 'drizzle-orm/libsql'
+
+let drizzleInstance: ReturnType<typeof drizzle> | null = null
+
+export function useDrizzle() {
+  drizzleInstance ??= drizzle({
+    connection: { url: useRuntimeConfig().dbUrl },
+    casing: 'snake_case',
+  })
+  return drizzleInstance
+}
+```
+
+:::
+
+The module will automatically:
+- load the drizzle schema from the `drizzle.config.ts` file (configurable with the `rstoreDrizzle.drizzleConfigPath` option in the Nuxt config),
+- generate the models from the schema for each table with the relations,
+- generate a REST API under the `/api/rstore` path to handle the CRUD operations,
+- generate a plugin to handle the queries and mutations,
+- generate all the necessary types for the models and the API.
+
+Example drizzle schema:
+
+```ts
+import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
+
+export const todos = sqliteTable('todos', {
+  id: integer().primaryKey({ autoIncrement: true }),
+  title: text().notNull(),
+  completed: integer().notNull().$defaultFn(() => 0),
+  createdAt: integer({ mode: 'timestamp' }).notNull().$defaultFn(() => new Date()),
+  updatedAt: integer({ mode: 'timestamp' }),
+})
+```
+
+Example drizzle config:
+
+```ts
+import { defineConfig } from 'drizzle-kit'
+
+export default defineConfig({
+  dialect: 'sqlite',
+  schema: './server/database/schema.ts',
+  out: './server/database/migrations',
+  casing: 'snake_case',
+})
+```
+
+You can already use the store in your components without any additional configuration:
+
+```vue
+<script setup>
+const store = useStore()
+
+const { data: todos } = await store.todos.queryMany()
+</script>
+
+<template>
+  <pre>{{ todos }}</pre>
+</template>
+```
+
+::: tip Model Names
+The model names are infered from the exported variable names in the drizzle schema, **not** the table names.
+:::
+
+::: tip
+You can use [nitro middlewares](https://nitro.build/guide/routing#middleware) to add authentication to the API, for example in a `server/middleware/auth.ts` file.
+:::
