@@ -545,3 +545,43 @@ The model names are infered from the exported variable names in the drizzle sche
 ::: tip
 You can use [nitro middlewares](https://nitro.build/guide/routing#middleware) to add authentication to the API, for example in a `server/middleware/auth.ts` file.
 :::
+
+### Filter
+
+You can use the `params.where` option of any [query](./data/query.md) to filter the results using drizzle's operators such as `eq`, `gt`, `lt`, etc. (which are auto-imported).
+
+The supported operators are defined [here](https://github.com/Akryum/rstore/blob/main/packages/nuxt-drizzle/src/runtime/utils/types.ts#L5) ([drizzle docs](https://orm.drizzle.team/docs/operators)).
+
+```vue
+<script lang="ts" setup>
+const store = useStore()
+
+const email = ref('')
+
+const { data: users } = await store.users.queryMany(() => ({
+  params: {
+    where: email.value ? eq('email', email.value) : undefined,
+  },
+}))
+</script>
+```
+
+::: info
+Please note that only simple filters are supported - you can't do joins or subqueries inside `where`.
+:::
+
+### Relations
+
+You can use the `include` option to include related models in the query. [Learn more here](./model/relations.md).
+
+```vue
+<script lang="ts" setup>
+const store = useStore()
+
+const { data: users } = await store.users.queryMany(() => ({
+  include: {
+    posts: true,
+  },
+}))
+</script>
+```
