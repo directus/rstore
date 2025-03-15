@@ -93,6 +93,27 @@ const cacheCount = computed(() => Object.keys((cache.value as any)[props.item.na
       </div>
     </div>
 
+    <div v-if="item.computed && Object.keys(item.computed).length" class="text-xs font-mono border border-default rounded p-2 flex flex-col gap-1">
+      <div class="opacity-75 flex items-center gap-1">
+        <UIcon name="lucide:square-function" />
+        Computed fields
+      </div>
+      <div
+        v-for="(computed, key) in item.computed"
+        :key="key"
+        class="flex gap-1 items-start"
+      >
+        <div class="bg-blue-500/25 rounded px-0.5">
+          {{ key }}
+        </div>
+        <CodeSnippet
+          :code="computed.toString()"
+          lang="js"
+          class="text-xs max-h-90 overflow-auto"
+        />
+      </div>
+    </div>
+
     <div v-if="item.meta" class="text-xs font-mono border border-default rounded p-2 flex flex-col gap-1">
       <div class="opacity-75 flex items-center gap-1">
         <UIcon name="lucide:tag" />
