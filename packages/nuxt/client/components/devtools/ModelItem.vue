@@ -92,5 +92,16 @@ const cacheCount = computed(() => Object.keys((cache.value as any)[props.item.na
         </div>
       </div>
     </div>
+
+    <div v-if="item.meta" class="text-xs font-mono border border-default rounded p-2 flex flex-col gap-1">
+      <div class="opacity-75 flex items-center gap-1">
+        <UIcon name="lucide:tag" />
+        Metadata
+      </div>
+      <CodeSnippet
+        :code="item.meta"
+        class="text-xs max-h-90 overflow-auto"
+      />
+    </div>
   </div>
 </template>
