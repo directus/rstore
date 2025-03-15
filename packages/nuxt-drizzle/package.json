@@ -9,6 +9,9 @@
     "type": "git",
     "directory": "packages/nuxt-drizzle"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "exports": {
     ".": {
       "types": "./dist/types.d.ts",

@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.5.3
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.5.2...v0.5.3)
+
+### 🚀 Enhancements
+
+- New @rstore/nuxt-drizzle package ([e8fa3cd](https://github.com/Akryum/rstore/commit/e8fa3cd))
+- **devtools:** Model meta ([18624cd](https://github.com/Akryum/rstore/commit/18624cd))
+- **devtools:** Computed fields ([ea95c2d](https://github.com/Akryum/rstore/commit/ea95c2d))
+
+### 🩹 Fixes
+
+- **devtools:** Model search scrolling with list ([bb08cef](https://github.com/Akryum/rstore/commit/bb08cef))
+
+### 📖 Documentation
+
+- Update devtools screenshot ([399c55b](https://github.com/Akryum/rstore/commit/399c55b))
+- Nuxt-drizzle ([ec3c95d](https://github.com/Akryum/rstore/commit/ec3c95d))
+- Update readme ([b659089](https://github.com/Akryum/rstore/commit/b659089))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.5.2
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.5.1...v0.5.2)
