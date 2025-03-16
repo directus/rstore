@@ -365,9 +365,7 @@ The rstore module will only scan exported defaults in files in the `rstore` fold
 ::: code-group
 
 ```ts [app/rstore/plugins/my-plugin.ts]
-import { definePlugin } from '@rstore/vue'
-
-export default definePlugin({
+export default defineRstorePlugin({
   name: 'my-rstore-plugin',
 
   setup({ hook }) {
@@ -385,7 +383,7 @@ By default, rstore doesn't make any assumption about the way you fetch data in y
 Example for a simple REST API:
 
 ```js [src/rstore/plugin.ts]
-export default definePlugin({
+export default defineRstorePlugin({
   name: 'my-rstore-plugin',
 
   setup({ hook }) {
