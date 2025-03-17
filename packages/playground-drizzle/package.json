@@ -8,7 +8,7 @@
     "dev": "nuxt dev",
     "generate": "nuxt generate",
     "preview": "nuxt preview",
-    "postinstall": "nuxt prepare",
+    "dev:prepare": "nuxt prepare",
     "db:push": "drizzle-kit push"
   },
   "dependencies": {
