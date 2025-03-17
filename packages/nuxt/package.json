@@ -48,12 +48,17 @@
     "sirv": "^3.0.1"
   },
   "devDependencies": {
+    "@iconify-json/lucide": "^1.2.28",
     "@nuxt/devtools": "^2.0.0",
     "@nuxt/module-builder": "^0.8.4",
     "@nuxt/schema": "^3.15.4",
     "@nuxt/test-utils": "^3.15.4",
+    "@nuxt/ui": "^3.0.0",
     "@types/node": "latest",
+    "@vueuse/core": "^12.7.0",
+    "@vueuse/nuxt": "^12.7.0",
     "nuxt": "^3.15.4",
+    "shiki": "^3.1.0",
     "typescript": "~5.7.3",
     "vitest": "catalog:",
     "vue-tsc": "^2.2.0"

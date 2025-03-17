@@ -45,13 +45,7 @@
       "simple-git-hooks",
       "vue-demi",
       "workerd"
-    ],
-    "overrides": {
-      "@tailwindcss/node": "4.0.7",
-      "@tailwindcss/postcss": "4.0.7",
-      "@tailwindcss/vite": "4.0.7",
-      "tailwindcss": "4.0.7"
-    }
+    ]
   },
   "simple-git-hooks": {
     "pre-commit": "pnpm lint-staged && pnpm run test && pnpm run test:types",

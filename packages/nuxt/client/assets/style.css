@@ -1,10 +1,9 @@
-@import "tailwindcss";
+@import "tailwindcss" theme(static);
 @import "@nuxt/ui";
 
 @utility border-default {
   @apply border-neutral-100 dark:border-neutral-800;
 }
-
 
 body {
   /* Use the nuxt devtools background colors */
