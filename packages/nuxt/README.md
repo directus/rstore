@@ -21,14 +21,6 @@
   </a>
 </p>
 
-<p align="center">
-  <span>Backed by</span>
-  <br>
-  <a href="https://directus.io">
-    <img src="https://github.com/Akryum/rstore/blob/main/img/directus-logo-stacked.png?raw=true" alt="Directus" width="100px" height="100px">
-  </a>
-</p>
-
 rstore is a data store allowing you to handle all data in your application.
 
 Define a data model and then run queries or execute mutations (create, update and delete) on your data.
@@ -46,8 +38,10 @@ Define a data model and then run queries or execute mutations (create, update an
 
 ![Devtools screenshot](./docs/guide/img/nuxt-devtools2.png)
 
-# Sponsors
-
-[💚 Become a sponsor!](https://github.com/sponsors/Akryum)
-
-![sponsors](https://akryum.netlify.app/sponsors.svg)
+<p align="center">
+  <span>Backed by</span>
+  <br>
+  <a href="https://directus.io">
+    <img src="https://github.com/Akryum/rstore/blob/main/img/directus-logo-stacked.png?raw=true" alt="Directus" width="100px" height="100px">
+  </a>
+</p>
