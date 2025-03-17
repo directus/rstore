@@ -225,7 +225,7 @@ export function useStore () {
 import type { VueStore } from '@rstore/vue'
 import type { InjectionKey } from 'vue'
 
-const injectStoreKey = Symbol('rstore') as InjectionKey<VueStore<typeof model>>
+const injectStoreKey = Symbol('rstore') as InjectionKey<VueStore<typeof models>>
 
 export async function rstore(app: App) {
   const store = await createStore({
