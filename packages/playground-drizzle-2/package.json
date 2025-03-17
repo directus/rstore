@@ -1,0 +1,46 @@
+{
+  "name": "rstore-playground-drizzle-2",
+  "type": "module",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "nuxi dev",
+    "dev:build": "nuxi build",
+    "dev:prepare": "nuxi prepare",
+    "db:generate": "drizzle-kit generate",
+    "db:studio": "drizzle-kit studio --config drizzle.studio.config.ts"
+  },
+  "dependencies": {
+    "@lucia-auth/adapter-sqlite": "^3.0.2",
+    "@nuxthub/core": "^0.8.18",
+    "@rstore/nuxt": "workspace:^",
+    "@rstore/nuxt-drizzle": "workspace:^",
+    "arctic": "^3.5.0",
+    "drizzle-orm": "^0.40.0",
+    "lucia": "^3.2.2",
+    "shiki": "^3.1.0"
+  },
+  "devDependencies": {
+    "@faker-js/faker": "^9.4.0",
+    "@libsql/client": "^0.14.0",
+    "@nuxt/devtools": "^2.0.0",
+    "@nuxt/devtools-kit": "^2.2.1",
+    "@nuxt/eslint-config": "^1.0.1",
+    "@nuxt/module-builder": "^0.8.4",
+    "@nuxt/schema": "^3.15.4",
+    "@nuxt/test-utils": "^3.15.4",
+    "@nuxt/ui": "^3.0.0-beta.2",
+    "@types/node": "latest",
+    "@vueuse/core": "^12.7.0",
+    "@vueuse/nuxt": "^12.7.0",
+    "changelogen": "^0.5.7",
+    "drizzle-kit": "^0.30.5",
+    "eslint": "^9.20.0",
+    "nuxt": "^3.15.4",
+    "typescript": "~5.7.3",
+    "vitest": "catalog:",
+    "vue-tsc": "^2.2.0",
+    "wrangler": "^3.114.1",
+    "zod": "^3.24.2"
+  }
+}
