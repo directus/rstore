@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.5.5
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.5.4...v0.5.5)
+
+### 🩹 Fixes
+
+- Type imports ([1915d5c](https://github.com/Akryum/rstore/commit/1915d5c))
+- **drizzle:** AddServerScanDir not working ([744558a](https://github.com/Akryum/rstore/commit/744558a))
+
+### 📖 Documentation
+
+- Nuxt drizzle filter and relation ([d62a705](https://github.com/Akryum/rstore/commit/d62a705))
+- Nuxt drizzle more docs ([5d18348](https://github.com/Akryum/rstore/commit/5d18348))
+- Utilize the `defineRstorePlugin` function in the nuxt example section ([#18](https://github.com/Akryum/rstore/pull/18))
+
+### 🏡 Chore
+
+- Simpler drizzle playground ([cfe578a](https://github.com/Akryum/rstore/commit/cfe578a))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+- Phojie Rengel ([@phojie](http://github.com/phojie))
+
 ## v0.5.4
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.5.3...v0.5.4)
