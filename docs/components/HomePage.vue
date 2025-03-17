@@ -183,17 +183,6 @@ const heroHover = ref(false)
     ]"
     class="VPHomeFeatures"
   />
-
-  <div class="text-center flex flex-col m-12 gap-2 items-center">
-    <VPButton
-      href="https://github.com/sponsors/Akryum"
-      target="_blank"
-      theme="sponsor"
-      text="❤️ Become a sponsor!"
-    />
-
-    <img src="https://akryum.netlify.app/sponsors.svg" alt="Sponsors list" class="w-300">
-  </div>
 </template>
 
 <style scoped>
