@@ -450,6 +450,8 @@ Open the Nuxt devtools and check the `rstore` tab:
 
 ## Nuxt + Drizzle
 
+[Online Demo](https://codesandbox.io/p/devbox/wonderful-sun-s4cgl6)
+
 In case you are using [Drizzle](https://orm.drizzle.team), you can install the `@rstore/nuxt-drizzle` module instead of `@rstore/nuxt` to automatically generate the models and plugins from your drizzle schema.
 
 ```sh
