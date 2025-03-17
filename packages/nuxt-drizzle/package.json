@@ -41,6 +41,7 @@
     "@rstore/nuxt": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
+    "h3": "^1.15.1",
     "jiti": "^2.4.2",
     "pathe": "^2.0.3"
   },

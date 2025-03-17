@@ -466,7 +466,7 @@ export default defineNuxtConfig({
 
 ::: warning Important Notice
 
-Make sure to export a function called `useDrizzle` that returns the drizzle instance in your server utils so it can be auto-imported in the generated API.
+By default the module will attempt to import `useDrizzle` from `~~/server/utils/drizzle` that should return a drizzle instance.
 
 Example:
 
@@ -484,6 +484,21 @@ export function useDrizzle() {
   })
   return drizzleInstance
 }
+```
+
+You can customize this in the `rstoreDrizzle.drizzleImport` option in the Nuxt config.
+
+```ts
+export default defineNuxtConfig({
+  modules: [
+    '@rstore/nuxt-drizzle',
+  ],
+  rstoreDrizzle: {
+    drizzleImport: {
+      default: { name: 'useDb', from: '~~/server/useDb' },
+    },
+  },
+})
 ```
 
 :::

@@ -1,7 +1,7 @@
 import type { CustomModelMeta, Model, ModelRelation } from '@rstore/shared'
 import type { Config as DrizzleKitConfig } from 'drizzle-kit'
 import fs from 'node:fs'
-import { addImportsDir, addServerScanDir, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule, updateTemplates, useLogger } from '@nuxt/kit'
+import { addImportsDir, addServerHandler, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule, updateTemplates, useLogger } from '@nuxt/kit'
 import { createTableRelationsHelpers, getTableName, is, isTable, Many, One, Relations, type Table, type TableConfig } from 'drizzle-orm'
 import { createJiti } from 'jiti'
 import path from 'pathe'
@@ -15,16 +15,19 @@ declare module '@rstore/shared' {
 }
 
 export interface ModuleOptions {
+  /**
+   * Path to the drizzle config file
+   */
   drizzleConfigPath?: string
 
-  // @TODO make this work
-  // It looks like `addServerTemplate` isn't processed by nitro's autoimport correctly
-  // /**
-  //  * Import name for the function that returns the drizzle instance
-  //  *
-  //  * @default 'useDrizzle'
-  //  */
-  // drizzleImport?: string
+  /**
+   * Import name for the function that returns the drizzle instance
+   *
+   * @default { default: { name: 'useDrizzle', from '~~/server/utils/drizzle' } }
+   */
+  drizzleImport?: {
+    default: { name: string, from: string }
+  }
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -42,7 +45,31 @@ export default defineNuxtModule<ModuleOptions>({
     }
 
     // Add files to nuxt app
-    addServerScanDir(resolve('./runtime/server'))
+    addServerHandler({
+      handler: resolve('./runtime/server/api/index.get'),
+      route: '/api/rstore/:model',
+      method: 'get',
+    })
+    addServerHandler({
+      handler: resolve('./runtime/server/api/index.post'),
+      route: '/api/rstore/:model',
+      method: 'post',
+    })
+    addServerHandler({
+      handler: resolve('./runtime/server/api/[key]/index.get'),
+      route: '/api/rstore/:model/:key',
+      method: 'get',
+    })
+    addServerHandler({
+      handler: resolve('./runtime/server/api/[key]/index.patch'),
+      route: '/api/rstore/:model/:key',
+      method: 'patch',
+    })
+    addServerHandler({
+      handler: resolve('./runtime/server/api/[key]/index.delete'),
+      route: '/api/rstore/:model/:key',
+      method: 'delete',
+    })
     addImportsDir(resolve('./runtime/utils'))
 
     const jiti = createJiti(import.meta.url, {
@@ -318,10 +345,14 @@ export default defineNuxtModule<ModuleOptions>({
         }
 
         return `import * as schema from '${drizzleSchemaPath}'
+import { ${options.drizzleImport?.default?.name ?? 'useDrizzle'} as _drizzleDefault } from '${options.drizzleImport?.default?.from ?? '~~/server/utils/drizzle'}'
 
 export const tables = schema
 export const modelMetas = ${JSON.stringify(modelMetas, null, 2)}
-export const dialect = '${drizzleConfig.dialect}'`
+export const dialect = '${drizzleConfig.dialect}'
+export const useDrizzles = {
+  default: _drizzleDefault,
+}`
       },
     })
 

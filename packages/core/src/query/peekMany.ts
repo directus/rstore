@@ -49,8 +49,6 @@ export function peekMany<
       marker: force ? undefined : getMarker('many', marker),
     })
 
-    // console.log('peekMany', model, findOptions, result, getMarker('many', marker))
-
     if (typeof findOptions?.filter === 'function') {
       const filterFn = findOptions.filter
       result = result.filter(item => filterFn(item))
