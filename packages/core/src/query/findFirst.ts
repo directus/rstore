@@ -1,5 +1,4 @@
-import type { FindFirstOptions, Model, ModelDefaults, ModelList, QueryResult, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
-import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
+import type { CustomHookMeta, FindFirstOptions, Model, ModelDefaults, ModelList, QueryResult, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekFirst } from './peekFirst'

@@ -1,5 +1,4 @@
-import type { FindManyOptions, Model, ModelDefaults, ModelList, QueryResult, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
-import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
+import type { CustomHookMeta, FindManyOptions, Model, ModelDefaults, ModelList, QueryResult, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 

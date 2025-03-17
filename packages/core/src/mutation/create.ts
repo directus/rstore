@@ -1,5 +1,5 @@
-import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
-import { type Model, type ModelDefaults, type ModelList, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, set, type StoreCore } from '@rstore/shared'
+import type { CustomHookMeta, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, StoreCore } from '@rstore/shared'
+import { pickNonSpecialProps, set } from '@rstore/shared'
 
 export interface CreateOptions<
   TModel extends Model,

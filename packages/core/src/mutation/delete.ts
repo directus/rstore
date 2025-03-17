@@ -1,5 +1,4 @@
-import type { Model, ModelDefaults, ModelList, ResolvedModel, StoreCore } from '@rstore/shared'
-import type { CustomHookMeta } from '@rstore/shared/src/types/hooks'
+import type { CustomHookMeta, Model, ModelDefaults, ModelList, ResolvedModel, StoreCore } from '@rstore/shared'
 
 export interface DeleteOptions<
   TModel extends Model,
