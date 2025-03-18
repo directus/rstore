@@ -21,4 +21,8 @@ export type {
   CustomModelMeta,
   CustomParams,
   CustomSortOption,
+  FindOptions,
+  Model,
+  ModelDefaults,
+  ModelList,
 } from '@rstore/shared'

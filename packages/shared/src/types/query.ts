@@ -20,6 +20,12 @@ export interface CustomSortOption<
   TModelList extends ModelList,
 > {}
 
+export interface FindOptions<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+> extends FindOptionsBase<TModel, TModelDefaults, TModelList> {}
+
 /**
  * Fetch policy for the query.
  *
@@ -36,7 +42,7 @@ export interface CustomSortOption<
  */
 export type FetchPolicy = 'cache-first' | 'cache-and-fetch' | 'fetch-only' | 'cache-only' | 'no-cache'
 
-export interface FindOptions<
+export interface FindOptionsBase<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
@@ -76,24 +82,22 @@ export interface FindOptions<
   fetchPolicy?: FetchPolicy
 }
 
-export interface FindFirstOptions<
+export type FindFirstOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> extends FindOptions<TModel, TModelDefaults, TModelList> {
+> = FindOptions<TModel, TModelDefaults, TModelList> & {
   /**
    * Key of the item. Usually used for fetching the item by its key (e.g. ID).
    */
   key?: string | number
 }
 
-export interface FindManyOptions<
+export type FindManyOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> extends FindOptions<TModel, TModelDefaults, TModelList> {
-  // nothing here yet
-}
+> = FindOptions<TModel, TModelDefaults, TModelList>
 
 export interface QueryResult<TResult> {
   result: TResult
