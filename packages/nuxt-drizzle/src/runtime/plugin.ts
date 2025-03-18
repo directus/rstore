@@ -64,40 +64,42 @@ export default definePlugin({
     })
 
     hook('fetchRelations', async (payload) => {
-      const store = payload.store as VueStore
-      const payloadResult = payload.getResult()
-      const items: any[] = Array.isArray(payloadResult) ? payloadResult : [payloadResult]
-      await Promise.all(items.map(async (item) => {
-        const key = payload.model.getKey(item)
-        if (key) {
-          // Get the full wrapped item with computed props etc.
-          const wrappedItem = store.$cache.readItem({
-            model: payload.model,
-            key,
-          })
-          if (!wrappedItem) {
-            return
-          }
-
-          for (const relationKey in payload.findOptions.include) {
-            if (!payload.findOptions.include[relationKey]) {
-              continue
+      if (payload.model.meta?.scopeId === scopeId) {
+        const store = payload.store as VueStore
+        const payloadResult = payload.getResult()
+        const items: any[] = Array.isArray(payloadResult) ? payloadResult : [payloadResult]
+        await Promise.all(items.map(async (item) => {
+          const key = payload.model.getKey(item)
+          if (key) {
+            // Get the full wrapped item with computed props etc.
+            const wrappedItem = store.$cache.readItem({
+              model: payload.model,
+              key,
+            })
+            if (!wrappedItem) {
+              return
             }
 
-            const relation = payload.model.relations[relationKey]
-            if (!relation) {
-              throw new Error(`Relation "${relationKey}" does not exist on model "${payload.model.name}"`)
-            }
+            for (const relationKey in payload.findOptions.include) {
+              if (!payload.findOptions.include[relationKey]) {
+                continue
+              }
 
-            await Promise.all(Object.keys(relation.to).map((modelName) => {
-              const relationData = relation.to[modelName]!
-              return store.$model(modelName).findMany({
-                where: eq(relationData.on, wrappedItem[relationData.eq]),
-              })
-            }))
+              const relation = payload.model.relations[relationKey]
+              if (!relation) {
+                throw new Error(`Relation "${relationKey}" does not exist on model "${payload.model.name}"`)
+              }
+
+              await Promise.all(Object.keys(relation.to).map((modelName) => {
+                const relationData = relation.to[modelName]!
+                return store.$model(modelName).findMany({
+                  where: eq(relationData.on, wrappedItem[relationData.eq]),
+                })
+              }))
+            }
           }
-        }
-      }))
+        }))
+      }
     })
 
     /* Cache */
