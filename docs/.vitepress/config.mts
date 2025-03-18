@@ -12,6 +12,12 @@ export default defineConfig({
 
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
+      {
+        text: 'Plugins',
+        items: [
+          { text: 'Nuxt + Drizzle', link: '/plugins/nuxt-drizzle' },
+        ],
+      },
       // { text: 'Demo', link: 'https://rstore-playground.pages.dev/' },
       { text: 'Changelog', link: 'https://github.com/Akryum/rstore/blob/main/CHANGELOG.md' },
     ],
@@ -49,6 +55,14 @@ export default defineConfig({
           items: [
             { text: 'Setup', link: '/guide/plugin/setup' },
             { text: 'Hooks', link: '/guide/plugin/hooks' },
+          ],
+        },
+      ],
+      '/plugins/': [
+        {
+          text: 'Plugins',
+          items: [
+            { text: 'Nuxt + Drizzle', link: '/plugins/nuxt-drizzle' },
           ],
         },
       ],

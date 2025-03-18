@@ -1,4 +1,5 @@
 import { definePlugin, type VueStore } from '@rstore/vue'
+import { eq } from './utils/where'
 import { filterWhere } from './where'
 
 const scopeId = 'rstore-drizzle'
@@ -39,6 +40,7 @@ export default definePlugin({
         else {
           const result: any = await $fetch(`/api/rstore/${payload.model.name}`, {
             query: {
+              where: payload.findOptions?.where,
               ...payload.findOptions?.params,
               limit: 1,
             },
@@ -50,9 +52,11 @@ export default definePlugin({
 
     hook('fetchMany', async (payload) => {
       if (payload.model.meta?.scopeId === scopeId) {
-        // @ts-expect-error excessive stacks
         payload.setResult(await $fetch(`/api/rstore/${payload.model.name}`, {
-          query: payload.findOptions?.params,
+          query: {
+            where: payload.findOptions?.where,
+            ...payload.findOptions?.params,
+          },
         }))
       }
     })
@@ -86,9 +90,7 @@ export default definePlugin({
             await Promise.all(Object.keys(relation.to).map((modelName) => {
               const relationData = relation.to[modelName]!
               return store.$model(modelName).findMany({
-                params: {
-                  where: eq(relationData.on, wrappedItem[relationData.eq]),
-                },
+                where: eq(relationData.on, wrappedItem[relationData.eq]),
               })
             }))
           }
@@ -100,7 +102,7 @@ export default definePlugin({
 
     hook('cacheFilterFirst', (payload) => {
       if (payload.model.meta?.scopeId === scopeId) {
-        const where = payload.findOptions?.params?.where
+        const where = payload.findOptions?.where ?? payload.findOptions?.params?.where
         if (where) {
           const items = payload.readItemsFromCache()
           payload.setResult(items.find(item => filterWhere(item, where)))
@@ -110,7 +112,7 @@ export default definePlugin({
 
     hook('cacheFilterMany', (payload) => {
       if (payload.model.meta?.scopeId === scopeId) {
-        const where = payload.findOptions?.params?.where
+        const where = payload.findOptions?.where ?? payload.findOptions?.params?.where
         if (where) {
           const items = payload.getResult()
           payload.setResult(items.filter(item => filterWhere(item, where)))
@@ -122,7 +124,7 @@ export default definePlugin({
 
     hook('createItem', async (payload) => {
       if (payload.model.meta?.scopeId === scopeId) {
-        const result = await $fetch(`/api/rstore/${payload.model.name}`, {
+        const result: any = await $fetch(`/api/rstore/${payload.model.name}`, {
           method: 'POST',
           body: payload.item,
         })
@@ -132,7 +134,7 @@ export default definePlugin({
 
     hook('updateItem', async (payload) => {
       if (payload.model.meta?.scopeId === scopeId) {
-        const result = await $fetch(`/api/rstore/${payload.model.name}/${payload.key}`, {
+        const result: any = await $fetch(`/api/rstore/${payload.model.name}/${payload.key}`, {
           method: 'PATCH',
           body: {
             ...payload.item,

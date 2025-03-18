@@ -1,7 +1,14 @@
 <script lang="ts" setup>
+useHead({
+  title: 'Rstore Nuxt Drizzle Playground',
+})
+
 const store = useStore()
 
-const { data: todos } = await store.todos.queryMany()
+const filter = ref<'all' | 'unfinished' | 'finished'>('all')
+const { data: todos } = await store.todos.queryMany(() => ({
+  where: filter.value === 'all' ? undefined : eq('completed', Number(filter.value === 'finished')),
+}))
 
 const createTodo = store.todos.createForm()
 const createInput = useTemplateRef('input')
@@ -13,34 +20,59 @@ createTodo.$onSaved(() => {
 
 <template>
   <div class="m-4 p-4 border border-default rounded-xl flex flex-col gap-px">
-    <UForm
-      :state="createTodo"
-      :schema="createTodo.$schema"
-      class="mb-4"
-      @submit="createTodo.$save()"
-    >
-      <UButtonGroup
-        class="w-full"
+    <div class="flex items-center gap-4 mb-4">
+      <UForm
+        :state="createTodo"
+        :schema="createTodo.$schema"
+        class="flex-1 min-w-0"
+        @submit="createTodo.$save()"
       >
-        <UInput
-          ref="input"
-          v-model="createTodo.title"
-          placeholder="What needs to be done?"
-          autofocus
-          size="xl"
+        <UButtonGroup
           class="w-full"
-          @keydown.enter.prevent="createTodo.$save()"
-        />
+        >
+          <UInput
+            ref="input"
+            v-model="createTodo.title"
+            placeholder="What needs to be done?"
+            autofocus
+            size="xl"
+            class="w-full"
+            @keydown.enter.prevent="createTodo.$save()"
+          />
 
+          <UButton
+            type="submit"
+            icon="lucide:plus"
+            label="Add"
+            size="xl"
+            :loading="createTodo.$loading"
+          />
+        </UButtonGroup>
+      </UForm>
+
+      <UButtonGroup
+        size="xl"
+      >
         <UButton
-          type="submit"
-          icon="lucide:plus"
-          label="Add"
-          size="xl"
-          :loading="createTodo.$loading"
+          label="All"
+          color="neutral"
+          :variant="filter === 'all' ? 'subtle' : 'outline'"
+          @click="filter = 'all'"
+        />
+        <UButton
+          label="Unfinished"
+          color="neutral"
+          :variant="filter === 'unfinished' ? 'subtle' : 'outline'"
+          @click="filter = 'unfinished'"
+        />
+        <UButton
+          label="Finished"
+          color="neutral"
+          :variant="filter === 'finished' ? 'subtle' : 'outline'"
+          @click="filter = 'finished'"
         />
       </UButtonGroup>
-    </UForm>
+    </div>
 
     <TodoItem
       v-for="{ id } in todos"

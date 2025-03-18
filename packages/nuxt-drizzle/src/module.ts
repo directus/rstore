@@ -6,13 +6,7 @@ import { createTableRelationsHelpers, getTableName, is, isTable, Many, One, Rela
 import { createJiti } from 'jiti'
 import path from 'pathe'
 
-declare module '@rstore/shared' {
-  export interface CustomModelMeta {
-    scopeId?: string
-    table?: string
-    primaryKeys?: string[]
-  }
-}
+export type * from './runtime/types'
 
 export interface ModuleOptions {
   /**
@@ -23,9 +17,15 @@ export interface ModuleOptions {
   /**
    * Import name for the function that returns the drizzle instance
    *
-   * @default { default: { name: 'useDrizzle', from '~~/server/utils/drizzle' } }
+   * @default { name: 'useDrizzle', from '~~/server/utils/drizzle' }
    */
   drizzleImport?: {
+    name: string
+    from: string
+
+    /**
+     * @deprecated
+     */
     default: { name: string, from: string }
   }
 }
@@ -345,7 +345,7 @@ export default defineNuxtModule<ModuleOptions>({
         }
 
         return `import * as schema from '${drizzleSchemaPath}'
-import { ${options.drizzleImport?.default?.name ?? 'useDrizzle'} as _drizzleDefault } from '${options.drizzleImport?.default?.from ?? '~~/server/utils/drizzle'}'
+import { ${options.drizzleImport?.name ?? options.drizzleImport?.default?.name ?? 'useDrizzle'} as _drizzleDefault } from '${options.drizzleImport?.from ?? options.drizzleImport?.default?.from ?? '~~/server/utils/drizzle'}'
 
 export const tables = schema
 export const modelMetas = ${JSON.stringify(modelMetas, null, 2)}
@@ -409,6 +409,11 @@ export default [
         })
       })
     }
+
+    // Add global types
+    nuxt.hook('prepare:types', ({ references }) => {
+      references.push({ path: resolve('./runtime/types.ts') })
+    })
 
     const { addModelImport, addPluginImport } = await import('@rstore/nuxt/api')
 

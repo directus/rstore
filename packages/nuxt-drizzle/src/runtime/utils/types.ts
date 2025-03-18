@@ -1,7 +1,3 @@
-/* eslint-disable unused-imports/no-unused-vars */
-
-import type { Model, ModelDefaults, ModelList } from '@rstore/shared'
-
 export interface RestoreDrizzleConditionModifier {
   operator: 'not'
   condition: RstoreDrizzleCondition
@@ -36,24 +32,3 @@ export type RstoreDrizzleCondition = RestoreDrizzleConditionModifier |
   RstoreDrizzleTernaryOperator |
   RstoreDrizzleConditionGroup |
   undefined
-
-declare module '@rstore/vue' {
-  export interface CustomModelMeta {
-    scopeId?: string
-    table?: string
-    primaryKeys?: string[]
-  }
-
-  export interface CustomParams<
-    TModel extends Model,
-    TModelDefaults extends ModelDefaults,
-    TModelList extends ModelList,
-  > {
-    where?: RstoreDrizzleCondition
-  }
-
-  export interface CustomHookMeta {
-  }
-}
-
-export {}
