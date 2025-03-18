@@ -152,6 +152,21 @@ const { data: users } = await store.users.queryMany(() => ({
 
 ## Configuration
 
+### apiPath
+
+Customize the path to the API. By default it will be `/api/rstore`.
+
+```ts
+export default defineNuxtConfig({
+  modules: [
+    '@rstore/nuxt-drizzle',
+  ],
+  rstoreDrizzle: {
+    apiPath: '/api/my-api',
+  },
+})
+```
+
 ### drizzleConfigPath
 
 Customize the path to the drizzle config file. By default it will look for a `drizzle.config.ts` file in the root of your project.

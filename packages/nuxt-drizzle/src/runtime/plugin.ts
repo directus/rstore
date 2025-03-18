@@ -1,3 +1,5 @@
+// @ts-expect-error virtual module
+import { apiPath } from '#build/$rstore-drizzle-config.js'
 import { definePlugin, type VueStore } from '@rstore/vue'
 import { eq } from './utils/where'
 import { filterWhere } from './where'
@@ -29,7 +31,7 @@ export default definePlugin({
     hook('fetchFirst', async (payload) => {
       if (payload.model.meta?.scopeId === scopeId) {
         if (payload.key) {
-          const result = await $fetch(`/api/rstore/${payload.model.name}/${payload.key}`)
+          const result = await $fetch(`${apiPath}/${payload.model.name}/${payload.key}`)
           if (result) {
             payload.setResult(result)
           }
@@ -38,7 +40,7 @@ export default definePlugin({
           }
         }
         else {
-          const result: any = await $fetch(`/api/rstore/${payload.model.name}`, {
+          const result: any = await $fetch(`${apiPath}/${payload.model.name}`, {
             query: {
               where: payload.findOptions?.where,
               ...payload.findOptions?.params,
@@ -52,7 +54,7 @@ export default definePlugin({
 
     hook('fetchMany', async (payload) => {
       if (payload.model.meta?.scopeId === scopeId) {
-        payload.setResult(await $fetch(`/api/rstore/${payload.model.name}`, {
+        payload.setResult(await $fetch(`${apiPath}/${payload.model.name}`, {
           query: {
             where: payload.findOptions?.where,
             ...payload.findOptions?.params,
@@ -124,7 +126,7 @@ export default definePlugin({
 
     hook('createItem', async (payload) => {
       if (payload.model.meta?.scopeId === scopeId) {
-        const result: any = await $fetch(`/api/rstore/${payload.model.name}`, {
+        const result: any = await $fetch(`${apiPath}/${payload.model.name}`, {
           method: 'POST',
           body: payload.item,
         })
@@ -134,7 +136,7 @@ export default definePlugin({
 
     hook('updateItem', async (payload) => {
       if (payload.model.meta?.scopeId === scopeId) {
-        const result: any = await $fetch(`/api/rstore/${payload.model.name}/${payload.key}`, {
+        const result: any = await $fetch(`${apiPath}/${payload.model.name}/${payload.key}`, {
           method: 'PATCH',
           body: {
             ...payload.item,
@@ -147,7 +149,7 @@ export default definePlugin({
 
     hook('deleteItem', async (payload) => {
       if (payload.model.meta?.scopeId === scopeId) {
-        await $fetch(`/api/rstore/${payload.model.name}/${payload.key}`, {
+        await $fetch(`${apiPath}/${payload.model.name}/${payload.key}`, {
           method: 'DELETE',
         })
       }

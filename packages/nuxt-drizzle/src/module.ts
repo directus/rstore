@@ -28,6 +28,13 @@ export interface ModuleOptions {
      */
     default: { name: string, from: string }
   }
+
+  /**
+   * Generated REST API path
+   *
+   * @default '/api/rstore'
+   */
+  apiPath?: string
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -44,30 +51,32 @@ export default defineNuxtModule<ModuleOptions>({
       await installModule('@rstore/nuxt')
     }
 
+    const apiPath = options.apiPath ?? '/api/rstore'
+
     // Add files to nuxt app
     addServerHandler({
       handler: resolve('./runtime/server/api/index.get'),
-      route: '/api/rstore/:model',
+      route: `${apiPath}/:model`,
       method: 'get',
     })
     addServerHandler({
       handler: resolve('./runtime/server/api/index.post'),
-      route: '/api/rstore/:model',
+      route: `${apiPath}/:model`,
       method: 'post',
     })
     addServerHandler({
       handler: resolve('./runtime/server/api/[key]/index.get'),
-      route: '/api/rstore/:model/:key',
+      route: `${apiPath}/:model/:key`,
       method: 'get',
     })
     addServerHandler({
       handler: resolve('./runtime/server/api/[key]/index.patch'),
-      route: '/api/rstore/:model/:key',
+      route: `${apiPath}/:model/:key`,
       method: 'patch',
     })
     addServerHandler({
       handler: resolve('./runtime/server/api/[key]/index.delete'),
-      route: '/api/rstore/:model/:key',
+      route: `${apiPath}/:model/:key`,
       method: 'delete',
     })
     addImportsDir(resolve('./runtime/utils'))
@@ -413,6 +422,12 @@ export default [
     // Add global types
     nuxt.hook('prepare:types', ({ references }) => {
       references.push({ path: resolve('./runtime/types.ts') })
+    })
+
+    // Runtime config
+    addTemplate({
+      filename: '$rstore-drizzle-config.js',
+      getContents: () => `export const apiPath = ${JSON.stringify(apiPath)}\n`,
     })
 
     const { addModelImport, addPluginImport } = await import('@rstore/nuxt/api')
