@@ -37,7 +37,7 @@ export default defineNuxtConfig({
 })
 ```
 
-5. Now you can use the `useRstore` composable in your components to access the Directus collections:
+5. Now you can use the `useStore` composable in your components to access the Directus collections:
 
 ```vue
 <script lang="ts" setup>
