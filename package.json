@@ -48,7 +48,7 @@
     ]
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm lint-staged && pnpm run test && pnpm run test:types",
+    "pre-commit": "pnpm lint-staged && pnpm run test && pnpm run test:types && pnpm run build && pnpm run copy-readme",
     "commit-msg": "node scripts/verify-commit.js"
   },
   "lint-staged": {

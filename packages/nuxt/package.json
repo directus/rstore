@@ -40,7 +40,7 @@
     "prepare:all": "nuxi prepare playground && pnpm run dev:prepare && pnpm run client:prepare",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "postinstall": "nuxt-module-build prepare"
+    "postinstall": "pnpm run dev:prepare"
   },
   "dependencies": {
     "@nuxt/devtools-kit": "^2.2.1",

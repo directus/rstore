@@ -33,7 +33,7 @@
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:types:nope": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit",
-    "postinstall": "nuxt-module-build prepare"
+    "postinstall": "pnpm run dev:prepare"
   },
   "dependencies": {
     "@directus/sdk": "^19.0.1",

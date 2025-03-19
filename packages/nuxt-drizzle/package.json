@@ -33,7 +33,7 @@
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:types": "vue-tsc --noEmit",
-    "postinstall": "nuxt-module-build prepare"
+    "postinstall": "pnpm run dev:prepare"
   },
   "peerDependencies": {
     "drizzle-orm": "*"
