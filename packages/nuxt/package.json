@@ -33,14 +33,13 @@
     "dev": "pnpm run build",
     "dev:playground": "nuxi prepare playground && nuxi dev ../playground",
     "dev:build": "nuxi build ../playground",
-    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare ../playground",
+    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare playground && nuxi prepare ../playground",
     "client:build": "nuxi generate client",
     "client:dev": "nuxi dev client --port 3300",
     "client:prepare": "nuxi prepare client",
     "prepare:all": "nuxi prepare playground && pnpm run dev:prepare && pnpm run client:prepare",
     "test": "vitest run",
-    "test:watch": "vitest watch",
-    "postinstall": "pnpm run dev:prepare"
+    "test:watch": "vitest watch"
   },
   "dependencies": {
     "@nuxt/devtools-kit": "^2.2.1",

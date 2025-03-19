@@ -11,8 +11,8 @@
     "node": ">=23.0.0"
   },
   "scripts": {
-    "build": "pnpm run -r build",
-    "dev": "pnpm run -r  --filter \"@rstore/*\" dev",
+    "build": "pnpm run -r --filter \"@rstore/*\" build",
+    "dev": "pnpm run -r --filter \"@rstore/*\" dev",
     "lint": "eslint --cache .",
     "test": "vitest run",
     "test:dev": "vitest",
