@@ -22,6 +22,7 @@
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
+    "bb": "pnpm run build && pnpm run test:types",
     "postinstall": "simple-git-hooks"
   },
   "devDependencies": {
@@ -30,6 +31,7 @@
     "@tailwindcss/vite": "4.0.7",
     "eslint": "^9.17.0",
     "lint-staged": "^15.4.3",
+    "npm-run-all2": "^7.0.2",
     "simple-git-hooks": "^2.11.1",
     "tailwindcss": "4.0.7",
     "typescript": "^5.7.2",
@@ -48,7 +50,7 @@
     ]
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm lint-staged && pnpm run test && pnpm run test:types && pnpm run build && pnpm run copy-readme && pnpm run docs:build",
+    "pre-commit": "pnpm lint-staged && run-p test bb copy-readme docs:build",
     "commit-msg": "node scripts/verify-commit.js"
   },
   "lint-staged": {
