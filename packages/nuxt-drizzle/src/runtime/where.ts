@@ -1,3 +1,5 @@
+import type { RstoreDrizzleCondition } from './utils/types'
+
 export function filterWhere(
   item: any,
   condition: RstoreDrizzleCondition,

@@ -54,6 +54,7 @@ export default definePlugin({
 
     hook('fetchMany', async (payload) => {
       if (payload.model.meta?.scopeId === scopeId) {
+        // @ts-expect-error excessive stack depth
         payload.setResult(await $fetch(`${apiPath}/${payload.model.name}`, {
           query: {
             where: payload.findOptions?.where,

@@ -51,6 +51,11 @@ export default defineNuxtModule<ModuleOptions>({
       await installModule('@rstore/nuxt')
     }
 
+    // Add global types
+    nuxt.hook('prepare:types', ({ references }) => {
+      references.push({ path: resolve('./runtime/types.ts') })
+    })
+
     const apiPath = options.apiPath ?? '/api/rstore'
 
     // Add files to nuxt app
@@ -418,11 +423,6 @@ export default [
         })
       })
     }
-
-    // Add global types
-    nuxt.hook('prepare:types', ({ references }) => {
-      references.push({ path: resolve('./runtime/types.ts') })
-    })
 
     // Runtime config
     addTemplate({

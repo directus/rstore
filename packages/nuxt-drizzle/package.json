@@ -26,12 +26,14 @@
   ],
   "scripts": {
     "build": "nuxi prepare playground && nuxt-module-build build",
+    "dev": "pnpm run build",
     "dev:playground": "nuxi dev playground",
     "dev:build": "nuxi build playground",
     "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare playground",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "test:types": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit"
+    "test:types": "vue-tsc --noEmit",
+    "postinstall": "nuxt-module-build prepare"
   },
   "peerDependencies": {
     "drizzle-orm": "*"

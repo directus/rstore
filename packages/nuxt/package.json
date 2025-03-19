@@ -30,6 +30,7 @@
   ],
   "scripts": {
     "build": "nuxi prepare playground && nuxt-module-build build && npm run client:build",
+    "dev": "pnpm run build",
     "dev:playground": "nuxi prepare playground && nuxi dev ../playground",
     "dev:build": "nuxi build ../playground",
     "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare ../playground",
@@ -38,7 +39,8 @@
     "client:prepare": "nuxi prepare client",
     "prepare:all": "nuxi prepare playground && pnpm run dev:prepare && pnpm run client:prepare",
     "test": "vitest run",
-    "test:watch": "vitest watch"
+    "test:watch": "vitest watch",
+    "postinstall": "nuxt-module-build prepare"
   },
   "dependencies": {
     "@nuxt/devtools-kit": "^2.2.1",

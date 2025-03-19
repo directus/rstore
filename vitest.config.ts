@@ -5,7 +5,7 @@ export default defineConfig({
     exclude: [
       '**/node_modules/**',
       'packages/nuxt',
-      'packages/nuxt-drizzle',
+      'packages/nuxt-*',
     ],
   },
 })
