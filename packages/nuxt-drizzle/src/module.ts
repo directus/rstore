@@ -177,7 +177,10 @@ export default defineNuxtModule<ModuleOptions>({
           meta: {
             scopeId: 'rstore-drizzle',
             table: tableName,
-            primaryKeys: (config as any)?.primaryKeys?.length ? (config as any).primaryKeys : (config?.columns as any[] | undefined)?.filter(col => col.primary).map(col => col.keyAsName ? col.name : col.key),
+            primaryKeys: config?.primaryKeys?.length
+              ? config.primaryKeys
+              : config?.columns?.filter((col) => col.primary || col.name === "id")
+                .map((col) => col.keyAsName ? col.name : col.key ?? col.name),
           },
         }
         models.push(model)
