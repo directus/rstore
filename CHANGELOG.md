@@ -1,6 +1,46 @@
 # Changelog
 
 
+## v0.5.6
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.5.5...v0.5.6)
+
+### 🚀 Enhancements
+
+- Allow customizing FindOptions interface ([42a818d](https://github.com/Akryum/rstore/commit/42a818d))
+- **nuxt-drizzle:** Customize apiPath ([f78bc4c](https://github.com/Akryum/rstore/commit/f78bc4c))
+- New @rstore/nuxt-directus package ([6c9dd60](https://github.com/Akryum/rstore/commit/6c9dd60))
+
+### 🩹 Fixes
+
+- **devtools:** Tailwind config ([684adff](https://github.com/Akryum/rstore/commit/684adff))
+- **nuxt-drizzle:** Scope fetchRelations ([bf629c3](https://github.com/Akryum/rstore/commit/bf629c3))
+
+### 💅 Refactors
+
+- **nuxt-drizzle:** Moved `where` to find options and removed `moduleOptions.drizzleImport.default` ([39ebb86](https://github.com/Akryum/rstore/commit/39ebb86))
+
+### 📖 Documentation
+
+- Link to nuxt drizzle codesandbox ([3ca066b](https://github.com/Akryum/rstore/commit/3ca066b))
+- Remove sponsors section ([65841ca](https://github.com/Akryum/rstore/commit/65841ca))
+- Remove sponsors from homepage ([fba1f0f](https://github.com/Akryum/rstore/commit/fba1f0f))
+
+### 🏡 Chore
+
+- Fix typo ([#19](https://github.com/Akryum/rstore/pull/19))
+- Fix tailwind config ([4256e06](https://github.com/Akryum/rstore/commit/4256e06))
+- Skip playground prepare ([d65ad58](https://github.com/Akryum/rstore/commit/d65ad58))
+- Cleanup playgrounds ([43692b8](https://github.com/Akryum/rstore/commit/43692b8))
+- Typo ([dd5be8f](https://github.com/Akryum/rstore/commit/dd5be8f))
+- Nuxt module cleanup ([e9a878e](https://github.com/Akryum/rstore/commit/e9a878e))
+- Fix nuxt module build ([3e3572e](https://github.com/Akryum/rstore/commit/3e3572e))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+- Konv Suu <2583695112@qq.com>
+
 ## v0.5.5
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.5.4...v0.5.5)
