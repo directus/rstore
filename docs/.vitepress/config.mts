@@ -16,6 +16,7 @@ export default defineConfig({
         text: 'Plugins',
         items: [
           { text: 'Nuxt + Drizzle', link: '/plugins/nuxt-drizzle' },
+          { text: 'Nuxt + Directus', link: '/plugins/nuxt-directus' },
         ],
       },
       // { text: 'Demo', link: 'https://rstore-playground.pages.dev/' },
@@ -63,6 +64,7 @@ export default defineConfig({
           text: 'Plugins',
           items: [
             { text: 'Nuxt + Drizzle', link: '/plugins/nuxt-drizzle' },
+            { text: 'Nuxt + Directus', link: '/plugins/nuxt-directus' },
           ],
         },
       ],

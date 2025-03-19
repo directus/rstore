@@ -1,0 +1,31 @@
+{
+  "name": "rstore-drizzle-playground",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt dev",
+    "dev:build": "nuxt build",
+    "dev:prepare": "nuxt prepare"
+  },
+  "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "@rstore/nuxt-directus": "workspace:*",
+    "@vueuse/core": "^12.7.0",
+    "@vueuse/nuxt": "^12.7.0",
+    "drizzle-orm": "^0.40.0"
+  },
+  "devDependencies": {
+    "@iconify-json/lucide": "^1.2.22",
+    "@iconify-json/simple-icons": "^1.2.19",
+    "@nuxt/ui": "^3.0.0",
+    "drizzle-kit": "^0.30.5",
+    "nuxt": "^3.16.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "@parcel/watcher",
+      "esbuild",
+      "vue-demi"
+    ]
+  }
+}
