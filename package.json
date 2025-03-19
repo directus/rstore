@@ -32,6 +32,7 @@
     "eslint": "^9.17.0",
     "lint-staged": "^15.4.3",
     "npm-run-all2": "^7.0.2",
+    "pathe": "^2.0.3",
     "simple-git-hooks": "^2.11.1",
     "tailwindcss": "4.0.7",
     "typescript": "^5.7.2",
@@ -50,12 +51,7 @@
     ]
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm lint-staged && run-p test bb copy-readme docs:build",
+    "pre-commit": "pnpm lint-staged",
     "commit-msg": "node scripts/verify-commit.js"
-  },
-  "lint-staged": {
-    "*": [
-      "eslint --fix"
-    ]
   }
 }
