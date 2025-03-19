@@ -34,7 +34,7 @@ export default {
   'README.md': _stagedFiles => [
     'pnpm run copy-readme',
   ],
-  'package.json|pnpm-lock.yaml': _stagedFiles => [
+  'pnpm-lock.yaml': _stagedFiles => [
     'run-p docs:build bb test',
   ],
 }
