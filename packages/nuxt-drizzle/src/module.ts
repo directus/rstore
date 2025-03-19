@@ -116,7 +116,7 @@ export default defineNuxtModule<ModuleOptions>({
       }
     }
 
-    const getModelsFormDrizzleSchema = useDedupePromise(async () => {
+    const getModelsFromDrizzleSchema = useDedupePromise(async () => {
       const schema = { ...(await jiti.import(drizzleSchemaPath)) as any }
 
       const models: Model[] = []
@@ -347,7 +347,7 @@ export default defineNuxtModule<ModuleOptions>({
       filename: '$rstore-drizzle-server-utils.js',
       getContents: async () => {
         jiti.cache = {}
-        const models = await getModelsFormDrizzleSchema()
+        const models = await getModelsFromDrizzleSchema()
         const modelMetas: Record<string, CustomModelMeta | undefined> = {}
         for (const model of models) {
           modelMetas[model.name] = model.meta
@@ -368,7 +368,7 @@ export const useDrizzles = {
     addTemplate({
       filename: '$rstore-drizzle-models.js',
       getContents: async () => {
-        const models = await getModelsFormDrizzleSchema()
+        const models = await getModelsFromDrizzleSchema()
         return `export default [${
           models.map((model) => {
             let code = `{`
@@ -388,7 +388,7 @@ export const useDrizzles = {
     addTypeTemplate({
       filename: '$rstore-drizzle-models.d.ts',
       getContents: async () => {
-        const models = await getModelsFormDrizzleSchema()
+        const models = await getModelsFromDrizzleSchema()
         return `import { defineItemType } from '@rstore/vue'
 import * as schema from '${drizzleSchemaPath}'
 
