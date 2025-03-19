@@ -32,8 +32,7 @@
     "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare playground",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "test:types": "vue-tsc --noEmit",
-    "postinstall": "pnpm run dev:prepare"
+    "test:types": "vue-tsc --noEmit"
   },
   "peerDependencies": {
     "drizzle-orm": "*"
