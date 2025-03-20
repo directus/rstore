@@ -3,7 +3,7 @@
 The structure of your data is presented in rstore with Models:
 
 ```ts
-import type { ModelList } from '@rstore/vue'
+import type { ModelList } from '@rstore/shared'
 
 const models: ModelList = [
   { name: 'todos' },

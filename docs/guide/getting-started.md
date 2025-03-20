@@ -52,7 +52,7 @@ export const todoModel = defineDataModel({
 ```
 
 ```ts [src/rstore/model.ts]
-import type { ModelList } from '@rstore/vue'
+import type { ModelList } from '@rstore/shared'
 import { defineItemType } from '@rstore/vue'
 
 // Item type
