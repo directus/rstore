@@ -1,6 +1,34 @@
 # Changelog
 
 
+## v0.5.7
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.5.6...v0.5.7)
+
+- Republishing packages
+
+### 📖 Documentation
+
+- Fix dead links ([e87a44c](https://github.com/Akryum/rstore/commit/e87a44c))
+- Add directus in getting started ([ad426a7](https://github.com/Akryum/rstore/commit/ad426a7))
+- Fix typo ([9de9e53](https://github.com/Akryum/rstore/commit/9de9e53))
+- Fix other typo ([9968cf8](https://github.com/Akryum/rstore/commit/9968cf8))
+
+### 🏡 Chore
+
+- Build docs in commit hook ([2887bc5](https://github.com/Akryum/rstore/commit/2887bc5))
+- Run some scripts in commit in parallel ([ab276b1](https://github.com/Akryum/rstore/commit/ab276b1))
+- Improve lint-staged config ([ee2787b](https://github.com/Akryum/rstore/commit/ee2787b))
+- Only rerun everything on pnpm-lock ([bfc08e5](https://github.com/Akryum/rstore/commit/bfc08e5))
+
+### 🤖 CI
+
+- Fix pnpm install ([862055f](https://github.com/Akryum/rstore/commit/862055f))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.5.6
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.5.5...v0.5.6)
