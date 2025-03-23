@@ -508,3 +508,26 @@ const { data: todos } = await store.todos.queryMany()
 ```
 
 [Continue to the plugin documentation ➜](../plugins/nuxt-drizzle.md)
+
+## Nuxt + Directus
+
+You can use the `@rstore/nuxt-directus` module to automatically generate the models and plugins from your [Directus](https://directus.io) backend.
+
+```bash
+npm install @rstore/nuxt-directus
+```
+
+```ts
+export default defineNuxtConfig({
+  modules: [
+    '@rstore/nuxt-directus',
+  ],
+
+  rstoreDirectus: {
+    url: 'https://your-directus-instance.com', // The URL of your Directus instance
+    adminToken: import.meta.env.DIRECTUS_TOKEN, // The admin token you created in step 2
+  },
+})
+```
+
+[Continue to the plugin documentation ➜](../plugins/nuxt-directus.md)

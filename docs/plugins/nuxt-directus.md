@@ -37,7 +37,7 @@ export default defineNuxtConfig({
 })
 ```
 
-5. Now you can use the `useRstore` composable in your components to access the Directus collections:
+5. Now you can use the `useStore` composable in your components to access the Directus collections:
 
 ```vue
 <script lang="ts" setup>
@@ -62,7 +62,7 @@ In this example, we are accessing the collection named `Todos` in Directus, and 
 
 You can use the `filter` option in your queries to filter the data returned from Directus. The filter rules are the same as the ones used in Directus, so you can refer to the [Directus documentation](https://directus.io/docs/guides/connect/filter-rules) for more information.
 
-Some options are supported just yet:
+Some options are not supported just yet:
 
 - Relation filters
 - `$CURRENT_USER` and `$CURRENT_ROLE` dynamic variables
