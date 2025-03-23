@@ -179,8 +179,8 @@ export default defineNuxtModule<ModuleOptions>({
             table: tableName,
             primaryKeys: config?.primaryKeys?.length
               ? config.primaryKeys
-              : config?.columns?.filter((col) => col.primary || col.name === "id")
-                .map((col) => col.keyAsName ? col.name : col.key ?? col.name),
+              : config?.columns?.length ? config.columns.filter((col) => col.primary || col.name === "id")
+                .map((col) => col.keyAsName ? col.name : col.key ?? (col.name !== null && col.name !== undefined ? col.name : undefined)) : [],
           },
         }
         models.push(model)
