@@ -31,9 +31,9 @@ const store = await createStore({
 ```ts{2-5} [rstore.ts]
 const store = await createStore({
   models: [
-    defineItemType<Todo>().model({ name: 'todos' } as const),
-    defineItemType<User>().model({ name: 'users' } as const),
-  ] as const,
+    defineItemType<Todo>().model({ name: 'todos' }),
+    defineItemType<User>().model({ name: 'users' }),
+  ],
   plugins: [],
 })
 ```
@@ -74,22 +74,18 @@ interface TodoType {
 const todoModel = defineItemType<TodoType>().model({
   name: 'todos',
   // other properties...
-} as const)
+})
 
 const store = await createStore({
   models: [
     todoModel
-  ] as const,
+  ],
   plugins: [],
 })
 ```
 
 ::: info
 The [currying](https://en.wikipedia.org/wiki/Currying) is necessary to specify the type of the item while still letting TypeScript infer the type of the model. This is a limitation of TypeScript, and [it might improve in the future](https://github.com/microsoft/TypeScript/issues/26242).
-
----
-
-Use `as const` to ensure that the model is treated as a constant and not as a mutable object. This is important for TypeScript to infer the type correctly.
 :::
 
 ## Item Key

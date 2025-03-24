@@ -37,7 +37,7 @@ const userModel = defineItemType<User>().model({
       },
     },
   },
-} as const)
+})
 ```
 
 ### One-to-Many
@@ -65,7 +65,7 @@ const userModel = defineItemType<User>().model({
       many: true,
     },
   },
-} as const)
+})
 ```
 
 ### Example
@@ -100,7 +100,7 @@ const userModel = defineItemType<User>().model({
       many: true,
     },
   },
-} as const)
+})
 
 interface Message {
   id: string
@@ -129,7 +129,7 @@ const messageModel = defineItemType<Message>().model({
       },
     },
   },
-} as const)
+})
 ```
 
 ## Polymorphic Relations
@@ -176,7 +176,7 @@ const commentModel = defineItemType<Comment>().model({
       },
     },
   },
-} as const)
+})
 ```
 
 ::: info

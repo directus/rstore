@@ -17,7 +17,7 @@ export function defineItemType<
     model: <
       TComputed extends Record<string, any>,
       TSchemas extends ModelSchemas,
-      TModel extends Model<TItem, TComputed, TSchemas> = Model<TItem, TComputed, TSchemas>,
+      const TModel extends Model<TItem, TComputed, TSchemas> = Model<TItem, TComputed, TSchemas>,
     > (model: TModel): TModel & { '~item': TItem } => model as any,
   }
 }

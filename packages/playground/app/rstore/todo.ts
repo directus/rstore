@@ -8,4 +8,4 @@ export default defineItemType<Todo>().model({
   meta: {
     path: 'todos',
   },
-} as const)
+})

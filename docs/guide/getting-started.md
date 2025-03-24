@@ -67,17 +67,13 @@ export interface Todo {
 // Model
 const todoModel = defineItemType<Todo>().model({
   name: 'todos',
-} as const)
+})
 
 export const models = [
   todoModel,
-] as const satisfies ModelList
+] satisfies ModelList
 ```
 
-:::
-
-::: tip
-If you are using TypeScript, don't forget to add `as const` to enable type safety.
 :::
 
 3. Create a plugin to interact with an API:
@@ -311,7 +307,7 @@ export default defineNuxtConfig({
 // One Model
 export default defineItemType<Todo>().model({
   name: 'todos',
-} as const)
+})
 ```
 
 ```ts [app/rstore/multiple.ts]
@@ -319,11 +315,11 @@ export default defineItemType<Todo>().model({
 export default [
   defineItemType<User>().model({
     name: 'users',
-  } as const),
+  }),
 
   defineItemType<Bot>().model({
     name: 'bots',
-  } as const),
+  }),
 ]
 ```
 
@@ -350,10 +346,6 @@ export interface Bot {
 }
 ```
 
-:::
-
-::: tip
-If you are using TypeScript, don't forget to add `as const` to enable type safety.
 :::
 
 ::: warning FILE SCANNING

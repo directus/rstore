@@ -96,7 +96,7 @@ function ensureArray<T>(value: T): EnsureArray<T> {
 }
 export const constModels = [
   ${files.map((file, index) => `...ensureArray(M${index}),`).join('\n')}
-] as const satisfies ModelList`
+] satisfies ModelList`
       },
     })
 

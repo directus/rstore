@@ -405,7 +405,7 @@ export default [
     if (model.relations) {
       code += `relations: ${JSON.stringify(model.relations)},`
     }
-    code += `} as const),`
+    code += `}),`
     return code
   }).join('\n')}
 ]

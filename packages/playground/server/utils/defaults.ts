@@ -4,6 +4,7 @@ type DefaultValues = {
 
 export const defaultValues = {
   users: {},
+  bots: {},
   messages: {},
   todos: {
     completed: false,

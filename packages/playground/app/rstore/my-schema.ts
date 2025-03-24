@@ -30,7 +30,7 @@ export default [
     meta: {
       path: 'users',
     },
-  } as const),
+  }),
 
   defineItemType<Bot>().model({
     name: 'Bot',
@@ -57,7 +57,7 @@ export default [
     meta: {
       path: 'bots',
     },
-  } as const),
+  }),
 
   defineItemType<Message>().model({
     name: 'Message',
@@ -94,5 +94,5 @@ export default [
     meta: {
       path: 'messages',
     },
-  } as const),
+  }),
 ]

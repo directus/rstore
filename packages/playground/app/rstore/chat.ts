@@ -3,4 +3,4 @@ export default defineItemType<ChatMessage>().model({
   meta: {
     websocketTopic: 'chat-messages',
   },
-} as const)
+})

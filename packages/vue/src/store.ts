@@ -34,8 +34,8 @@ interface PrivateVueStore {
 }
 
 export async function createStore<
-  TModelList extends ModelList,
-  TModelDefaults extends ModelDefaults,
+  const TModelList extends ModelList,
+  const TModelDefaults extends ModelDefaults,
 >(options: CreateStoreOptions<TModelList, TModelDefaults>): Promise<VueStore<TModelList, TModelDefaults>> {
   let storeProxy = undefined as unknown as VueStore<TModelList, TModelDefaults>
 
