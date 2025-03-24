@@ -1,6 +1,7 @@
 import type { FindOptions, Model, ModelDefaults, ModelList, Plugin, StoreCore, WrappedItem } from '@rstore/shared'
 import { createStoreCore, resolveModel } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
+import { createEventHook } from '@vueuse/core'
 import { createModelApi, type VueModelApi } from './api'
 import { createCache } from './cache'
 
@@ -27,6 +28,7 @@ export type VueStore<
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > = StoreCore<TModelList, TModelDefaults> & VueStoreModelApiProxy<TModelList, TModelDefaults> & {
   $model: (modelName: string) => VueModelApi<any, TModelDefaults, TModelList, WrappedItem<any, TModelDefaults, TModelList>>
+  $onCacheReset: (callback: () => void) => () => void
 }
 
 interface PrivateVueStore {
@@ -67,6 +69,12 @@ export async function createStore<
 
       privateStore.$_modelNames = new Set(store.$models.map(m => m.name))
 
+      const cacheResetEvent = createEventHook()
+
+      store.$hooks.hook('afterCacheReset', async () => {
+        await cacheResetEvent.trigger()
+      })
+
       storeProxy = new Proxy(store, {
         get(_, key) {
           if (typeof key === 'string' && privateStore.$_modelNames.has(key)) {
@@ -75,6 +83,10 @@ export async function createStore<
 
           if (key === '$model') {
             return (modelName: string) => getApi(modelName)
+          }
+
+          if (key === '$onCacheReset') {
+            return cacheResetEvent.on
           }
 
           return Reflect.get(store, key)

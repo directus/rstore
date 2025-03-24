@@ -1,8 +1,9 @@
-import type { CreateFormObject, CreateFormObjectBase, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreCore, UpdateFormObject, WrappedItem } from '@rstore/shared'
+import type { CreateFormObject, CreateFormObjectBase, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, UpdateFormObject, WrappedItem } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueLiveQueryReturn } from './live'
 import type { VueQueryReturn } from './query'
+import type { VueStore } from './store'
 import { createItem, deleteItem, findFirst, findMany, peekFirst, peekMany, subscribe, unsubscribe, updateItem } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
@@ -169,7 +170,7 @@ export function createModelApi<
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
 >(
-  store: StoreCore<TModelList, TModelDefaults>,
+  store: VueStore<TModelList, TModelDefaults>,
   model: ResolvedModel<TModel, TModelDefaults, TModelList>,
 ): VueModelApi<TModel, TModelDefaults, TModelList, WrappedItem<TModel, TModelDefaults, TModelList>> {
   type Api = VueModelApi<TModel, TModelDefaults, TModelList, WrappedItem<TModel, TModelDefaults, TModelList>>

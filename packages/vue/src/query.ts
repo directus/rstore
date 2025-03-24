@@ -1,5 +1,6 @@
-import type { FindOptions, HybridPromise, Model, ModelDefaults, ModelList, StoreCore } from '@rstore/shared'
+import type { FindOptions, HybridPromise, Model, ModelDefaults, ModelList } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
+import type { VueStore } from './store'
 import { computed, ref, shallowRef, toValue, watch } from 'vue'
 
 export interface VueQueryReturn<
@@ -21,7 +22,7 @@ export interface VueCreateQueryOptions<
   TOptions extends FindOptions<TModel, TModelDefaults, TModelList>,
   TResult,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
+  store: VueStore<TModelList, TModelDefaults>
   fetchMethod: (options?: TOptions) => Promise<TResult>
   cacheMethod: (options?: TOptions) => TResult
   defaultValue: TResult
@@ -109,6 +110,10 @@ export function createQuery<
     }
     return promise
   }
+
+  store.$onCacheReset(() => {
+    refresh()
+  })
 
   return promise
 }
