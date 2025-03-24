@@ -1,4 +1,4 @@
-import type { CustomHookMeta, FindManyOptions, Model, ModelDefaults, ModelList, QueryResult, ResolvedModel, StoreCore, WrappedItem, WriteItem } from '@rstore/shared'
+import { type CustomHookMeta, dedupePromise, type FindManyOptions, type Model, type ModelDefaults, type ModelList, type QueryResult, type ResolvedModel, type StoreCore, type WrappedItem, type WriteItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekMany } from './peekMany'
@@ -18,6 +18,34 @@ export interface FindManyParams<
  * Find all items that match the query.
  */
 export async function findMany<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+>({
+  store,
+  meta,
+  model,
+  findOptions,
+}: FindManyParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelList>>>> {
+  if (findOptions?.dedupe === false) {
+    return _findMany({
+      store,
+      meta,
+      model,
+      findOptions,
+    })
+  }
+
+  const dedupeKey = JSON.stringify(findOptions)
+  return dedupePromise(store.$dedupePromises, `findMany:${dedupeKey}`, () => _findMany({
+    store,
+    meta,
+    model,
+    findOptions,
+  }))
+}
+
+async function _findMany<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,

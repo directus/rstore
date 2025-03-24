@@ -16,7 +16,7 @@ vi.mock('../../src/query/peekFirst', () => ({
     if (typeof findOptions !== 'string' && findOptions.key === '1') {
       return { result: { id: '1', name: 'Test Item' }, marker: 'marker-1' }
     }
-    if (findOptions.filter?.({ id: '2', name: 'Test Item 2' })) {
+    if (typeof findOptions?.filter === 'function' && findOptions.filter?.({ id: '2', name: 'Test Item 2' })) {
       return { result: { id: '2', name: 'Test Item 2' }, marker: 'marker-2' }
     }
     return { result: null, marker: undefined }
@@ -37,6 +37,7 @@ describe('findFirst', () => {
       $hooks: createHooks(),
       $getFetchPolicy: () => 'cache-first',
       $processItemParsing: vi.fn(),
+      $dedupePromises: new Map(),
     } as any
 
     model = {
@@ -118,5 +119,163 @@ describe('findFirst', () => {
     })
 
     expect(mockStore.$cache.writeItem).not.toHaveBeenCalled()
+  })
+
+  describe('should dedupe finds', () => {
+    it('should dedupe findFirst on key', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult({ foo: 'bar' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fn)
+
+      const result = await Promise.all([
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: '42',
+        }),
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: '42',
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledOnce()
+      expect(result.map(r => r.result)).toEqual([
+        { foo: 'bar' },
+        { foo: 'bar' },
+      ])
+    })
+
+    it('should not dedupe findFirst on different key', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult({ foo: payload.findOptions.key })
+      })
+      mockStore.$hooks.hook('fetchFirst', fn)
+
+      const result = await Promise.all([
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: '42',
+        }),
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: '43',
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledTimes(2)
+      expect(result.map(r => r.result)).toEqual([
+        { foo: '42' },
+        { foo: '43' },
+      ])
+    })
+
+    it('should dedupe findFirst on findOptions', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult({ foo: 'bar' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fn)
+
+      const result = await Promise.all([
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: { filter: { id: { eq: '42' } } },
+        }),
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: { filter: { id: { eq: '42' } } },
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledOnce()
+      expect(result.map(r => r.result)).toEqual([
+        { foo: 'bar' },
+        { foo: 'bar' },
+      ])
+    })
+
+    it('should not dedupe findFirst on different findOptions', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult({ foo: payload.findOptions.filter.id.eq })
+      })
+      mockStore.$hooks.hook('fetchFirst', fn)
+
+      const result = await Promise.all([
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: { filter: { id: { eq: '42' } } },
+        }),
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: { filter: { id: { eq: '43' } } },
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledTimes(2)
+      expect(result.map(r => r.result)).toEqual([
+        { foo: '42' },
+        { foo: '43' },
+      ])
+    })
+
+    it('should ignore filter function', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult({ foo: payload.findOptions.params.id.eq })
+      })
+      mockStore.$hooks.hook('fetchFirst', fn)
+
+      const result = await Promise.all([
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
+        }),
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledTimes(1)
+      expect(result.map(r => r.result)).toEqual([
+        { foo: '42' },
+        { foo: '42' },
+      ])
+    })
+
+    it('should support dedupe:false', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult({ foo: payload.findOptions.params.id.eq })
+      })
+      mockStore.$hooks.hook('fetchFirst', fn)
+
+      const result = await Promise.all([
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
+        }),
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledTimes(2)
+      expect(result.map(r => r.result)).toEqual([
+        { foo: '42' },
+        { foo: '42' },
+      ])
+    })
   })
 })

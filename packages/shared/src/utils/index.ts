@@ -1,3 +1,4 @@
+export * from './dedupe.js'
 export { createHooks } from './hookable.js'
 export * from './hooks.js'
 export * from './obj.js'

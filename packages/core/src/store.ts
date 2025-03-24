@@ -60,6 +60,7 @@ export async function createStoreCore<
     },
     $mutationHistory: [],
     $isServer: options.isServer ?? false,
+    $dedupePromises: new Map(),
   }
 
   if (options.transformStore) {

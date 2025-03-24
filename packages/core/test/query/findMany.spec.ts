@@ -13,7 +13,7 @@ interface TestModelType extends Model {
 
 vi.mock('../../src/query/peekMany', () => ({
   peekMany: vi.fn(({ findOptions }) => {
-    if (findOptions.filter?.({ id: '2', name: 'Test Item 2' })) {
+    if (typeof findOptions?.filter === 'function' && findOptions.filter?.({ id: '2', name: 'Test Item 2' })) {
       return { result: [{ id: '2', name: 'Test Item 2' }], marker: 'marker-2' }
     }
     return { result: [], marker: undefined }
@@ -33,6 +33,7 @@ describe('findMany', () => {
       $hooks: createHooks(),
       $getFetchPolicy: () => 'cache-first',
       $processItemParsing: vi.fn(),
+      $dedupePromises: new Map(),
     } as any
 
     model = {
@@ -116,5 +117,111 @@ describe('findMany', () => {
     })
 
     expect(mockStore.$cache.writeItems).not.toHaveBeenCalled()
+  })
+
+  describe('should dedupe finds', () => {
+    it('should dedupe findMany on findOptions', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult([{ foo: 'bar' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fn)
+
+      const result = await Promise.all([
+        findMany({
+          store: mockStore,
+          model,
+          findOptions: { filter: { id: { eq: '42' } } },
+        }),
+        findMany({
+          store: mockStore,
+          model,
+          findOptions: { filter: { id: { eq: '42' } } },
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledOnce()
+      expect(result.map(r => r.result)).toEqual([
+        [{ foo: 'bar' }],
+        [{ foo: 'bar' }],
+      ])
+    })
+
+    it('should not dedupe findMany on different findOptions', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult([{ foo: payload.findOptions.filter.id.eq }])
+      })
+      mockStore.$hooks.hook('fetchMany', fn)
+
+      const result = await Promise.all([
+        findMany({
+          store: mockStore,
+          model,
+          findOptions: { filter: { id: { eq: '42' } } },
+        }),
+        findMany({
+          store: mockStore,
+          model,
+          findOptions: { filter: { id: { eq: '43' } } },
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledTimes(2)
+      expect(result.map(r => r.result)).toEqual([
+        [{ foo: '42' }],
+        [{ foo: '43' }],
+      ])
+    })
+
+    it('should ignore filter function', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult([{ foo: payload.findOptions.params.id.eq }])
+      })
+      mockStore.$hooks.hook('fetchMany', fn)
+
+      const result = await Promise.all([
+        findMany({
+          store: mockStore,
+          model,
+          findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
+        }),
+        findMany({
+          store: mockStore,
+          model,
+          findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledTimes(1)
+      expect(result.map(r => r.result)).toEqual([
+        [{ foo: '42' }],
+        [{ foo: '42' }],
+      ])
+    })
+
+    it('should support dedupe:false', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult([{ foo: payload.findOptions.params.id.eq }])
+      })
+      mockStore.$hooks.hook('fetchMany', fn)
+
+      const result = await Promise.all([
+        findMany({
+          store: mockStore,
+          model,
+          findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
+        }),
+        findMany({
+          store: mockStore,
+          model,
+          findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledTimes(2)
+      expect(result.map(r => r.result)).toEqual([
+        [{ foo: '42' }],
+        [{ foo: '42' }],
+      ])
+    })
   })
 })

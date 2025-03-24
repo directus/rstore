@@ -1,4 +1,4 @@
-import type { CustomHookMeta, FindFirstOptions, Model, ModelDefaults, ModelList, QueryResult, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
+import { type CustomHookMeta, dedupePromise, type FindFirstOptions, type Model, type ModelDefaults, type ModelList, type QueryResult, type ResolvedModel, type StoreCore, type WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekFirst } from './peekFirst'
@@ -18,6 +18,34 @@ export interface FindFirstParams<
  * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
  */
 export async function findFirst<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+>({
+  store,
+  meta,
+  model,
+  findOptions: keyOrOptions,
+}: FindFirstParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<WrappedItem<TModel, TModelDefaults, TModelList> | null>> {
+  if (typeof keyOrOptions === 'object' && keyOrOptions?.dedupe === false) {
+    return _findFirst({
+      store,
+      meta,
+      model,
+      findOptions: keyOrOptions,
+    })
+  }
+
+  const dedupeKey = typeof keyOrOptions === 'string' ? keyOrOptions : JSON.stringify(keyOrOptions)
+  return dedupePromise(store.$dedupePromises, `findFirst:${dedupeKey}`, () => _findFirst({
+    store,
+    meta,
+    model,
+    findOptions: keyOrOptions,
+  }))
+}
+
+async function _findFirst<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,

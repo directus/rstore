@@ -80,6 +80,15 @@ export interface FindOptionsBase<
    * `no-cache` means that the query will not use the cache and only fetch the data from the adapter plugins. No data will be stored in the cache.
    */
   fetchPolicy?: FetchPolicy
+
+  /**
+   * Deduplicate findFirst and findMany that are called with the same findOptions at the same time.
+   *
+   * Comparison is done with JSON.stringfy.
+   *
+   * @default true
+   */
+  dedupe?: boolean
 }
 
 export type FindFirstOptions<

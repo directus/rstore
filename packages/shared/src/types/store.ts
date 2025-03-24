@@ -20,4 +20,5 @@ export interface StoreCore<
   $getModel: (item: any, modelNames?: string[]) => ResolvedModel<Model, ModelDefaults, ModelList> | null
   $mutationHistory: Array<MutationOperation<any, TModelDefaults, TModelList>>
   $isServer: boolean
+  $dedupePromises: Map<string, Promise<any>>
 }
