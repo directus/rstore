@@ -20,12 +20,5 @@
     "@nuxt/ui": "^3.0.0",
     "drizzle-kit": "^0.30.5",
     "nuxt": "^3.16.0"
-  },
-  "pnpm": {
-    "onlyBuiltDependencies": [
-      "@parcel/watcher",
-      "esbuild",
-      "vue-demi"
-    ]
   }
 }
