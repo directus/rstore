@@ -92,17 +92,17 @@ export function wrapItem<
           const relation = model.relations[key as string]
           const result: Array<any> = []
           for (const targetModelName in relation.to) {
-            const targetModel = relation.to[targetModelName]
-            const targetType = store.$models.find(m => m.name === targetModelName)
-            if (!targetType) {
+            const targetModelConfig = relation.to[targetModelName]
+            const targetModel = store.$models.find(m => m.name === targetModelName)
+            if (!targetModel) {
               throw new Error(`Model "${targetModelName}" does not exist in the store`)
             }
-            const value = Reflect.get(proxy, targetModel.eq)
+            const value = Reflect.get(proxy, targetModelConfig.eq)
             const cacheResultForTarget = (relation.many ? peekMany : peekFirst)({
               store,
-              model: targetType,
+              model: targetModel,
               findOptions: {
-                filter: foreignItem => foreignItem[targetModel.on] === value,
+                filter: foreignItem => foreignItem[targetModelConfig.on] === value,
               },
               force: true,
             }).result
