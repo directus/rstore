@@ -246,7 +246,12 @@ export function createModelApi<
           form.$error = null
           try {
             const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-            await this.$schema['~standard'].validate(data)
+            const { issues } = await this.$schema['~standard'].validate(data)
+            if (issues) {
+              const error = new Error(issues.map(i => i.message).join(', '))
+              ;(error as any).$issues = issues
+              throw error
+            }
             const item = await api.create(data)
             onSaved.trigger(item)
             form.$reset()
@@ -318,7 +323,12 @@ export function createModelApi<
             for (const key in form.$changedProps) {
               data[key] = form[key]
             }
-            await this.$schema['~standard'].validate(data)
+            const { issues } = await this.$schema['~standard'].validate(data)
+            if (issues) {
+              const error = new Error(issues.map(i => i.message).join(', '))
+              ;(error as any).$issues = issues
+              throw error
+            }
             const item = await api.update(data, {
               key: model.getKey(initialData),
             })
