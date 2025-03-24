@@ -1,6 +1,29 @@
 # Changelog
 
 
+## v0.5.8
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.5.7...v0.5.8)
+
+### 🚀 Enhancements
+
+- As const is no longer required ([58639ff](https://github.com/Akryum/rstore/commit/58639ff))
+- Refresh queries on cache reset, closes #4 ([#4](https://github.com/Akryum/rstore/issues/4))
+- Dedupe findFirst and findMany, fix #16 ([#16](https://github.com/Akryum/rstore/issues/16))
+
+### 🩹 Fixes
+
+- **drizzle:** Named column breaking primary keys, fix #20 ([#20](https://github.com/Akryum/rstore/issues/20))
+
+### 🏡 Chore
+
+- Update pnpm and refresh lockfile ([aeb00c8](https://github.com/Akryum/rstore/commit/aeb00c8))
+- Cleanup variable names ([33be02b](https://github.com/Akryum/rstore/commit/33be02b))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.5.7
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.5.6...v0.5.7)
