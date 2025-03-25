@@ -137,3 +137,54 @@ export default definePlugin({
 ```
 
 :::
+
+## Comparisons
+
+### Pinia
+
+[Pinia](https://pinia.vuejs.org/) is the official state management library for Vue.js applications. While both rstore and Pinia are designed to manage application state, they have very different focuses and features.
+
+Pinia is a successor to [vuex](https://vuex.vuejs.org/) and is primarily focused on providing a very low-level API for managing state in Vue applications. It doesn't provide any structure or specific APIs to fetch data or handle caching. Instead, it relies on the Vue Composition API to manage state and allows developers to create their own methods - which means you have to implement most of the code for caching and data fetching yourself.
+
+| rstore | Pinia |
+|--------|-------|
+| Normalized reactive cache | Manual caching with Vue Composition API |
+| Comprehensive query/mutation/live APIs | Write custom methods |
+| Works well with standardized data sources | Very flexible data fetching |
+
+### Pinia Colada
+
+[Pinia Colada](https://pinia-colada.esm.dev/) is a library that provides a set of tools for data fetching and caching on top of Pinia. Its API is similar to the one of [Tanstack Query](https://tanstack.com/query/latest/docs/framework/vue/overview).
+
+The main difference between rstore and Pinia Colada is that rstore is higher-level and provide a more structured and opinionated way to manage data. It has a built-in normalized reactive cache and provides a set of APIs for querying and mutating data, while Pinia Colada is more focused on providing a flexible API for data fetching and caching.
+
+Another important difference is that rstore is based on a normalized cache and is designed as a local-first store to enable (optional) patterns such as offline, synchronization or realtime. This means that reads are computed client-size too, while with Pinia Colada you rely by default on the server more.
+
+| rstore | Pinia Colada |
+|--------|--------------|
+| Local-first (compute client-side) | Server-first with caching |
+| Normalized cache | Query-based cache |
+| Data structured with models | No mandatory structure |
+| Fetching through plugins | Fetching in queries themselves |
+
+### Tanstack Query
+
+[Tanstack Query](https://tanstack.com/query/latest/docs/framework/vue/overview) is the new name of `vue-query`. The comparison would be mostly the same as [Pinia Colada](#pinia-colada).
+
+### Vue-Promised
+
+[Vue-Promised](https://github.com/posva/vue-promised) is a library to provide low-level utilities to help handle async operations in Vue. It is not a state management library and does not provide any caching or data fetching capabilities. Compared to rstire, it is very minimalistic and does not provide any structure or opinionated way to manage data.
+
+### swrv
+
+[swrv](https://github.com/Kong/swrv) is a port of [swr](https://github.com/vercel/swr) for Vue. It is a library for data fetching and caching, but it is not a state management library. It is focused on providing a simple API to fetch data following the [stale-while-revalidate pattern](https://datatracker.ietf.org/doc/html/rfc5861). You can achieve the same with rstore using the [fetchPolicy](./data/query.md#fetch-policy) set to `cache-and-fetch`.
+
+### Apollo
+
+[Apollo](https://apollo.vuejs.org/) is the a GraphQL client that shares some similarities with rstore. It has a normalized cache although it is not designed as local-first. It is focused on GraphQL whereas rstore is agnostic to the data source. Furthermore, rstore is much lighter than the `Apollo Client + vue-apollo` combination as it seamlessly and natively integrates with Vue and directly uses Vue's reactivity system.
+
+| rstore | Apollo |
+|--------|--------|
+| Normalized reactive cache | Normalized reactive cache |
+| Local-first | Server-first with cache |
+| Agnostic to data source | GraphQL only |
