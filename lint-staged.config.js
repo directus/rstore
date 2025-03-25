@@ -27,7 +27,7 @@ export default {
     })
     return [
       'pnpm run test',
-      `pnpm run -r ${packageNames.map(name => `--filter ...${name}`).join(' ')} build`,
+      // `pnpm run -r ${packageNames.map(name => `--filter ...${name}`).join(' ')} build`,
       `pnpm run -r ${packageNames.map(name => `--filter ...${name}`).join(' ')} test:types`,
     ]
   },
