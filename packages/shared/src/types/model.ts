@@ -62,7 +62,7 @@ export interface Model<
    * Field configuration for the model.
    */
   'fields'?: {
-    [K in Path<TItem>]: {
+    [K in Path<TItem>]?: {
       /**
        * Parse the value received from the adapters.
        */

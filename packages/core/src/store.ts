@@ -87,7 +87,7 @@ export async function createStoreCore<
   store.$hooks.hook('parseItem', (payload) => {
     if (payload.model.fields) {
       for (const path in payload.model.fields) {
-        const fieldConfig = payload.model.fields[path]
+        const fieldConfig = payload.model.fields[path]!
         if (fieldConfig.parse) {
           const value = get(payload.item, path as any)
           if (value != null) {

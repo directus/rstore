@@ -130,7 +130,7 @@ describe('model', () => {
       },
     })
     expect(resolved[0].computed.calc).toBeTypeOf('function')
-    expect(resolved[0].fields!.createdAt.parse).toBeTypeOf('function')
+    expect(resolved[0].fields!.createdAt!.parse).toBeTypeOf('function')
     expect(resolved[0].formSchema.create['~standard'].vendor).toBe('rstore')
     expect(resolved[0].formSchema.update['~standard'].vendor).toBe('rstore')
     expect(resolved[0].meta).toEqual({
@@ -165,7 +165,7 @@ describe('model', () => {
     expect(resolved[0].getKey({ id: 0 })).toBe(defaults.getKey?.({ id: 0 }))
     expect(resolved[0].relations).toEqual({})
     expect(resolved[0].computed.calc).toBeTypeOf('function')
-    expect(resolved[0].fields!.createdAt.parse).toBeTypeOf('function')
+    expect(resolved[0].fields!.createdAt!.parse).toBeTypeOf('function')
     expect(resolved[0].formSchema.create['~standard'].vendor).toBe('rstore')
     expect(resolved[0].formSchema.update['~standard'].vendor).toBe('rstore')
     expect(resolved[0].meta).toEqual({
