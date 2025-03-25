@@ -1,4 +1,4 @@
-import { type Cache, type CustomHookMeta, type FindOptions, get, type Hooks, type ModelDefaults, type ModelList, type Plugin, set, type StoreCore } from '@rstore/shared'
+import { type Cache, type CustomHookMeta, type FindOptions, get, type Hooks, type Model, type ModelDefaults, type ModelList, type Plugin, set, type StoreCore } from '@rstore/shared'
 import { defaultFetchPolicy } from './fetchPolicy'
 import { resolveModels } from './model'
 import { setupPlugin } from './plugin'
@@ -96,7 +96,33 @@ export async function createStoreCore<
         }
       }
     }
+
+    for (const key in payload.item) {
+      if (key in payload.model.relations) {
+        const value = payload.item[key]
+        if (value) {
+          if (Array.isArray(value)) {
+            for (const child of value as any[]) {
+              parseNestedItem(payload.model, key, child)
+            }
+          }
+          else {
+            parseNestedItem(payload.model, key, value)
+          }
+        }
+      }
+    }
   })
+
+  function parseNestedItem(parentModel: Model, key: string, child: any) {
+    const relation = parentModel.relations![key]!
+    const possibleModels = Object.keys(relation.to)
+    const childModel = store.$getModel(child, possibleModels)
+    if (!childModel) {
+      throw new Error(`Could not determine type for relation ${parentModel.name}.${String(key)}`)
+    }
+    store.$processItemParsing(childModel, child)
+  }
 
   return store
 }

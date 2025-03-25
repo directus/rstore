@@ -92,19 +92,19 @@ export function createCache<
           if (Array.isArray(rawItem)) {
             for (const nestedItem of rawItem as any[]) {
               this.writeItemForRelation({
-                model,
+                parentModel: model,
                 relationKey: key,
                 relation,
-                item: nestedItem,
+                childItem: nestedItem,
               })
             }
           }
           else {
             this.writeItemForRelation({
-              model,
+              parentModel: model,
               relationKey: key,
               relation,
-              item: rawItem,
+              childItem: rawItem,
             })
           }
         }
@@ -151,24 +151,22 @@ export function createCache<
         operation: 'write',
       })
     },
-    writeItemForRelation({ model, relationKey, relation, item }) {
+    writeItemForRelation({ parentModel, relationKey, relation, childItem }) {
       const store = getStore()
-      const possibleTypes = Object.keys(relation.to)
-      const nestedItemType = store.$getModel(item, possibleTypes)
-      if (!nestedItemType) {
-        throw new Error(`Could not determine type for relation ${model.name}.${String(relationKey)}`)
+      const possibleModels = Object.keys(relation.to)
+      const nestedItemModel = store.$getModel(childItem, possibleModels)
+      if (!nestedItemModel) {
+        throw new Error(`Could not determine type for relation ${parentModel.name}.${String(relationKey)}`)
       }
-      const nestedKey = nestedItemType.getKey(item)
+      const nestedKey = nestedItemModel.getKey(childItem)
       if (!nestedKey) {
-        throw new Error(`Could not determine key for relation ${model.name}.${String(relationKey)}`)
+        throw new Error(`Could not determine key for relation ${parentModel.name}.${String(relationKey)}`)
       }
-
-      store.$processItemParsing(model, item)
 
       this.writeItem({
-        model: nestedItemType,
+        model: nestedItemModel,
         key: nestedKey,
-        item,
+        item: childItem,
       })
     },
     deleteItem({ model, key }) {

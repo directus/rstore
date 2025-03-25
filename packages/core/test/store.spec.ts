@@ -56,26 +56,73 @@ describe('createStoreCore', () => {
     expect(options.hooks.callHook).toHaveBeenCalledWith('init', expect.anything())
   })
 
-  it('calls custom field parse', async () => {
-    const models: ModelList = [
-      {
-        name: 'Test',
-        fields: {
-          name: {
-            parse: (value: any) => value.toUpperCase(),
+  describe('field parsing', () => {
+    it('calls custom field parse', async () => {
+      const models: ModelList = [
+        {
+          name: 'Test',
+          fields: {
+            name: {
+              parse: (value: any) => value.toUpperCase(),
+            },
           },
         },
-      },
-    ]
-    options.models = models
-    options.hooks = createHooks()
+      ]
+      options.models = models
+      options.hooks = createHooks()
 
-    const store = await createStoreCore(options)
-    const item = { name: 'test' }
+      const store = await createStoreCore(options)
+      const item = { name: 'test' }
 
-    store.$processItemParsing(store.$models[0], item)
+      store.$processItemParsing(store.$models[0], item)
 
-    expect(item.name).toBe('TEST')
+      expect(item.name).toBe('TEST')
+    })
+
+    it('handle nested relations in result', async () => {
+      const models: ModelList = [
+        {
+          name: 'Message',
+          relations: {
+            author: {
+              to: {
+                User: {
+                  on: 'id',
+                  eq: 'authorId',
+                },
+              },
+            },
+          },
+        },
+        {
+          name: 'User',
+          fields: {
+            createdAt: {
+              parse: (value: any) => new Date(value),
+            },
+          },
+        },
+      ]
+      options.models = models
+      options.hooks = createHooks()
+
+      const store = await createStoreCore(options)
+
+      const message: any = {
+        id: 'm1',
+        authorId: 'u1',
+        author: {
+          id: 'u1',
+          username: 'test',
+          createdAt: '2023-01-01T00:00:00Z',
+        },
+      }
+
+      store.$processItemParsing(store.$models[0], message)
+
+      expect(message.author.createdAt).toBeInstanceOf(Date)
+      expect(message.author.createdAt.toISOString()).toBe('2023-01-01T00:00:00.000Z')
+    })
   })
 
   describe('getFetchPolicy', () => {

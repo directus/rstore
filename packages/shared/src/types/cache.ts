@@ -72,10 +72,10 @@ export interface Cache<
   }) => void
 
   writeItemForRelation: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelList>
+    parentModel: ResolvedModel<TModel, TModelDefaults, TModelList>
     relationKey: keyof ResolvedModelItemBase<TModel, TModelDefaults, TModelList>['relations']
     relation: ModelRelation
-    item: any
+    childItem: any
   }) => void
 
   getState: () => CustomCacheState
