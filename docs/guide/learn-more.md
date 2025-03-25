@@ -156,9 +156,9 @@ Pinia is a successor to [vuex](https://vuex.vuejs.org/) and is primarily focused
 
 [Pinia Colada](https://pinia-colada.esm.dev/) is a library that provides a set of tools for data fetching and caching on top of Pinia. Its API is similar to the one of [Tanstack Query](https://tanstack.com/query/latest/docs/framework/vue/overview).
 
-The main difference between rstore and Pinia Colada is that rstore is higher-level and provide a more structured and opinionated way to manage data. It has a built-in normalized reactive cache and provides a set of APIs for querying and mutating data, while Pinia Colada is more focused on providing a flexible API for data fetching and caching.
+The main difference between rstore and Pinia Colada is that rstore is higher-level and provide a more structured and opinionated way to manage data. It has a built-in normalized reactive cache and provides a set of APIs for querying and mutating data, while Pinia Colada is more focused on providing a flexible API for data querying that wraps custom fetching logic.
 
-Another important difference is that rstore is based on a normalized cache and is designed as a local-first store to enable (optional) patterns such as offline, synchronization or realtime. This means that reads are computed client-size too, while with Pinia Colada you rely by default on the server more.
+Another important difference is that rstore is based on a normalized cache and is designed as a local-first store to enable (optional) patterns such as offline, synchronization or realtime. This means that reads are computed client-side too, while with Pinia Colada you rely by default on the server more.
 
 | rstore | Pinia Colada |
 |--------|--------------|
