@@ -56,8 +56,10 @@ export interface VueModelApi<
   /**
    * Create a reactive query for the first item that matches the given options.
    */
-  queryFirst: (
-    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
+  queryFirst: <
+    const TOptions extends string | number | FindFirstOptions<TModel, TModelDefaults, TModelList> | { enabled: false },
+  > (
+    options: MaybeRefOrGetter<TOptions>,
   ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TItem | null>>
 
   /**
@@ -77,8 +79,10 @@ export interface VueModelApi<
   /**
    * Create a reactive query for all items that match the given options.
    */
-  queryMany: (
-    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelList> | undefined>,
+  queryMany: <
+    const TOptions extends FindManyOptions<TModel, TModelDefaults, TModelList> | undefined | { enabled: false },
+  > (
+    options?: MaybeRefOrGetter<TOptions>,
   ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, Array<TItem>>>
 
   /**

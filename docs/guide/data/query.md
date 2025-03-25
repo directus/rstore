@@ -88,6 +88,58 @@ const { data: someUsers } = store.User.queryMany(() => ({
 }))
 ```
 
+### Disabling a query
+
+You can disable a query by returning the `{ enabled: false }` flag as the find options:
+
+```ts
+const enabled = ref(false)
+
+const { data: todos } = store.Todo.queryMany(() => ({
+  enabled: enabled.value,
+}))
+```
+
+```ts
+const enabled = ref(false)
+
+const { data: todos } = store.Todo.queryFirst(
+  () => enabled.value ? 'some-id' : { enabled: false }
+)
+```
+
+This syntax is useful when you use TS as it will allow guarding against nullish values at the same time:
+
+```ts
+const someItem = ref<Record<string, any> | null>(null)
+
+const { data: parent } = store.Item.queryFirst(() => someItem.value
+  ? {
+      params: {
+        // `someItem.value` is not nullish here
+        id: someItem.value.parentId,
+      }
+    }
+  : { enabled: false }
+)
+```
+
+### Dependent queries
+
+```ts
+// Get the user
+const { data: user } = store.User.queryFirst({ /* ... */ })
+
+// Then get the user's projects
+const { data: projects } = store.Project.queryMany(() => user.value
+  ? {
+      params: {
+        userId: user.value.id,
+      }
+    }
+  : { enabled: false })
+```
+
 ## Cache read
 
 ### Peek first

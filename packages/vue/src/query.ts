@@ -13,6 +13,10 @@ export interface VueQueryReturn<
   loading: Ref<boolean>
   error: Ref<Error | null>
   refresh: () => HybridPromise<VueQueryReturn<_TModel, _TModelDefaults, _TModelList, TResult>>
+  /**
+   * @private
+   */
+  _result: Ref<TResult>
 }
 
 export interface VueCreateQueryOptions<
@@ -26,7 +30,7 @@ export interface VueCreateQueryOptions<
   fetchMethod: (options?: TOptions) => Promise<TResult>
   cacheMethod: (options?: TOptions) => TResult
   defaultValue: TResult
-  options?: MaybeRefOrGetter<TOptions | undefined>
+  options?: MaybeRefOrGetter<TOptions | undefined | { enabled: boolean }>
 }
 
 /**
@@ -45,14 +49,24 @@ export function createQuery<
   defaultValue,
   options,
 }: VueCreateQueryOptions<TModel, TModelDefaults, TModelList, TOptions, TResult>): HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TResult>> {
-  const fetchPolicy = store.$getFetchPolicy(toValue(options)?.fetchPolicy)
+  function getOptions(): TOptions | undefined {
+    const result = toValue(options)
+    return typeof result === 'object' && 'enabled' in result && result.enabled === false ? undefined : result as TOptions
+  }
+
+  function isDisabled() {
+    const result = toValue(options)
+    return typeof result === 'object' && 'enabled' in result && result.enabled === false
+  }
+
+  let fetchPolicy = store.$getFetchPolicy(getOptions()?.fetchPolicy)
 
   const result = shallowRef<TResult>(defaultValue)
 
   // @TODO include nested relations in no-cache results
-  const data = (fetchPolicy !== 'no-cache'
-    ? computed(() => cacheMethod(toValue(options)) ?? null)
-    : result) as Ref<TResult>
+  const data = computed(() => fetchPolicy !== 'no-cache'
+    ? cacheMethod(getOptions()) ?? null
+    : result.value) as Ref<TResult>
 
   const loading = ref(false)
 
@@ -63,31 +77,35 @@ export function createQuery<
     loading,
     error,
     refresh,
+    _result: result,
   }
 
   async function load() {
-    loading.value = true
-    error.value = null
+    if (!isDisabled()) {
+      loading.value = true
+      error.value = null
 
-    try {
-      const finalOptions: TOptions = toValue(options) ?? {} as TOptions
+      try {
+        const finalOptions: TOptions = getOptions() ?? {} as TOptions
+        fetchPolicy = store.$getFetchPolicy(getOptions()?.fetchPolicy)
 
-      // If fetchPolicy is `cache-and-fetch`, fetch in parallel
-      if (fetchPolicy === 'cache-and-fetch') {
-        fetchMethod({
-          ...finalOptions,
-          fetchPolicy: 'fetch-only',
-        } as FindOptions<TModel, TModelDefaults, TModelList> as any)
+        // If fetchPolicy is `cache-and-fetch`, fetch in parallel
+        if (fetchPolicy === 'cache-and-fetch') {
+          fetchMethod({
+            ...finalOptions,
+            fetchPolicy: 'fetch-only',
+          } as FindOptions<TModel, TModelDefaults, TModelList> as any)
+        }
+
+        result.value = await fetchMethod(finalOptions)
       }
-
-      result.value = await fetchMethod(finalOptions)
-    }
-    catch (e: any) {
-      error.value = e
-      console.error(e)
-    }
-    finally {
-      loading.value = false
+      catch (e: any) {
+        error.value = e
+        console.error(e)
+      }
+      finally {
+        loading.value = false
+      }
     }
 
     return returnObject
