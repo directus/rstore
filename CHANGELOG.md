@@ -1,6 +1,41 @@
 # Changelog
 
 
+## v0.5.9
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.5.8...v0.5.9)
+
+### 🚀 Enhancements
+
+- **vue:** Disable query ([1316655](https://github.com/Akryum/rstore/commit/1316655))
+
+### 🩹 Fixes
+
+- **vue:** Form validation issues handling ([9f2b238](https://github.com/Akryum/rstore/commit/9f2b238))
+- **fields:** Handle parsing fields of nested relations, fix #25 ([#25](https://github.com/Akryum/rstore/issues/25))
+
+### 📖 Documentation
+
+- Comparisons ([3af462b](https://github.com/Akryum/rstore/commit/3af462b))
+- Typo and fixes ([cca2fe1](https://github.com/Akryum/rstore/commit/cca2fe1))
+
+### 🌊 Types
+
+- Fix model.fields requiring all fields ([a4a02bb](https://github.com/Akryum/rstore/commit/a4a02bb))
+
+### 🏡 Chore
+
+- Update issue repro links ([3a5651d](https://github.com/Akryum/rstore/commit/3a5651d))
+- Disable build in commit hook ([65fc756](https://github.com/Akryum/rstore/commit/65fc756))
+
+### ✅ Tests
+
+- **vue:** Some tests ([b4b10a0](https://github.com/Akryum/rstore/commit/b4b10a0))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.5.8
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.5.7...v0.5.8)
