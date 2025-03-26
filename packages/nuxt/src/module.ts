@@ -38,6 +38,12 @@ export default defineNuxtModule<ModuleOptions>({
       'defineRstorePlugin',
       'useStore',
     ].map(name => ({ from: importsFile, name })))
+    addImports([
+      'StoreRawModels',
+      'Store',
+      'StoreResolvedModelItem',
+      'StoreWrappedItem',
+    ].map(name => ({ from: importsFile, name, type: true })))
 
     // Scan folder
     if (!options.rstoreDirs) {
