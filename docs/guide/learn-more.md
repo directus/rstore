@@ -16,6 +16,9 @@ Its main features include:
 
 Whether you're building a small prototype or a large-scale enterprise application, rstore provides the tools you need to manage your data effectively.
 
+![schema of rstore overview](./img/rstore-overview-dark.svg){.dark-only}
+![schema of rstore overview](./img/rstore-overview.svg){.light-only}
+
 ## Use Cases
 
 Here are some use cases for which rstore can be a great data management solution.
@@ -52,6 +55,9 @@ The reactive normalized cache in rstore offers several benefits.
 - Efficiency is achieved through the structured format of normalized data, allowing for quicker and less overhead-intensive queries and updates.
 - Co-locating the data requirements with the components that use them is a powerful pattern. By using the `queryMany` and `queryFirst` composables, you can easily fetch and display data in your components without worrying about deduplicating or synchronizing with other components.
 
+![schema of rstore cache](./img/rstore-cache-dark.svg){.dark-only}{.small}
+![schema of rstore cache](./img/rstore-cache.svg){.light-only}{.small}
+
 ::: details Example of cache
 
 Here is what the cache can look like:
@@ -78,6 +84,15 @@ Here is what the cache can look like:
 
 :::
 
+## Local-First
+
+rstore is designed with a local-first approach, meaning that it prioritizes local data access and computation. This design choice allows for faster data retrieval and manipulation, as well as improved performance in scenarios where network connectivity may be unreliable or slow.
+
+In practice this means that all data reads in components are computed client-size from the cache, including filtering and sorting.
+
+![schema of rstore local-first](./img/rstore-local-first-dark.svg){.dark-only}
+![schema of rstore local-first](./img/rstore-local-first.svg){.light-only}
+
 ## Plugins
 
 rstore's plugin system is designed to be highly adaptable, allowing you to fetch data from any source without making any assumptions about how the data should be retrieved. This flexibility ensures that rstore can be integrated seamlessly into any existing architecture or workflow.
@@ -87,6 +102,9 @@ Multiple plugins can be added to a store allowing an architecture that primarily
 ::: info
 In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and other popular standards. Feel free to also share your own plugins with the community! 😸
 :::
+
+![schema of rstore plugin](./img/rstore-plugin-dark.svg){.dark-only}
+![schema of rstore plugin](./img/rstore-plugin.svg){.light-only}
 
 ::: details
 

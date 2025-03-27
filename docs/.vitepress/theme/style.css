@@ -308,3 +308,17 @@ footer.VPFooter {
   }
 }
 
+/* Images */
+
+html.dark .light-only {
+  display: none !important;
+}
+
+html:not(.dark) .dark-only {
+  display: none !important;
+}
+
+img.small {
+  max-width: 500px;
+  margin: 0 auto;
+}
