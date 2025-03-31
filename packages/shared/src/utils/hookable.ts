@@ -14,7 +14,7 @@ export class Hookable<
   HooksT extends Record<string, HookCallback<any, any>> = Record<string, HookCallback<any, any>>,
   HookNameT extends HookKeys<HooksT> = HookKeys<HooksT>,
 > {
-  private _hooks: { [key: string]: StoredHookCallback<any, any>[] } = {}
+  public _hooks: { [key: string]: StoredHookCallback<any, any>[] } = {}
 
   constructor() {
     this.hook = this.hook.bind(this)

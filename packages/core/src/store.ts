@@ -29,7 +29,7 @@ export async function createStoreCore<
     $cache: options.cache,
     $models: models,
     $modelDefaults: options.modelDefaults ?? {} as TModelDefaults,
-    $plugins: options.plugins ?? [],
+    $plugins: options.plugins?.map(p => ({ ...p, hooks: {} })) ?? [],
     $hooks: options.hooks,
     $findDefaults: options.findDefaults ?? {},
     $getFetchPolicy(value) {

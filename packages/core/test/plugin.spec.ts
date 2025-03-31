@@ -1,4 +1,4 @@
-import { createHooks, type ModelDefaults, type ModelList, type Plugin, type StoreCore } from '@rstore/shared'
+import { createHooks, type ModelDefaults, type ModelList, type RegisteredPlugin, type StoreCore } from '@rstore/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { setupPlugin } from '../src/plugin'
 
@@ -11,8 +11,9 @@ describe('setupPlugin', () => {
       },
     } as any
 
-    const mockPlugin: Plugin = {
+    const mockPlugin: RegisteredPlugin = {
       name: 'test',
+      hooks: {},
       setup: vi.fn(),
     }
 
@@ -32,8 +33,9 @@ describe('setupPlugin', () => {
       },
     } as any
 
-    const mockPlugin: Plugin = {
+    const mockPlugin: RegisteredPlugin = {
       name: 'test',
+      hooks: {},
       setup: vi.fn().mockResolvedValueOnce(undefined),
     }
 
@@ -50,8 +52,9 @@ describe('setupPlugin', () => {
       },
     } as any
 
-    const mockPlugin: Plugin = {
+    const mockPlugin: RegisteredPlugin = {
       name: 'test',
+      hooks: {},
       setup: vi.fn().mockRejectedValueOnce(new Error('Setup failed')),
     }
 
@@ -67,8 +70,9 @@ describe('setupPlugin', () => {
         },
       } as any
 
-      const mockPlugin: Plugin = {
+      const mockPlugin: RegisteredPlugin = {
         name: 'test',
+        hooks: {},
         setup: ({ hook }) => {
           hook('fetchMany', () => {})
         },
@@ -86,8 +90,9 @@ describe('setupPlugin', () => {
 
       const hookCallback = vi.fn()
 
-      const mockPlugin: Plugin = {
+      const mockPlugin: RegisteredPlugin = {
         name: 'test',
+        hooks: {},
         scopeId: 'my-scope',
         setup: ({ hook }) => {
           hook('fetchMany', hookCallback)
@@ -121,8 +126,9 @@ describe('setupPlugin', () => {
 
       const hookCallback = vi.fn()
 
-      const mockPlugin: Plugin = {
+      const mockPlugin: RegisteredPlugin = {
         name: 'test',
+        hooks: {},
         scopeId: 'my-scope',
         setup: ({ hook }) => {
           hook('fetchMany', hookCallback, {
@@ -159,8 +165,9 @@ describe('setupPlugin', () => {
 
       const hookCallback = vi.fn()
 
-      const mockPlugin: Plugin = {
+      const mockPlugin: RegisteredPlugin = {
         name: 'test',
+        hooks: {},
         scopeId: 'my-scope',
         setup: ({ hook }) => {
           hook('fetchMany', hookCallback)
@@ -193,8 +200,9 @@ describe('setupPlugin', () => {
 
       const hookCallback = vi.fn()
 
-      const mockPlugin: Plugin = {
+      const mockPlugin: RegisteredPlugin = {
         name: 'test',
+        hooks: {},
         setup: ({ hook }) => {
           hook('fetchMany', hookCallback)
         },
@@ -233,8 +241,9 @@ describe('setupPlugin', () => {
           $modelDefaults: {},
         } as any
 
-        const mockPlugin: Plugin = {
+        const mockPlugin: RegisteredPlugin = {
           name: 'test',
+          hooks: {},
           setup: async ({ addModelDefaults }) => {
             addModelDefaults({
               computed: {
@@ -264,8 +273,9 @@ describe('setupPlugin', () => {
           },
         } as any
 
-        const mockPlugin: Plugin = {
+        const mockPlugin: RegisteredPlugin = {
           name: 'test',
+          hooks: {},
           setup: async ({ addModelDefaults }) => {
             addModelDefaults({
               computed: {
@@ -296,8 +306,9 @@ describe('setupPlugin', () => {
           },
         } as any
 
-        const mockPlugin: Plugin = {
+        const mockPlugin: RegisteredPlugin = {
           name: 'test',
+          hooks: {},
           setup: async ({ addModelDefaults }) => {
             addModelDefaults({
               computed: {

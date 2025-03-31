@@ -33,6 +33,8 @@ export default defineRstorePlugin({
           payload.setResult(result?.[0])
         }
       }
+    }, {
+      ignoreScope: true,
     })
     // hook('beforeCacheReadMany', (payload) => {
     //   payload.setMarker(`many:${payload.model.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)

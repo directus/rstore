@@ -3,7 +3,8 @@ import type { ModelDefaults, ModelList } from './model.js'
 import type { Awaitable } from './utils.js'
 
 export interface CustomPluginMeta {
-  // empty
+  description?: string
+  builtin?: boolean
 }
 
 export interface Plugin {
@@ -27,6 +28,11 @@ export interface Plugin {
   scopeId?: string
 
   meta?: CustomPluginMeta
+}
+
+export interface RegisteredPlugin extends Plugin {
+  // eslint-disable-next-line ts/no-unsafe-function-type
+  hooks: Record<string, Array<{ callback: Function, options?: HookPluginOptions }>>
 }
 
 export interface HookPluginOptions {

@@ -31,7 +31,7 @@ const cacheCount = computed(() => Object.keys((cache.value as any)[props.item.na
             :color="cacheCount ? 'primary' : 'neutral'"
             icon="lucide:database"
             :class="{
-              'outline outline-green-500': open,
+              'ring ring-green-500': open,
               'font-bold': cacheCount > 0,
             }"
           />

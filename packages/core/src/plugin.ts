@@ -1,4 +1,4 @@
-import type { HookPayload, ModelDefaults, ModelList, Plugin, StoreCore } from '@rstore/shared'
+import type { HookPayload, ModelDefaults, ModelList, Plugin, RegisteredPlugin, StoreCore } from '@rstore/shared'
 
 const mergedModelDefaultsFields = [
   'computed',
@@ -12,9 +12,12 @@ const deepMergedModelDefaultsFields = [
 export async function setupPlugin<
   TModelList extends ModelList,
   TModelDefaults extends ModelDefaults,
->(store: StoreCore<TModelList, TModelDefaults>, plugin: Plugin) {
+>(store: StoreCore<TModelList, TModelDefaults>, plugin: RegisteredPlugin) {
   await plugin.setup({
     hook(name, callback, options) {
+      plugin.hooks[name] ??= []
+      plugin.hooks[name].push({ callback, options })
+
       return store.$hooks.hook(name, (payload: HookPayload) => {
         // Plugin scoping to specific models with the same scopeId
         if (!options?.ignoreScope && plugin.scopeId && 'model' in payload && payload.model.scopeId && payload.model.scopeId !== plugin.scopeId) {

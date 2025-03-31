@@ -30,6 +30,11 @@ function convertFunctionsToString(obj: Record<string, any> | undefined) {
 export const devtoolsPlugin = definePlugin({
   name: 'rstore-devtools',
 
+  meta: {
+    builtin: true,
+    description: 'Integrate with Nuxt Devtools',
+  },
+
   setup({ hook }) {
     const storeStats = useStoreStats()
 
@@ -113,6 +118,8 @@ export const devtoolsPlugin = definePlugin({
       })
       historyUpdated.trigger()
     })
+
+    // Subscriptions
 
     const subscriptionsUpdated = nuxtApp.$rstoreSubscriptionsUpdated = createEventHook()
 

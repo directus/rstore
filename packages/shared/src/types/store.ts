@@ -2,7 +2,7 @@ import type { Hooks } from '../utils/hooks'
 import type { Cache } from './cache'
 import type { Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelList } from './model'
 import type { MutationOperation } from './mutation'
-import type { Plugin } from './plugin'
+import type { RegisteredPlugin } from './plugin'
 import type { FetchPolicy, FindOptions } from './query'
 
 export interface StoreCore<
@@ -12,7 +12,7 @@ export interface StoreCore<
   $cache: Cache<TModelList, TModelDefaults>
   $models: ResolvedModelList<TModelList, TModelDefaults>
   $modelDefaults: TModelDefaults
-  $plugins: Array<Plugin>
+  $plugins: Array<RegisteredPlugin>
   $hooks: Hooks<TModelList, TModelDefaults>
   $findDefaults: Partial<FindOptions<any, any, any>>
   $getFetchPolicy: (value: FetchPolicy | null | undefined) => FetchPolicy
