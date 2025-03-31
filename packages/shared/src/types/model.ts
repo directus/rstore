@@ -77,6 +77,13 @@ export interface Model<
 
   'formSchema'?: TSchemas
 
+  /**
+   * Allows scoping the model to specific plugins.
+   *
+   * This is useful when you have multiple data sources.
+   */
+  'scopeId'?: string
+
   'meta'?: CustomModelMeta
 
   /**
@@ -136,6 +143,7 @@ export interface ResolvedModel<
   'computed': NonNullable<TModelDefaults['computed'] & TModel['computed']>
   'fields': TModel['fields']
   'formSchema': Full<TSchemas>
+  'scopeId'?: string
   'meta'?: CustomModelMeta
   '~item'?: TModel['~item']
 }

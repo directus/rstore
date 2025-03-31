@@ -174,8 +174,8 @@ export default defineNuxtModule<ModuleOptions>({
       for (const { key, table, tableName, config } of tables) {
         const model: Model = {
           name: key,
+          scopeId: 'rstore-drizzle',
           meta: {
-            scopeId: 'rstore-drizzle',
             table: tableName,
             primaryKeys: (config as any)?.primaryKeys?.length ? (config as any).primaryKeys : (config?.columns as any[] | undefined)?.filter(col => col.primary).map(col => col.keyAsName ? col.key : col.name),
           },
@@ -378,6 +378,7 @@ export const useDrizzles = {
           models.map((model) => {
             let code = `{`
             code += `name: '${model.name}',`
+            code += `scopeId: '${model.scopeId}',`
             code += `meta: ${JSON.stringify(model.meta)},`
             if (model.relations) {
               code += `relations: ${JSON.stringify(model.relations)},`

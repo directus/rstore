@@ -1,6 +1,12 @@
+import type { Plugin } from '../types/plugin.js'
 import type { Awaitable } from '../types/utils.js'
 
 type HookCallback<TParams extends (any[] | never), TReturn> = (...arguments_: TParams) => Awaitable<TReturn>
+
+interface StoredHookCallback<TParams extends (any[] | never), TReturn> {
+  callback: HookCallback<TParams, TReturn>
+  plugin?: Plugin
+}
 
 type HookKeys<T> = keyof T & string
 
@@ -8,7 +14,7 @@ export class Hookable<
   HooksT extends Record<string, HookCallback<any, any>> = Record<string, HookCallback<any, any>>,
   HookNameT extends HookKeys<HooksT> = HookKeys<HooksT>,
 > {
-  private _hooks: { [key: string]: HookCallback<any, any>[] } = {}
+  private _hooks: { [key: string]: StoredHookCallback<any, any>[] } = {}
 
   constructor() {
     this.hook = this.hook.bind(this)
@@ -17,19 +23,22 @@ export class Hookable<
     // this.callHookWith = this.callHookWith.bind(this)
   }
 
-  hook<HookName extends HookNameT>(name: HookName, callback: HooksT[HookName]): () => void {
+  hook<HookName extends HookNameT>(name: HookName, callback: HooksT[HookName], plugin?: Plugin): () => void {
     if (!this._hooks[name]) {
       this._hooks[name] = []
     }
-    this._hooks[name].push(callback)
+    this._hooks[name].push({
+      callback,
+      plugin,
+    })
     return () => {
-      this._hooks[name] = this._hooks[name].filter(cb => cb !== callback)
+      this._hooks[name] = this._hooks[name].filter(cb => cb.callback !== callback)
     }
   }
 
   async callHook<HookName extends HookNameT>(name: HookName, ...args: Parameters<HooksT[HookName]>): Promise<ReturnType<HooksT[HookName]> | undefined> {
     let returned: any
-    for (const callback of this._hooks[name] ?? []) {
+    for (const { callback } of this._hooks[name] ?? []) {
       const result = await callback(...args as any[])
       if (result != null) {
         returned = result
@@ -40,7 +49,7 @@ export class Hookable<
 
   callHookSync<HookName extends HookNameT>(name: HookName, ...args: Parameters<HooksT[HookName]>): ReturnType<HooksT[HookName]> | undefined {
     let returned: any
-    for (const callback of this._hooks[name] ?? []) {
+    for (const { callback } of this._hooks[name] ?? []) {
       const result = callback(...args as any[])
       if (result != null) {
         returned = result

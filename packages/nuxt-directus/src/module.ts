@@ -65,8 +65,8 @@ export default defineNuxtModule<ModuleOptions>({
     const models: Array<Model> = collections.map((collection) => {
       return {
         name: collection.collection,
+        scopeId: 'rstore-directus',
         meta: {
-          scopeId: 'rstore-directus',
         },
         relations: {}, // TODO
       }
@@ -79,6 +79,7 @@ export default defineNuxtModule<ModuleOptions>({
           models.map((model) => {
             let code = `{`
             code += `name: '${model.name}',`
+            code += `scopeId: '${model.scopeId}',`
             code += `meta: ${JSON.stringify(model.meta)},`
             if (model.relations) {
               code += `relations: ${JSON.stringify(model.relations)},`

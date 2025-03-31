@@ -54,6 +54,47 @@ export default definePlugin({
 
 Explore the [Plugin hooks](./hooks.md) for a complete list of available hooks.
 
+## Scope ID
+
+The scope ID allows filtering which plugins will handle the model. For example, if a model has a scope A, only plugins with the scope A will be able to handle it by default. This is very useful to handle multiple data sources.
+
+```ts{3}
+export default definePlugin({
+  name: 'my-plugin',
+  scopeId: 'my-scope',
+})
+```
+
+In the following example, the `fetchMany` hook will only be called with the models that have the `my-scope` scope ID:
+
+```ts
+export default definePlugin({
+  name: 'my-plugin',
+  scopeId: 'my-scope',
+  setup({ hook }) {
+    hook('fetchMany', async (payload) => {
+      // This will only be called for models with the scopeId 'my-scope'
+    })
+  }
+})
+```
+
+You can opt-out of the filtering with the `ignoreScope` option of the hooks:
+
+```ts
+export default definePlugin({
+  name: 'my-plugin',
+  scopeId: 'my-scope',
+  setup({ hook }) {
+    hook('fetchMany', async (payload) => {
+      // This will be called for all models regardless of their scopeId
+    }, {
+      ignoreScope: true,
+    })
+  }
+})
+```
+
 ## Adding model defaults
 
 Plugins can define default options for all models using the `addModelDefaults` method:

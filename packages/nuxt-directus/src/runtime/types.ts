@@ -5,10 +5,6 @@ import type { QueryFilter } from '@directus/sdk'
 import type { Model, ModelDefaults, ModelList } from '@rstore/vue'
 
 declare module '@rstore/vue' {
-  export interface CustomModelMeta {
-    scopeId?: string
-  }
-
   export interface FindOptions<
     TModel extends Model,
     TModelDefaults extends ModelDefaults,

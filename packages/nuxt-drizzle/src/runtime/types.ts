@@ -5,7 +5,6 @@ import type { RstoreDrizzleCondition } from './utils/types'
 
 declare module '@rstore/vue' {
   export interface CustomModelMeta {
-    scopeId?: string
     table?: string
     primaryKeys?: string[]
   }

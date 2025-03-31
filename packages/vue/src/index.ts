@@ -20,6 +20,7 @@ export type {
   CustomHookMeta,
   CustomModelMeta,
   CustomParams,
+  CustomPluginMeta,
   CustomSortOption,
   FindOptions,
   Model,

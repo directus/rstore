@@ -81,6 +81,7 @@ export function resolveModel<
       create: model.formSchema?.create ?? emptySchemas.create,
       update: model.formSchema?.update ?? emptySchemas.update,
     },
+    scopeId: model.scopeId,
     meta: {
       ...defaults?.meta,
       ...model.meta,

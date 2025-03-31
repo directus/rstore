@@ -1,9 +1,9 @@
-import type { ModelDefaults, ModelList, Plugin, StoreCore } from '@rstore/shared'
+import { createHooks, type ModelDefaults, type ModelList, type Plugin, type StoreCore } from '@rstore/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { setupPlugin } from '../src/plugin'
 
 describe('setupPlugin', () => {
-  it('should call plugin.setup with the correct hook', async () => {
+  it('should call plugin.setup', async () => {
     const mockHook = vi.fn()
     const mockStore: StoreCore<ModelList, ModelDefaults> = {
       $hooks: {
@@ -19,7 +19,7 @@ describe('setupPlugin', () => {
     await setupPlugin(mockStore, mockPlugin)
 
     expect(mockPlugin.setup).toHaveBeenCalledWith({
-      hook: mockHook,
+      hook: expect.any(Function),
       addModelDefaults: expect.any(Function),
     })
   })
@@ -56,6 +56,170 @@ describe('setupPlugin', () => {
     }
 
     await expect(setupPlugin(mockStore, mockPlugin)).rejects.toThrow('Setup failed')
+  })
+
+  describe('hook', () => {
+    it('should register hook', async () => {
+      const mockHook = vi.fn()
+      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+        $hooks: {
+          hook: mockHook,
+        },
+      } as any
+
+      const mockPlugin: Plugin = {
+        name: 'test',
+        setup: ({ hook }) => {
+          hook('fetchMany', () => {})
+        },
+      }
+
+      await setupPlugin(mockStore, mockPlugin)
+
+      expect(mockHook).toHaveBeenCalledWith('fetchMany', expect.any(Function), mockPlugin)
+    })
+
+    it('should filter hook with scopeId', async () => {
+      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+        $hooks: createHooks(),
+      } as any
+
+      const hookCallback = vi.fn()
+
+      const mockPlugin: Plugin = {
+        name: 'test',
+        scopeId: 'my-scope',
+        setup: ({ hook }) => {
+          hook('fetchMany', hookCallback)
+        },
+      }
+
+      await setupPlugin(mockStore, mockPlugin)
+
+      await mockStore.$hooks.callHook('fetchMany', {
+        model: {
+          name: 'Todo',
+          scopeId: 'my-scope',
+        } as any,
+      } as any)
+
+      await mockStore.$hooks.callHook('fetchMany', {
+        model: {
+          name: 'Message',
+          scopeId: 'other-scope',
+        } as any,
+      } as any)
+
+      expect(hookCallback).toHaveBeenCalledOnce()
+      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
+    })
+
+    it('should not filter hook with scopeId with ignoreScope', async () => {
+      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+        $hooks: createHooks(),
+      } as any
+
+      const hookCallback = vi.fn()
+
+      const mockPlugin: Plugin = {
+        name: 'test',
+        scopeId: 'my-scope',
+        setup: ({ hook }) => {
+          hook('fetchMany', hookCallback, {
+            ignoreScope: true,
+          })
+        },
+      }
+
+      await setupPlugin(mockStore, mockPlugin)
+
+      await mockStore.$hooks.callHook('fetchMany', {
+        model: {
+          name: 'Todo',
+          scopeId: 'my-scope',
+        } as any,
+      } as any)
+
+      await mockStore.$hooks.callHook('fetchMany', {
+        model: {
+          name: 'Message',
+          scopeId: 'other-scope',
+        } as any,
+      } as any)
+
+      expect(hookCallback).toHaveBeenCalledTimes(2)
+      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
+      expect(hookCallback.mock.calls[1][0].model.name).toBe('Message')
+    })
+
+    it('should not filter hook with model without scope', async () => {
+      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+        $hooks: createHooks(),
+      } as any
+
+      const hookCallback = vi.fn()
+
+      const mockPlugin: Plugin = {
+        name: 'test',
+        scopeId: 'my-scope',
+        setup: ({ hook }) => {
+          hook('fetchMany', hookCallback)
+        },
+      }
+
+      await setupPlugin(mockStore, mockPlugin)
+
+      await mockStore.$hooks.callHook('fetchMany', {
+        model: {
+          name: 'Todo',
+        } as any,
+      } as any)
+
+      await mockStore.$hooks.callHook('fetchMany', {
+        model: {
+          name: 'Message',
+        } as any,
+      } as any)
+
+      expect(hookCallback).toHaveBeenCalledTimes(2)
+      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
+      expect(hookCallback.mock.calls[1][0].model.name).toBe('Message')
+    })
+
+    it('should not filter hook with plugin without scope', async () => {
+      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+        $hooks: createHooks(),
+      } as any
+
+      const hookCallback = vi.fn()
+
+      const mockPlugin: Plugin = {
+        name: 'test',
+        setup: ({ hook }) => {
+          hook('fetchMany', hookCallback)
+        },
+      }
+
+      await setupPlugin(mockStore, mockPlugin)
+
+      await mockStore.$hooks.callHook('fetchMany', {
+        model: {
+          name: 'Todo',
+          scopeId: 'my-scope',
+        } as any,
+      } as any)
+
+      await mockStore.$hooks.callHook('fetchMany', {
+        model: {
+          name: 'Message',
+          scopeId: 'other-scope',
+        } as any,
+      } as any)
+
+      expect(hookCallback).toHaveBeenCalledTimes(2)
+      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
+      expect(hookCallback.mock.calls[1][0].model.name).toBe('Message')
+    })
   })
 
   describe('addModelDefaults', () => {

@@ -1,6 +1,10 @@
-import type { Hooks } from '../utils/hooks.js'
+import type { HookDefinitions } from './hooks.js'
 import type { ModelDefaults, ModelList } from './model.js'
 import type { Awaitable } from './utils.js'
+
+export interface CustomPluginMeta {
+  // empty
+}
 
 export interface Plugin {
   /**
@@ -14,6 +18,22 @@ export interface Plugin {
    * @returns
    */
   setup: (api: PluginSetupApi) => Awaitable<void>
+
+  /**
+   * Allows scoping the plugin to specific models with the same scopeId.
+   *
+   * This is useful when you have multiple data sources.
+   */
+  scopeId?: string
+
+  meta?: CustomPluginMeta
+}
+
+export interface HookPluginOptions {
+  /**
+   * Allows the hook to be called with any model, even with different scopeId.
+   */
+  ignoreScope?: boolean
 }
 
 export interface PluginSetupApi {
@@ -22,5 +42,10 @@ export interface PluginSetupApi {
    */
   addModelDefaults: (modelDefaults: ModelDefaults) => void
 
-  hook: Hooks<ModelList, ModelDefaults>['hook']
+  hook: <
+    TName extends keyof HookDefinitions<ModelList, ModelDefaults>,
+  > (name: TName,
+    callback: HookDefinitions<ModelList, ModelDefaults>[TName],
+    options?: HookPluginOptions
+  ) => () => void
 }

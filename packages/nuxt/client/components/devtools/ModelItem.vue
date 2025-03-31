@@ -46,6 +46,19 @@ const cacheCount = computed(() => Object.keys((cache.value as any)[props.item.na
       </UPopover>
     </div>
 
+    <div class="text-xs font-mono border border-default rounded p-2 flex gap-4">
+      <div class="opacity-75 flex items-center gap-1">
+        <UIcon name="lucide:focus" />
+        Scope ID
+      </div>
+      <div v-if="item.scopeId" class="font-bold bg-gray-500/25 rounded px-1">
+        {{ item.scopeId }}
+      </div>
+      <div v-else class="italic opacity-50">
+        None (handled by all plugins)
+      </div>
+    </div>
+
     <div v-if="Object.keys(item.relations).length" class="text-xs font-mono border border-default rounded p-2 flex flex-col gap-1">
       <div class="opacity-75 flex items-center gap-1">
         <UIcon name="lucide:link" />

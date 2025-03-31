@@ -1,4 +1,4 @@
-import type { ModelDefaults, ModelList, Plugin, StoreCore } from '@rstore/shared'
+import type { HookPayload, ModelDefaults, ModelList, Plugin, StoreCore } from '@rstore/shared'
 
 const mergedModelDefaultsFields = [
   'computed',
@@ -14,7 +14,15 @@ export async function setupPlugin<
   TModelDefaults extends ModelDefaults,
 >(store: StoreCore<TModelList, TModelDefaults>, plugin: Plugin) {
   await plugin.setup({
-    hook: store.$hooks.hook,
+    hook(name, callback, options) {
+      return store.$hooks.hook(name, (payload: HookPayload) => {
+        // Plugin scoping to specific models with the same scopeId
+        if (!options?.ignoreScope && plugin.scopeId && 'model' in payload && payload.model.scopeId && payload.model.scopeId !== plugin.scopeId) {
+          return
+        }
+        return callback(payload as any)
+      }, plugin)
+    },
 
     addModelDefaults(modelDefaults) {
       for (const key of Object.keys(modelDefaults) as Array<keyof ModelDefaults>) {

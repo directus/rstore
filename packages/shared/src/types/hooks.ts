@@ -298,3 +298,5 @@ export interface HookDefinitions<
     }
   ) => Awaitable<void>
 }
+
+export type HookPayload = Parameters<HookDefinitions<ModelList, ModelDefaults>[keyof HookDefinitions<ModelList, ModelDefaults>]>[0]

@@ -105,6 +105,25 @@ const todoModel = defineDataModel({
 })
 ```
 
+## Scope ID
+
+The scope ID allows filtering which plugins will handle the model. For example, if a model has a scope A, only plugins with the scope A will be able to handle it by default. This is very useful to handle multiple data sources.
+
+```ts
+const todoModel = defineDataModel({
+  name: 'todos',
+  scopeId: 'main-backend',
+  // Only plugins with the scopeId 'main-backend'
+  // will be able to handle this model by default
+})
+```
+
+::: warning
+If the scope ID is not defined, the model will be handle by all plugins.
+:::
+
+Learn more about scope ID in [plugins](../plugin/setup.md#scope-id).
+
 ## Model metadata
 
 The model can have metadata that can be used to customize the behavior of the model.
