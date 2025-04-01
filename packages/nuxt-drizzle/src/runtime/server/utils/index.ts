@@ -13,14 +13,14 @@ export interface RstoreDrizzleQueryParams {
 }
 
 export function getDrizzleTableFromModel(modelName: string) {
-  const { table: tableKey, primaryKeys } = (modelMetas as Record<string, CustomModelMeta>)[modelName]!
-  const table = (tables as any)[tableKey!] as Table
+  const table = (tables as any)[modelName] as Table
   if (!table) {
     throw createError({
       statusCode: 404,
-      statusMessage: `Table ${tableKey} not found for model ${modelName}`,
+      statusMessage: `Table not found for model ${modelName}`,
     })
   }
+  const { table: tableKey, primaryKeys } = (modelMetas as Record<string, CustomModelMeta>)[modelName]!
   return {
     table,
     tableKey,
