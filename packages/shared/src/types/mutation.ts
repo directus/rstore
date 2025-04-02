@@ -28,7 +28,9 @@ export type CreateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['create']>> & Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>> & CreateFormObjectBase<TModel, TModelDefaults, TModelList>
+> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['create']>>
+  & CreateFormObjectBase<TModel, TModelDefaults, TModelList>
+  & Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 
 export interface UpdateFormObjectBase<
   TModel extends Model,
@@ -46,4 +48,6 @@ export type UpdateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['update']>> & Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>> & UpdateFormObjectBase<TModel, TModelDefaults, TModelList>
+> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['update']>>
+  & UpdateFormObjectBase<TModel, TModelDefaults, TModelList>
+  & Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>

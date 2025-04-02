@@ -165,7 +165,9 @@ export type ResolvedModelItem<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> = ResolvedModelItemBase<TModel, TModelDefaults, TModelList> & ResolvedRelationItems<TModel, TModelDefaults, TModelList> & ResolvedComputedFields<TModel, TModelDefaults, TModelList>
+> = ResolvedModelItemBase<TModel, TModelDefaults, TModelList>
+  & ResolvedRelationItems<TModel, TModelDefaults, TModelList>
+  & ResolvedComputedFields<TModel, TModelDefaults, TModelList>
 
 export type ResolvedRelationItems<
   TModel extends Model,

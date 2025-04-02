@@ -1,5 +1,5 @@
 import type { constModels } from '#build/$rstore-model-const'
-import type { ModelByName, ModelDefaults, ModelNameMap, ResolvedModelItem, WrappedItem } from '@rstore/shared'
+import type { ModelByName, ModelNameMap, ResolvedModelItem, WrappedItem } from '@rstore/shared'
 import type { VueStore } from '@rstore/vue'
 import { useNuxtApp } from '#app'
 
@@ -11,9 +11,11 @@ export {
 
 export type StoreRawModels = typeof constModels
 
+export interface StoreModelDefaults {}
+
 export type Store = VueStore<
   StoreRawModels,
-  ModelDefaults
+  StoreModelDefaults
 >
 
 type StoreModelNameMap = ModelNameMap<StoreRawModels>
