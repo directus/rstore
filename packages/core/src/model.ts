@@ -1,4 +1,4 @@
-import type { DefaultIsInstanceOf, Full, GetKey, Model, ModelDefaults, ModelList, ModelSchemas, ResolvedModel, ResolvedModelList } from '@rstore/shared'
+import type { DefaultIsInstanceOf, Exactly, Full, GetKey, Model, ModelDefaults, ModelList, ModelSchemas, ResolvedModel, ResolvedModelList } from '@rstore/shared'
 
 export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
 
@@ -15,9 +15,7 @@ export function defineItemType<
      * Define a typed model.
      */
     model: <
-      TComputed extends Record<string, any>,
-      TSchemas extends ModelSchemas,
-      const TModel extends Model<TItem, TComputed, TSchemas> = Model<TItem, TComputed, TSchemas>,
+      const TModel extends Exactly<Model<TItem>, TModel>,
     > (model: TModel): TModel & { '~item': TItem } => model as any,
   }
 }

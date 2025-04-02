@@ -89,3 +89,8 @@ export type FilterNotStartingWith<Set, Needle extends string> = Set extends `${N
 export type FilterStartsWith<Set, Needle extends string> = Set extends `${Needle}${infer _X}` ? Set : never
 
 export type KeysToUnion<T> = T extends { [K in keyof T]: infer _V } ? keyof T : never
+
+/**
+ * Checks for excess properties in T that are not in U.
+ */
+export type Exactly<BaseType, TestedType> = BaseType & Record<Exclude<keyof TestedType, keyof BaseType>, never>
