@@ -1,4 +1,4 @@
-import type { CreateFormObject, CreateFormObjectBase, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, UpdateFormObject, WrappedItem } from '@rstore/shared'
+import type { CreateFormObject, CreateFormObjectBase, CustomHookMeta, Exactly, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, UpdateFormObject, WrappedItem } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueLiveQueryReturn } from './live'
@@ -57,7 +57,7 @@ export interface VueModelApi<
    * Create a reactive query for the first item that matches the given options.
    */
   queryFirst: <
-    const TOptions extends string | number | FindFirstOptions<TModel, TModelDefaults, TModelList> | { enabled: false },
+    const TOptions extends string | number | Exactly<FindFirstOptions<TModel, TModelDefaults, TModelList>, TOptions> | { enabled: false },
   > (
     options: MaybeRefOrGetter<TOptions>,
   ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TItem | null>>
@@ -80,7 +80,7 @@ export interface VueModelApi<
    * Create a reactive query for all items that match the given options.
    */
   queryMany: <
-    const TOptions extends FindManyOptions<TModel, TModelDefaults, TModelList> | undefined | { enabled: false },
+    const TOptions extends Exactly<FindManyOptions<TModel, TModelDefaults, TModelList>, TOptions> | undefined | { enabled: false },
   > (
     options?: MaybeRefOrGetter<TOptions>,
   ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, Array<TItem>>>
