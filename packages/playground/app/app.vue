@@ -74,6 +74,8 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
 
           <div class="flex-1" />
 
+          <UserMenu />
+
           <ClientOnly>
             <UTooltip text="rstore">
               <UButton

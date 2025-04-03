@@ -1,6 +1,8 @@
-import { type Cache, type CustomHookMeta, type FindOptions, get, type Hooks, type Model, type ModelDefaults, type ModelList, type Plugin, set, type StoreCore } from '@rstore/shared'
+import type { Cache, CustomHookMeta, FindOptions, Hooks, Model, ModelDefaults, ModelList, MutationSpecialProps, Plugin, StoreCore } from '@rstore/shared'
+import { get, set } from '@rstore/shared'
 import { defaultFetchPolicy } from './fetchPolicy'
 import { resolveModels } from './model'
+import { createModule } from './module'
 import { setupPlugin } from './plugin'
 
 export interface CreateStoreCoreOptions<
@@ -61,6 +63,11 @@ export async function createStoreCore<
     $mutationHistory: [],
     $isServer: options.isServer ?? false,
     $dedupePromises: new Map(),
+    $createModule(module) {
+      return createModule(store, module)
+    },
+    $registeredModules: new Map(),
+    $wrapMutation: mutation => mutation as typeof mutation & MutationSpecialProps,
   }
 
   if (options.transformStore) {
@@ -119,7 +126,7 @@ export async function createStoreCore<
     const possibleModels = Object.keys(relation.to)
     const childModel = store.$getModel(child, possibleModels)
     if (!childModel) {
-      throw new Error(`Could not determine type for relation ${parentModel.name}.${String(key)}`)
+      throw new Error(`Could not determine for relation ${parentModel.name}.${String(key)}`)
     }
     store.$processItemParsing(childModel, child)
   }

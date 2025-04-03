@@ -181,6 +181,11 @@ export function createCache<
         operation: 'delete',
       })
     },
+    getModuleState(name, initState) {
+      const cacheKey = `$${name}`
+      state.value[cacheKey] ??= initState
+      return state.value[cacheKey]
+    },
     getState() {
       return toRaw(state.value)
     },
@@ -204,10 +209,14 @@ export function createCache<
         meta: {},
       })
     },
-    // @ts-expect-error private
     _private: {
       state,
       wrappedItems,
     },
-  }
+  } satisfies Cache & {
+    _private: {
+      state: typeof state
+      wrappedItems: typeof wrappedItems
+    }
+  } as any
 }

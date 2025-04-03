@@ -84,6 +84,8 @@ export interface Model<
    */
   'scopeId'?: string
 
+  'state'?: () => Record<string, any>
+
   'meta'?: CustomModelMeta
 
   /**
@@ -133,7 +135,7 @@ export type ModelByName<TModels extends ModelList, TName extends string, TNameMa
 export interface ResolvedModel<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  _TModelList extends ModelList,
+  TModelList extends ModelList,
   TSchemas extends ModelSchemas = ModelSchemas,
 > {
   'name': string
@@ -144,6 +146,9 @@ export interface ResolvedModel<
   'fields': TModel['fields']
   'formSchema': Full<TSchemas>
   'scopeId'?: string
+  // 'state': () => ResolvedModelState<TModel>
+  // // 'global': NonNullable<TModel['global']>
+  // // 'mutations': NonNullable<TModel['mutations']>
   'meta'?: CustomModelMeta
   '~item'?: TModel['~item']
 }
@@ -200,3 +205,7 @@ type ResolvedComputedFields<
 > = {
   [K in keyof NonNullable<TModelDefaults['computed'] & TModel['computed']>]: ReturnType<NonNullable<TModelDefaults['computed'] & TModel['computed']>[K]>
 }
+
+// export type ResolvedModelState<
+//   TModel extends Model,
+// > = ReturnType<NonNullable<TModel['state']>>

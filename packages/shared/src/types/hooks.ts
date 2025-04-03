@@ -1,4 +1,5 @@
 import type { Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItemBase } from './model'
+import type { ResolvedModule } from './module'
 import type { FindOptions } from './query'
 import type { StoreCore } from './store'
 import type { Awaitable, Path, PathValue } from './utils'
@@ -295,6 +296,13 @@ export interface HookDefinitions<
       subscriptionId: string
       key?: string | number
       findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
+    }
+  ) => Awaitable<void>
+
+  moduleResolved: (
+    payload: {
+      store: StoreCore<TModelList, TModelDefaults>
+      module: ResolvedModule<any, any>
     }
   ) => Awaitable<void>
 }

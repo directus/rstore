@@ -94,3 +94,5 @@ export type KeysToUnion<T> = T extends { [K in keyof T]: infer _V } ? keyof T : 
  * Checks for excess properties in T that are not in U.
  */
 export type Exactly<BaseType, TestedType> = BaseType & Record<Exclude<keyof TestedType, keyof BaseType>, never>
+
+export type Brand<Base, Branding> = Base & { __brand: Branding }

@@ -3,7 +3,7 @@ import type { Model, ModelDefaults, ModelList, ResolvedModel } from '@rstore/sha
 
 const store = useNonNullRstore()
 
-const search = ref('')
+const search = useLocalStorage('rstore-search-models', '')
 
 const filteredTypes = computed(() => {
   return store.value.$models.filter((model) => {

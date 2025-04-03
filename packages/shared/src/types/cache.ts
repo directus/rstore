@@ -1,5 +1,6 @@
 import type { WrappedItem } from './item'
 import type { Model, ModelDefaults, ModelList, ModelRelation, ResolvedModel, ResolvedModelItemBase } from './model'
+import type { Module, ResolvedModuleState } from './module'
 
 /*
 
@@ -77,6 +78,8 @@ export interface Cache<
     relation: ModelRelation
     childItem: any
   }) => void
+
+  getModuleState: <TModule extends Module> (name: TModule['name'], initState: TModule['state']) => ResolvedModuleState<TModule>
 
   getState: () => CustomCacheState
 

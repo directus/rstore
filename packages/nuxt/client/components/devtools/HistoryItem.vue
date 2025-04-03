@@ -9,7 +9,7 @@ const duration = computed(() => {
     return null
   }
   const diff = props.item.ended.getTime() - props.item.started.getTime()
-  return diff < 1000 ? `${diff}ms` : `${(diff / 1000).toFixed(2)}s`
+  return formatDuration(diff)
 })
 
 const icons = {

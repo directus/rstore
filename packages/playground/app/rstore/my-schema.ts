@@ -27,6 +27,23 @@ export default [
         many: true,
       },
     },
+    // state: () => ({
+    //   currentUserKey: null as string | null,
+    // }),
+    // global: {
+
+    // },
+    // global: {
+    //   currentUser: {
+    //     find: state => ({
+    //       key: state.currentUserKey,
+    //     }),
+    //   },
+    // },
+    // mutations: {
+    //   login: {},
+    //   logout: {},
+    // },
     meta: {
       path: 'users',
     },

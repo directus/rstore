@@ -12,6 +12,10 @@ export interface MutationOperation<
   payload?: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 }
 
+export interface MutationSpecialProps {
+  // To be extended
+}
+
 export interface CreateFormObjectBase<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,

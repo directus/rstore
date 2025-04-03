@@ -49,6 +49,7 @@ export default defineConfig({
             { text: 'Form Object', link: '/guide/data/form' },
             { text: 'Subscriptions', link: '/guide/data/live' },
             { text: 'Cache', link: '/guide/data/cache' },
+            { text: 'Module', link: '/guide/data/module' },
           ],
         },
         {

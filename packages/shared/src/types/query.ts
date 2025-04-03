@@ -89,6 +89,11 @@ export interface FindOptionsBase<
    * @default true
    */
   dedupe?: boolean
+
+  /**
+   * Enable or disable the query.
+   */
+  enabled?: boolean
 }
 
 export type FindFirstOptions<

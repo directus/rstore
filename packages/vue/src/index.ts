@@ -1,4 +1,8 @@
 export {
+  defineModule,
+} from './module'
+
+export {
   addModel,
   createStore,
   removeModel,
@@ -26,4 +30,5 @@ export type {
   Model,
   ModelDefaults,
   ModelList,
+  Module,
 } from '@rstore/shared'

@@ -36,7 +36,7 @@ export class Hookable<
     }
   }
 
-  async callHook<HookName extends HookNameT>(name: HookName, ...args: Parameters<HooksT[HookName]>): Promise<ReturnType<HooksT[HookName]> | undefined> {
+  async callHook<const HookName extends HookNameT>(name: HookName, ...args: Parameters<HooksT[HookName]>): Promise<ReturnType<Awaited<HooksT[HookName]>> | undefined> {
     let returned: any
     for (const { callback } of this._hooks[name] ?? []) {
       const result = await callback(...args as any[])

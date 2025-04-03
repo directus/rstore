@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 const plugins = useStorePlugins()
-const search = ref('')
+const search = useLocalStorage('rstore-search-plugins', '')
 
 const filteredPlugins = computed(() => {
   return plugins.value.filter((plugin) => {

@@ -36,6 +36,7 @@ export default defineNuxtModule<ModuleOptions>({
       'defineItemType',
       'defineDataModel',
       'defineRstorePlugin',
+      'defineRstoreModule',
       'useStore',
     ].map(name => ({ from: importsFile, name })))
     addImports([

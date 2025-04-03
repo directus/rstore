@@ -2,6 +2,7 @@ import type { FindOptions, Model, ModelDefaults, ModelList, Plugin, StoreCore, W
 import { createStoreCore, resolveModel } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook } from '@vueuse/core'
+import { ref, type Ref } from 'vue'
 import { createModelApi, type VueModelApi } from './api'
 import { createCache } from './cache'
 
@@ -89,6 +90,33 @@ export async function createStore<
             return cacheResetEvent.on
           }
 
+          if (key === '$wrapMutation') {
+            return <TMutation extends (...args: any[]) => unknown>(mutation: TMutation) => {
+              const $loading = ref(false)
+              const $error = ref<Error | null>(null)
+              const $time = ref(0)
+              const wrappedMutation = async (...args: Parameters<TMutation>) => {
+                $loading.value = true
+                const start = performance.now()
+                try {
+                  await mutation(...args)
+                  $error.value = null
+                }
+                catch (e) {
+                  $error.value = e as Error
+                }
+                finally {
+                  $loading.value = false
+                  $time.value = performance.now() - start
+                }
+              }
+              wrappedMutation.$loading = $loading
+              wrappedMutation.$error = $error
+              wrappedMutation.$time = $time
+              return wrappedMutation
+            }
+          }
+
           return Reflect.get(store, key)
         },
       }) as VueStore<TModelList, TModelDefaults>
@@ -119,4 +147,12 @@ export function removeModel(store: VueStore, modelName: string) {
 
   store.$models.splice(index, 1)
   privateStore.$_modelNames.delete(modelName)
+}
+
+declare module '@rstore/shared' {
+  export interface MutationSpecialProps {
+    $loading: Ref<boolean>
+    $error: Ref<Error | null>
+    $time: Ref<number>
+  }
 }

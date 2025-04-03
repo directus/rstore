@@ -14,6 +14,7 @@ export default defineNuxtConfig({
     '../nuxt/src/module',
     '@nuxt/ui',
     '@vueuse/nuxt',
+    'nuxt-auth-utils',
 
     /**
      * Start a sub Nuxt Server for developing the client

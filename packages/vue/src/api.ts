@@ -167,6 +167,14 @@ export interface VueModelApi<
   getKey: (
     item: ResolvedModelItem<TModel, TModelDefaults, TModelList>,
   ) => string | number | null | undefined
+
+  writeItem: (
+    item: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>,
+  ) => WrappedItem<TModel, TModelDefaults, TModelList>
+
+  clearItem: (
+    key: string | number,
+  ) => void
 }
 
 export function createModelApi<
@@ -468,6 +476,29 @@ export function createModelApi<
     },
 
     getKey: item => model.getKey(item),
+
+    writeItem: (item) => {
+      const key = model.getKey(item)
+      if (!key) {
+        throw new Error('Item write failed: key is not defined')
+      }
+      store.$cache.writeItem({
+        model,
+        key,
+        item,
+      })
+      return store.$cache.readItem({
+        model,
+        key,
+      })!
+    },
+
+    clearItem: (key) => {
+      store.$cache.deleteItem({
+        model,
+        key,
+      })
+    },
   }
   return api
 }

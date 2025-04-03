@@ -1,5 +1,7 @@
 <script lang="ts" setup>
 const store = useHostRstore()
+
+await initHighlighter()
 </script>
 
 <template>

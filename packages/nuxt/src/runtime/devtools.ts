@@ -1,8 +1,11 @@
-import type { StoreHistoryItem, StoreSubscriptionItem } from '../../client/utils/types'
+import type { ResolvedModule } from '@rstore/shared'
+import type { ShallowRef } from 'vue'
 
+import type { StoreHistoryItem, StoreSubscriptionItem } from '../../client/utils/types'
 import { useNuxtApp, useState } from '#app'
 import { definePlugin } from '@rstore/vue'
 import { createEventHook } from '@vueuse/core'
+import { shallowRef, triggerRef, watch } from 'vue'
 
 function useStoreStats() {
   return useState('$rstore-devtools-stats', () => ({
@@ -141,6 +144,56 @@ export const devtoolsPlugin = definePlugin({
         subscriptionsUpdated.trigger()
       }
     })
+
+    // Modules
+
+    if (import.meta.client) {
+      const modulesUpdated = nuxtApp.$rstoreModulesUpdated = createEventHook()
+
+      let modules: ShallowRef<Map<string, ResolvedModule<any, any>>> | undefined
+
+      hook('init', (payload) => {
+        modules = shallowRef(payload.store.$registeredModules)
+
+        watch(() => {
+          const result: Record<string, any> = {}
+          for (const [moduleName, module] of modules!.value.entries()) {
+            const m = result[moduleName] = {
+              state: module.$state,
+            } as Record<string, any>
+            for (const key in module) {
+              if (key.startsWith('$')) {
+                continue
+              }
+              const value = module[key]
+              // Register reactivity dependencies on mutation refs
+              if (value?.__brand === 'rstore-module-mutation') {
+                m[key] = {
+                  $loading: value.$loading.value,
+                  $error: value.$error.value,
+                }
+              }
+              else {
+                m[key] = value
+              }
+            }
+          }
+          return result
+        }, () => {
+          modulesUpdated.trigger()
+        }, {
+          deep: true,
+        })
+      })
+
+      hook('moduleResolved', (payload) => {
+        modulesUpdated.trigger()
+        if (modules) {
+          modules.value = payload.store.$registeredModules
+          triggerRef(modules)
+        }
+      })
+    }
   },
 })
 

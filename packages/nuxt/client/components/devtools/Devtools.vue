@@ -23,6 +23,11 @@ const tabs: Array<TabsItem> = [
     icon: 'lucide:bell',
   },
   {
+    label: 'Modules',
+    slot: 'modules',
+    icon: 'lucide:circuit-board',
+  },
+  {
     label: 'Plugins',
     slot: 'plugins',
     icon: 'lucide:puzzle',
@@ -109,6 +114,10 @@ const showCacheOps = useLocalStorage('rstore-devtools-show-cache-ops', false)
 
       <template v-if="currentTab.slot === 'subscriptions'">
         <DevtoolsSubscriptions />
+      </template>
+
+      <template v-if="currentTab.slot === 'modules'">
+        <DevtoolsModules />
       </template>
 
       <template v-if="currentTab.slot === 'plugins'">

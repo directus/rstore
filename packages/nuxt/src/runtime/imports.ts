@@ -6,6 +6,7 @@ import { useNuxtApp } from '#app'
 export * from '@rstore/vue'
 
 export {
+  defineModule as defineRstoreModule,
   definePlugin as defineRstorePlugin,
 } from '@rstore/vue'
 
