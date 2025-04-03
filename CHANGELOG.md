@@ -1,6 +1,35 @@
 # Changelog
 
 
+## v0.6.1
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.6.0...v0.6.1)
+
+### 🚀 Enhancements
+
+- Record module mutations in the mutation history ([db41348](https://github.com/Akryum/rstore/commit/db41348))
+
+### 🩹 Fixes
+
+- **vue:** Throw error in wrapped mutation ([d78e144](https://github.com/Akryum/rstore/commit/d78e144))
+
+### 💅 Refactors
+
+- Deprecate store.$createModule -> use createModule directly ([757d48a](https://github.com/Akryum/rstore/commit/757d48a))
+
+### 📖 Documentation
+
+- Update federation docs ([c9f518e](https://github.com/Akryum/rstore/commit/c9f518e))
+- More cache docs ([6c239c1](https://github.com/Akryum/rstore/commit/6c239c1))
+
+### 🏡 Chore
+
+- Add create module API jsdoc ([dbe1db9](https://github.com/Akryum/rstore/commit/dbe1db9))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.0
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.5.9...v0.6.0)
