@@ -119,10 +119,10 @@ const todoModel = defineDataModel({
 ```
 
 ::: warning
-If the scope ID is not defined, the model will be handle by all plugins.
+If the scope ID is not defined, the model will be handled by all plugins.
 :::
 
-Learn more about scope ID in [plugins](../plugin/setup.md#scope-id).
+Learn more about federation and multi-source [here](./federation.md).
 
 ## Model metadata
 

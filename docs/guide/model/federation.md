@@ -1,64 +1,61 @@
 # Federation & Multi-sources
 
-To implement multiple data sources, we can use the `meta` object of the models to specify the source of the data. Plugins process all models, which means that they can be scoped to a specific set of models depending on the `meta` object using conditional logic.
+To implement multiple data sources, we can use the `scopeId` of the models and the plugins to specify the source of the data. Plugins process all models that share their `scopeId`.
 
-For example, we could create a `sourceId` property in the `meta` object of the models.
+## Models
 
-If you are using TypeScript, you can augment the `CustomModelMeta` interface:
+The scope ID allows filtering which plugins will handle the model. For example, if a model has a scope A, only plugins with the scope A will be able to handle it by default. This is very useful to handle multiple data sources.
 
-```ts
-declare module '@rstore/vue' {
-  export interface CustomModelMeta {
-    sourceId?: string
-  }
-}
-
-export {}
-```
-
-In the models you can add the `sourceId` property to the `meta` object:
-
-::: code-group
-
-```js [model.js]
-import { defineDataModel } from '@rstore/vue'
-
-export const todoModel = defineDataModel({
+```ts{3}
+const todoModel = defineDataModel({
   name: 'todos',
-  meta: {
-    sourceId: 'app1',
-  },
+  scopeId: 'main-backend',
+  // Only plugins with the scopeId 'main-backend'
+  // will be able to handle this model by default
 })
 ```
 
-```ts [model.ts]
-import { defineItemType } from '@rstore/vue'
-
-export const todoModel = defineItemType<Todo>().model({
-  name: 'todos',
-  meta: {
-    sourceId: 'app1',
-  },
-})
-```
-
+::: warning
+If the scope ID is not defined, the model will be handled by all plugins.
 :::
 
-Then, in the plugin, you can use the `sourceId` property to filter the models:
+## Plugins
 
-```ts
-import { definePlugin } from '@rstore/vue'
+The scope ID allows filtering which plugins will handle the model. For example, if a model has a scope A, only plugins with the scope A will be able to handle it by default. This is very useful to handle multiple data sources.
 
+```ts{3}
 export default definePlugin({
-  name: 'app1-plugin',
-  setup({ hook }) {
-    hook('fetchFirst', async (payload) => {
-      if (payload.model.meta?.sourceId === 'app1') {
-        // Fetch data from the app1 source
-      }
-    })
-  },
+  name: 'my-plugin',
+  scopeId: 'main-backend',
 })
 ```
 
-Since rstore all models and all plugins are processed in the same context by design, all items from multiple sources can seamlessly load relations from other sources.
+In the following example, the `fetchMany` hook will only be called with the models that have the `main-backend` scope ID:
+
+```ts
+export default definePlugin({
+  name: 'my-plugin',
+  scopeId: 'main-backend',
+  setup({ hook }) {
+    hook('fetchMany', async (payload) => {
+      // This will only be called for models with the scopeId 'main-backend'
+    })
+  }
+})
+```
+
+You can opt-out of the filtering with the `ignoreScope` option of the hooks:
+
+```ts
+export default definePlugin({
+  name: 'my-plugin',
+  scopeId: 'main-backend',
+  setup({ hook }) {
+    hook('fetchMany', async (payload) => {
+      // This will be called for all models regardless of their scopeId
+    }, {
+      ignoreScope: true,
+    })
+  }
+})
+```

@@ -95,6 +95,8 @@ export default definePlugin({
 })
 ```
 
+Learn more about federation and multi-source [here](../model/federation.md).
+
 ## Adding model defaults
 
 Plugins can define default options for all models using the `addModelDefaults` method:
