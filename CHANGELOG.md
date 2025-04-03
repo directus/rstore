@@ -1,6 +1,35 @@
 # Changelog
 
 
+## v0.6.0
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.5.9...v0.6.0)
+
+### 🚀 Enhancements
+
+- Scope id, closes #9 ([#9](https://github.com/Akryum/rstore/issues/9))
+- **devtools:** Plugins tab ([b48bf6c](https://github.com/Akryum/rstore/commit/b48bf6c))
+- Modules, closes #10 ([#10](https://github.com/Akryum/rstore/issues/10))
+
+### 🩹 Fixes
+
+- **drizzle:** Table with different name not recognized, fix #30 ([#30](https://github.com/Akryum/rstore/issues/30))
+
+### 📖 Documentation
+
+- Added some schemas ([1db4dc6](https://github.com/Akryum/rstore/commit/1db4dc6))
+
+### 🌊 Types
+
+- **nuxt:** Add Store, StoreResolvedModelItem and StoreWrappedItem to auto imports ([3ef23c3](https://github.com/Akryum/rstore/commit/3ef23c3))
+- Check for excess properties in `defineItemType.model` ([c52fb38](https://github.com/Akryum/rstore/commit/c52fb38))
+- **vue:** Check for excess properties in queryFirst, queryMany ([b6e2453](https://github.com/Akryum/rstore/commit/b6e2453))
+- **nuxt:** Don't use ModelDefaults as the store defaults type parameters to allow excess properties check ([758a4ea](https://github.com/Akryum/rstore/commit/758a4ea))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.5.9
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.5.8...v0.5.9)
