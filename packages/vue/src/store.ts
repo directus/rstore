@@ -104,6 +104,7 @@ export async function createStore<
                 }
                 catch (e) {
                   $error.value = e as Error
+                  throw e
                 }
                 finally {
                   $loading.value = false
