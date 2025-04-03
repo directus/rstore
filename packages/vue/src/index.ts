@@ -13,6 +13,7 @@ export type {
 } from './store'
 
 export {
+  createModule,
   defineDataModel,
   defineItemType,
   definePlugin,

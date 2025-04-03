@@ -2,6 +2,11 @@ import type { Awaitable, CreateModuleApi, Module, ModuleMutation, ResolvedModule
 
 type ResolveCallbacks = Array<() => Awaitable<unknown>>
 
+/**
+ * Define an rstore module.
+ *
+ * Learn more: https://rstore.dev/guide/data/module.html
+ */
 export function defineModule<
   const TModule extends Module,
   const TModuleExposed extends Record<string, any>,
@@ -22,6 +27,14 @@ export function defineModule<
   }
 }
 
+/**
+ * Create an rstore module. This function should be used inside the `defineModule` function.
+ *
+ * Learn more: https://rstore.dev/guide/data/module.html
+ * @param store The store instance
+ * @param module The module options
+ * @returns A module setup API
+ */
 export function createModule<
   TModule extends Module,
 >(store: StoreCore<any, any>, module: TModule): CreateModuleApi<TModule> {

@@ -1,7 +1,7 @@
 export const useAuth = defineRstoreModule(() => {
   const store = useStore()
 
-  const { state, resolve, onResolve, defineMutation } = store.$createModule({
+  const { state, resolve, onResolve, defineMutation } = createRstoreModule(store, {
     name: 'auth',
     state: {
       currentUserKey: null as string | null,

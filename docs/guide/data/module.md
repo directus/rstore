@@ -2,17 +2,17 @@
 
 In most application, there are cases where some specific logic or state is needed. For example, you may want to handle the current user with a specific key and also have special mutations for login or logout.
 
-For this, you can create an rstore module, which is a shared composable that calls `store.$createModule` and returns some exposed properties.
+For this, you can create an rstore module, which is a shared composable that calls `createModule` and returns some exposed properties.
 
 ```ts
 // src/composables/auth.ts
 
-import { defineModule } from '@rstore/vue'
+import { createModule, defineModule } from '@rstore/vue'
 
 export const useAuth = defineModule(() => {
   const store = useStore()
 
-  const { state, resolve, onResolve, defineMutation } = store.$createModule({
+  const { state, resolve, onResolve, defineMutation } = createModule(store, {
     name: 'auth',
     state: {
       // Create some state here
@@ -27,7 +27,7 @@ export const useAuth = defineModule(() => {
 ```
 
 ::: tip
-With the `@rstore/nuxt` module, you can directly use the auto-imported `defineRstoreModule` function instead of `defineModule`.
+With the `@rstore/nuxt` module, you can directly use the auto-imported `defineRstoreModule` function instead of `defineModule` and `createRstoreModule` instead of `createModule`.
 :::
 
 ## Benefits of using modules
@@ -44,10 +44,10 @@ With the `@rstore/nuxt` module, you can directly use the auto-imported `defineRs
 
 ## State
 
-Define the state of the module using the `state` option of `store.$createModule`. The state is reactive and stored in the rstore cache (which also means it is transferred to the client in SSR).
+Define the state of the module using the `state` option of `createModule`. The state is reactive and stored in the rstore cache (which also means it is transferred to the client in SSR).
 
 ```ts{3-5}
-const { state } = store.$createModule({
+const { state } = createModule(store, {
   name: 'auth',
   state: {
     currentUserKey: null as string | null,
@@ -60,7 +60,7 @@ const { state } = store.$createModule({
 You must return the result of the `resolve` function to expose the module properties. The `resolve` function takes an object with the properties you want to expose.
 
 ```ts{6-8}
-const { state, resolve } = store.$createModule({
+const { state, resolve } = createModule(store, {
   name: 'auth',
   state: {},
 })
@@ -73,7 +73,7 @@ return resolve({
 You can for example expose a query:
 
 ```ts
-const { state, resolve } = store.$createModule({
+const { state, resolve } = createModule(store, {
   name: 'auth',
   state: {
     currentUserKey: null as string | null,
@@ -105,7 +105,7 @@ const { data: currentUser } = auth.currentUser
 You can use the `onResolve` function to run some code when the module is resolved. This is useful for initializing the module or running some async code.
 
 ```ts
-const { state, resolve, onResolve, defineMutation } = store.$createModule({
+const { state, resolve, onResolve, defineMutation } = createModule(store, {
   name: 'auth',
   state: {
     currentUserKey: null as string | null,
@@ -167,7 +167,7 @@ Awaiting a module is always optional. You can use the module without awaiting it
 You can define mutations using the `defineMutation` function. This is useful for defining actions that modify the state of the module or the store in general.
 
 ```ts
-const { state, resolve, defineMutation } = store.$createModule({
+const { state, resolve, defineMutation } = createModule(store, {
   name: 'auth',
   state: {
     currentUserKey: null as string | null,

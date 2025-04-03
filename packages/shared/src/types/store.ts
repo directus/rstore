@@ -28,6 +28,9 @@ export interface StoreCore<
    * @private
    */
   $dedupePromises: Map<string, Promise<any>>
+  /**
+   * @deprecated Use `createModule` import instead.
+   */
   $createModule: <TModule extends Module> (module: TModule) => CreateModuleApi<TModule>
   /**
    * @private
