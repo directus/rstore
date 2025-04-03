@@ -45,10 +45,16 @@ export function createModule<
     $callbacks.push(cb)
   }
 
+  /**
+   * Allow looking up the exposed mutations.
+   */
+  let _exposed: Record<string, any> = {}
+
   return {
     ...module,
     state,
     resolve(exposed: any) {
+      _exposed = exposed
       const resolved: ResolvedModule<any, any> & {
         $callbacks: ResolveCallbacks
       } = {
@@ -66,6 +72,20 @@ export function createModule<
     },
     onResolve,
     defineMutation(mutation) {
+      let key: string | undefined
+      const originalMutation = mutation
+      mutation = ((...args: Parameters<typeof mutation>) => {
+        if (!key) {
+          key = Object.keys(_exposed).find(k => _exposed[k] === mutation)
+        }
+        store.$mutationHistory.push({
+          operation: 'module-mutation',
+          module: module.name,
+          key: key!,
+          payload: args,
+        })
+        return originalMutation(...args)
+      }) as typeof mutation
       mutation = store.$wrapMutation(mutation)
       ;(mutation as any).__brand = 'rstore-module-mutation'
       return mutation as ModuleMutation<typeof mutation>

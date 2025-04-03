@@ -1,5 +1,3 @@
-/* eslint-disable ts/no-unsafe-function-type */
-
 import type { MutationSpecialProps } from './mutation'
 import type { Awaitable, Brand } from './utils'
 
@@ -18,10 +16,10 @@ export type ResolvedModule<
   $state: ResolvedModuleState<TModule>
 }
 
-export type ModuleMutation<TMutation extends Function> = Brand<TMutation, 'rstore-module-mutation'> & MutationSpecialProps
+export type ModuleMutation<TMutation extends (...args: any[]) => unknown> = Brand<TMutation, 'rstore-module-mutation'> & MutationSpecialProps
 
 export type CreateModuleApi<TModule extends Module> = TModule & {
   resolve: <const TModuleExposed extends Record<string, any>> (exposed: TModuleExposed) => ResolvedModule<TModule, TModuleExposed>
-  defineMutation: <const TMutation extends Function> (mutation: TMutation) => ModuleMutation<TMutation>
+  defineMutation: <const TMutation extends (...args: any[]) => unknown> (mutation: TMutation) => ModuleMutation<TMutation>
   onResolve: (cb: () => Awaitable<unknown>) => void
 }

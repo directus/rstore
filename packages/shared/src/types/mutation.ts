@@ -6,8 +6,12 @@ export interface MutationOperation<
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
 > {
-  operation: 'create' | 'update' | 'delete'
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>
+  operation: 'create' | 'update' | 'delete' | 'module-mutation'
+  model?: ResolvedModel<TModel, TModelDefaults, TModelList>
+  module?: string
+  /**
+   * Either the key of the item in the model or the key of the exposed mutation in the module.
+   */
   key?: string | number
   payload?: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 }
