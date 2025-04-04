@@ -43,6 +43,7 @@ const exposed = computed(() => {
           {{ key }}
         </div>
 
+        <!-- Mutation -->
         <template v-if="value?.__brand === 'rstore-module-mutation'">
           <UBadge
             label="Mutation"
@@ -72,6 +73,49 @@ const exposed = computed(() => {
             :label="`Time: ${formatDuration(value.$time.value)}`"
             color="neutral"
             size="sm"
+            variant="soft"
+          />
+        </template>
+
+        <!-- Query -->
+        <template v-else-if="value?.data && value?.loading && value?.error">
+          <UBadge
+            label="Query"
+            size="sm"
+            color="info"
+            variant="soft"
+          />
+
+          <UBadge
+            icon="lucide:refresh-cw"
+            :label="`Loading: ${value.loading.value}`"
+            :color="value.loading.value ? 'info' : 'neutral'"
+            size="sm"
+            variant="soft"
+          />
+
+          <UBadge
+            :icon="value.error.value ? 'lucide:alert-triangle' : 'lucide:check-circle'"
+            :label="`Error: ${value.error.value}`"
+            :color="value.error.value ? 'error' : 'success'"
+            size="sm"
+            variant="soft"
+          />
+
+          <DevtoolsResultPopover :result="value.data.value" />
+        </template>
+
+        <!-- Ref -->
+        <template v-else-if="value && 'value' in value">
+          <DevtoolsResultPopover :result="value.value" />
+        </template>
+
+        <!-- Function -->
+        <template v-else-if="typeof value === 'function'">
+          <UBadge
+            label="Function"
+            size="sm"
+            color="info"
             variant="soft"
           />
         </template>

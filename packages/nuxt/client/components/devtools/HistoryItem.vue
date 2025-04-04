@@ -49,43 +49,7 @@ const icons = {
         <span v-if="item.item" class="whitespace-pre-wrap text-pink-500">{{ JSON.stringify(item.item, null, 2) }}</span>
         <span>)</span>
 
-        <UPopover
-          arrow
-        >
-          <template #default="{ open }">
-            <UBadge
-              v-if="item.result && Array.isArray(item.result)"
-              :label="item.result.length || '0'"
-              icon="lucide:arrow-right"
-              color="success"
-              size="sm"
-              :variant="item.result.length ? 'subtle' : 'outline'"
-              class="font-sans align-middle ml-1 cursor-pointer"
-              :class="{
-                'outline outline-primary-500': open,
-              }"
-            />
-            <UBadge
-              v-if="item.result && !Array.isArray(item.result)"
-              label="1"
-              icon="lucide:arrow-right"
-              color="success"
-              size="sm"
-              variant="subtle"
-              class="font-sans align-middle ml-1 cursor-pointer"
-              :class="{
-                'outline outline-primary-500': open,
-              }"
-            />
-          </template>
-
-          <template #content>
-            <CodeSnippet
-              :code="props.item.result"
-              class="text-xs p-2 max-w-120 max-h-90 overflow-auto"
-            />
-          </template>
-        </UPopover>
+        <DevtoolsResultPopover :result="item.result" class="ml-1" />
 
         <UBadge
           v-if="item.server"

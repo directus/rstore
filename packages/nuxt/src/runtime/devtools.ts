@@ -5,7 +5,7 @@ import type { StoreHistoryItem, StoreSubscriptionItem } from '../../client/utils
 import { useNuxtApp, useState } from '#app'
 import { definePlugin } from '@rstore/vue'
 import { createEventHook } from '@vueuse/core'
-import { shallowRef, triggerRef, watch } from 'vue'
+import { isRef, shallowRef, triggerRef, watch } from 'vue'
 
 function useStoreStats() {
   return useState('$rstore-devtools-stats', () => ({
@@ -172,6 +172,16 @@ export const devtoolsPlugin = definePlugin({
                   $loading: value.$loading.value,
                   $error: value.$error.value,
                 }
+              }
+              else if (value?.data && isRef(value.data) && value?.loading && isRef(value.loading) && value?.error && isRef(value.error)) {
+                m[key] = {
+                  data: value.data.value,
+                  loading: value.loading.value,
+                  error: value.error.value,
+                }
+              }
+              else if (isRef(value)) {
+                m[key] = value.value
               }
               else {
                 m[key] = value

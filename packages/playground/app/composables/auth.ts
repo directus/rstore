@@ -63,5 +63,6 @@ export const useAuth = defineRstoreModule(() => {
     currentUser,
     login,
     logout,
+    loggedIn: computed(() => !!state.currentUserKey),
   })
 })
