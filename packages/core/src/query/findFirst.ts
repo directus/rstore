@@ -37,7 +37,7 @@ export async function findFirst<
   }
 
   const dedupeKey = typeof keyOrOptions === 'string' ? keyOrOptions : JSON.stringify(keyOrOptions)
-  return dedupePromise(store.$dedupePromises, `findFirst:${dedupeKey}`, () => _findFirst({
+  return dedupePromise(store.$dedupePromises, `findFirst:${model.name}:${dedupeKey}`, () => _findFirst({
     store,
     meta,
     model,

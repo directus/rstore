@@ -148,6 +148,35 @@ describe('findFirst', () => {
       ])
     })
 
+    it('should not dedupe findFirst on different model', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult({ foo: payload.findOptions.key })
+      })
+      mockStore.$hooks.hook('fetchFirst', fn)
+
+      const result = await Promise.all([
+        findFirst({
+          store: mockStore,
+          model,
+          findOptions: '42',
+        }),
+        findFirst({
+          store: mockStore,
+          model: {
+            ...model,
+            name: 'Other',
+          },
+          findOptions: '42',
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledTimes(2)
+      expect(result.map(r => r.result)).toEqual([
+        { foo: '42' },
+        { foo: '42' },
+      ])
+    })
+
     it('should not dedupe findFirst on different key', async () => {
       const fn = vi.fn((payload) => {
         payload.setResult({ foo: payload.findOptions.key })

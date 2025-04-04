@@ -146,6 +146,35 @@ describe('findMany', () => {
       ])
     })
 
+    it('should not dedupe findMany on different model', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult([{ foo: 'bar' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fn)
+
+      const result = await Promise.all([
+        findMany({
+          store: mockStore,
+          model,
+          findOptions: { filter: { id: { eq: '42' } } },
+        }),
+        findMany({
+          store: mockStore,
+          model: {
+            ...model,
+            name: 'Other',
+          },
+          findOptions: { filter: { id: { eq: '42' } } },
+        }),
+      ])
+
+      expect(fn).toHaveBeenCalledTimes(2)
+      expect(result.map(r => r.result)).toEqual([
+        [{ foo: 'bar' }],
+        [{ foo: 'bar' }],
+      ])
+    })
+
     it('should not dedupe findMany on different findOptions', async () => {
       const fn = vi.fn((payload) => {
         payload.setResult([{ foo: payload.findOptions.filter.id.eq }])

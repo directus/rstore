@@ -37,7 +37,7 @@ export async function findMany<
   }
 
   const dedupeKey = JSON.stringify(findOptions)
-  return dedupePromise(store.$dedupePromises, `findMany:${dedupeKey}`, () => _findMany({
+  return dedupePromise(store.$dedupePromises, `findMany:${model.name}:${dedupeKey}`, () => _findMany({
     store,
     meta,
     model,
