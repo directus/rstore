@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.6.2
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.6.1...v0.6.2)
+
+### 🚀 Enhancements
+
+- **devtools:** More displayed in module exposed props ([a91f51b](https://github.com/Akryum/rstore/commit/a91f51b))
+
+### 🩹 Fixes
+
+- Not deduping on model, closes #31 ([#31](https://github.com/Akryum/rstore/issues/31))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.1
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.6.0...v0.6.1)
