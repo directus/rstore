@@ -26,6 +26,9 @@ declare module '@rstore/vue' {
      * @deprecated Use \`findOptions.where\` instead
      */
     where?: RstoreDrizzleCondition
+
+    limit?: number
+    offset?: number
   }
 }
 

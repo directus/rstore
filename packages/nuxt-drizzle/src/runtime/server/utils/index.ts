@@ -9,7 +9,8 @@ import { createError } from 'h3'
 
 export interface RstoreDrizzleQueryParams {
   where?: string
-  limit?: number
+  limit?: string
+  offset?: string
 }
 
 export function getDrizzleTableFromModel(modelName: string) {

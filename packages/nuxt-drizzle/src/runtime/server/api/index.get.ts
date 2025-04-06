@@ -27,7 +27,11 @@ export default eventHandler(async (event) => {
   }
 
   if (query.limit != null) {
-    q.limit(query.limit)
+    q.limit(Number.parseInt(query.limit))
+  }
+
+  if (query.offset != null) {
+    q.offset(Number.parseInt(query.offset))
   }
 
   return q.$dynamic()

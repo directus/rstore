@@ -6,8 +6,13 @@ useHead({
 const store = useStore()
 
 const filter = ref<'all' | 'unfinished' | 'finished'>('all')
-const { data: todos } = await store.todos.queryMany(() => ({
+const page = ref(0)
+const { data: todos, loading } = await store.todos.queryMany(() => ({
   where: filter.value === 'all' ? undefined : eq('completed', Number(filter.value === 'finished')),
+  params: {
+    limit: 10,
+    offset: page.value * 10,
+  },
 }))
 
 const createTodo = store.todos.createForm()
@@ -78,6 +83,15 @@ createTodo.$onSuccess(() => {
       v-for="{ id } in todos"
       :id
       :key="id"
+    />
+
+    <UButton
+      label="Load more"
+      color="neutral"
+      variant="soft"
+      :loading
+      block
+      @click="page++"
     />
 
     <div v-if="!todos.length" class="text-center text-gray-500 p-12">
