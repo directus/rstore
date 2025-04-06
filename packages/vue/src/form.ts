@@ -23,6 +23,7 @@ export interface FormObjectAdditionalProps<
    */
   $onSaved: EventHookOn<TData>
   $onSuccess: EventHookOn<TData>
+  $onError: EventHookOn<Error>
 }
 
 export function createFormObject<
@@ -31,6 +32,7 @@ export function createFormObject<
   const TAdditionalProps = Record<string, never>,
 >(options: CreateFormObjectOptions<TData, TSchema, TAdditionalProps>) {
   const onSuccess = createEventHook()
+  const onError = createEventHook<Error>()
   const form = reactive({
     ...options.defaultValues?.(),
     ...options.additionalProps,
@@ -69,6 +71,7 @@ export function createFormObject<
       }
       catch (error: any) {
         form.$error = error
+        onError.trigger(error)
         throw error
       }
       finally {
@@ -81,6 +84,7 @@ export function createFormObject<
     },
     $schema: markRaw(options.schema),
     $onSuccess: onSuccess.on,
+    $onError: onError.on,
     $onSaved(...args) {
       console.warn(`$onSaved() is deprecated, use $onSuccess() instead`)
       return this.$onSaved(...args)
