@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
+import type { FormObjectBase } from './form'
 import type { Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem } from './model'
 
 export interface MutationOperation<
@@ -20,17 +21,11 @@ export interface MutationSpecialProps {
   // To be extended
 }
 
-export interface CreateFormObjectBase<
+export type CreateFormObjectBase<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> {
-  $save: () => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-  $reset: () => void
-  $schema: NonNullable<NonNullable<TModel['formSchema']>['create']>
-  $error: Error | null
-  $loading: boolean
-}
+> = FormObjectBase<ResolvedModelItem<TModel, TModelDefaults, TModelList>, NonNullable<NonNullable<TModel['formSchema']>['create']>>
 
 export type CreateFormObject<
   TModel extends Model,
@@ -40,17 +35,11 @@ export type CreateFormObject<
   & CreateFormObjectBase<TModel, TModelDefaults, TModelList>
   & Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 
-export interface UpdateFormObjectBase<
+export type UpdateFormObjectBase<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> {
-  $save: () => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-  $reset: () => Promise<void>
-  $schema: NonNullable<NonNullable<TModel['formSchema']>['update']>
-  $error: Error | null
-  $loading: boolean
-}
+> = FormObjectBase<ResolvedModelItem<TModel, TModelDefaults, TModelList>, NonNullable<NonNullable<TModel['formSchema']>['update']>>
 
 export type UpdateFormObject<
   TModel extends Model,

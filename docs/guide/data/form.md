@@ -19,7 +19,7 @@ The form object is a reactive object that contains the data of the form. You can
 It has several special properties:
 
 - `$reset()`: a method that resets the form to its initial state.
-- `$save()`: a method that saves the form and creates a new item.
+- `$submit()`: a method that saves the form and creates a new item.
 - `$loading`: a boolean that indicates whether the form is being saved.
 - `$error`: an error object that contains the error if the form could not be saved.
 - `$schema` the validation schema for the form object (see [schema validation](#schema-validation)).
@@ -39,7 +39,7 @@ createTodo.$onSaved(() => {
 </script>
 
 <template>
-  <form @submit.prevent="createTodo.$save()">
+  <form @submit.prevent="createTodo.$submit()">
     <!-- Input -->
     <input ref="input" v-model="createTodo.title">
     <!-- Submit -->
@@ -81,7 +81,7 @@ The update for object has the following special properties:
 
 - `$reset()`: a method that resets the form to its initial state.
 
-- `$save()`: a method that saves the form and updates the item.
+- `$submit()`: a method that saves the form and updates the item.
 
 - `$loading`: a boolean that indicates whether the form is being saved.
 
@@ -116,7 +116,7 @@ updateTodo.$onSaved(() => emit('close'))
 </script>
 
 <template>
-  <form @submit.prevent="updateTodo.$save()">
+  <form @submit.prevent="updateTodo.$submit()">
     <!-- Input -->
     <input v-model="updateTodo.title">
     <!-- Submit -->
@@ -173,7 +173,7 @@ const createTodo = store.todos.createForm()
   <UForm
     :state="createTodo"
     :schema="createTodo.$schema"
-    @submit="createTodo.$save()"
+    @submit="createTodo.$submit()"
   >
     <!-- UFormFields here -->
   </UForm>

@@ -245,7 +245,7 @@ const createTodo = store.todos.createForm()
   <UForm
     :state="createTodo"
     :schema="createTodo.$schema"
-    @submit="createTodo.$save()"
+    @submit="createTodo.$submit()"
   >
     <!-- UFormFields here -->
   </UForm>

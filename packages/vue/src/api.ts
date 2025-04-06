@@ -1,4 +1,4 @@
-import type { CreateFormObject, CreateFormObjectBase, CustomHookMeta, Exactly, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, UpdateFormObject, WrappedItem } from '@rstore/shared'
+import type { CreateFormObject, CreateFormObjectBase, CustomHookMeta, Exactly, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, UpdateFormObject, UpdateFormObjectBase, WrappedItem } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueLiveQueryReturn } from './live'
@@ -253,7 +253,7 @@ export function createModelApi<
             Object.assign(form, formOptions.defaultValues())
           }
         },
-        async $save() {
+        async $submit() {
           form.$loading = true
           form.$error = null
           try {
@@ -276,6 +276,10 @@ export function createModelApi<
           finally {
             form.$loading = false
           }
+        },
+        $save() {
+          console.warn(`$save() is deprecated, use $submit() instead`)
+          return this.$submit()
         },
         $schema: markRaw(formOptions?.schema ?? model.formSchema.create),
         $onSaved: onSaved.on,
@@ -309,7 +313,7 @@ export function createModelApi<
 
       const form = reactive({
         ...formOptions?.defaultValues?.(),
-        ...initialData,
+        ...initialData as object,
 
         $error: null,
         $loading: false,
@@ -327,7 +331,7 @@ export function createModelApi<
           }
           form.$changedProps = {}
         },
-        async $save() {
+        async $submit() {
           form.$loading = true
           form.$error = null
           try {
@@ -356,9 +360,13 @@ export function createModelApi<
             form.$loading = false
           }
         },
+        $save() {
+          console.warn(`$save() is deprecated, use $submit() instead`)
+          return this.$submit()
+        },
         $schema: markRaw(formOptions?.schema ?? model.formSchema.update),
         $onSaved: onSaved.on,
-      } satisfies TReturn) as TReturn
+      } satisfies UpdateFormObjectBase<TModel, TModelDefaults, TModelList> & UpdateFormObjectAdditional<TModel, TModelDefaults, TModelList>) as TReturn
 
       // Detect changed props
       const proxy = new Proxy(form, {

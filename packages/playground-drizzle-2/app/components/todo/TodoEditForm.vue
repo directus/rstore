@@ -18,7 +18,7 @@ updateTodo.$onSaved(() => emit('close'))
     :state="updateTodo"
     :schema="updateTodo.$schema"
     class="flex flex-col gap-4"
-    @submit="updateTodo.$save()"
+    @submit="updateTodo.$submit()"
   >
     <UFormField
       label="Text"

@@ -17,7 +17,7 @@ createTodo.$onSaved(() => {
       :state="createTodo"
       :schema="createTodo.$schema"
       class="mb-4"
-      @submit="createTodo.$save()"
+      @submit="createTodo.$submit()"
     >
       <UButtonGroup
         class="w-full"
@@ -29,7 +29,7 @@ createTodo.$onSaved(() => {
           autofocus
           size="xl"
           class="w-full"
-          @keydown.enter.prevent="createTodo.$save()"
+          @keydown.enter.prevent="createTodo.$submit()"
         />
 
         <UButton
