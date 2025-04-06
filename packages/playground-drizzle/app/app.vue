@@ -12,7 +12,7 @@ const { data: todos } = await store.todos.queryMany(() => ({
 
 const createTodo = store.todos.createForm()
 const createInput = useTemplateRef('input')
-createTodo.$onSaved(() => {
+createTodo.$onSuccess(() => {
   createInput.value?.inputRef?.focus()
   createInput.value?.inputRef?.select()
 })

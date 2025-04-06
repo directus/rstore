@@ -9,7 +9,7 @@ export interface FormObjectBase<
    */
   $save: () => Promise<TResult>
   $submit: () => Promise<TResult>
-  $reset: () => void
+  $reset: () => Promise<void>
   $schema: TSchema
   $error: Error | null
   $loading: boolean

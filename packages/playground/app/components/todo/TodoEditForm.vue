@@ -10,7 +10,7 @@ const emit = defineEmits<{
 const store = useStore()
 
 const updateTodo = await store.Todo.updateForm(props.id)
-updateTodo.$onSaved(() => emit('close'))
+updateTodo.$onSuccess(() => emit('close'))
 </script>
 
 <template>
@@ -58,6 +58,15 @@ updateTodo.$onSaved(() => emit('close'))
         color="primary"
         block
         :loading="updateTodo.$loading"
+        :disabled="!updateTodo.$hasChanges()"
+      />
+    </div>
+
+    <div class="text-xs space-y-2">
+      <div>Changed props:</div>
+      <Output
+        :data="updateTodo.$changedProps"
+        class="!m-0"
       />
     </div>
   </UForm>

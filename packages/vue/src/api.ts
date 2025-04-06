@@ -1,37 +1,26 @@
-import type { CreateFormObject, CreateFormObjectBase, CustomHookMeta, Exactly, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, UpdateFormObject, UpdateFormObjectBase, WrappedItem } from '@rstore/shared'
-import type { EventHookOn } from '@vueuse/core'
+import type { CreateFormObject, CustomHookMeta, Exactly, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, UpdateFormObject, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueLiveQueryReturn } from './live'
 import type { VueQueryReturn } from './query'
 import type { VueStore } from './store'
 import { createItem, deleteItem, findFirst, findMany, peekFirst, peekMany, subscribe, unsubscribe, updateItem } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
-import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
-import { markRaw, reactive, toValue, watch } from 'vue'
+import { tryOnScopeDispose } from '@vueuse/core'
+import { toValue, watch } from 'vue'
+import { createFormObject, createFormObjectWithChangeDetection, type FormObjectAdditionalProps, type FormObjectWithChangeDetectionAdditionalProps } from './form'
 import { createQuery } from './query'
 
-interface CreateFormObjectAdditional<
+interface CreateFormObjectAdditionalProps<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> {
-  $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-}
+> extends FormObjectAdditionalProps<ResolvedModelItem<TModel, TModelDefaults, TModelList>> {}
 
-interface UpdateFormObjectAdditional<
+interface UpdateFormObjectAdditionalProps<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
   TModelList extends ModelList,
-> {
-  $hasChanges: () => boolean
-  $changedProps: Partial<{
-    [TKey in keyof ResolvedModelItem<TModel, TModelDefaults, TModelList>]: [
-      newValue: ResolvedModelItem<TModel, TModelDefaults, TModelList>[TKey],
-      oldValue: ResolvedModelItem<TModel, TModelDefaults, TModelList>[TKey],
-    ]
-  }>
-  $onSaved: EventHookOn<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-}
+> extends FormObjectAdditionalProps<ResolvedModelItem<TModel, TModelDefaults, TModelList>>, FormObjectWithChangeDetectionAdditionalProps<ResolvedModelItem<TModel, TModelDefaults, TModelList>> {}
 
 export interface VueModelApi<
   TModel extends Model,
@@ -109,7 +98,7 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => CreateFormObject<TModel, TModelDefaults, TModelList> & CreateFormObjectAdditional<TModel, TModelDefaults, TModelList>
+  ) => CreateFormObject<TModel, TModelDefaults, TModelList> & CreateFormObjectAdditionalProps<TModel, TModelDefaults, TModelList>
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
@@ -141,7 +130,7 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelList> & UpdateFormObjectAdditional<TModel, TModelDefaults, TModelList>>
+  ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelList> & UpdateFormObjectAdditionalProps<TModel, TModelDefaults, TModelList>>
 
   /**
    * Find all items that match the query.
@@ -236,55 +225,13 @@ export function createModelApi<
 
     createForm: (formOptions) => {
       type TReturn = ReturnType<Api['createForm']>
-
-      const onSaved = createEventHook()
-      const form = reactive({
-        ...formOptions?.defaultValues?.(),
-
-        $error: null,
-        $loading: false,
-        $reset() {
-          for (const key in form) {
-            if (!key.startsWith('$')) {
-              delete (form as any)[key]
-            }
-          }
-          if (formOptions?.defaultValues) {
-            Object.assign(form, formOptions.defaultValues())
-          }
-        },
-        async $submit() {
-          form.$loading = true
-          form.$error = null
-          try {
-            const data = pickNonSpecialProps(form) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
-            const { issues } = await this.$schema['~standard'].validate(data)
-            if (issues) {
-              const error = new Error(issues.map(i => i.message).join(', '))
-              ;(error as any).$issues = issues
-              throw error
-            }
-            const item = await api.create(data)
-            onSaved.trigger(item)
-            form.$reset()
-            return item
-          }
-          catch (error: any) {
-            form.$error = error
-            throw error
-          }
-          finally {
-            form.$loading = false
-          }
-        },
-        $save() {
-          console.warn(`$save() is deprecated, use $submit() instead`)
-          return this.$submit()
-        },
-        $schema: markRaw(formOptions?.schema ?? model.formSchema.create),
-        $onSaved: onSaved.on,
-      } satisfies CreateFormObjectBase<TModel, TModelDefaults, TModelList> & CreateFormObjectAdditional<TModel, TModelDefaults, TModelList>) as TReturn
-      return form
+      return createFormObject<
+        ResolvedModelItem<TModel, TModelDefaults, TModelList>
+      >({
+        defaultValues: formOptions?.defaultValues,
+        schema: formOptions?.schema ?? model.formSchema.create,
+        submit: data => api.create(data),
+      }) as TReturn
     },
 
     update: (item, updateOptions) => updateItem({
@@ -295,10 +242,6 @@ export function createModelApi<
     }),
 
     updateForm: async (options, formOptions) => {
-      type TReturn = Awaited<ReturnType<Api['updateForm']>>
-
-      const onSaved = createEventHook()
-
       async function getFormData(): Promise<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>> {
         const item = await api.findFirst(options)
 
@@ -309,88 +252,30 @@ export function createModelApi<
         return pickNonSpecialProps(item)
       }
 
-      let initialData = await getFormData()
+      const initialData = await getFormData()
 
-      const form = reactive({
-        ...formOptions?.defaultValues?.(),
-        ...initialData as object,
-
-        $error: null,
-        $loading: false,
-        $changedProps: {},
-        $hasChanges: () => Object.keys(form.$changedProps).length > 0,
-        async $reset() {
-          if (formOptions?.defaultValues) {
-            Object.assign(form, formOptions.defaultValues())
+      const form = createFormObjectWithChangeDetection<
+        ResolvedModelItem<TModel, TModelDefaults, TModelList>
+      >({
+        defaultValues: () => ({
+          ...formOptions?.defaultValues?.(),
+          ...initialData,
+        }),
+        schema: formOptions?.schema ?? model.formSchema.update,
+        resetDefaultValues: () => getFormData(),
+        // Only use changed props
+        transformData: (form) => {
+          const data = {} as any
+          for (const key in form.$changedProps) {
+            data[key] = form[key]
           }
-          initialData = await getFormData()
-          for (const key in form) {
-            if (!key.startsWith('$')) {
-              (form as any)[key] = initialData[key]
-            }
-          }
-          form.$changedProps = {}
+          return data
         },
-        async $submit() {
-          form.$loading = true
-          form.$error = null
-          try {
-            const data = {} as any
-            for (const key in form.$changedProps) {
-              data[key] = form[key]
-            }
-            const { issues } = await this.$schema['~standard'].validate(data)
-            if (issues) {
-              const error = new Error(issues.map(i => i.message).join(', '))
-              ;(error as any).$issues = issues
-              throw error
-            }
-            const item = await api.update(data, {
-              key: model.getKey(initialData),
-            })
-            onSaved.trigger(item)
-            await form.$reset()
-            return item
-          }
-          catch (error: any) {
-            form.$error = error
-            throw error
-          }
-          finally {
-            form.$loading = false
-          }
-        },
-        $save() {
-          console.warn(`$save() is deprecated, use $submit() instead`)
-          return this.$submit()
-        },
-        $schema: markRaw(formOptions?.schema ?? model.formSchema.update),
-        $onSaved: onSaved.on,
-      } satisfies UpdateFormObjectBase<TModel, TModelDefaults, TModelList> & UpdateFormObjectAdditional<TModel, TModelDefaults, TModelList>) as TReturn
-
-      // Detect changed props
-      const proxy = new Proxy(form, {
-        get(target, key) {
-          return Reflect.get(target, key)
-        },
-        set(target, key, value) {
-          if (typeof key === 'string' && key in form) {
-            const oldValue = initialData[key]
-            if (value !== oldValue) {
-              form.$changedProps[key as keyof typeof form.$changedProps] = [value, oldValue]
-            }
-            else {
-              delete form.$changedProps[key]
-            }
-          }
-          return Reflect.set(target, key, value)
-        },
-        ownKeys(target) {
-          return Reflect.ownKeys(target).filter(key => typeof key !== 'string' || !key.startsWith('$'))
-        },
+        submit: data => api.update(data, {
+          key: model.getKey(initialData),
+        }),
       })
-
-      return proxy
+      return form
     },
 
     delete: (keyOrItem) => {

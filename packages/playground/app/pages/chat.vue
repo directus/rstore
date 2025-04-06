@@ -13,7 +13,7 @@ const { data: messages } = store.ChatMessage.liveQueryMany({
 const createChatMessage = store.ChatMessage.createForm()
 
 const input = useTemplateRef('input')
-createChatMessage.$onSaved(() => {
+createChatMessage.$onSuccess(() => {
   input.value?.inputRef?.focus()
   input.value?.inputRef?.select()
 })

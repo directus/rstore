@@ -23,7 +23,7 @@ It has several special properties:
 - `$loading`: a boolean that indicates whether the form is being saved.
 - `$error`: an error object that contains the error if the form could not be saved.
 - `$schema` the validation schema for the form object (see [schema validation](#schema-validation)).
-- `$onSaved(cb)`: a method that registers a callback to be called when the form is saved.
+- `$onSuccess(cb)`: a method that registers a callback to be called when the form is saved.
 
 Example:
 
@@ -32,7 +32,7 @@ Example:
 const store = useStore()
 const createTodo = store.todos.createForm()
 const input = useTemplateRef('input')
-createTodo.$onSaved(() => {
+createTodo.$onSuccess(() => {
   input.value.focus()
   input.value.select()
 })
@@ -95,7 +95,7 @@ The update for object has the following special properties:
 
   `{ [propertyName]: [newValue, oldValue] }`
 
-- `$onSaved(cb)`: a method that registers a callback to be called when the form is saved.
+- `$onSuccess(cb)`: a method that registers a callback to be called when the form is saved.
 
 Example:
 
@@ -112,7 +112,7 @@ const emit = defineEmits<{
 const store = useStore()
 
 const updateTodo = await store.Todo.updateForm(props.id)
-updateTodo.$onSaved(() => emit('close'))
+updateTodo.$onSuccess(() => emit('close'))
 </script>
 
 <template>

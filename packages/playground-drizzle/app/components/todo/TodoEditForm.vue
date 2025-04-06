@@ -10,7 +10,7 @@ const emit = defineEmits<{
 const store = useStore()
 
 const updateTodo = await store.todos.updateForm(props.id)
-updateTodo.$onSaved(() => emit('close'))
+updateTodo.$onSuccess(() => emit('close'))
 </script>
 
 <template>
