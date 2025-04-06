@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.6.3
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.2...v0.6.3)
+
+### 🩹 Fixes
+
+- **nuxt:** Should dedupe modules per request during SSR ([73f1aa5](https://github.com/directus/rstore/commit/73f1aa5))
+
+### 🏡 Chore
+
+- Use npm exec instead of pnpm in git hook ([c84118e](https://github.com/directus/rstore/commit/c84118e))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.2
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.6.1...v0.6.2)
