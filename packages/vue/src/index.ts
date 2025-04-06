@@ -1,4 +1,9 @@
 export {
+  createFormObject,
+  createFormObjectWithChangeDetection,
+} from './form'
+
+export {
   defineModule,
 } from './module'
 
