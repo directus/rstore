@@ -3,6 +3,10 @@ export {
 } from './module'
 
 export {
+  install as RstorePlugin,
+} from './plugin'
+
+export {
   addModel,
   createStore,
   removeModel,

@@ -6,7 +6,7 @@ import _models from '#build/$rstore-model'
 // @ts-expect-error virtual file
 import * as _plugins from '#build/$rstore-plugins'
 
-import { createStore } from '@rstore/vue'
+import { createStore, RstorePlugin } from '@rstore/vue'
 import { markRaw } from 'vue'
 
 export default defineNuxtPlugin(async (nuxtApp) => {
@@ -37,6 +37,10 @@ export default defineNuxtPlugin(async (nuxtApp) => {
   if (import.meta.client && nuxtApp.payload.state[cacheKey]) {
     store.$cache.setState(nuxtApp.payload.state[cacheKey])
   }
+
+  nuxtApp.vueApp.use(RstorePlugin, {
+    store,
+  })
 
   // Inject $rstore
   return {
