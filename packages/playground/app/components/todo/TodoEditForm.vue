@@ -37,7 +37,9 @@ updateTodo.$onSuccess(() => emit('close'))
         type="button"
         icon="lucide:rotate-ccw"
         color="neutral"
-        variant="soft"
+        variant="ghost"
+        label="Reset"
+        block
         :disabled="updateTodo.$loading"
         @click="updateTodo.$reset()"
       />
@@ -58,16 +60,32 @@ updateTodo.$onSuccess(() => emit('close'))
         color="primary"
         block
         :loading="updateTodo.$loading"
-        :disabled="!updateTodo.$hasChanges()"
+        :disabled="!updateTodo.$hasChanges() || !updateTodo.$valid"
       />
     </div>
 
-    <div class="text-xs space-y-2">
+    <div class="text-xs flex flex-col gap-2">
       <div>Changed props:</div>
+
       <Output
         :data="updateTodo.$changedProps"
         class="!m-0"
       />
+
+      <div class="flex gap-2">
+        <UBadge
+          :color="updateTodo.$valid ? 'success' : 'error'"
+          :label="updateTodo.$valid ? 'Form Valid' : 'Form Invalid'"
+          :icon="updateTodo.$valid ? 'lucide:check' : 'lucide:x'"
+          variant="soft"
+        />
+        <UBadge
+          :color="updateTodo.$hasChanges() ? 'info' : 'neutral'"
+          :label="updateTodo.$hasChanges() ? 'Has changes' : 'No changes'"
+          :icon="updateTodo.$hasChanges() ? 'lucide:square' : 'lucide:square-dashed'"
+          variant="soft"
+        />
+      </div>
     </div>
   </UForm>
 </template>

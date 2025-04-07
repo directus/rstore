@@ -1,4 +1,4 @@
-import type { DefaultIsInstanceOf, Exactly, Full, GetKey, Model, ModelDefaults, ModelList, ModelSchemas, ResolvedModel, ResolvedModelList } from '@rstore/shared'
+import type { DefaultIsInstanceOf, Exactly, Full, GetKey, Model, ModelDefaults, ModelList, ModelSchemas, ResolvedModel, ResolvedModelList, StandardSchemaV1 } from '@rstore/shared'
 
 export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
 
@@ -27,21 +27,19 @@ export function defineDataModel(model: Model): Model {
   return model
 }
 
+export function emptySchema(): StandardSchemaV1 {
+  return {
+    '~standard': {
+      validate: value => ({ value }),
+      vendor: 'rstore',
+      version: 1,
+    },
+  }
+}
+
 const emptySchemas: Full<ModelSchemas> = {
-  create: {
-    '~standard': {
-      validate: value => ({ value }),
-      vendor: 'rstore',
-      version: 1,
-    },
-  },
-  update: {
-    '~standard': {
-      validate: value => ({ value }),
-      vendor: 'rstore',
-      version: 1,
-    },
-  },
+  create: emptySchema(),
+  update: emptySchema(),
 }
 
 export function resolveModel<

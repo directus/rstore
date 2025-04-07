@@ -63,7 +63,7 @@ const editOpen = ref(false)
       />
 
       <template #content>
-        <div class="p-4">
+        <div class="p-4 lg:min-w-100">
           <TodoEditForm
             :id="todo.id"
             @close="editOpen = false"

@@ -11,6 +11,7 @@ export interface FormObjectBase<
   $submit: () => Promise<TResult>
   $reset: () => Promise<void>
   $schema: TSchema
+  $valid: boolean
   $error: Error | null
   $loading: boolean
 }

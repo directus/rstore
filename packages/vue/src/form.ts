@@ -1,6 +1,7 @@
+import { emptySchema } from '@rstore/core'
 import { type Awaitable, type FormObjectBase, pickNonSpecialProps, type StandardSchemaV1 } from '@rstore/shared'
 import { createEventHook, type EventHookOn } from '@vueuse/core'
-import { markRaw, reactive } from 'vue'
+import { markRaw, nextTick, reactive } from 'vue'
 
 export interface CreateFormObjectOptions<
   TData extends Record<string, any>,
@@ -9,7 +10,7 @@ export interface CreateFormObjectOptions<
 > {
   defaultValues?: (() => Partial<TData>) | undefined
   resetDefaultValues?: (() => Awaitable<Partial<TData>>) | undefined
-  schema: TSchema
+  schema?: TSchema
   transformData?: (data: Partial<TData>) => Partial<TData>
   submit: (data: Partial<TData>) => Promise<TData>
   additionalProps?: TAdditionalProps
@@ -82,7 +83,8 @@ export function createFormObject<
       console.warn(`$save() is deprecated, use $submit() instead`)
       return this.$submit()
     },
-    $schema: markRaw(options.schema),
+    $schema: markRaw(options.schema ?? emptySchema()) as TSchema,
+    $valid: false as boolean,
     $onSuccess: onSuccess.on,
     $onError: onError.on,
     $onSaved(...args) {
@@ -90,7 +92,35 @@ export function createFormObject<
       return this.$onSaved(...args)
     },
   } satisfies FormObjectBase<TData, TSchema> & FormObjectAdditionalProps<TData>)
-  return form as FormObjectBase<TData, TSchema> & FormObjectAdditionalProps<TData> & TAdditionalProps & Partial<TData>
+
+  // Validate on change
+
+  let validationQueued = false
+  function queueValidation() {
+    if (validationQueued) {
+      return
+    }
+    validationQueued = true
+    nextTick(async () => {
+      const { issues } = await form.$schema['~standard'].validate(pickNonSpecialProps(form))
+      form.$valid = !issues
+      validationQueued = false
+    })
+  }
+
+  const proxy = new Proxy(form, {
+    set(target, key, value) {
+      if (typeof key === 'string' && !key.startsWith('$')) {
+        queueValidation()
+      }
+      return Reflect.set(target, key, value)
+    },
+  })
+
+  // Validate initially (don't await for it)
+  queueValidation()
+
+  return proxy as FormObjectBase<TData, TSchema> & FormObjectAdditionalProps<TData> & TAdditionalProps & Partial<TData>
 }
 
 export interface FormObjectWithChangeDetectionAdditionalProps<
