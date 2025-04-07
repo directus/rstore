@@ -11,6 +11,10 @@ const store = useStore()
 
 const updateTodo = await store.Todo.updateForm(props.id)
 updateTodo.$onSuccess(() => emit('close'))
+updateTodo.$onChange((changes) => {
+  // eslint-disable-next-line no-console
+  console.log('Changes:', changes)
+})
 </script>
 
 <template>
@@ -28,6 +32,16 @@ updateTodo.$onSuccess(() => emit('close'))
         v-model="updateTodo.text"
         placeholder="What needs to be done?"
         autofocus
+        class="w-full"
+      />
+    </UFormField>
+
+    <UFormField
+      name="completed"
+    >
+      <UCheckbox
+        v-model="updateTodo.completed"
+        label="Completed"
         class="w-full"
       />
     </UFormField>
@@ -63,6 +77,8 @@ updateTodo.$onSuccess(() => emit('close'))
         :disabled="!updateTodo.$hasChanges() || !updateTodo.$valid"
       />
     </div>
+
+    <USeparator />
 
     <div class="text-xs flex flex-col gap-2">
       <div>Changed props:</div>

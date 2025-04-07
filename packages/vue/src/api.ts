@@ -7,20 +7,8 @@ import { createItem, deleteItem, findFirst, findMany, peekFirst, peekMany, subsc
 import { pickNonSpecialProps } from '@rstore/shared'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { ref, toValue, watch } from 'vue'
-import { createFormObject, createFormObjectWithChangeDetection, type FormObjectAdditionalProps, type FormObjectWithChangeDetectionAdditionalProps } from './form'
+import { createFormObject, type FormObjectAdditionalProps } from './form'
 import { createQuery } from './query'
-
-interface CreateFormObjectAdditionalProps<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> extends FormObjectAdditionalProps<ResolvedModelItem<TModel, TModelDefaults, TModelList>> {}
-
-interface UpdateFormObjectAdditionalProps<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> extends FormObjectAdditionalProps<ResolvedModelItem<TModel, TModelDefaults, TModelList>>, FormObjectWithChangeDetectionAdditionalProps<ResolvedModelItem<TModel, TModelDefaults, TModelList>> {}
 
 export interface VueModelApi<
   TModel extends Model,
@@ -98,7 +86,7 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => CreateFormObject<TModel, TModelDefaults, TModelList> & CreateFormObjectAdditionalProps<TModel, TModelDefaults, TModelList>
+  ) => CreateFormObject<TModel, TModelDefaults, TModelList> & FormObjectAdditionalProps<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
@@ -130,7 +118,7 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelList> & UpdateFormObjectAdditionalProps<TModel, TModelDefaults, TModelList>>
+  ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelList> & FormObjectAdditionalProps<ResolvedModelItem<TModel, TModelDefaults, TModelList>>>
 
   /**
    * Find all items that match the query.
@@ -255,7 +243,7 @@ export function createModelApi<
 
       const initialData = await getFormData()
 
-      const form = createFormObjectWithChangeDetection<
+      const form = createFormObject<
         ResolvedModelItem<TModel, TModelDefaults, TModelList>
       >({
         defaultValues: () => ({

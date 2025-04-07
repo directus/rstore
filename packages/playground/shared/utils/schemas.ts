@@ -12,7 +12,7 @@ export const createValidationSchemas = {
     text: z.string(),
   }),
   todos: z.object({
-    text: z.string(),
+    text: z.string().nonempty(),
   }),
 } as const
 
@@ -28,7 +28,7 @@ export const updateValidationSchemas = {
     text: z.string(),
   }).partial(),
   todos: z.object({
-    text: z.string().min(1),
+    text: z.string().nonempty(),
     completed: z.boolean(),
   }).partial(),
 } as const

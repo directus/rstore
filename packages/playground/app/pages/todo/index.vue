@@ -38,6 +38,7 @@ createTodo.$onSuccess(() => {
           label="Add"
           size="xl"
           :loading="createTodo.$loading"
+          :disabled="!createTodo.$valid"
         />
       </UButtonGroup>
     </UForm>
