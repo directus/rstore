@@ -4,6 +4,24 @@
 
 Each hook has a payload object that is sent to the registered callback functions.
 
+## Metadata
+
+Most hook payloads have a `meta` object that can store any kind of metadata. For example, it can be used to expose additional information from the server to the queries.
+
+It's type can be extended like this:
+
+```ts
+// hook.d.ts
+
+declare module '@rstore/vue' {
+  export interface CustomHookMeta {
+    totalPage?: number
+  }
+}
+
+export {}
+```
+
 ## Data handling
 
 Those hooks are the main ones to handle data fetching and item mutations.

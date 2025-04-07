@@ -30,6 +30,8 @@ The `queryFirst` and `queryMany` composables return an object with the following
 
 - `refresh`: a function that can be called to refresh the data.
 
+- `meta`: a ref that contains a metadata object that can modified by plugins.
+
 The composables also return a promise so they can be used with async setup.
 
 ```vue

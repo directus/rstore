@@ -1,4 +1,4 @@
-import type { FindOptions, HybridPromise, Model, ModelDefaults, ModelList } from '@rstore/shared'
+import type { CustomHookMeta, FindOptions, HybridPromise, Model, ModelDefaults, ModelList } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueStore } from './store'
 import { computed, ref, shallowRef, toValue, watch } from 'vue'
@@ -13,6 +13,7 @@ export interface VueQueryReturn<
   loading: Ref<boolean>
   error: Ref<Error | null>
   refresh: () => HybridPromise<VueQueryReturn<_TModel, _TModelDefaults, _TModelList, TResult>>
+  meta: Ref<CustomHookMeta>
   /**
    * @private
    */
@@ -27,8 +28,8 @@ export interface VueCreateQueryOptions<
   TResult,
 > {
   store: VueStore<TModelList, TModelDefaults>
-  fetchMethod: (options?: TOptions) => Promise<TResult>
-  cacheMethod: (options?: TOptions) => TResult
+  fetchMethod: (options: TOptions | undefined, meta: CustomHookMeta) => Promise<TResult>
+  cacheMethod: (options: TOptions | undefined, meta: CustomHookMeta) => TResult
   defaultValue: TResult
   options?: MaybeRefOrGetter<TOptions | undefined | { enabled: boolean }>
 }
@@ -62,10 +63,11 @@ export function createQuery<
   let fetchPolicy = store.$getFetchPolicy(getOptions()?.fetchPolicy)
 
   const result = shallowRef<TResult>(defaultValue)
+  const meta = ref<CustomHookMeta>({})
 
   // @TODO include nested relations in no-cache results
   const data = computed(() => fetchPolicy !== 'no-cache'
-    ? cacheMethod(getOptions()) ?? null
+    ? cacheMethod(getOptions(), meta.value) ?? null
     : result.value) as Ref<TResult>
 
   const loading = ref(false)
@@ -77,6 +79,7 @@ export function createQuery<
     loading,
     error,
     refresh,
+    meta,
     _result: result,
   }
 
@@ -94,10 +97,10 @@ export function createQuery<
           fetchMethod({
             ...finalOptions,
             fetchPolicy: 'fetch-only',
-          } as FindOptions<TModel, TModelDefaults, TModelList> as any)
+          } as FindOptions<TModel, TModelDefaults, TModelList> as any, meta.value)
         }
 
-        result.value = await fetchMethod(finalOptions)
+        result.value = await fetchMethod(finalOptions, meta.value)
       }
       catch (e: any) {
         error.value = e

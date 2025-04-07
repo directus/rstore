@@ -190,8 +190,8 @@ export function createModelApi<
 
     queryFirst: options => createQuery({
       store,
-      fetchMethod: options => findFirst({ store, model, findOptions: options! }).then(r => r.result),
-      cacheMethod: options => peekFirst({ store, model, findOptions: options!, force: true }).result,
+      fetchMethod: (options, meta) => findFirst({ store, model, findOptions: options!, meta }).then(r => r.result),
+      cacheMethod: (options, meta) => peekFirst({ store, model, findOptions: options!, meta, force: true }).result,
       defaultValue: null,
       // @ts-expect-error @TODO fix type issue with options being a possible string
       options,
@@ -211,8 +211,8 @@ export function createModelApi<
 
     queryMany: options => createQuery({
       store,
-      fetchMethod: options => findMany({ store, model, findOptions: options }).then(r => r.result),
-      cacheMethod: options => peekMany({ store, model, findOptions: options, force: true }).result,
+      fetchMethod: (options, meta) => findMany({ store, model, findOptions: options, meta }).then(r => r.result),
+      cacheMethod: (options, meta) => peekMany({ store, model, findOptions: options, meta, force: true }).result,
       defaultValue: [],
       options,
     }),
