@@ -141,9 +141,9 @@ export interface VueModelApi<
 
   subscribe: (
     keyOrFindOptions?: MaybeRefOrGetter<string | number | FindOptions<TModel, TModelDefaults, TModelList> | undefined>,
-  ) => Promise<{
+  ) => {
     unsubscribe: () => Promise<void>
-  }>
+  }
 
   liveQueryFirst: (
     options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
@@ -298,7 +298,7 @@ export function createModelApi<
       })
     },
 
-    subscribe: async (keyOrFindOptions) => {
+    subscribe: (keyOrFindOptions) => {
       if (store.$isServer) {
         return {
           unsubscribe: () => Promise.resolve(),
