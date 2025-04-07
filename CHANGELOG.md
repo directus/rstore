@@ -1,6 +1,26 @@
 # Changelog
 
 
+## v0.6.5
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.6.4...v0.6.5)
+
+### 🚀 Enhancements
+
+- **drizzle:** Limit and offset ([585d705](https://github.com/Akryum/rstore/commit/585d705))
+
+### 🩹 Fixes
+
+- **drizzle:** No key found ([3a47a0a](https://github.com/Akryum/rstore/commit/3a47a0a))
+
+### 🏡 Chore
+
+- Drizzle playground devtools ([a546812](https://github.com/Akryum/rstore/commit/a546812))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.4
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.3...v0.6.4)
