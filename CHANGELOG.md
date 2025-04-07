@@ -1,6 +1,27 @@
 # Changelog
 
 
+## v0.6.4
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.3...v0.6.4)
+
+### 🚀 Enhancements
+
+- **form:** Rename $save to $submit ([dbf46cb](https://github.com/directus/rstore/commit/dbf46cb))
+- **form:** Rename $onSaved to $onSuccess ([d363e72](https://github.com/directus/rstore/commit/d363e72))
+- **vue:** Export createFormObject and createFormObjectWithChangeDetection ([6b6c94f](https://github.com/directus/rstore/commit/6b6c94f))
+- **vue:** Form.$onError event hook ([f09d156](https://github.com/directus/rstore/commit/f09d156))
+- **query:** Expose meta ([7950c24](https://github.com/directus/rstore/commit/7950c24))
+- **subscribe:** Expose meta ([4b17eeb](https://github.com/directus/rstore/commit/4b17eeb))
+
+### 🩹 Fixes
+
+- Subscribe should not return a promise ([a461e65](https://github.com/directus/rstore/commit/a461e65))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.3
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.2...v0.6.3)
