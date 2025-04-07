@@ -30,6 +30,15 @@ const { unsubscribe } = store.ChatMessage.subscribe()
 unsubscribe()
 ```
 
+## Metadata
+
+Plugins can set metadata information on the `meta` ref returned by `subscribe`:
+
+```ts
+const { meta } = store.ChatMessage.subscribe()
+console.log(meta.value)
+```
+
 ## Live Query
 
 You can use the `liveQueryFirst` and `liveQueryMany` methods to do both a query and a subscription at the same time.

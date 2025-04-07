@@ -1,12 +1,12 @@
 import type { CreateFormObject, CustomHookMeta, Exactly, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, UpdateFormObject, WrappedItem } from '@rstore/shared'
-import type { MaybeRefOrGetter } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueLiveQueryReturn } from './live'
 import type { VueQueryReturn } from './query'
 import type { VueStore } from './store'
 import { createItem, deleteItem, findFirst, findMany, peekFirst, peekMany, subscribe, unsubscribe, updateItem } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { tryOnScopeDispose } from '@vueuse/core'
-import { toValue, watch } from 'vue'
+import { ref, toValue, watch } from 'vue'
 import { createFormObject, createFormObjectWithChangeDetection, type FormObjectAdditionalProps, type FormObjectWithChangeDetectionAdditionalProps } from './form'
 import { createQuery } from './query'
 
@@ -143,6 +143,7 @@ export interface VueModelApi<
     keyOrFindOptions?: MaybeRefOrGetter<string | number | FindOptions<TModel, TModelDefaults, TModelList> | undefined>,
   ) => {
     unsubscribe: () => Promise<void>
+    meta: Ref<CustomHookMeta>
   }
 
   liveQueryFirst: (
@@ -302,10 +303,11 @@ export function createModelApi<
       if (store.$isServer) {
         return {
           unsubscribe: () => Promise.resolve(),
+          meta: ref({}),
         }
       }
 
-      const meta: CustomHookMeta = {}
+      const meta = ref<CustomHookMeta>({})
 
       let subscriptionId: string | undefined
       let previousKey: string | number | undefined
@@ -315,7 +317,7 @@ export function createModelApi<
         if (subscriptionId) {
           unsubscribe({
             store,
-            meta,
+            meta: meta.value,
             model,
             subscriptionId,
             key: previousKey,
@@ -337,7 +339,7 @@ export function createModelApi<
 
         await subscribe({
           store,
-          meta,
+          meta: meta.value,
           model,
           subscriptionId,
           key,
@@ -355,17 +357,22 @@ export function createModelApi<
 
       return {
         unsubscribe: unsub,
+        meta,
       }
     },
 
     liveQueryFirst: (options) => {
-      api.subscribe(options)
-      return api.queryFirst(options)
+      const { meta } = api.subscribe(options)
+      const query = api.queryFirst(options)
+      query.meta.value = meta.value
+      return query
     },
 
     liveQueryMany: (options) => {
-      api.subscribe(options)
-      return api.queryMany(options)
+      const { meta } = api.subscribe(options)
+      const query = api.queryMany(options)
+      query.meta.value = meta.value
+      return query
     },
 
     getKey: item => model.getKey(item),
