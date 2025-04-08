@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v0.6.6
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.5...v0.6.6)
+
+### 🚀 Enhancements
+
+- **form:** $valid ([c07d4e9](https://github.com/directus/rstore/commit/c07d4e9))
+- **form:** $onChange and merge createFormObjectWithChangeDetection into createFormObject ([18ae2b9](https://github.com/directus/rstore/commit/18ae2b9))
+
+### 🩹 Fixes
+
+- Refresh force fetch ([6651650](https://github.com/directus/rstore/commit/6651650))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.5
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.6.4...v0.6.5)
