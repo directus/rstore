@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 const store = useStore()
 
-const { data: todos } = await store.Todo.queryMany()
+const { data: todos, refresh } = await store.Todo.queryMany()
 
 const createTodo = store.Todo.createForm()
 const createInput = useTemplateRef('input')
@@ -39,6 +39,12 @@ createTodo.$onSuccess(() => {
           size="xl"
           :loading="createTodo.$loading"
           :disabled="!createTodo.$valid"
+        />
+
+        <UButton
+          icon="lucide:refresh-cw"
+          class="px-3"
+          @click="refresh()"
         />
       </UButtonGroup>
     </UForm>

@@ -83,7 +83,7 @@ export function createQuery<
     _result: result,
   }
 
-  async function load() {
+  async function load(force: boolean = false) {
     if (!isDisabled()) {
       loading.value = true
       error.value = null
@@ -93,11 +93,15 @@ export function createQuery<
         fetchPolicy = store.$getFetchPolicy(getOptions()?.fetchPolicy)
 
         // If fetchPolicy is `cache-and-fetch`, fetch in parallel
-        if (fetchPolicy === 'cache-and-fetch') {
+        if (!force && fetchPolicy === 'cache-and-fetch') {
           fetchMethod({
             ...finalOptions,
             fetchPolicy: 'fetch-only',
           } as FindOptions<TModel, TModelDefaults, TModelList> as any, meta.value)
+        }
+
+        if (force) {
+          finalOptions.fetchPolicy = 'fetch-only'
         }
 
         result.value = await fetchMethod(finalOptions, meta.value)
@@ -126,7 +130,7 @@ export function createQuery<
 
   function refresh() {
     if (!loading.value) {
-      promise = load() as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TResult>>
+      promise = load(true) as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TResult>>
       Object.assign(promise, returnObject)
     }
     return promise
