@@ -7,6 +7,14 @@ const props = defineProps<{
 const store = useStore()
 
 const { data: message } = await store.Message.queryFirst(props.id)
+
+async function updateText() {
+  const { faker } = await import('@faker-js/faker')
+
+  await message.value?.$update({
+    text: faker.lorem.paragraph(),
+  })
+}
 </script>
 
 <template>
@@ -55,6 +63,14 @@ const { data: message } = await store.Message.queryFirst(props.id)
         <span class="opacity-50 ml-auto text-sm">
           {{ message.timeAgo }}
         </span>
+
+        <UButton
+          icon="lucide:edit"
+          label="Update text"
+          size="xs"
+          variant="ghost"
+          @click="updateText()"
+        />
       </div>
       <p
         class="px-4 py-2 bg-gray-100 dark:bg-gray-800 rounded-lg"

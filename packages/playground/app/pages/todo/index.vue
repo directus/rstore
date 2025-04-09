@@ -43,6 +43,8 @@ createTodo.$onSuccess(() => {
 
         <UButton
           icon="lucide:refresh-cw"
+          color="neutral"
+          variant="soft"
           class="px-3"
           @click="refresh()"
         />
