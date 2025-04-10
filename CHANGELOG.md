@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.6.7
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.6...v0.6.7)
+
+### 🚀 Enhancements
+
+- **form:** Call form object ([6fdb1aa](https://github.com/directus/rstore/commit/6fdb1aa))
+
+### 🩹 Fixes
+
+- **nuxt drizzle:** Use request fetch ([7e7493b](https://github.com/directus/rstore/commit/7e7493b))
+- **nuxt-drizzle:** Relations handling ([5afaa22](https://github.com/directus/rstore/commit/5afaa22))
+- **nuxt-drizzle:** Primary key multi columns ([0fa1424](https://github.com/directus/rstore/commit/0fa1424))
+
+### 🏡 Chore
+
+- Update pnpm ([62f6985](https://github.com/directus/rstore/commit/62f6985))
+- **playground:** More stuff ([f2237f2](https://github.com/directus/rstore/commit/f2237f2))
+- **playground:** Db explorer ([eef0271](https://github.com/directus/rstore/commit/eef0271))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.6
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.5...v0.6.6)
