@@ -1,5 +1,9 @@
 import type { CustomModelMeta, Model, ModelRelation } from '@rstore/shared'
 import type { Config as DrizzleKitConfig } from 'drizzle-kit'
+import type { getTableConfig as mysqlGetTableConfig } from 'drizzle-orm/mysql-core'
+import type { getTableConfig as pgGetTableConfig } from 'drizzle-orm/pg-core'
+import type { getTableConfig as singleStoreGetTableConfig } from 'drizzle-orm/singlestore-core'
+import type { getTableConfig as sqliteGetTableConfig } from 'drizzle-orm/sqlite-core'
 import fs from 'node:fs'
 import { addImportsDir, addServerHandler, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule, updateTemplates, useLogger } from '@nuxt/kit'
 import { createTableRelationsHelpers, getTableName, is, isTable, Many, One, Relations, type Table, type TableConfig } from 'drizzle-orm'
@@ -36,6 +40,13 @@ export interface ModuleOptions {
    */
   apiPath?: string
 }
+
+type AllTableConfig = TableConfig & (
+  ReturnType<typeof pgGetTableConfig> |
+  ReturnType<typeof mysqlGetTableConfig> |
+  ReturnType<typeof sqliteGetTableConfig> |
+  ReturnType<typeof singleStoreGetTableConfig>
+)
 
 export default defineNuxtModule<ModuleOptions>({
   meta: {
@@ -127,13 +138,13 @@ export default defineNuxtModule<ModuleOptions>({
       const models: Model[] = []
       const modelsByTable = new WeakMap<Table, Model>()
 
-      const tables: Array<{ key: string, table: Table, tableName: string, config: TableConfig | undefined }> = []
+      const tables: Array<{ key: string, table: Table, tableName: string, config: AllTableConfig | undefined }> = []
       const relationsList: Array<Relations> = []
 
       for (const key in schema) {
         const schemaItem = schema[key]
         if (isTable(schemaItem)) {
-          let config: TableConfig | undefined
+          let config: AllTableConfig | undefined
 
           switch (drizzleConfig.dialect) {
             case 'postgresql': {
@@ -177,7 +188,7 @@ export default defineNuxtModule<ModuleOptions>({
           scopeId: 'rstore-drizzle',
           meta: {
             table: tableName,
-            primaryKeys: (config as any)?.primaryKeys?.length ? (config as any).primaryKeys : (config?.columns as any[] | undefined)?.filter(col => col.primary).map(col => col.keyAsName ? col.key ?? col.name : col.name),
+            primaryKeys: config?.primaryKeys?.length ? config.primaryKeys[0]!.columns.map(col => col.name) : config?.columns?.filter(col => col.primary).map(col => col.name) ?? [],
           },
         }
         models.push(model)
