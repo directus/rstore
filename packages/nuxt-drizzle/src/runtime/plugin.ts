@@ -29,9 +29,11 @@ export default definePlugin({
 
     /* Fetch */
 
+    const requestFetch = useRequestFetch()
+
     hook('fetchFirst', async (payload) => {
       if (payload.key) {
-        const result = await $fetch(`${apiPath}/${payload.model.name}/${payload.key}`)
+        const result = await requestFetch(`${apiPath}/${payload.model.name}/${payload.key}`)
         if (result) {
           payload.setResult(result)
         }
@@ -40,7 +42,7 @@ export default definePlugin({
         }
       }
       else {
-        const result: any = await $fetch(`${apiPath}/${payload.model.name}`, {
+        const result: any = await requestFetch(`${apiPath}/${payload.model.name}`, {
           query: {
             where: payload.findOptions?.where,
             ...payload.findOptions?.params,
@@ -53,7 +55,7 @@ export default definePlugin({
 
     hook('fetchMany', async (payload) => {
       // @ts-expect-error excessive stack depth
-      payload.setResult(await $fetch(`${apiPath}/${payload.model.name}`, {
+      payload.setResult(await requestFetch(`${apiPath}/${payload.model.name}`, {
         query: {
           where: payload.findOptions?.where,
           ...payload.findOptions?.params,
@@ -119,7 +121,7 @@ export default definePlugin({
     /* Mutations */
 
     hook('createItem', async (payload) => {
-      const result: any = await $fetch(`${apiPath}/${payload.model.name}`, {
+      const result: any = await requestFetch(`${apiPath}/${payload.model.name}`, {
         method: 'POST',
         body: payload.item,
       })
@@ -127,7 +129,7 @@ export default definePlugin({
     })
 
     hook('updateItem', async (payload) => {
-      const result: any = await $fetch(`${apiPath}/${payload.model.name}/${payload.key}`, {
+      const result: any = await requestFetch(`${apiPath}/${payload.model.name}/${payload.key}`, {
         method: 'PATCH',
         body: {
           ...payload.item,
@@ -138,7 +140,7 @@ export default definePlugin({
     })
 
     hook('deleteItem', async (payload) => {
-      await $fetch(`${apiPath}/${payload.model.name}/${payload.key}`, {
+      await requestFetch(`${apiPath}/${payload.model.name}/${payload.key}`, {
         method: 'DELETE',
       })
     })
