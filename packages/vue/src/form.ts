@@ -37,6 +37,12 @@ export interface FormObjectAdditionalProps<
   $onChange: EventHookOn<FormObjectChanged<TData>>
 }
 
+export type FormObject<
+  TData extends Record<string, any>,
+  TSchema extends StandardSchemaV1 = StandardSchemaV1,
+  TAdditionalProps = Record<string, never>,
+> = FormObjectBase<TData, TSchema> & FormObjectAdditionalProps<TData> & TAdditionalProps & Partial<TData> & (() => Promise<TData>)
+
 export function createFormObject<
   TData extends Record<string, any> = Record<string, any>,
   TSchema extends StandardSchemaV1 = StandardSchemaV1,
@@ -134,7 +140,9 @@ export function createFormObject<
     })
   }
 
-  const proxy = new Proxy(form, {
+  const base = form.$submit
+
+  const proxy = new Proxy(base, {
     set(target, key, value) {
       if (typeof key === 'string' && !key.startsWith('$')) {
         const oldValue = initialData[key as keyof typeof initialData]
@@ -147,17 +155,20 @@ export function createFormObject<
         }
         queueChange()
       }
-      return Reflect.set(target, key, value)
+      return Reflect.set(form, key, value)
     },
-    ownKeys(target) {
-      return Reflect.ownKeys(target).filter(key => typeof key !== 'string' || !key.startsWith('$'))
+    get(target, key) {
+      return Reflect.get(form, key)
+    },
+    ownKeys() {
+      return Reflect.ownKeys(form).filter(key => typeof key !== 'string' || !key.startsWith('$'))
     },
   })
 
   // Validate initially (don't await for it)
   queueChange()
 
-  return proxy as FormObjectBase<TData, TSchema> & FormObjectAdditionalProps<TData> & TAdditionalProps & Partial<TData>
+  return proxy as FormObject<TData, TSchema, TAdditionalProps>
 }
 
 /**

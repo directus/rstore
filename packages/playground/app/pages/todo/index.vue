@@ -17,7 +17,7 @@ createTodo.$onSuccess(() => {
       :state="createTodo"
       :schema="createTodo.$schema"
       class="mb-4"
-      @submit="createTodo.$submit()"
+      @submit="createTodo()"
     >
       <UButtonGroup
         class="w-full"

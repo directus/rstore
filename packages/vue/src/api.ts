@@ -7,7 +7,7 @@ import { createItem, deleteItem, findFirst, findMany, peekFirst, peekMany, subsc
 import { pickNonSpecialProps } from '@rstore/shared'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { ref, toValue, watch } from 'vue'
-import { createFormObject, type FormObjectAdditionalProps } from './form'
+import { createFormObject, type FormObject } from './form'
 import { createQuery } from './query'
 
 export interface VueModelApi<
@@ -86,7 +86,7 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => CreateFormObject<TModel, TModelDefaults, TModelList> & FormObjectAdditionalProps<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  ) => CreateFormObject<TModel, TModelDefaults, TModelList> & FormObject<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
@@ -118,7 +118,7 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelList> & FormObjectAdditionalProps<ResolvedModelItem<TModel, TModelDefaults, TModelList>>>
+  ) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelList> & FormObject<ResolvedModelItem<TModel, TModelDefaults, TModelList>>>
 
   /**
    * Find all items that match the query.

@@ -54,6 +54,14 @@ createTodo.$onSuccess(() => {
 </template>
 ```
 
+You can also call the form object to submit it:
+
+```ts
+const createTodo = store.todos.createForm()
+createTodo.title = 'My new todo'
+const todo = await createTodo()
+```
+
 ## Update Form
 
 You can also create a form object to update an existing item with the `updateForm` method.
