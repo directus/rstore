@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.6.8
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.7...v0.6.8)
+
+### 🩹 Fixes
+
+- **nuxt-drizzle:** Missing useRequestFetch import ([f4aac90](https://github.com/directus/rstore/commit/f4aac90))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.7
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.6...v0.6.7)
