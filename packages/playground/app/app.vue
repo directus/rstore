@@ -68,6 +68,11 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
                 icon: 'lucide:message-circle',
                 to: '/chat',
               },
+              {
+                label: 'Database',
+                icon: 'lucide:database',
+                to: '/database',
+              },
             ]"
             content-orientation="vertical"
           />

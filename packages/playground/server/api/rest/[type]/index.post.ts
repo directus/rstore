@@ -1,10 +1,10 @@
 export default defineEventHandler(async (event) => {
   const { type } = getRouterParams(event) as { type: keyof Db, id: string }
-  const schema = createValidationSchemas[type]
-  const body = await readValidatedBody(event, data => schema.parse(data))
+  const schema = createValidationSchemas[type as keyof CreateValidationSchemas]
+  const body = schema ? await readValidatedBody(event, data => schema.parse(data)) : await readBody(event)
   const newItem: any = {
     id: crypto.randomUUID(),
-    ...defaultValues[type],
+    ...defaultValues[type as keyof typeof defaultValues],
     ...body,
     createdAt: new Date(),
   }

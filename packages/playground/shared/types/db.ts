@@ -36,3 +36,22 @@ export interface ChatMessage {
   text: string
   createdAt: Date
 }
+
+export interface DataSource {
+  id: string
+  name: string
+}
+
+export interface DataCollection {
+  id: string
+  dataSourceId: string
+  name: string
+}
+
+export interface DataField {
+  id: string
+  dataCollectionId: string
+  name: string
+  type: string
+  nullable: boolean
+}

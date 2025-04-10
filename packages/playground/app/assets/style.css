@@ -4,3 +4,7 @@
 @utility border-default {
   @apply border-neutral-100 dark:border-neutral-800;
 }
+
+@utility divide-default {
+  @apply divide-neutral-100 dark:divide-neutral-800;
+}

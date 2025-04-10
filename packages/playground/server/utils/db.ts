@@ -5,6 +5,9 @@ export interface Db {
   users: User[]
   bots: Bot[]
   messages: Message[]
+  dataSources: DataSource[]
+  dataCollections: DataCollection[]
+  dataFields: DataField[]
 }
 
 export const db: Db = {
@@ -74,6 +77,42 @@ export const db: Db = {
       recipientId: 'user3',
       text: faker.lorem.paragraph(),
       createdAt: new Date(),
+    },
+  ],
+  dataSources: [
+    {
+      id: 'source1',
+      name: 'My DB',
+    },
+  ],
+  dataCollections: [
+    {
+      id: 'collection1',
+      dataSourceId: 'source1',
+      name: 'Posts',
+    },
+  ],
+  dataFields: [
+    {
+      id: 'field1',
+      dataCollectionId: 'collection1',
+      name: 'Title',
+      type: 'string',
+      nullable: false,
+    },
+    {
+      id: 'field2',
+      dataCollectionId: 'collection1',
+      name: 'Content',
+      type: 'string',
+      nullable: false,
+    },
+    {
+      id: 'field3',
+      dataCollectionId: 'collection1',
+      name: 'Published',
+      type: 'boolean',
+      nullable: true,
     },
   ],
 }
