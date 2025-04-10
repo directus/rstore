@@ -184,18 +184,17 @@ export default defineNuxtModule<ModuleOptions>({
         modelsByTable.set(table, model)
       }
 
+      const explicitOneRelations: Array<One> = []
+      const implicitOneRelations: Array<{ model: Model, key: string, relation: One }> = []
+      const implicitManyRelations: Array<{ model: Model, key: string, relation: Many<string> }> = []
+
       for (const relations of relationsList) {
         const model = modelsByTable.get(relations.table)
         if (!model) {
           throw new Error(`Model not found for table ${relations.table}`)
         }
-        model.relations ??= {}
 
         const config = relations.config(createTableRelationsHelpers(relations.table))
-
-        const explicitOneRelations: One[] = []
-        const implicitOneRelations: Array<{ key: string, relation: One }> = []
-        const implicitManyRelations: Array<{ key: string, relation: Many<string> }> = []
 
         for (const key in config) {
           const relation = config[key]
@@ -203,7 +202,7 @@ export default defineNuxtModule<ModuleOptions>({
             if (relation.config) {
               const fields = relation.config.fields
               if (!fields[0]) {
-                implicitOneRelations.push({ key, relation })
+                implicitOneRelations.push({ model, key, relation })
                 continue
               }
               if (fields.length > 1) {
@@ -211,7 +210,7 @@ export default defineNuxtModule<ModuleOptions>({
               }
               const references = relation.config.references
               if (!references[0]) {
-                implicitOneRelations.push({ key, relation })
+                implicitOneRelations.push({ model, key, relation })
                 continue
               }
               if (references.length > 1) {
@@ -223,6 +222,7 @@ export default defineNuxtModule<ModuleOptions>({
                 throw new Error(`Target model not found for table ${relation.referencedTableName}`)
               }
 
+              model.relations ??= {}
               model.relations[key] = {
                 to: {
                   [targetModel.name]: {
@@ -234,114 +234,118 @@ export default defineNuxtModule<ModuleOptions>({
               explicitOneRelations.push(relation)
             }
             else {
-              implicitOneRelations.push({ key, relation })
+              implicitOneRelations.push({ model, key, relation })
             }
           }
           else if (is(relation, Many)) {
-            implicitManyRelations.push({ key, relation })
+            implicitManyRelations.push({ model, key, relation })
           }
         }
+      }
 
-        for (const { key, relation } of implicitOneRelations) {
-          if (relation.relationName) {
-            const targetRelation = explicitOneRelations.find(r => r.relationName === relation.relationName)
-            if (!targetRelation) {
-              throw new Error(`Explicit relation not found for ${relation.relationName}`)
-            }
-            const targetModel = modelsByTable.get(targetRelation.referencedTable)
-            if (!targetModel) {
-              throw new Error(`Target model not found for table ${targetRelation.referencedTableName}`)
-            }
-            model.relations[key] = {
-              to: {
-                [targetModel.name]: {
-                  on: targetRelation.config!.fields[0]!.name,
-                  eq: targetRelation.config!.references[0]!.name,
-                },
-              },
-            }
+      for (const { model, key, relation } of implicitOneRelations) {
+        if (relation.relationName) {
+          const targetRelation = explicitOneRelations.find(r => r.relationName === relation.relationName)
+          if (!targetRelation) {
+            throw new Error(`Explicit relation not found for ${relation.relationName}`)
           }
-          else {
-            const targetModel = modelsByTable.get(relation.referencedTable)
-            if (!targetModel) {
-              throw new Error(`Target model not found for table ${relation.referencedTableName}`)
-            }
-            if (!targetModel.relations) {
-              throw new Error(`Target model ${targetModel.name} has no relations`)
-            }
-            let newRelation: ModelRelation | undefined
-            for (const relationKey in targetModel.relations) {
-              for (const modelName in targetModel.relations[relationKey]!.to) {
-                if (modelName === model.name) {
-                  newRelation = {
-                    to: {
-                      [targetModel.name]: {
-                        on: targetModel.relations[relationKey]!.to[modelName]!.eq,
-                        eq: targetModel.relations[relationKey]!.to[modelName]!.on,
-                      },
-                    },
-                  }
-                  break
-                }
-              }
-            }
-            if (!newRelation) {
-              throw new Error(`Reference relation not found for ${model.name}.${key}`)
-            }
-            model.relations[key] = newRelation
+          const targetModel = modelsByTable.get(targetRelation.referencedTable)
+          if (!targetModel) {
+            throw new Error(`Target model not found for table ${targetRelation.referencedTableName}`)
+          }
+          model.relations ??= {}
+          model.relations[key] = {
+            to: {
+              [targetModel.name]: {
+                on: targetRelation.config!.fields[0]!.name,
+                eq: targetRelation.config!.references[0]!.name,
+              },
+            },
           }
         }
-
-        for (const { key, relation } of implicitManyRelations) {
-          if (relation.relationName) {
-            const targetRelation = explicitOneRelations.find(r => r.relationName === relation.relationName)
-            if (!targetRelation) {
-              throw new Error(`Explicit relation not found for ${relation.relationName}`)
-            }
-            const targetModel = modelsByTable.get(targetRelation.referencedTable)
-            if (!targetModel) {
-              throw new Error(`Target model not found for table ${targetRelation.referencedTableName}`)
-            }
-            model.relations[key] = {
-              to: {
-                [targetModel.name]: {
-                  on: targetRelation.config!.fields[0]!.name,
-                  eq: targetRelation.config!.references[0]!.name,
-                },
-              },
-              many: true,
-            }
+        else {
+          const targetModel = modelsByTable.get(relation.referencedTable)
+          if (!targetModel) {
+            throw new Error(`Target model not found for table ${relation.referencedTableName}`)
           }
-          else {
-            const targetModel = modelsByTable.get(relation.referencedTable)
-            if (!targetModel) {
-              throw new Error(`Target model not found for table ${relation.referencedTableName}`)
-            }
-            if (!targetModel.relations) {
-              throw new Error(`Target model ${targetModel.name} has no relations`)
-            }
-            let newRelation: ModelRelation | undefined
-            for (const relationKey in targetModel.relations) {
-              for (const modelName in targetModel.relations[relationKey]!.to) {
-                if (modelName === model.name) {
-                  newRelation = {
-                    to: {
-                      [targetModel.name]: {
-                        on: targetModel.relations[relationKey]!.to[modelName]!.eq,
-                        eq: targetModel.relations[relationKey]!.to[modelName]!.on,
-                      },
+          if (!targetModel.relations) {
+            throw new Error(`Target model ${targetModel.name} has no relations`)
+          }
+          let newRelation: ModelRelation | undefined
+          for (const relationKey in targetModel.relations) {
+            for (const modelName in targetModel.relations[relationKey]!.to) {
+              if (modelName === model.name) {
+                newRelation = {
+                  to: {
+                    [targetModel.name]: {
+                      on: targetModel.relations[relationKey]!.to[modelName]!.eq,
+                      eq: targetModel.relations[relationKey]!.to[modelName]!.on,
                     },
-                    many: true,
-                  }
-                  break
+                  },
                 }
+                break
               }
             }
-            if (!newRelation) {
-              throw new Error(`Reference relation not found for ${model.name}.${key}`)
-            }
-            model.relations[key] = newRelation
           }
+          if (!newRelation) {
+            throw new Error(`Reference relation not found for ${model.name}.${key}`)
+          }
+          model.relations ??= {}
+          model.relations[key] = newRelation
+        }
+      }
+
+      for (const { model, key, relation } of implicitManyRelations) {
+        if (relation.relationName) {
+          const targetRelation = explicitOneRelations.find(r => r.relationName === relation.relationName)
+          if (!targetRelation) {
+            throw new Error(`Explicit relation not found for ${relation.relationName}`)
+          }
+          const targetModel = modelsByTable.get(targetRelation.referencedTable)
+          if (!targetModel) {
+            throw new Error(`Target model not found for table ${targetRelation.referencedTableName}`)
+          }
+          model.relations ??= {}
+          model.relations[key] = {
+            to: {
+              [targetModel.name]: {
+                on: targetRelation.config!.fields[0]!.name,
+                eq: targetRelation.config!.references[0]!.name,
+              },
+            },
+            many: true,
+          }
+        }
+        else {
+          const targetModel = modelsByTable.get(relation.referencedTable)
+          if (!targetModel) {
+            throw new Error(`Target model not found for table ${relation.referencedTableName}`)
+          }
+          if (!targetModel.relations) {
+            throw new Error(`Target model ${targetModel.name} has no relations`)
+          }
+          let newRelation: ModelRelation | undefined
+          for (const relationKey in targetModel.relations) {
+            for (const modelName in targetModel.relations[relationKey]!.to) {
+              if (modelName === model.name) {
+                newRelation = {
+                  to: {
+                    [targetModel.name]: {
+                      on: targetModel.relations[relationKey]!.to[modelName]!.eq,
+                      eq: targetModel.relations[relationKey]!.to[modelName]!.on,
+                    },
+                  },
+                  many: true,
+                }
+                break
+              }
+            }
+          }
+          if (!newRelation) {
+            throw new Error(`Reference relation not found for ${model.name}.${key}`)
+          }
+          model.relations ??= {}
+          model.relations[key] = newRelation
         }
       }
 
