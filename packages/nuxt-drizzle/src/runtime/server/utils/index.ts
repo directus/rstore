@@ -11,7 +11,12 @@ export interface RstoreDrizzleQueryParams {
   where?: string
   limit?: string
   offset?: string
+  orderBy?: string | string[]
+  with?: string
+  columns?: string
 }
+
+export type RstoreDrizzleQueryParamsOne = Omit<RstoreDrizzleQueryParams, 'limit' | 'offset' | 'orderBy'>
 
 export function getDrizzleTableFromModel(modelName: string) {
   const table = (tables as any)[modelName] as Table

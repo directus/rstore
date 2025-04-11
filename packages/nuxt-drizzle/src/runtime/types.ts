@@ -29,7 +29,23 @@ declare module '@rstore/vue' {
 
     limit?: number
     offset?: number
+    with?: DrizzleWith
+    columns?: DrizzleColumns
+    orderBy?: DrizzleOrderBy
   }
 }
+
+// @TODO typed columns
+type DrizzleColumns = Record<string, boolean>
+
+// @TODO typed `with` relations
+type DrizzleWith = Record<string, boolean | {
+  with?: DrizzleWith
+  columns?: DrizzleColumns
+  limit?: number
+}>
+
+// @TODO typed order by
+type DrizzleOrderBy = Array<`${string}.${'asc' | 'desc'}`>
 
 export {}
