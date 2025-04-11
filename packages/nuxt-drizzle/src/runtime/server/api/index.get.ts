@@ -56,18 +56,13 @@ export default eventHandler(async (event) => {
     const orderBy = []
     for (const rawOrderBy of orderByData) {
       const parts = rawOrderBy.split('.')
-      let columnName: string
-      let order: 'asc' | 'desc'
-      if (parts.length === 2) {
-        columnName = parts[0]
-        order = parts[1] as 'asc' | 'desc'
-      }
-      else {
+      if (parts.length !== 2) {
         throw createError({
           statusCode: 400,
           statusMessage: 'Invalid orderBy',
         })
       }
+      const [columnName, order] = parts
       const operator = orderByOperators[order as 'asc' | 'desc']
       orderBy.push(operator((table as any)[columnName]))
     }
