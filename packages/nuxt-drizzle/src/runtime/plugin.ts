@@ -35,7 +35,9 @@ export default definePlugin({
 
     hook('fetchFirst', async (payload) => {
       if (payload.key) {
-        const result = await requestFetch(`${apiPath}/${payload.model.name}/${payload.key}`)
+        const result = await requestFetch(`${apiPath}/${payload.model.name}/${payload.key}`, {
+          query: payload.findOptions?.params,
+        })
         if (result) {
           payload.setResult(result)
         }
@@ -114,9 +116,33 @@ export default definePlugin({
 
     hook('cacheFilterMany', (payload) => {
       const where = payload.findOptions?.where ?? payload.findOptions?.params?.where
-      if (where) {
-        const items = payload.getResult()
-        payload.setResult(items.filter(item => filterWhere(item, where)))
+      const orderBy = payload.findOptions?.params?.orderBy
+
+      if (where || orderBy) {
+        let items = payload.getResult()
+
+        // Filter
+        if (where) {
+          items = items.filter(item => filterWhere(item, where))
+        }
+
+        // Order by
+        if (orderBy) {
+          items.sort((a: any, b: any) => {
+            for (const param of orderBy) {
+              const [key, order] = param.split('.')
+              if (a[key] < b[key]) {
+                return order === 'asc' ? -1 : 1
+              }
+              if (a[key] > b[key]) {
+                return order === 'asc' ? 1 : -1
+              }
+            }
+            return 0
+          })
+        }
+
+        payload.setResult(items)
       }
     })
 

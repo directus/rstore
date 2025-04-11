@@ -12,6 +12,13 @@ const { data: todos, loading } = await store.todos.queryMany(() => ({
   params: {
     limit: 10,
     offset: page.value * 10,
+    // columns: {
+    //   title: false,
+    // },
+    orderBy: [
+      // 'completed.asc',
+      'createdAt.desc',
+    ],
   },
 }))
 
