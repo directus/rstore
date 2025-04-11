@@ -1,6 +1,27 @@
 # Changelog
 
 
+## v0.6.9
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.8...v0.6.9)
+
+### 🚀 Enhancements
+
+- **nuxt-drizzle:** Support with, columns, top-level orderBy ([#36](https://github.com/directus/rstore/pull/36))
+
+### 🩹 Fixes
+
+- **nuxt-drizzle:** PrimaryKeys use item keys instead of column names ([4115eb8](https://github.com/directus/rstore/commit/4115eb8))
+- **nuxt-drizzle:** In relations use keys instead of columns names ([dcb93f4](https://github.com/directus/rstore/commit/dcb93f4))
+
+### 🏡 Chore
+
+- Copy readme to all packages ([a804085](https://github.com/directus/rstore/commit/a804085))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.8
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.7...v0.6.8)

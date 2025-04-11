@@ -1,7 +1,7 @@
 {
   "name": "@rstore/nuxt-drizzle",
   "type": "module",
-  "version": "0.6.8",
+  "version": "0.6.9",
   "description": "Rstore + Nuxt + Drizzle",
   "license": "MIT",
   "repository": {
