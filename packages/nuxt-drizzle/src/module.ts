@@ -48,6 +48,8 @@ type AllTableConfig = TableConfig & (
   ReturnType<typeof singleStoreGetTableConfig>
 )
 
+type Column = AllTableConfig['columns'][number]
+
 export default defineNuxtModule<ModuleOptions>({
   meta: {
     name: 'rstore-nuxt-drizzle',
@@ -182,13 +184,22 @@ export default defineNuxtModule<ModuleOptions>({
         }
       }
 
+      function getColumnKey(table: Table, column: Column) {
+        for (const key in table) {
+          if (table[key as keyof Table] === column) {
+            return key
+          }
+        }
+        return column.name
+      }
+
       for (const { key, table, tableName, config } of tables) {
         const model: Model = {
           name: key,
           scopeId: 'rstore-drizzle',
           meta: {
             table: tableName,
-            primaryKeys: config?.primaryKeys?.length ? config.primaryKeys[0]!.columns.map(col => col.name) : config?.columns?.filter(col => col.primary).map(col => col.name) ?? [],
+            primaryKeys: config?.primaryKeys?.length ? config.primaryKeys[0]!.columns.map(col => getColumnKey(table, col)) : config?.columns?.filter(col => col.primary).map(col => getColumnKey(table, col)) ?? [],
           },
         }
         models.push(model)
