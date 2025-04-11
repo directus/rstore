@@ -248,8 +248,8 @@ export default defineNuxtModule<ModuleOptions>({
               model.relations[key] = {
                 to: {
                   [targetModel.name]: {
-                    on: references[0].name,
-                    eq: fields[0].name,
+                    on: getColumnKey(relation.referencedTable, references[0]),
+                    eq: getColumnKey(relation.sourceTable, fields[0]),
                   },
                 },
               }
@@ -279,8 +279,8 @@ export default defineNuxtModule<ModuleOptions>({
           model.relations[key] = {
             to: {
               [targetModel.name]: {
-                on: targetRelation.config!.fields[0]!.name,
-                eq: targetRelation.config!.references[0]!.name,
+                on: getColumnKey(relation.referencedTable, targetRelation.config!.fields[0]),
+                eq: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]),
               },
             },
           }
@@ -331,8 +331,8 @@ export default defineNuxtModule<ModuleOptions>({
           model.relations[key] = {
             to: {
               [targetModel.name]: {
-                on: targetRelation.config!.fields[0]!.name,
-                eq: targetRelation.config!.references[0]!.name,
+                on: getColumnKey(relation.referencedTable, targetRelation.config!.fields[0]),
+                eq: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]),
               },
             },
             many: true,
