@@ -146,6 +146,9 @@ export function removeModel(store: VueStore, modelName: string) {
     throw new Error(`Model ${modelName} not found`)
   }
 
+  const model = store.$models[index]
+  store.$cache.clearModel({ model })
+
   store.$models.splice(index, 1)
   privateStore.$_modelNames.delete(modelName)
 }

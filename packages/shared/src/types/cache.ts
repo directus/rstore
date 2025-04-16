@@ -86,4 +86,8 @@ export interface Cache<
   setState: (state: CustomCacheState) => void
 
   clear: () => void
+
+  clearModel: (params: {
+    model: ResolvedModel<Model, ModelDefaults, ModelList>
+  }) => void
 }

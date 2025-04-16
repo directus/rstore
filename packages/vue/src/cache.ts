@@ -200,6 +200,14 @@ export function createCache<
         meta: {},
       })
     },
+    clearModel({ model }) {
+      const itemsForType = state.value[model.name]
+      if (itemsForType) {
+        for (const key in itemsForType) {
+          this.deleteItem({ model, key })
+        }
+      }
+    },
     _private: {
       state,
       wrappedItems,
