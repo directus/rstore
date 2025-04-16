@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v0.6.10
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.9...v0.6.10)
+
+### 🚀 Enhancements
+
+- **vue:** Cache use weakmap for wrapped item cache ([90e840a](https://github.com/directus/rstore/commit/90e840a))
+
+### 🩹 Fixes
+
+- **vue:** Clear model cache on `removeModel` ([38d720d](https://github.com/directus/rstore/commit/38d720d))
+- Revert call form object ([0fc4952](https://github.com/directus/rstore/commit/0fc4952))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.9
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.8...v0.6.9)
