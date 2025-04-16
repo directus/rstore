@@ -20,14 +20,7 @@ export function createCache<
     _markers: {},
   })
 
-  const wrappedItems = new Map<string, WrappedItem<any, any, any>>()
-
-  function getWrappedItemCacheKey<TModel extends Model>(
-    model: ResolvedModel<TModel, TModelDefaults, TModelList>,
-    key: string | number,
-  ) {
-    return `${model.name}:${key}`
-  }
+  let wrappedItems = new WeakMap<ResolvedModelItem<Model, TModelDefaults, TModelList>, WrappedItem<Model, TModelDefaults, TModelList>>()
 
   function getWrappedItem<TModel extends Model>(
     model: ResolvedModel<TModel, TModelDefaults, TModelList>,
@@ -36,19 +29,14 @@ export function createCache<
     if (!item) {
       return undefined
     }
-    const key = model.getKey(item)
-    if (!key) {
-      throw new Error('Key is required on item to get wrapped')
-    }
-    const cacheKey = getWrappedItemCacheKey(model, key)
-    let wrappedItem = wrappedItems.get(cacheKey)
+    let wrappedItem = wrappedItems.get(item)
     if (!wrappedItem) {
       wrappedItem = wrapItem({
         store: getStore(),
         model,
         item,
       })
-      wrappedItems.set(cacheKey, wrappedItem)
+      wrappedItems.set(item, wrappedItem)
     }
     return wrappedItem
   }
@@ -170,16 +158,19 @@ export function createCache<
       })
     },
     deleteItem({ model, key }) {
-      delete state.value[model.name]?.[key]
-      wrappedItems.delete(getWrappedItemCacheKey(model, key))
-      const store = getStore()
-      store.$hooks.callHookSync('afterCacheWrite', {
-        store,
-        meta: {},
-        model,
-        key,
-        operation: 'delete',
-      })
+      const item = state.value[model.name]?.[key]
+      if (item) {
+        delete state.value[model.name]?.[key]
+        wrappedItems.delete(item)
+        const store = getStore()
+        store.$hooks.callHookSync('afterCacheWrite', {
+          store,
+          meta: {},
+          model,
+          key,
+          operation: 'delete',
+        })
+      }
     },
     getModuleState(name, initState) {
       const cacheKey = `$${name}`
@@ -191,7 +182,7 @@ export function createCache<
     },
     setState(value) {
       state.value = value
-      wrappedItems.clear()
+      wrappedItems = new WeakMap()
 
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', {
@@ -201,7 +192,7 @@ export function createCache<
     },
     clear() {
       state.value = {}
-      wrappedItems.clear()
+      wrappedItems = new WeakMap()
 
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', {
