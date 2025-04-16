@@ -140,9 +140,7 @@ export function createFormObject<
     })
   }
 
-  const base = form.$submit
-
-  const proxy = new Proxy(base, {
+  const proxy = new Proxy(form, {
     set(target, key, value) {
       if (typeof key === 'string' && !key.startsWith('$')) {
         const oldValue = initialData[key as keyof typeof initialData]
