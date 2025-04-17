@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.6.11
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.10...v0.6.11)
+
+### 🚀 Enhancements
+
+- Support nuxt layer, closes #8 ([#8](https://github.com/directus/rstore/issues/8))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.10
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.9...v0.6.10)

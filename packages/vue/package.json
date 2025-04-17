@@ -1,7 +1,7 @@
 {
   "name": "@rstore/vue",
   "type": "module",
-  "version": "0.6.10",
+  "version": "0.6.11",
   "description": "Reactive Store for Vue",
   "repository": {
     "url": "https://github.com/Akryum/rstore.git",
