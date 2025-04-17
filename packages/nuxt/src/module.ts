@@ -56,6 +56,16 @@ export default defineNuxtModule<ModuleOptions>({
     const rstoreModelDirs = options.rstoreDirs as string[]
     const rstorePluginDirs = rstoreModelDirs.map(dir => resolve(dir, 'plugins'))
 
+    for (const layer of nuxt.options._layers) {
+      const layerRstoreDirs = layer.config?.rstore?.rstoreDirs ?? ['rstore']
+      for (const dir of layerRstoreDirs) {
+        const layerDir = resolve(layer.config.rootDir, dir)
+        rstoreModelDirs.push(layerDir)
+        const layerPluginDir = resolve(layer.config.rootDir, dir, 'plugins')
+        rstorePluginDirs.push(layerPluginDir)
+      }
+    }
+
     async function resolveModelFiles() {
       let files = (await Promise.all(rstoreModelDirs.map((dir) => {
         return resolveFiles(dir, ['./*{.ts,.js}'])
