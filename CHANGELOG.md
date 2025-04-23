@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.6.12
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.11...v0.6.12)
+
+### 🩹 Fixes
+
+- **nuxt:** Use layer srcDir instead of rootDir ([35eddf6](https://github.com/directus/rstore/commit/35eddf6))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.11
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.10...v0.6.11)
