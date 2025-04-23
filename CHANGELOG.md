@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.6.14
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.13...v0.6.14)
+
+### 🚀 Enhancements
+
+- **nuxt:** Run plugin before router ([8572e56](https://github.com/directus/rstore/commit/8572e56))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.13
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.12...v0.6.13)
