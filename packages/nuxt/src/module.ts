@@ -57,11 +57,11 @@ export default defineNuxtModule<ModuleOptions>({
     const rstorePluginDirs = rstoreModelDirs.map(dir => resolve(dir, 'plugins'))
 
     for (const layer of nuxt.options._layers) {
-      const layerRstoreDirs = layer.config?.rstore?.rstoreDirs ?? ['rstore']
+      const layerRstoreDirs = (layer.config as unknown as { rstore: ModuleOptions } | null)?.rstore?.rstoreDirs ?? ['rstore']
       for (const dir of layerRstoreDirs) {
-        const layerDir = resolve(layer.config.rootDir, dir)
+        const layerDir = resolve(layer.config.srcDir, dir)
         rstoreModelDirs.push(layerDir)
-        const layerPluginDir = resolve(layer.config.rootDir, dir, 'plugins')
+        const layerPluginDir = resolve(layer.config.srcDir, dir, 'plugins')
         rstorePluginDirs.push(layerPluginDir)
       }
     }
