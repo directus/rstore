@@ -47,14 +47,9 @@ export default defineNuxtModule<ModuleOptions>({
       'StoreWrappedItem',
     ].map(name => ({ from: importsFile, name, type: true })))
 
-    // Scan folder
-    if (!options.rstoreDirs) {
-      // resolve it against the src dir which is the root by default
-      options.rstoreDirs = [resolve(nuxt.options.srcDir, 'rstore')]
-    }
-
-    const rstoreModelDirs = options.rstoreDirs as string[]
-    const rstorePluginDirs = rstoreModelDirs.map(dir => resolve(dir, 'plugins'))
+    // Scan folders
+    const rstoreModelDirs: string[] = []
+    const rstorePluginDirs: string[] = []
 
     for (const layer of nuxt.options._layers) {
       const layerRstoreDirs = (layer.config as unknown as { rstore: ModuleOptions } | null)?.rstore?.rstoreDirs ?? ['rstore']
