@@ -9,43 +9,49 @@ import * as _plugins from '#build/$rstore-plugins'
 import { createStore, RstorePlugin } from '@rstore/vue'
 import { markRaw } from 'vue'
 
-export default defineNuxtPlugin(async (nuxtApp) => {
-  let plugins = Object.values({ ..._plugins }) as Plugin[]
-  const models = _models as ModelList
+export default defineNuxtPlugin({
+  name: 'rstore',
 
-  // Devtools
-  if (import.meta.dev) {
-    const { devtoolsPlugin } = await import('./devtools')
-    plugins = [
-      ...plugins,
-      devtoolsPlugin,
-    ]
-  }
+  order: -21,
 
-  const store = await createStore({
-    plugins,
-    models,
-    isServer: !!import.meta.server,
-  })
+  setup: async (nuxtApp) => {
+    let plugins = Object.values({ ..._plugins }) as Plugin[]
+    const models = _models as ModelList
 
-  const cacheKey = '$srstore'
+    // Devtools
+    if (import.meta.dev) {
+      const { devtoolsPlugin } = await import('./devtools')
+      plugins = [
+        ...plugins,
+        devtoolsPlugin,
+      ]
+    }
 
-  nuxtApp.hook('app:rendered', () => {
-    nuxtApp.payload.state[cacheKey] = markRaw(store.$cache.getState())
-  })
+    const store = await createStore({
+      plugins,
+      models,
+      isServer: !!import.meta.server,
+    })
 
-  if (import.meta.client && nuxtApp.payload.state[cacheKey]) {
-    store.$cache.setState(nuxtApp.payload.state[cacheKey])
-  }
+    const cacheKey = '$srstore'
 
-  nuxtApp.vueApp.use(RstorePlugin, {
-    store,
-  })
+    nuxtApp.hook('app:rendered', () => {
+      nuxtApp.payload.state[cacheKey] = markRaw(store.$cache.getState())
+    })
 
-  // Inject $rstore
-  return {
-    provide: {
-      rstore: store,
-    },
-  }
+    if (import.meta.client && nuxtApp.payload.state[cacheKey]) {
+      store.$cache.setState(nuxtApp.payload.state[cacheKey])
+    }
+
+    nuxtApp.vueApp.use(RstorePlugin, {
+      store,
+    })
+
+    // Inject $rstore
+    return {
+      provide: {
+        rstore: store,
+      },
+    }
+  },
 })
