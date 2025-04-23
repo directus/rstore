@@ -1,6 +1,18 @@
 # Changelog
 
 
+## v0.6.13
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.12...v0.6.13)
+
+### 🩹 Fixes
+
+- **nuxt:** Duplicate scan dirs with app ([86ea149](https://github.com/directus/rstore/commit/86ea149))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.12
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.11...v0.6.12)
