@@ -65,39 +65,57 @@ export function createCache<
 
       // Handle relations
       const data = {} as Record<string, any>
-      for (const key in rawData) {
-        if (key in model.relations) {
-          const relation = model.relations[key]
-          const rawItem = rawData[key]
+      for (const field in rawData) {
+        if (field in model.relations) {
+          const relation = model.relations[field]
+          const rawItem = rawData[field]
+
+          // TODO: figure out deletions
+          if (!rawItem) {
+            continue
+          }
 
           if (relation.many && !Array.isArray(rawItem)) {
-            throw new Error(`Expected array for relation ${model.name}.${key}`)
+            throw new Error(`Expected array for relation ${model.name}.${field}`)
           }
           else if (!relation.many && Array.isArray(rawItem)) {
-            throw new Error(`Expected object for relation ${model.name}.${key}`)
+            throw new Error(`Expected object for relation ${model.name}.${field}`)
           }
 
           if (Array.isArray(rawItem)) {
             for (const nestedItem of rawItem as any[]) {
               this.writeItemForRelation({
                 parentModel: model,
-                relationKey: key,
+                relationKey: field,
                 relation,
                 childItem: nestedItem,
               })
             }
           }
-          else {
+          else if (rawItem) {
             this.writeItemForRelation({
               parentModel: model,
-              relationKey: key,
+              relationKey: field,
               relation,
               childItem: rawItem,
             })
           }
+          else {
+            // TODO: figure out deletions
+            // // If to-one relation is null, we delete the existing item
+            // const existingItem = this.readItem({ model, key })
+            // if (existingItem) {
+            //   const childItem: WrappedItemBase<Model, ModelDefaults, ModelList> = existingItem[field]
+            //   const nestedItemModel = getStore().$getModel(childItem, [childItem.$model])
+            //   const nestedKey = nestedItemModel?.getKey(childItem)
+            //   if (nestedItemModel && nestedKey) {
+            //     this.deleteItem({ model: nestedItemModel, key: nestedKey })
+            //   }
+            // }
+          }
         }
         else {
-          data[key] = rawData[key]
+          data[field] = rawData[field]
         }
       }
 
@@ -211,11 +229,13 @@ export function createCache<
     _private: {
       state,
       wrappedItems,
+      getWrappedItem,
     },
   } satisfies Cache & {
     _private: {
       state: typeof state
       wrappedItems: typeof wrappedItems
+      getWrappedItem: typeof getWrappedItem
     }
   } as any
 }
