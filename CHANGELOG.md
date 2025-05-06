@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.6.15
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.14...v0.6.15)
+
+### 🩹 Fixes
+
+- **vue:** Cache attempting to write null items in relations ([db88234](https://github.com/directus/rstore/commit/db88234))
+
+### 🏡 Chore
+
+- Pnpm in git hook ([caead6b](https://github.com/directus/rstore/commit/caead6b))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.14
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.13...v0.6.14)
