@@ -51,7 +51,7 @@
     ]
   },
   "simple-git-hooks": {
-    "pre-commit": "npm exec lint-staged",
+    "pre-commit": "pnpm exec lint-staged",
     "commit-msg": "node scripts/verify-commit.js"
   }
 }
