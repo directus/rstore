@@ -125,6 +125,79 @@ describe('createStoreCore', () => {
     })
   })
 
+  describe('field serialization', () => {
+    it('calls custom field serialize', async () => {
+      const models: ModelList = [
+        {
+          name: 'Test',
+          fields: {
+            date: {
+              serialize: (value: Date) => value.toISOString(),
+            },
+          },
+        },
+      ]
+      options.models = models
+      options.hooks = createHooks()
+
+      const store = await createStoreCore(options)
+      const item = { date: new Date('2023-01-01T00:00:00Z') }
+
+      store.$processItemSerialization(store.$models[0], item)
+
+      expect(item.date).toBe('2023-01-01T00:00:00.000Z')
+    })
+
+    it('skips serialization if value is null', async () => {
+      const serializeMock = vi.fn()
+      const models: ModelList = [
+        {
+          name: 'Test',
+          fields: {
+            optionalField: {
+              serialize: serializeMock,
+            },
+          },
+        },
+      ]
+      options.models = models
+      options.hooks = createHooks()
+
+      const store = await createStoreCore(options)
+      const item = { optionalField: null }
+
+      store.$processItemSerialization(store.$models[0], item)
+
+      expect(serializeMock).not.toHaveBeenCalled()
+    })
+
+    it('handles nested fields with dot notation', async () => {
+      const models: ModelList = [
+        {
+          name: 'Test',
+          fields: {
+            'metadata.createdAt': {
+              serialize: (value: Date) => value.toISOString(),
+            },
+          },
+        },
+      ]
+      options.models = models
+      options.hooks = createHooks()
+
+      const store = await createStoreCore(options)
+      const item = {
+        metadata: {
+          createdAt: new Date('2023-01-01T00:00:00Z'),
+        },
+      }
+
+      store.$processItemSerialization(store.$models[0], item)
+
+      expect(item.metadata.createdAt).toBe('2023-01-01T00:00:00.000Z')
+    })
+  })
+
   describe('getFetchPolicy', () => {
     it('should return default fetch policy if no value is provided', async () => {
       const store = await createStoreCore(options)

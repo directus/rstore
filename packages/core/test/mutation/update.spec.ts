@@ -18,6 +18,7 @@ describe('updateItem', () => {
     mockStore = {
       $hooks: createHooks(),
       $processItemParsing: vi.fn(),
+      $processItemSerialization: vi.fn(),
       $cache: {
         writeItem: vi.fn(),
       },
@@ -114,5 +115,27 @@ describe('updateItem', () => {
       key: '1',
       payload: mockItem,
     })
+  })
+
+  it('should serialize item before processing', async () => {
+    const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
+    let payloadItem: any
+    mockStore.$hooks.hook('updateItem', vi.fn(({ item, setResult }) => {
+      payloadItem = item
+      setResult(resultItem)
+    }))
+    mockModel.getKey = vi.fn(() => '1')
+    Object.assign(mockItem, { text: 'test' })
+    let processItemSerializationPayloadItem: any = null
+    mockStore.$processItemSerialization = vi.fn((model, item) => {
+      processItemSerializationPayloadItem = structuredClone(item)
+      item.serialized = true
+    })
+
+    await updateItem(options)
+
+    expect(mockStore.$processItemSerialization).toHaveBeenCalled()
+    expect(processItemSerializationPayloadItem).toEqual({ text: 'test' })
+    expect(payloadItem).toEqual({ text: 'test', serialized: true })
   })
 })

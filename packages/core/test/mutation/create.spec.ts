@@ -19,6 +19,7 @@ describe('createItem', () => {
       },
       $mutationHistory: [],
       $processItemParsing: vi.fn(),
+      $processItemSerialization: vi.fn(),
     } as unknown as StoreCore<ModelList, ModelDefaults>
 
     mockModel = {
@@ -85,5 +86,27 @@ describe('createItem', () => {
       model: mockModel,
       payload: mockItem,
     })
+  })
+
+  it('should serialize item before processing', async () => {
+    const resultItem = { id: '1' } as ResolvedModelItem<Model, ModelDefaults, ModelList>
+    let payloadItem: any
+    mockStore.$hooks.hook('createItem', vi.fn(({ item, setResult }) => {
+      payloadItem = item
+      setResult(resultItem)
+    }))
+    mockModel.getKey = vi.fn(() => '1')
+    Object.assign(mockItem, { text: 'test' })
+    let processItemSerializationPayloadItem: any = null
+    mockStore.$processItemSerialization = vi.fn((model, item) => {
+      processItemSerializationPayloadItem = structuredClone(item)
+      item.serialized = true
+    })
+
+    await createItem(options)
+
+    expect(mockStore.$processItemSerialization).toHaveBeenCalled()
+    expect(processItemSerializationPayloadItem).toEqual({ text: 'test' })
+    expect(payloadItem).toEqual({ text: 'test', serialized: true })
   })
 })

@@ -21,6 +21,10 @@ export interface StoreCore<
    * @private
    */
   $processItemParsing: <TModel extends Model> (model: ResolvedModel<TModel, TModelDefaults, TModelList>, item: any) => void
+  /**
+   * @private
+   */
+  $processItemSerialization: <TModel extends Model> (model: ResolvedModel<TModel, TModelDefaults, TModelList>, item: any) => void
   $getModel: (item: any, modelNames?: string[]) => ResolvedModel<Model, ModelDefaults, ModelList> | null
   $mutationHistory: Array<MutationOperation<any, TModelDefaults, TModelList>>
   $isServer: boolean

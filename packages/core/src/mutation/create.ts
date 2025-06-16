@@ -25,6 +25,9 @@ export async function createItem<
   const meta: CustomHookMeta = {}
 
   item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+
+  store.$processItemSerialization(model, item)
+
   let result: ResolvedModelItem<TModel, TModelDefaults, TModelList> | undefined
 
   await store.$hooks.callHook('beforeMutation', {

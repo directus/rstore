@@ -64,12 +64,12 @@ export interface Model<
   'fields'?: {
     [K in Path<TItem>]?: {
       /**
-       * Parse the value received from the adapters.
+       * Parse the value received from the plugins.
        */
       parse?: (value: any) => PathValue<TItem, K>
 
       /**
-       * Serialize the value before sending it to the adapters.
+       * Serialize the value before sending it to the plugins.
        */
       serialize?: (value: PathValue<TItem, K>) => any
     }

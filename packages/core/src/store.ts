@@ -48,6 +48,17 @@ export async function createStoreCore<
         },
       })
     },
+    $processItemSerialization(model, item) {
+      store.$hooks.callHookSync('serializeItem', {
+        store,
+        meta: {},
+        model,
+        item,
+        modifyItem: (path, value) => {
+          set(item, path, value as any)
+        },
+      })
+    },
     $getModel(item, modelNames?) {
       if (modelNames?.length === 1) {
         return store.$models.find(m => m.name === modelNames[0]) ?? null
@@ -130,6 +141,20 @@ export async function createStoreCore<
     }
     store.$processItemParsing(childModel, child)
   }
+
+  store.$hooks.hook('serializeItem', (payload) => {
+    if (payload.model.fields) {
+      for (const path in payload.model.fields) {
+        const fieldConfig = payload.model.fields[path]!
+        if (fieldConfig.serialize) {
+          const value = get(payload.item, path as any)
+          if (value != null) {
+            payload.modifyItem(path as any, fieldConfig.serialize(value))
+          }
+        }
+      }
+    }
+  })
 
   return store
 }

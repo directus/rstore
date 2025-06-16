@@ -28,6 +28,9 @@ export async function updateItem<
   const meta: CustomHookMeta = {}
 
   item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+
+  store.$processItemSerialization(model, item)
+
   key = key ?? model.getKey(item)
 
   if (!key) {

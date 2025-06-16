@@ -172,6 +172,18 @@ export interface HookDefinitions<
     }
   ) => void
 
+  serializeItem: <
+    TModel extends Model,
+  > (
+    payload: {
+      store: StoreCore<TModelList, TModelDefaults>
+      meta: CustomHookMeta
+      model: ResolvedModel<TModel, TModelDefaults, TModelList>
+      item: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>
+      modifyItem: <TItem extends Record<string, any>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
+    }
+  ) => void
+
   beforeMutation: <
     TModel extends Model,
   > (
