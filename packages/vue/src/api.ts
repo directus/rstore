@@ -169,6 +169,7 @@ export function createModelApi<
       store,
       model,
       findOptions: toValue(findOptions),
+      force: true,
     }).result,
 
     findFirst: findOptions => findFirst({
@@ -190,6 +191,7 @@ export function createModelApi<
       store,
       model,
       findOptions: toValue(findOptions),
+      force: true,
     }).result,
 
     findMany: findOptions => findMany({
