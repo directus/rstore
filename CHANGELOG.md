@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.6.16
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.15...v0.6.16)
+
+### 🚀 Enhancements
+
+- Field serialize, fix #41 ([#41](https://github.com/directus/rstore/issues/41))
+
+### 🩹 Fixes
+
+- Peek methods returning empty results when called directly, fix #42 ([#42](https://github.com/directus/rstore/issues/42))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.15
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.14...v0.6.15)
