@@ -1,5 +1,5 @@
 import { emptySchema } from '@rstore/core'
-import { type Awaitable, type FormObjectBase, pickNonSpecialProps, type StandardSchemaV1 } from '@rstore/shared'
+import { type Awaitable, type CreateFormObject, type FormObjectBase, type Model, type ModelDefaults, type ModelList, pickNonSpecialProps, type ResolvedModelItem, type StandardSchemaV1, type UpdateFormObject } from '@rstore/shared'
 import { createEventHook, type EventHookOn } from '@vueuse/core'
 import { markRaw, nextTick, reactive } from 'vue'
 
@@ -37,11 +37,29 @@ export interface FormObjectAdditionalProps<
   $onChange: EventHookOn<FormObjectChanged<TData>>
 }
 
-export type FormObject<
+type VueFormObject<
   TData extends Record<string, any>,
   TSchema extends StandardSchemaV1 = StandardSchemaV1,
   TAdditionalProps = Record<string, never>,
 > = FormObjectBase<TData, TSchema> & FormObjectAdditionalProps<TData> & TAdditionalProps & Partial<TData> & (() => Promise<TData>)
+
+/**
+ * Object returned by `store.<Model>.createForm()`
+ */
+export type VueCreateFormObject<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+> = CreateFormObject<TModel, TModelDefaults, TModelList> & VueFormObject<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+
+/**
+ * Object returned by `store.<Model>.updateForm()`
+ */
+export type VueUpdateFormObject<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends ModelList,
+> = UpdateFormObject<TModel, TModelDefaults, TModelList> & VueFormObject<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
 
 export function createFormObject<
   TData extends Record<string, any> = Record<string, any>,
@@ -166,7 +184,7 @@ export function createFormObject<
   // Validate initially (don't await for it)
   queueChange()
 
-  return proxy as FormObject<TData, TSchema, TAdditionalProps>
+  return proxy as VueFormObject<TData, TSchema, TAdditionalProps>
 }
 
 /**

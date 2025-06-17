@@ -3,6 +3,11 @@ export {
   createFormObjectWithChangeDetection,
 } from './form'
 
+export type {
+  VueCreateFormObject as CreateFormObject,
+  VueUpdateFormObject as UpdateFormObject,
+} from './form'
+
 export {
   defineModule,
 } from './module'
