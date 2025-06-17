@@ -1,6 +1,26 @@
 # Changelog
 
 
+## v0.6.17
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.16...v0.6.17)
+
+### 🚀 Enhancements
+
+- **nuxt:** Export StoreCreateFormObject<modelName> and StoreUpdateFormObject<modelName> ([50f323d](https://github.com/directus/rstore/commit/50f323d))
+
+### 📖 Documentation
+
+- Update commit convention regex ([84302cd](https://github.com/directus/rstore/commit/84302cd))
+
+### 🌊 Types
+
+- **vue:** Export CreateFormObject and UpdateFormObject ([b6b5b2e](https://github.com/directus/rstore/commit/b6b5b2e))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.16
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.15...v0.6.16)
