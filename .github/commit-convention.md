@@ -8,7 +8,7 @@ Messages must be matched by the following regex:
 
 <!-- prettier-ignore -->
 ```js
-/^(revert: )?(feat|fix|docs|dx|refactor|perf|test|workflow|build|ci|chore|types|wip|release|deps)(\(.+\))?: .{1,50}/
+/^(?:revert: )?(?:feat|fix|docs|dx|style|refactor|perf|test|workflow|build|ci|chore|types|wip|release)(?:\(.+\))?: .{1,50}/
 ```
 
 #### Examples
