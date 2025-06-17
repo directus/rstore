@@ -10,7 +10,9 @@ const { data: messages } = store.ChatMessage.liveQueryMany({
   fetchPolicy: 'cache-only',
 })
 
-const createChatMessage = store.ChatMessage.createForm()
+type CreateChat = StoreCreateFormObject<'ChatMessage'>
+
+const createChatMessage: CreateChat = store.ChatMessage.createForm()
 
 const input = useTemplateRef('input')
 createChatMessage.$onSuccess(() => {

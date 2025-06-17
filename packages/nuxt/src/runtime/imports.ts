@@ -1,6 +1,6 @@
 import type { constModels } from '#build/$rstore-model-const'
 import type { ModelByName, ModelNameMap, ResolvedModelItem, WrappedItem } from '@rstore/shared'
-import type { VueStore } from '@rstore/vue'
+import type { CreateFormObject, UpdateFormObject, VueStore } from '@rstore/vue'
 import { useNuxtApp } from '#app'
 
 export * from '@rstore/vue'
@@ -33,6 +33,22 @@ export type StoreResolvedModelItem<
 export type StoreWrappedItem<
   TModelName extends keyof StoreModelNameMap,
 > = WrappedItem<
+  ModelByName<Store['$models'], TModelName, StoreModelNameMap>,
+  Store['$modelDefaults'],
+  StoreRawModels
+>
+
+export type StoreCreateFormObject<
+  TModelName extends keyof StoreModelNameMap,
+> = CreateFormObject<
+  ModelByName<Store['$models'], TModelName, StoreModelNameMap>,
+  Store['$modelDefaults'],
+  StoreRawModels
+>
+
+export type StoreUpdateFormObject<
+  TModelName extends keyof StoreModelNameMap,
+> = UpdateFormObject<
   ModelByName<Store['$models'], TModelName, StoreModelNameMap>,
   Store['$modelDefaults'],
   StoreRawModels

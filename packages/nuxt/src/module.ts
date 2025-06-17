@@ -45,6 +45,8 @@ export default defineNuxtModule<ModuleOptions>({
       'Store',
       'StoreResolvedModelItem',
       'StoreWrappedItem',
+      'StoreCreateFormObject',
+      'StoreUpdateFormObject',
     ].map(name => ({ from: importsFile, name, type: true })))
 
     // Scan folders
