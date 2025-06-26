@@ -124,6 +124,7 @@ export interface HookDefinitions<
       key?: string | number
       findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
       setMarker: (marker: string) => void
+      setFilter: (filter: (item: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>) => boolean) => void
     }
   ) => void
 
