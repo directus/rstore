@@ -1,4 +1,4 @@
-import type { CustomHookMeta, FindManyOptions, Model, ModelDefaults, QueryResult, ResolvedModel, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { CustomHookMeta, FindManyOptions, Model, ModelDefaults, QueryResult, ResolvedModel, ResolvedModelItemBase, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
@@ -47,12 +47,8 @@ export function peekMany<
     let result = store.$cache.readItems({
       model,
       marker: force ? undefined : getMarker('many', marker),
+      filter: typeof findOptions?.filter === 'function' ? findOptions.filter as (item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>) => boolean : undefined,
     })
-
-    if (typeof findOptions?.filter === 'function') {
-      const filterFn = findOptions.filter
-      result = result.filter(item => filterFn(item))
-    }
 
     store.$hooks.callHookSync('cacheFilterMany', {
       store,

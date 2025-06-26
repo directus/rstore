@@ -1,5 +1,5 @@
 import type { VueStore } from './store'
-import { type Cache, type Model, type ModelDefaults, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, type StoreSchema, type WrappedItem } from '@rstore/shared'
+import { type Cache, type Model, type ModelDefaults, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, type ResolvedModelItemBase, type StoreSchema, type WrappedItem } from '@rstore/shared'
 import { ref, toRaw } from 'vue'
 import { wrapItem } from './item'
 
@@ -52,11 +52,24 @@ export function createCache<
     readItem({ model, key }) {
       return getWrappedItem(model, state.value[model.name]?.[key])
     },
-    readItems({ model, marker }) {
+    readItems({ model, marker, filter }) {
       if (marker && !state.value._markers?.[marker]) {
         return []
       }
-      return Object.values<any>(state.value[model.name] ?? {}).map(item => getWrappedItem(model, item)).filter(Boolean) as WrappedItem<any, any, any>[]
+      const data: Array<ResolvedModelItemBase<any, any, any>> = Object.values(state.value[model.name] ?? {})
+      const result: Array<WrappedItem<any, any, any>> = []
+      for (const item of data) {
+        if (item) {
+          if (filter && !filter(item)) {
+            continue
+          }
+          const wrappedItem = getWrappedItem(model, item)
+          if (wrappedItem) {
+            result.push(wrappedItem)
+          }
+        }
+      }
+      return result
     },
     writeItem({ model, key, item, marker, fromWriteItems }) {
       state.value[model.name] ??= {}
