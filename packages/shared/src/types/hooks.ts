@@ -93,7 +93,7 @@ export interface HookDefinitions<
       findOptions?: FindOptions<TModel, TModelDefaults, TSchema>
       getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TSchema> | undefined
       setResult: (result: ResolvedModelItemBase<TModel, TModelDefaults, TSchema> | undefined) => void
-      readItemsFromCache: (options?: ReadItemsFromCacheOptions) => Array<ResolvedModelItemBase<TModel, TModelDefaults, TSchema>>
+      readItemsFromCache: (options?: ReadItemsFromCacheOptions<TModel, TModelDefaults, TSchema>) => Array<ResolvedModelItemBase<TModel, TModelDefaults, TSchema>>
     }
   ) => void
 
@@ -321,6 +321,10 @@ export interface HookDefinitions<
 
 export type HookPayload = Parameters<HookDefinitions<StoreSchema, ModelDefaults>[keyof HookDefinitions<StoreSchema, ModelDefaults>]>[0]
 
-export interface ReadItemsFromCacheOptions {
-  applyFilter?: boolean
+export interface ReadItemsFromCacheOptions<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TModelList extends StoreSchema,
+> {
+  applyFilter?: boolean | ((item: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>) => boolean)
 }

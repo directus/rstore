@@ -86,11 +86,20 @@ export function peekFirst<
       key,
       findOptions,
       readItemsFromCache: (options) => {
+        function getFilter() {
+          if (options?.applyFilter === true) {
+            return findOptions?.filter as (item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>) => boolean
+          }
+          else if (typeof options?.applyFilter === 'function') {
+            return options.applyFilter
+          }
+        }
+
         // Try with first marker first
         let items = store.$cache.readItems({
           model,
           marker: force ? undefined : getMarker('first', marker),
-          filter: options?.applyFilter && typeof findOptions?.filter === 'function' ? findOptions.filter as (item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>) => boolean : undefined,
+          filter: getFilter(),
         }) ?? []
 
         // Fallback to many marker
@@ -98,7 +107,7 @@ export function peekFirst<
           items = store.$cache.readItems({
             model,
             marker: getMarker('many', marker),
-            filter: options?.applyFilter && typeof findOptions?.filter === 'function' ? findOptions.filter as (item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>) => boolean : undefined,
+            filter: getFilter(),
           }) ?? []
         }
         return items
