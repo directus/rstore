@@ -113,12 +113,12 @@ export interface ModelRelation {
 
   to: Record<string, {
     /**
-     * Field name on the current model.
+     * Field name on the target model.
      */
     on: string
 
     /**
-     * Field name on the target model.
+     * Field name on the current model.
      */
     eq: string
   }>
