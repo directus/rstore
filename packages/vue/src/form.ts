@@ -73,7 +73,7 @@ export function createFormObject<
   const onChange = createEventHook()
 
   const form = reactive({
-    ...options.defaultValues?.(),
+    ...initialData as TData,
     ...options.additionalProps,
 
     $error: null,
