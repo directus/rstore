@@ -1,6 +1,22 @@
 # Changelog
 
 
+## v0.6.18
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.17...v0.6.18)
+
+### 🩹 Fixes
+
+- Don't call defaultValues in form objects twice ([#46](https://github.com/directus/rstore/pull/46))
+
+### 🏡 Chore
+
+- Inverted comment ([8dc260a](https://github.com/directus/rstore/commit/8dc260a))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.6.17
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.16...v0.6.17)
