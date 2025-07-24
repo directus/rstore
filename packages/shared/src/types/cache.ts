@@ -61,7 +61,11 @@ export interface Cache<
      * Marker to consider that the corresponding list was already fetched once. Allow returning empty list if marker is not found.
      */
     marker?: string
-  }) => Array<WrappedItem<TModel, TModelDefaults, TModelList>>
+    /**
+     * Filter the items to include.
+     */
+    filter?: (item: WrappedItem<TModel, TModelDefaults, TModelList>) => boolean
+  }) => Array<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>>
 
   writeItems: <TModel extends Model = Model>(params: {
     model: ResolvedModel<TModel, TModelDefaults, TModelList>
