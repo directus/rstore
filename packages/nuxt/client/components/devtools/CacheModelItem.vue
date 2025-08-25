@@ -21,7 +21,7 @@ const cacheCount = computed(() => Object.keys((cache.value as any)[props.model.n
       variant: 'ghost',
     }"
     size="sm"
-    class="w-full"
+    class="w-full h-8"
   >
     <span class="text-start flex-1 truncate min-w-0">
       {{ model.name }}
