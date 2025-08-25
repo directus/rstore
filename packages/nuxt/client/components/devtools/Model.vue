@@ -28,7 +28,6 @@ const filteredTypes = computed(() => {
           icon="lucide:search"
           placeholder="Search"
           size="xs"
-          variant="soft"
           autofocus
           class="w-full"
         />
