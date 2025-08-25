@@ -1,33 +1,33 @@
-import type { Cache, CustomHookMeta, FindOptions, Hooks, Model, ModelDefaults, ModelList, MutationSpecialProps, Plugin, StoreCore } from '@rstore/shared'
+import type { Cache, CustomHookMeta, FindOptions, Hooks, ModelDefaults, MutationSpecialProps, Plugin, ResolvedModel, StoreCore, StoreSchema } from '@rstore/shared'
 import { get, set } from '@rstore/shared'
 import { defaultFetchPolicy } from './fetchPolicy'
-import { resolveModels } from './model'
+import { addModelRelations, isModelRelations, resolveModels } from './model'
 import { createModule } from './module'
 import { setupPlugin } from './plugin'
 
 export interface CreateStoreCoreOptions<
-  TModelList extends ModelList = ModelList,
+  TSchema extends StoreSchema = StoreSchema,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
   cache: Cache
-  models: TModelList
+  schema: TSchema
   modelDefaults?: TModelDefaults
   plugins?: Array<Plugin>
-  hooks: Hooks<TModelList, TModelDefaults>
+  hooks: Hooks<TSchema, TModelDefaults>
   findDefaults?: Partial<FindOptions<any, any, any>>
   isServer?: boolean
-  transformStore?: (store: StoreCore<TModelList, TModelDefaults>) => StoreCore<TModelList, TModelDefaults>
+  transformStore?: (store: StoreCore<TSchema, TModelDefaults>) => StoreCore<TSchema, TModelDefaults>
 }
 
 export async function createStoreCore<
-  TModelList extends ModelList = ModelList,
+  TSchema extends StoreSchema = StoreSchema,
   TModelDefaults extends ModelDefaults = ModelDefaults,
->(options: CreateStoreCoreOptions<TModelList, TModelDefaults>): Promise<StoreCore<TModelList, TModelDefaults>> {
+>(options: CreateStoreCoreOptions<TSchema, TModelDefaults>): Promise<StoreCore<TSchema, TModelDefaults>> {
   // Create store
 
-  const models = resolveModels(options.models, options.modelDefaults)
+  const models = resolveModels(options.schema, options.modelDefaults)
 
-  let store: StoreCore<TModelList, TModelDefaults> = {
+  let store: StoreCore<TSchema, TModelDefaults> = {
     $cache: options.cache,
     $models: models,
     $modelDefaults: options.modelDefaults ?? {} as TModelDefaults,
@@ -81,6 +81,12 @@ export async function createStoreCore<
     $wrapMutation: mutation => mutation as typeof mutation & MutationSpecialProps,
   }
 
+  for (const item of options.schema) {
+    if (isModelRelations(item)) {
+      addModelRelations(store, item)
+    }
+  }
+
   if (options.transformStore) {
     store = options.transformStore(store)
   }
@@ -132,7 +138,7 @@ export async function createStoreCore<
     }
   })
 
-  function parseNestedItem(parentModel: Model, key: string, child: any) {
+  function parseNestedItem(parentModel: ResolvedModel, key: string, child: any) {
     const relation = parentModel.relations![key]!
     const possibleModels = Object.keys(relation.to)
     const childModel = store.$getModel(child, possibleModels)

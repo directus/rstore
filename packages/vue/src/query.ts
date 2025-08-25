@@ -1,18 +1,18 @@
-import type { CustomHookMeta, FindOptions, HybridPromise, Model, ModelDefaults, ModelList } from '@rstore/shared'
+import type { CustomHookMeta, FindOptions, HybridPromise, Model, ModelDefaults, StoreSchema } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueStore } from './store'
 import { computed, ref, shallowRef, toValue, watch } from 'vue'
 
 export interface VueQueryReturn<
-  _TModel extends Model,
-  _TModelDefaults extends ModelDefaults,
-  _TModelList extends ModelList,
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TSchema extends StoreSchema,
   TResult,
 > {
   data: Ref<TResult>
   loading: Ref<boolean>
   error: Ref<Error | null>
-  refresh: () => HybridPromise<VueQueryReturn<_TModel, _TModelDefaults, _TModelList, TResult>>
+  refresh: () => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, TResult>>
   meta: Ref<CustomHookMeta>
   /**
    * @private
@@ -23,11 +23,11 @@ export interface VueQueryReturn<
 export interface VueCreateQueryOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-  TOptions extends FindOptions<TModel, TModelDefaults, TModelList>,
+  TSchema extends StoreSchema,
+  TOptions extends FindOptions<TModel, TModelDefaults, TSchema>,
   TResult,
 > {
-  store: VueStore<TModelList, TModelDefaults>
+  store: VueStore<TSchema, TModelDefaults>
   fetchMethod: (options: TOptions | undefined, meta: CustomHookMeta) => Promise<TResult>
   cacheMethod: (options: TOptions | undefined, meta: CustomHookMeta) => TResult
   defaultValue: TResult
@@ -40,8 +40,8 @@ export interface VueCreateQueryOptions<
 export function createQuery<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-  TOptions extends FindOptions<TModel, TModelDefaults, TModelList>,
+  TSchema extends StoreSchema,
+  TOptions extends FindOptions<TModel, TModelDefaults, TSchema>,
   TResult,
 >({
   store,
@@ -49,7 +49,7 @@ export function createQuery<
   cacheMethod,
   defaultValue,
   options,
-}: VueCreateQueryOptions<TModel, TModelDefaults, TModelList, TOptions, TResult>): HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TResult>> {
+}: VueCreateQueryOptions<TModel, TModelDefaults, TSchema, TOptions, TResult>): HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, TResult>> {
   function getOptions(): TOptions | undefined {
     const result = toValue(options)
     return typeof result === 'object' && 'enabled' in result && result.enabled === false ? undefined : result as TOptions
@@ -62,7 +62,7 @@ export function createQuery<
 
   let fetchPolicy = store.$getFetchPolicy(getOptions()?.fetchPolicy)
 
-  const result = shallowRef<TResult>(defaultValue)
+  const result: Ref<TResult> = shallowRef(defaultValue)
   const meta = ref<CustomHookMeta>({})
 
   // @TODO include nested relations in no-cache results
@@ -74,7 +74,7 @@ export function createQuery<
 
   const error = ref<Error | null>(null)
 
-  const returnObject: VueQueryReturn<TModel, TModelDefaults, TModelList, TResult> = {
+  const returnObject: VueQueryReturn<TModel, TModelDefaults, TSchema, TResult> = {
     data,
     loading,
     error,
@@ -97,7 +97,7 @@ export function createQuery<
           fetchMethod({
             ...finalOptions,
             fetchPolicy: 'fetch-only',
-          } as FindOptions<TModel, TModelDefaults, TModelList> as any, meta.value)
+          } as FindOptions<TModel, TModelDefaults, TSchema> as any, meta.value)
         }
 
         if (force) {
@@ -125,12 +125,12 @@ export function createQuery<
     deep: true,
   })
 
-  let promise = load() as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TResult>>
+  let promise = load() as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, TResult>>
   Object.assign(promise, returnObject)
 
   function refresh() {
     if (!loading.value) {
-      promise = load(true) as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TResult>>
+      promise = load(true) as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, TResult>>
       Object.assign(promise, returnObject)
     }
     return promise

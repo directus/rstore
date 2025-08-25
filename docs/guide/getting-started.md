@@ -52,7 +52,7 @@ export const todoModel = defineDataModel({
 ```
 
 ```ts [src/rstore/model.ts]
-import type { ModelList } from '@rstore/vue'
+import type { StoreSchema } from '@rstore/vue'
 import { defineItemType } from '@rstore/vue'
 
 // Item type
@@ -69,9 +69,9 @@ const todoModel = defineItemType<Todo>().model({
   name: 'todos',
 })
 
-export const models = [
+export const schema = [
   todoModel,
-] satisfies ModelList
+] satisfies StoreSchema
 ```
 
 :::
@@ -165,7 +165,7 @@ import myPlugin from './plugin'
 
 export async function rstore(app) {
   const store = await createStore({
-    models: [
+    schema: [
       todoModel,
     ],
     plugins: [
@@ -178,12 +178,12 @@ export async function rstore(app) {
 ```ts [src/rstore/index.ts]
 import type { App } from 'vue'
 import { createStore } from '@rstore/vue'
-import { models } from './model'
+import { schema } from './model'
 import myPlugin from './plugin'
 
 export async function rstore(app: App) {
   const store = await createStore({
-    models,
+    schema,
     plugins: [
       myPlugin,
     ],
@@ -221,7 +221,7 @@ export function useStore () {
 import type { VueStore } from '@rstore/vue'
 import type { InjectionKey } from 'vue'
 
-const injectStoreKey = Symbol('rstore') as InjectionKey<VueStore<typeof models>>
+const injectStoreKey = Symbol('rstore') as InjectionKey<VueStore<typeof schema>>
 
 export async function rstore(app: App) {
   const store = await createStore({

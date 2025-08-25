@@ -1,31 +1,31 @@
 import type { VueStore } from './store'
-import { type Cache, type Model, type ModelDefaults, type ModelList, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, type WrappedItem } from '@rstore/shared'
+import { type Cache, type Model, type ModelDefaults, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, type StoreSchema, type WrappedItem } from '@rstore/shared'
 import { ref, toRaw } from 'vue'
 import { wrapItem } from './item'
 
 export interface CreateCacheOptions<
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
   TModelDefaults extends ModelDefaults,
 > {
-  getStore: () => VueStore<TModelList, TModelDefaults>
+  getStore: () => VueStore<TSchema, TModelDefaults>
 }
 
 export function createCache<
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
   TModelDefaults extends ModelDefaults,
 >({
   getStore,
-}: CreateCacheOptions<TModelList, TModelDefaults>): Cache {
+}: CreateCacheOptions<TSchema, TModelDefaults>): Cache {
   const state = ref<Record<string, any>>({
     _markers: {},
   })
 
-  let wrappedItems = new WeakMap<ResolvedModelItem<Model, TModelDefaults, TModelList>, WrappedItem<Model, TModelDefaults, TModelList>>()
+  let wrappedItems = new WeakMap<ResolvedModelItem<Model, TModelDefaults, TSchema>, WrappedItem<Model, TModelDefaults, TSchema>>()
 
   function getWrappedItem<TModel extends Model>(
-    model: ResolvedModel<TModel, TModelDefaults, TModelList>,
-    item: ResolvedModelItem<TModel, TModelDefaults, TModelList> | null | undefined,
-  ): WrappedItem<TModel, TModelDefaults, TModelList> | undefined {
+    model: ResolvedModel<TModel, TModelDefaults, TSchema>,
+    item: ResolvedModelItem<TModel, TModelDefaults, TSchema> | null | undefined,
+  ): WrappedItem<TModel, TModelDefaults, TSchema> | undefined {
     if (!item) {
       return undefined
     }
@@ -105,7 +105,7 @@ export function createCache<
             // // If to-one relation is null, we delete the existing item
             // const existingItem = this.readItem({ model, key })
             // if (existingItem) {
-            //   const childItem: WrappedItemBase<Model, ModelDefaults, ModelList> = existingItem[field]
+            //   const childItem: WrappedItemBase<Model, ModelDefaults, StoreSchema> = existingItem[field]
             //   const nestedItemModel = getStore().$getModel(childItem, [childItem.$model])
             //   const nestedKey = nestedItemModel?.getKey(childItem)
             //   if (nestedItemModel && nestedKey) {

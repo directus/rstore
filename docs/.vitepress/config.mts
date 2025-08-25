@@ -59,6 +59,12 @@ export default defineConfig({
             { text: 'Hooks', link: '/guide/plugin/hooks' },
           ],
         },
+        {
+          text: 'Migration',
+          items: [
+            { text: 'From 0.6 to 0.7', link: '/guide/migration/v0_7' },
+          ],
+        },
       ],
       '/plugins/': [
         {

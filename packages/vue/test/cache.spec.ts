@@ -17,7 +17,7 @@ describe('cache', () => {
     getKey: (item: any) => item.id,
     relations: {},
     computed: {},
-  } as ResolvedModel<any, any, any>
+  } as ResolvedModel
 
   const mockItem = { id: 1, name: 'Test Item' }
 
@@ -58,7 +58,7 @@ describe('cache', () => {
     cache.writeItem({ model: mockModel, key: 1, item: mockItem })
 
     const result = cache.readItem({ model: mockModel, key: 1 })
-    expect(result.$model).toBe(mockModel.name)
+    expect(result?.$model).toBe(mockModel.name)
   })
 
   it('should delete an item from the cache', () => {
@@ -90,7 +90,7 @@ describe('cache', () => {
     const mockModelWithRelation = {
       ...mockModel,
       relations: {
-        related: { to: { RelatedModel: { on: 'id', eq: 'relatedId' } }, many: false },
+        related: { to: { RelatedModel: { on: { id: 'relatedId' } } }, many: false },
       },
       computed: {},
     }

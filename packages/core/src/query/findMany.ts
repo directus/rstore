@@ -1,4 +1,4 @@
-import { type CustomHookMeta, dedupePromise, type FindManyOptions, type Model, type ModelDefaults, type ModelList, type QueryResult, type ResolvedModel, type StoreCore, type WrappedItem, type WriteItem } from '@rstore/shared'
+import { type CustomHookMeta, dedupePromise, type FindManyOptions, type Model, type ModelDefaults, type QueryResult, type ResolvedModel, type StoreCore, type StoreSchema, type WrappedItem, type WriteItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekMany } from './peekMany'
@@ -6,12 +6,12 @@ import { peekMany } from './peekMany'
 export interface FindManyParams<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
+  store: StoreCore<TSchema, TModelDefaults>
   meta?: CustomHookMeta
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  findOptions?: FindManyOptions<TModel, TModelDefaults, TModelList>
+  model: ResolvedModel<TModel, TModelDefaults, TSchema>
+  findOptions?: FindManyOptions<TModel, TModelDefaults, TSchema>
 }
 
 /**
@@ -20,13 +20,13 @@ export interface FindManyParams<
 export async function findMany<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 >({
   store,
   meta,
   model,
   findOptions,
-}: FindManyParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelList>>>> {
+}: FindManyParams<TModel, TModelDefaults, TSchema>): Promise<QueryResult<Array<WrappedItem<TModel, TModelDefaults, TSchema>>>> {
   if (findOptions?.dedupe === false) {
     return _findMany({
       store,
@@ -48,13 +48,13 @@ export async function findMany<
 async function _findMany<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 >({
   store,
   meta,
   model,
   findOptions,
-}: FindManyParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelList>>>> {
+}: FindManyParams<TModel, TModelDefaults, TSchema>): Promise<QueryResult<Array<WrappedItem<TModel, TModelDefaults, TSchema>>>> {
   meta ??= {}
 
   findOptions = findOptions ?? {}
@@ -124,7 +124,7 @@ async function _findMany<
 
     if (fetchPolicy !== 'no-cache') {
       const items = result
-      const writes: Array<WriteItem<TModel, TModelDefaults, TModelList>> = []
+      const writes: Array<WriteItem<TModel, TModelDefaults, TSchema>> = []
       for (const item of items) {
         const key = model.getKey(item)
         if (!key) {

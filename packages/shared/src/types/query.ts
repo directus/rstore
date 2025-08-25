@@ -1,30 +1,30 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { Model, ModelDefaults, ModelList, ResolvedModelItem } from './model'
+import type { Model, ModelDefaults, ResolvedModelItem, StoreSchema } from './model'
 
 export interface CustomParams<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {}
 
 export interface CustomFilterOption<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {}
 
 export interface CustomSortOption<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {}
 
 export interface FindOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> extends FindOptionsBase<TModel, TModelDefaults, TModelList> {}
+  TSchema extends StoreSchema,
+> extends FindOptionsBase<TModel, TModelDefaults, TSchema> {}
 
 /**
  * Fetch policy for the query.
@@ -45,20 +45,20 @@ export type FetchPolicy = 'cache-first' | 'cache-and-fetch' | 'fetch-only' | 'ca
 export interface FindOptionsBase<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {
   /**
    * Parameters sent to the adapter plugins. Usually used for filtering and sorting the data in the backend.
    */
-  params?: CustomParams<TModel, TModelDefaults, TModelList>
+  params?: CustomParams<TModel, TModelDefaults, TSchema>
   /**
    * Filter the item.
    */
-  filter?: ((item: ResolvedModelItem<TModel, TModelDefaults, TModelList>) => boolean) | CustomFilterOption<TModel, TModelDefaults, TModelList>
+  filter?: ((item: ResolvedModelItem<TModel, TModelDefaults, TSchema>) => boolean) | CustomFilterOption<TModel, TModelDefaults, TSchema>
   /**
    * Sort the items.
    */
-  sort?: ((a: ResolvedModelItem<TModel, TModelDefaults, TModelList>, b: ResolvedModelItem<TModel, TModelDefaults, TModelList>) => number) | CustomSortOption<TModel, TModelDefaults, TModelList>
+  sort?: ((a: ResolvedModelItem<TModel, TModelDefaults, TSchema>, b: ResolvedModelItem<TModel, TModelDefaults, TSchema>) => number) | CustomSortOption<TModel, TModelDefaults, TSchema>
   /**
    * Include the related items.
    */
@@ -99,8 +99,8 @@ export interface FindOptionsBase<
 export type FindFirstOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = FindOptions<TModel, TModelDefaults, TModelList> & {
+  TSchema extends StoreSchema,
+> = FindOptions<TModel, TModelDefaults, TSchema> & {
   /**
    * Key of the item. Usually used for fetching the item by its key (e.g. ID).
    */
@@ -110,8 +110,8 @@ export type FindFirstOptions<
 export type FindManyOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = FindOptions<TModel, TModelDefaults, TModelList>
+  TSchema extends StoreSchema,
+> = FindOptions<TModel, TModelDefaults, TSchema>
 
 export interface QueryResult<TResult> {
   result: TResult

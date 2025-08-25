@@ -1,4 +1,4 @@
-import type { CustomHookMeta, Exactly, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, WrappedItem } from '@rstore/shared'
+import type { CustomHookMeta, Exactly, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueLiveQueryReturn } from './live'
 import type { VueQueryReturn } from './query'
@@ -13,61 +13,61 @@ import { createQuery } from './query'
 export interface VueModelApi<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-  TItem extends WrappedItem<TModel, TModelDefaults, TModelList>,
+  TSchema extends StoreSchema,
+  TItem extends WrappedItem<TModel, TModelDefaults, TSchema>,
 > {
   /**
    * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
    */
   peekFirst: (
-    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
-  ) => WrappedItem<TModel, TModelDefaults, TModelList> | null
+    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TSchema>>,
+  ) => WrappedItem<TModel, TModelDefaults, TSchema> | null
 
   /**
    * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
    */
   findFirst: (
-    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
-  ) => Promise<WrappedItem<TModel, TModelDefaults, TModelList> | null>
+    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TSchema>>,
+  ) => Promise<WrappedItem<TModel, TModelDefaults, TSchema> | null>
 
   /**
    * Create a reactive query for the first item that matches the given options.
    */
   queryFirst: <
-    const TOptions extends string | number | Exactly<FindFirstOptions<TModel, TModelDefaults, TModelList>, TOptions> | { enabled: false },
+    const TOptions extends string | number | Exactly<FindFirstOptions<TModel, TModelDefaults, TSchema>, TOptions> | { enabled: false },
   > (
     options: MaybeRefOrGetter<TOptions>,
-  ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, TItem | null>>
+  ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, TItem | null>>
 
   /**
    * Find all items that match the query in the cache without fetching the data from the adapter plugins.
    */
   peekMany: (
-    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelList> | undefined>,
-  ) => Array<WrappedItem<TModel, TModelDefaults, TModelList>>
+    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TSchema> | undefined>,
+  ) => Array<WrappedItem<TModel, TModelDefaults, TSchema>>
 
   /**
    * Find all items that match the query.
    */
   findMany: (
-    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelList> | undefined>,
-  ) => Promise<Array<WrappedItem<TModel, TModelDefaults, TModelList>>>
+    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TSchema> | undefined>,
+  ) => Promise<Array<WrappedItem<TModel, TModelDefaults, TSchema>>>
 
   /**
    * Create a reactive query for all items that match the given options.
    */
   queryMany: <
-    const TOptions extends Exactly<FindManyOptions<TModel, TModelDefaults, TModelList>, TOptions> | undefined | { enabled: false },
+    const TOptions extends Exactly<FindManyOptions<TModel, TModelDefaults, TSchema>, TOptions> | undefined | { enabled: false },
   > (
     options?: MaybeRefOrGetter<TOptions>,
-  ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TModelList, Array<TItem>>>
+  ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, Array<TItem>>>
 
   /**
    * Create an item directly. For a more user-friendly way, use `createForm` instead.
    */
   create: (
-    item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>,
-  ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+    item: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>,
+  ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
   /**
    * (Recommended) The form object helps you creating a new item.
@@ -77,7 +77,7 @@ export interface VueModelApi<
       /**
        * Default values set in the form object initially and when it is reset.
        */
-      defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+      defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
       /**
        * Schema to validate the form object.
@@ -86,30 +86,30 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => VueCreateFormObject<TModel, TModelDefaults, TModelList>
+  ) => VueCreateFormObject<TModel, TModelDefaults, TSchema>
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
    */
   update: (
-    item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>,
+    item: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>,
     updateOptions?: {
       key?: string | number | null
     }
-  ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
   /**
    * (Recommended) The form object helps you updating an existing item. If the item is not loaded yet, it will be fetched first to pre-fill the form.
    */
   updateForm: (
-    options: string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>,
+    options: string | number | FindFirstOptions<TModel, TModelDefaults, TSchema>,
     formOptions?: {
       /**
        * Default values set in the form object initially and when it is reset.
        *
        * By default `updateForm` will initialize the fields with the existing item data.
        */
-      defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+      defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
       /**
        * Schema to validate the form object.
@@ -118,37 +118,37 @@ export interface VueModelApi<
        */
       schema?: StandardSchemaV1
     },
-  ) => Promise<VueUpdateFormObject<TModel, TModelDefaults, TModelList>>
+  ) => Promise<VueUpdateFormObject<TModel, TModelDefaults, TSchema>>
 
   /**
    * Find all items that match the query.
    */
   delete: (
-    keyOrItem: string | number | Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>,
+    keyOrItem: string | number | Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>,
   ) => Promise<void>
 
   subscribe: (
-    keyOrFindOptions?: MaybeRefOrGetter<string | number | FindOptions<TModel, TModelDefaults, TModelList> | undefined>,
+    keyOrFindOptions?: MaybeRefOrGetter<string | number | FindOptions<TModel, TModelDefaults, TSchema> | undefined>,
   ) => {
     unsubscribe: () => Promise<void>
     meta: Ref<CustomHookMeta>
   }
 
   liveQueryFirst: (
-    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>>,
-  ) => HybridPromise<VueLiveQueryReturn<TModel, TModelDefaults, TModelList, TItem | null>>
+    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TSchema>>,
+  ) => HybridPromise<VueLiveQueryReturn<TModel, TModelDefaults, TSchema, TItem | null>>
 
   liveQueryMany: (
-    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TModelList> | undefined>,
-  ) => HybridPromise<VueLiveQueryReturn<TModel, TModelDefaults, TModelList, Array<TItem>>>
+    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TSchema> | undefined>,
+  ) => HybridPromise<VueLiveQueryReturn<TModel, TModelDefaults, TSchema, Array<TItem>>>
 
   getKey: (
-    item: ResolvedModelItem<TModel, TModelDefaults, TModelList>,
+    item: ResolvedModelItem<TModel, TModelDefaults, TSchema>,
   ) => string | number | null | undefined
 
   writeItem: (
-    item: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>,
-  ) => WrappedItem<TModel, TModelDefaults, TModelList>
+    item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>,
+  ) => WrappedItem<TModel, TModelDefaults, TSchema>
 
   clearItem: (
     key: string | number,
@@ -158,12 +158,12 @@ export interface VueModelApi<
 export function createModelApi<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 >(
-  store: VueStore<TModelList, TModelDefaults>,
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>,
-): VueModelApi<TModel, TModelDefaults, TModelList, WrappedItem<TModel, TModelDefaults, TModelList>> {
-  type Api = VueModelApi<TModel, TModelDefaults, TModelList, WrappedItem<TModel, TModelDefaults, TModelList>>
+  store: VueStore<TSchema, TModelDefaults>,
+  model: ResolvedModel<TModel, TModelDefaults, TSchema>,
+): VueModelApi<TModel, TModelDefaults, TSchema, WrappedItem<TModel, TModelDefaults, TSchema>> {
+  type Api = VueModelApi<TModel, TModelDefaults, TSchema, WrappedItem<TModel, TModelDefaults, TSchema>>
   const api: Api = {
     peekFirst: findOptions => peekFirst({
       store,
@@ -178,12 +178,11 @@ export function createModelApi<
       findOptions: toValue(findOptions),
     }).then(r => r.result),
 
-    queryFirst: options => createQuery({
+    queryFirst: options => createQuery<TModel, TModelDefaults, TSchema, any, WrappedItem<TModel, TModelDefaults, TSchema> | null>({
       store,
       fetchMethod: (options, meta) => findFirst({ store, model, findOptions: options!, meta }).then(r => r.result),
       cacheMethod: (options, meta) => peekFirst({ store, model, findOptions: options!, meta, force: true }).result,
       defaultValue: null,
-      // @ts-expect-error @TODO fix type issue with options being a possible string
       options,
     }),
 
@@ -200,7 +199,7 @@ export function createModelApi<
       findOptions: toValue(findOptions),
     }).then(r => r.result),
 
-    queryMany: options => createQuery({
+    queryMany: options => createQuery<TModel, TModelDefaults, TSchema, any, Array<WrappedItem<TModel, TModelDefaults, TSchema>>>({
       store,
       fetchMethod: (options, meta) => findMany({ store, model, findOptions: options, meta }).then(r => r.result),
       cacheMethod: (options, meta) => peekMany({ store, model, findOptions: options, meta, force: true }).result,
@@ -217,7 +216,7 @@ export function createModelApi<
     createForm: (formOptions) => {
       type TReturn = ReturnType<Api['createForm']>
       return createFormObject<
-        ResolvedModelItem<TModel, TModelDefaults, TModelList>
+        ResolvedModelItem<TModel, TModelDefaults, TSchema>
       >({
         defaultValues: formOptions?.defaultValues,
         schema: formOptions?.schema ?? model.formSchema.create,
@@ -233,7 +232,7 @@ export function createModelApi<
     }),
 
     updateForm: async (options, formOptions) => {
-      async function getFormData(): Promise<ResolvedModelItemBase<TModel, TModelDefaults, TModelList>> {
+      async function getFormData(): Promise<ResolvedModelItemBase<TModel, TModelDefaults, TSchema>> {
         const item = await api.findFirst(options)
 
         if (!item) {
@@ -246,10 +245,10 @@ export function createModelApi<
       const initialData = await getFormData()
 
       const form = createFormObject<
-        ResolvedModelItem<TModel, TModelDefaults, TModelList>
+        ResolvedModelItem<TModel, TModelDefaults, TSchema>
       >({
         defaultValues: () => ({
-          ...formOptions?.defaultValues?.(),
+          ...formOptions?.defaultValues?.() as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>,
           ...initialData,
         }),
         schema: formOptions?.schema ?? model.formSchema.update,
@@ -301,7 +300,7 @@ export function createModelApi<
 
       let subscriptionId: string | undefined
       let previousKey: string | number | undefined
-      let previousFindOptions: FindOptions<TModel, TModelDefaults, TModelList> | undefined
+      let previousFindOptions: FindOptions<TModel, TModelDefaults, TSchema> | undefined
 
       async function unsub() {
         if (subscriptionId) {
@@ -319,7 +318,7 @@ export function createModelApi<
         }
       }
 
-      async function sub(optionsValue: string | number | FindOptions<TModel, TModelDefaults, TModelList> | undefined) {
+      async function sub(optionsValue: string | number | FindOptions<TModel, TModelDefaults, TSchema> | undefined) {
         await unsub()
 
         subscriptionId = crypto.randomUUID()

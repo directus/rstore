@@ -64,11 +64,12 @@ export default defineNuxtModule<ModuleOptions>({
 
     const models: Array<Model> = collections.map((collection) => {
       return {
-        name: collection.collection,
-        scopeId: 'rstore-directus',
-        meta: {
+        '~type': 'model',
+        'name': collection.collection,
+        'scopeId': 'rstore-directus',
+        'meta': {
         },
-        relations: {}, // TODO
+        'relations': {}, // TODO
       }
     })
 

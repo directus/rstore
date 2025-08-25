@@ -1,4 +1,4 @@
-import type { FindOptions, Model, ModelDefaults, ModelList, Plugin, StoreCore, WrappedItem } from '@rstore/shared'
+import type { FindOptions, Model, ModelDefaults, ModelsFromStoreSchema, Plugin, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { createStoreCore, resolveModel } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook } from '@vueuse/core'
@@ -7,10 +7,10 @@ import { createModelApi, type VueModelApi } from './api'
 import { createCache } from './cache'
 
 export interface CreateStoreOptions<
-  TModelList extends ModelList = ModelList,
+  TSchema extends StoreSchema = StoreSchema,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
-  models: TModelList
+  schema: TSchema
   modelDefaults?: TModelDefaults
   plugins: Array<Plugin>
   findDefaults?: Partial<FindOptions<any, any, any>>
@@ -18,17 +18,17 @@ export interface CreateStoreOptions<
 }
 
 export type VueStoreModelApiProxy<
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > = {
-  [M in TModelList[number] as M['name']]: VueModelApi<M, TModelDefaults, TModelList, WrappedItem<M, TModelDefaults, TModelList>>
+  [M in ModelsFromStoreSchema<TSchema> as M['name']]: VueModelApi<M, TModelDefaults, TSchema, WrappedItem<M, TModelDefaults, TSchema>>
 }
 
 export type VueStore<
-  TModelList extends ModelList = ModelList,
+  TSchema extends StoreSchema = StoreSchema,
   TModelDefaults extends ModelDefaults = ModelDefaults,
-> = StoreCore<TModelList, TModelDefaults> & VueStoreModelApiProxy<TModelList, TModelDefaults> & {
-  $model: (modelName: string) => VueModelApi<any, TModelDefaults, TModelList, WrappedItem<any, TModelDefaults, TModelList>>
+> = StoreCore<TSchema, TModelDefaults> & VueStoreModelApiProxy<TSchema, TModelDefaults> & {
+  $model: (modelName: string) => VueModelApi<any, TModelDefaults, TSchema, WrappedItem<any, TModelDefaults, TSchema>>
   $onCacheReset: (callback: () => void) => () => void
 }
 
@@ -37,13 +37,13 @@ interface PrivateVueStore {
 }
 
 export async function createStore<
-  const TModelList extends ModelList,
+  const TSchema extends StoreSchema,
   const TModelDefaults extends ModelDefaults,
->(options: CreateStoreOptions<TModelList, TModelDefaults>): Promise<VueStore<TModelList, TModelDefaults>> {
-  let storeProxy = undefined as unknown as VueStore<TModelList, TModelDefaults>
+>(options: CreateStoreOptions<TSchema, TModelDefaults>): Promise<VueStore<TSchema, TModelDefaults>> {
+  let storeProxy = undefined as unknown as VueStore<TSchema, TModelDefaults>
 
-  return createStoreCore<TModelList, TModelDefaults>({
-    models: options.models,
+  return createStoreCore<TSchema, TModelDefaults>({
+    schema: options.schema,
     modelDefaults: options.modelDefaults,
     plugins: options.plugins,
     cache: createCache({
@@ -55,7 +55,7 @@ export async function createStore<
     transformStore: (store) => {
       const privateStore = store as unknown as PrivateVueStore
 
-      const queryCache: Map<string, VueModelApi<Model, TModelDefaults, TModelList, WrappedItem<Model, TModelDefaults, TModelList>>> = new Map()
+      const queryCache: Map<string, VueModelApi<Model, TModelDefaults, TSchema, WrappedItem<Model, TModelDefaults, TSchema>>> = new Map()
 
       function getApi(key: string) {
         if (!queryCache.has(key)) {
@@ -120,11 +120,11 @@ export async function createStore<
 
           return Reflect.get(store, key)
         },
-      }) as VueStore<TModelList, TModelDefaults>
+      }) as VueStore<TSchema, TModelDefaults>
 
       return storeProxy
     },
-  }) as Promise<VueStore<TModelList, TModelDefaults>>
+  }) as Promise<VueStore<TSchema, TModelDefaults>>
 }
 
 export function addModel(store: VueStore, model: Model) {

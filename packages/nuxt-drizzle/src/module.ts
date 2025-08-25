@@ -195,9 +195,10 @@ export default defineNuxtModule<ModuleOptions>({
 
       for (const { key, table, tableName, config } of tables) {
         const model: Model = {
-          name: key,
-          scopeId: 'rstore-drizzle',
-          meta: {
+          '~type': 'model',
+          'name': key,
+          'scopeId': 'rstore-drizzle',
+          'meta': {
             table: tableName,
             primaryKeys: config?.primaryKeys?.length ? config.primaryKeys[0]!.columns.map(col => getColumnKey(table, col)) : config?.columns?.filter(col => col.primary).map(col => getColumnKey(table, col)) ?? [],
           },
@@ -218,6 +219,7 @@ export default defineNuxtModule<ModuleOptions>({
 
         const config = relations.config(createTableRelationsHelpers(relations.table))
 
+        // Explicit "to one" relations
         for (const key in config) {
           const relation = config[key]
           if (is(relation, One)) {
@@ -248,8 +250,9 @@ export default defineNuxtModule<ModuleOptions>({
               model.relations[key] = {
                 to: {
                   [targetModel.name]: {
-                    on: getColumnKey(relation.referencedTable, references[0]),
-                    eq: getColumnKey(relation.sourceTable, fields[0]),
+                    on: {
+                      [getColumnKey(relation.referencedTable, references[0])]: getColumnKey(relation.sourceTable, fields[0]),
+                    },
                   },
                 },
               }
@@ -265,7 +268,9 @@ export default defineNuxtModule<ModuleOptions>({
         }
       }
 
+      // Implicit "to one" relations
       for (const { model, key, relation } of implicitOneRelations) {
+        // Explicit relation name
         if (relation.relationName) {
           const targetRelation = explicitOneRelations.find(r => r.relationName === relation.relationName)
           if (!targetRelation) {
@@ -279,13 +284,15 @@ export default defineNuxtModule<ModuleOptions>({
           model.relations[key] = {
             to: {
               [targetModel.name]: {
-                on: getColumnKey(relation.referencedTable, targetRelation.config!.fields[0]),
-                eq: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]),
+                on: {
+                  [getColumnKey(relation.referencedTable, targetRelation.config!.fields[0])]: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]),
+                },
               },
             },
           }
         }
         else {
+          // Find the relation in the target model
           const targetModel = modelsByTable.get(relation.referencedTable)
           if (!targetModel) {
             throw new Error(`Target model not found for table ${relation.referencedTableName}`)
@@ -297,11 +304,13 @@ export default defineNuxtModule<ModuleOptions>({
           for (const relationKey in targetModel.relations) {
             for (const modelName in targetModel.relations[relationKey]!.to) {
               if (modelName === model.name) {
+                const targetTo = targetModel.relations[relationKey]!.to[modelName]!
+                const invertedFields = Object.fromEntries(Object.entries(targetTo.on).map(([key, value]) => [value, key]))
+
                 newRelation = {
                   to: {
                     [targetModel.name]: {
-                      on: targetModel.relations[relationKey]!.to[modelName]!.eq,
-                      eq: targetModel.relations[relationKey]!.to[modelName]!.on,
+                      on: invertedFields,
                     },
                   },
                 }
@@ -317,7 +326,9 @@ export default defineNuxtModule<ModuleOptions>({
         }
       }
 
+      // Implicit "to many" relations
       for (const { model, key, relation } of implicitManyRelations) {
+        // Explicit relation name
         if (relation.relationName) {
           const targetRelation = explicitOneRelations.find(r => r.relationName === relation.relationName)
           if (!targetRelation) {
@@ -331,14 +342,16 @@ export default defineNuxtModule<ModuleOptions>({
           model.relations[key] = {
             to: {
               [targetModel.name]: {
-                on: getColumnKey(relation.referencedTable, targetRelation.config!.fields[0]),
-                eq: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]),
+                on: {
+                  [getColumnKey(relation.referencedTable, targetRelation.config!.fields[0])]: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]),
+                },
               },
             },
             many: true,
           }
         }
         else {
+          // Find the relation in the target model
           const targetModel = modelsByTable.get(relation.referencedTable)
           if (!targetModel) {
             throw new Error(`Target model not found for table ${relation.referencedTableName}`)
@@ -350,11 +363,13 @@ export default defineNuxtModule<ModuleOptions>({
           for (const relationKey in targetModel.relations) {
             for (const modelName in targetModel.relations[relationKey]!.to) {
               if (modelName === model.name) {
+                const targetTo = targetModel.relations[relationKey]!.to[modelName]!
+                const invertedFields = Object.fromEntries(Object.entries(targetTo.on).map(([key, value]) => [value, key]))
+
                 newRelation = {
                   to: {
                     [targetModel.name]: {
-                      on: targetModel.relations[relationKey]!.to[modelName]!.eq,
-                      eq: targetModel.relations[relationKey]!.to[modelName]!.on,
+                      on: invertedFields,
                     },
                   },
                   many: true,

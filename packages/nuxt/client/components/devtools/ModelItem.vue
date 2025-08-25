@@ -2,7 +2,7 @@
 import type { ModelRelation, ResolvedModel } from '@rstore/shared'
 
 const props = defineProps<{
-  item: ResolvedModel<any, any, any>
+  item: ResolvedModel
 }>()
 
 const cache = useStoreCache()
@@ -64,46 +64,13 @@ const cacheCount = computed(() => Object.keys((cache.value as any)[props.item.na
         <UIcon name="lucide:link" />
         Relations
       </div>
-      <div
+      <DevtoolsModelRelation
         v-for="(relation, key) in item.relations as Record<string, ModelRelation>"
         :key
-        class="flex gap-1 items-start"
-      >
-        <div class="bg-blue-500/25 rounded px-0.5">
-          <span>{{ key }}</span>
-          <span v-if="relation.many">[]</span>
-        </div>
-        <div>
-          <div
-            v-for="(info, model) in relation.to"
-            :key="model"
-            class="flex items-center"
-          >
-            <div class="relative bottom-px">
-              <div v-if="Object.keys(relation.to)[0]! === model" class="h-px w-3.5 border-b -mr-2" />
-              <div v-else class="h-4 w-1.5 relative">
-                <div class="h-px w-2.25 border-b absolute top-2 -right-2" />
-                <div class="w-px h-4 border-r absolute -top-1.75 left-1.25" />
-              </div>
-            </div>
-            <UIcon
-              name="tabler:caret-right-filled"
-              class="size-[13px] relative bottom-px"
-            />
-            <span class="text-purple-500">
-              {{ model }}
-            </span>
-            <span class="opacity-50">.</span>
-            <span class="text-purple-500">
-              {{ info.on }}
-            </span>
-            <span class="opacity-50">=</span>
-            <span class="text-blue-500">
-              {{ info.eq }}
-            </span>
-          </div>
-        </div>
-      </div>
+        :model="item"
+        :relation-name="key"
+        :relation
+      />
     </div>
 
     <div v-if="item.computed && Object.keys(item.computed).length" class="text-xs font-mono border border-default rounded p-2 flex flex-col gap-1">

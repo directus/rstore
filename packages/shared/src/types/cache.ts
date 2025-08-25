@@ -1,5 +1,5 @@
 import type { WrappedItem } from './item'
-import type { Model, ModelDefaults, ModelList, ModelRelation, ResolvedModel, ResolvedModelItemBase } from './model'
+import type { Model, ModelDefaults, ModelRelation, ResolvedModel, ResolvedModelItemBase, StoreSchema } from './model'
 import type { Module, ResolvedModuleState } from './module'
 
 /*
@@ -27,45 +27,45 @@ export interface CustomCacheState {}
 export interface WriteItem<
   TModel extends Model = Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
-  TModelList extends ModelList = ModelList,
+  TSchema extends StoreSchema = StoreSchema,
 > {
   key: string | number
-  value: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>
+  value: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>
 }
 
 export interface Cache<
-  TModelList extends ModelList = ModelList,
+  TSchema extends StoreSchema = StoreSchema,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
   readItem: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelList>
+    model: ResolvedModel<TModel, TModelDefaults, TSchema>
     key: string | number
-  }) => WrappedItem<TModel, TModelDefaults, TModelList> | undefined
+  }) => WrappedItem<TModel, TModelDefaults, TSchema> | undefined
 
   writeItem: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelList>
+    model: ResolvedModel<TModel, TModelDefaults, TSchema>
     key: string | number
-    item: ResolvedModelItemBase<TModel, TModelDefaults, TModelList>
+    item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>
     marker?: string
     fromWriteItems?: boolean
   }) => void
 
   deleteItem: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelList>
+    model: ResolvedModel<TModel, TModelDefaults, TSchema>
     key: string | number
   }) => void
 
   readItems: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelList>
+    model: ResolvedModel<TModel, TModelDefaults, TSchema>
     /**
      * Marker to consider that the corresponding list was already fetched once. Allow returning empty list if marker is not found.
      */
     marker?: string
-  }) => Array<WrappedItem<TModel, TModelDefaults, TModelList>>
+  }) => Array<WrappedItem<TModel, TModelDefaults, TSchema>>
 
   writeItems: <TModel extends Model = Model>(params: {
-    model: ResolvedModel<TModel, TModelDefaults, TModelList>
-    items: Array<WriteItem<TModel, TModelDefaults, TModelList>>
+    model: ResolvedModel<TModel, TModelDefaults, TSchema>
+    items: Array<WriteItem<TModel, TModelDefaults, TSchema>>
     /**
      * Marker to consider that the corresponding list was already fetched once.
      */
@@ -73,8 +73,8 @@ export interface Cache<
   }) => void
 
   writeItemForRelation: <TModel extends Model = Model>(params: {
-    parentModel: ResolvedModel<TModel, TModelDefaults, TModelList>
-    relationKey: keyof ResolvedModelItemBase<TModel, TModelDefaults, TModelList>['relations']
+    parentModel: ResolvedModel<TModel, TModelDefaults, TSchema>
+    relationKey: keyof ResolvedModelItemBase<TModel, TModelDefaults, TSchema>['relations']
     relation: ModelRelation
     childItem: any
   }) => void
@@ -88,6 +88,6 @@ export interface Cache<
   clear: () => void
 
   clearModel: (params: {
-    model: ResolvedModel<Model, ModelDefaults, ModelList>
+    model: ResolvedModel<Model, ModelDefaults, StoreSchema>
   }) => void
 }

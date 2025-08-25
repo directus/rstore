@@ -27,10 +27,13 @@ export type {
 } from './store'
 
 export {
+  addModelRelations,
   createModule,
   defineDataModel,
   defineItemType,
   definePlugin,
+  defineRelations,
+  withItemType,
 } from '@rstore/core'
 
 export type {
@@ -44,6 +47,6 @@ export type {
   FindOptions,
   Model,
   ModelDefaults,
-  ModelList,
   Module,
+  StoreSchema,
 } from '@rstore/shared'

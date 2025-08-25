@@ -5,7 +5,7 @@ import { subscribe } from '../../src/subscription/subscribe'
 
 describe('subscribe', () => {
   let mockStore: StoreCore<any, any>
-  let model: ResolvedModel<any, any, any>
+  let model: ResolvedModel
 
   beforeEach(() => {
     mockStore = {

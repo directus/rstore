@@ -1,32 +1,32 @@
 import type { Hooks } from '../utils/hooks'
 import type { Cache } from './cache'
-import type { Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelList } from './model'
+import type { Model, ModelDefaults, ResolvedModel, ResolvedModelList, StoreSchema } from './model'
 import type { CreateModuleApi, Module, ResolvedModule } from './module'
 import type { MutationOperation, MutationSpecialProps } from './mutation'
 import type { RegisteredPlugin } from './plugin'
 import type { FetchPolicy, FindOptions } from './query'
 
 export interface StoreCore<
-  TModelList extends Array<Model>,
+  TSchema extends StoreSchema,
   TModelDefaults extends ModelDefaults = ModelDefaults,
 > {
-  $cache: Cache<TModelList, TModelDefaults>
-  $models: ResolvedModelList<TModelList, TModelDefaults>
+  $cache: Cache<TSchema, TModelDefaults>
+  $models: ResolvedModelList<TSchema, TModelDefaults>
   $modelDefaults: TModelDefaults
   $plugins: Array<RegisteredPlugin>
-  $hooks: Hooks<TModelList, TModelDefaults>
+  $hooks: Hooks<TSchema, TModelDefaults>
   $findDefaults: Partial<FindOptions<any, any, any>>
   $getFetchPolicy: (value: FetchPolicy | null | undefined) => FetchPolicy
   /**
    * @private
    */
-  $processItemParsing: <TModel extends Model> (model: ResolvedModel<TModel, TModelDefaults, TModelList>, item: any) => void
+  $processItemParsing: <TModel extends Model> (model: ResolvedModel<TModel, TModelDefaults, TSchema>, item: any) => void
   /**
    * @private
    */
-  $processItemSerialization: <TModel extends Model> (model: ResolvedModel<TModel, TModelDefaults, TModelList>, item: any) => void
-  $getModel: (item: any, modelNames?: string[]) => ResolvedModel<Model, ModelDefaults, ModelList> | null
-  $mutationHistory: Array<MutationOperation<any, TModelDefaults, TModelList>>
+  $processItemSerialization: <TModel extends Model> (model: ResolvedModel<TModel, TModelDefaults, TSchema>, item: any) => void
+  $getModel: (item: any, modelNames?: string[]) => ResolvedModel<Model, ModelDefaults, StoreSchema> | null
+  $mutationHistory: Array<MutationOperation<any, TModelDefaults, TSchema>>
   $isServer: boolean
   /**
    * @private

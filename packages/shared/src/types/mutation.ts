@@ -1,20 +1,20 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { FormObjectBase } from './form'
-import type { Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem } from './model'
+import type { Model, ModelDefaults, ResolvedModel, ResolvedModelItem, StoreSchema } from './model'
 
 export interface MutationOperation<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {
   operation: 'create' | 'update' | 'delete' | 'module-mutation'
-  model?: ResolvedModel<TModel, TModelDefaults, TModelList>
+  model?: ResolvedModel<TModel, TModelDefaults, TSchema>
   module?: string
   /**
    * Either the key of the item in the model or the key of the exposed mutation in the module.
    */
   key?: string | number
-  payload?: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  payload?: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 }
 
 export interface MutationSpecialProps {
@@ -24,27 +24,27 @@ export interface MutationSpecialProps {
 export type CreateFormObjectBase<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = FormObjectBase<ResolvedModelItem<TModel, TModelDefaults, TModelList>, NonNullable<NonNullable<TModel['formSchema']>['create']>>
+  TSchema extends StoreSchema,
+> = FormObjectBase<ResolvedModelItem<TModel, TModelDefaults, TSchema>, NonNullable<NonNullable<TModel['formSchema']>['create']>>
 
 export type CreateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['create']>>
-  & CreateFormObjectBase<TModel, TModelDefaults, TModelList>
-  & Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  & CreateFormObjectBase<TModel, TModelDefaults, TSchema>
+  & Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
 export type UpdateFormObjectBase<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = FormObjectBase<ResolvedModelItem<TModel, TModelDefaults, TModelList>, NonNullable<NonNullable<TModel['formSchema']>['update']>>
+  TSchema extends StoreSchema,
+> = FormObjectBase<ResolvedModelItem<TModel, TModelDefaults, TSchema>, NonNullable<NonNullable<TModel['formSchema']>['update']>>
 
 export type UpdateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['update']>>
-  & UpdateFormObjectBase<TModel, TModelDefaults, TModelList>
-  & Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  & UpdateFormObjectBase<TModel, TModelDefaults, TSchema>
+  & Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>

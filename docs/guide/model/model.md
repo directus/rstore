@@ -3,9 +3,9 @@
 The structure of your data is presented in rstore with Models:
 
 ```ts
-import type { ModelList } from '@rstore/vue'
+import type { StoreSchema } from '@rstore/vue'
 
-const models: ModelList = [
+const schema: StoreSchema = [
   { name: 'todos' },
   { name: 'users' },
   // more models...
@@ -20,7 +20,7 @@ Various applications can have different models based on their specific requireme
 
 ```js{2-5} [rstore.js]
 const store = await createStore({
-  models: [
+  schema: [
     { name: 'todos' },
     { name: 'users' },
   ],
@@ -30,7 +30,7 @@ const store = await createStore({
 
 ```ts{2-5} [rstore.ts]
 const store = await createStore({
-  models: [
+  schema: [
     defineItemType<Todo>().model({ name: 'todos' }),
     defineItemType<User>().model({ name: 'users' }),
   ],
@@ -53,7 +53,7 @@ const todoModel = defineDataModel({
 })
 
 const store = await createStore({
-  models: [
+  schema: [
     todoModel
   ],
   plugins: [],
@@ -77,7 +77,7 @@ const todoModel = defineItemType<TodoType>().model({
 })
 
 const store = await createStore({
-  models: [
+  schema: [
     todoModel
   ],
   plugins: [],

@@ -5,7 +5,7 @@ import { unsubscribe } from '../../src/subscription/unsubscribe'
 
 describe('unsubscribe', () => {
   let mockStore: StoreCore<any, any>
-  let model: ResolvedModel<any, any, any>
+  let model: ResolvedModel
 
   beforeEach(() => {
     mockStore = {

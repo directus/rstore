@@ -11,8 +11,9 @@ export default [
       receivedMessages: {
         to: {
           Message: {
-            on: 'recipientId',
-            eq: 'id',
+            on: {
+              recipientId: 'id',
+            },
           },
         },
         many: true,
@@ -20,8 +21,9 @@ export default [
       sentMessages: {
         to: {
           Message: {
-            on: 'authorId',
-            eq: 'id',
+            on: {
+              authorId: 'id',
+            },
           },
         },
         many: true,
@@ -55,8 +57,9 @@ export default [
       receivedMessages: {
         to: {
           Message: {
-            on: 'recipientId',
-            eq: 'id',
+            on: {
+              recipientId: 'id',
+            },
           },
         },
         many: true,
@@ -64,8 +67,9 @@ export default [
       sentMessages: {
         to: {
           Message: {
-            on: 'authorId',
-            eq: 'id',
+            on: {
+              authorId: 'id',
+            },
           },
         },
         many: true,
@@ -82,24 +86,28 @@ export default [
       author: {
         to: {
           User: {
-            on: 'id',
-            eq: 'authorId',
+            on: {
+              id: 'authorId',
+            },
           },
           Bot: {
-            on: 'id',
-            eq: 'authorId',
+            on: {
+              id: 'authorId',
+            },
           },
         },
       },
       recipient: {
         to: {
           User: {
-            on: 'id',
-            eq: 'recipientId',
+            on: {
+              id: 'recipientId',
+            },
           },
           Bot: {
-            on: 'id',
-            eq: 'recipientId',
+            on: {
+              id: 'recipientId',
+            },
           },
         },
       },

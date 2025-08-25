@@ -1,11 +1,11 @@
-import type { Model, ModelDefaults, ModelList, ResolvedModel, StoreCore } from '@rstore/shared'
+import type { Model, ModelDefaults, ResolvedModel, StoreCore, StoreSchema } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deleteItem } from '../../src/mutation/delete'
 
 describe('deleteItem', () => {
-  let mockStore: StoreCore<ModelList, ModelDefaults>
-  let mockModel: ResolvedModel<Model, ModelDefaults, ModelList>
+  let mockStore: StoreCore<StoreSchema, ModelDefaults>
+  let mockModel: ResolvedModel<Model, ModelDefaults, StoreSchema>
   let mockKey: string
 
   beforeEach(() => {

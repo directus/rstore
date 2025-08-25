@@ -1,12 +1,13 @@
 import type { VueStore } from '../src'
-import { peekMany } from '@rstore/core'
+import { emptySchemas, peekMany } from '@rstore/core'
 import { createHooks, type ResolvedModel, type StandardSchemaV1 } from '@rstore/shared'
-import { beforeEach, describe, expect, it, type MockedFunction, vi } from 'vitest'
+import { beforeEach, describe, expect, it, type Mock, type MockedFunction, vi } from 'vitest'
 import { markRaw } from 'vue'
 import { wrapItem } from '../src/item'
 
-vi.mock('@rstore/core', () => {
+vi.mock('@rstore/core', async (importOriginal) => {
   return {
+    ...(await importOriginal()),
     peekFirst: vi.fn(),
     peekMany: vi.fn(),
   }
@@ -15,7 +16,12 @@ vi.mock('@rstore/core', () => {
 describe('wrapItem', () => {
   let mockStore: VueStore
 
-  let mockModel: ResolvedModel<any, any, any>
+  let mockModel: ResolvedModel & {
+    getKey: Mock<ResolvedModel['getKey']>
+    computed: {
+      computedProp: Mock<() => any>
+    }
+  }
 
   let mockItem: any
 
@@ -37,20 +43,24 @@ describe('wrapItem', () => {
     } as any
 
     mockModel = {
-      name: 'testModel',
-      getKey: vi.fn(item => item.id),
-      computed: {
+      '~resolved': true,
+      'name': 'testModel',
+      'getKey': vi.fn(item => item.id),
+      'computed': {
         computedProp: vi.fn(),
       },
-      relations: {
+      'relations': {
         relatedItems: {
           to: {
-            relatedModel: { eq: 'id', on: 'foreignKey' },
+            relatedModel: { on: { foreignKey: 'id' } },
           },
           many: true,
         },
       },
-    } as any
+      'fields': {},
+      'formSchema': emptySchemas,
+      'isInstanceOf': () => true,
+    }
 
     mockItem = {
       id: 1,
@@ -110,14 +120,45 @@ describe('wrapItem', () => {
   })
 
   it('should resolve related items in the cache', () => {
-    const relatedItem = { id: 2, foreignKey: 1 }
-    mockStore.$models[0].relations.relatedItems = {
-      to: { relatedModel: { eq: 'id', on: 'foreignKey' } },
-      many: true,
-    }
-    ;(peekMany as MockedFunction<any>).mockReturnValue({ result: [relatedItem] })
+    const relatedItems = [
+      { id: 2, foreignKey: 1 },
+      { id: 3, foreignKey: 1 },
+      { id: 4, foreignKey: 2 },
+    ] as any[]
+    ;(peekMany as MockedFunction<typeof peekMany>).mockImplementation(({ findOptions }) => {
+      const filter = findOptions!.filter as (item: any) => boolean
+      return {
+        result: relatedItems.filter(filter),
+      }
+    })
     const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem }) as any
-    expect(wrappedItem.relatedItems).toEqual([relatedItem])
+    expect(wrappedItem.relatedItems.length).toBe(2)
+    expect(wrappedItem.relatedItems[0].id).toBe(2)
+    expect(wrappedItem.relatedItems[1].id).toBe(3)
+  })
+
+  it('should resolve related items with multiple foreign keys', () => {
+    mockModel.relations.relatedItems.to.relatedModel.on = {
+      'relatedModel.foreignKey1': 'testModel.id1',
+      'foreignKey2': 'id2',
+    }
+    mockItem = {
+      id1: 1,
+      id2: 2,
+    }
+    const relatedItems = [
+      { meow: 'meow', foreignKey1: 1, foreignKey2: 2 },
+      { meow: 'purr', foreignKey1: 1, foreignKey2: 3 },
+    ] as any[]
+    ;(peekMany as MockedFunction<typeof peekMany>).mockImplementation(({ findOptions }) => {
+      const filter = findOptions!.filter as (item: any) => boolean
+      return {
+        result: relatedItems.filter(filter),
+      }
+    })
+    const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem }) as any
+    expect(wrappedItem.relatedItems.length).toBe(1)
+    expect(wrappedItem.relatedItems[0].meow).toBe('meow')
   })
 
   it('should throw an error when trying to set a property', () => {

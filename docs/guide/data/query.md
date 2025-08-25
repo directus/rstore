@@ -6,7 +6,7 @@ Here are some examples:
 
 ```ts{3-4,8-9}
 const store = await createStore({
-  models: [
+  schema: [
     { name: 'Todo' },
     { name: 'users' },
   ],
@@ -221,7 +221,7 @@ The global fetch policy can be set in the store configuration using `findDefault
 
 ```ts
 const store = createStore({
-  models,
+  schema,
   plugins,
   findDefaults: {
     fetchPolicy: 'cache-first',

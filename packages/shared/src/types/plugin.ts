@@ -1,5 +1,5 @@
 import type { HookDefinitions } from './hooks.js'
-import type { ModelDefaults, ModelList } from './model.js'
+import type { ModelDefaults, StoreSchema } from './model.js'
 import type { Awaitable } from './utils.js'
 
 export interface CustomPluginMeta {
@@ -49,9 +49,9 @@ export interface PluginSetupApi {
   addModelDefaults: (modelDefaults: ModelDefaults) => void
 
   hook: <
-    TName extends keyof HookDefinitions<ModelList, ModelDefaults>,
+    TName extends keyof HookDefinitions<StoreSchema, ModelDefaults>,
   > (name: TName,
-    callback: HookDefinitions<ModelList, ModelDefaults>[TName],
+    callback: HookDefinitions<StoreSchema, ModelDefaults>[TName],
     options?: HookPluginOptions
   ) => () => void
 }

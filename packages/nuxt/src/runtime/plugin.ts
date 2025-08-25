@@ -1,8 +1,8 @@
-import type { ModelList, Plugin } from '@rstore/shared'
+import type { Plugin, StoreSchema } from '@rstore/shared'
 
 import { defineNuxtPlugin } from '#app'
 // @ts-expect-error virtual file
-import _models from '#build/$rstore-model'
+import _schema from '#build/$rstore-model'
 // @ts-expect-error virtual file
 import * as _plugins from '#build/$rstore-plugins'
 
@@ -16,7 +16,7 @@ export default defineNuxtPlugin({
 
   setup: async (nuxtApp) => {
     let plugins = Object.values({ ..._plugins }) as Plugin[]
-    const models = _models as ModelList
+    const schema = _schema as StoreSchema
 
     // Devtools
     if (import.meta.dev) {
@@ -29,7 +29,7 @@ export default defineNuxtPlugin({
 
     const store = await createStore({
       plugins,
-      models,
+      schema,
       isServer: !!import.meta.server,
     })
 

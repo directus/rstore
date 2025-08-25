@@ -1,4 +1,4 @@
-import type { Model, ModelDefaults, ModelList, ResolvedModelItem } from './model'
+import type { Model, ModelDefaults, ResolvedModelItem, StoreSchema } from './model'
 import type { UpdateFormObject } from './mutation'
 
 /**
@@ -7,7 +7,7 @@ import type { UpdateFormObject } from './mutation'
 export interface WrappedItemBase<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {
   /**
    * Name of the model.
@@ -17,12 +17,12 @@ export interface WrappedItemBase<
   /**
    * (Recommended) The form object helps you updating the item.
    */
-  $updateForm: (options?: WrappedItemUpdateFormOptions<TModel, TModelDefaults, TModelList>) => Promise<UpdateFormObject<TModel, TModelDefaults, TModelList>>
+  $updateForm: (options?: WrappedItemUpdateFormOptions<TModel, TModelDefaults, TSchema>) => Promise<UpdateFormObject<TModel, TModelDefaults, TSchema>>
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
    */
-  $update: (data: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>) => Promise<void>
+  $update: (data: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>) => Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
   /**
    * Delete the item.
@@ -38,15 +38,15 @@ export interface WrappedItemBase<
 export type WrappedItem<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = WrappedItemBase<TModel, TModelDefaults, TModelList> & ResolvedModelItem<TModel, TModelDefaults, TModelList>
+  TSchema extends StoreSchema,
+> = WrappedItemBase<TModel, TModelDefaults, TSchema> & ResolvedModelItem<TModel, TModelDefaults, TSchema>
 
 /* eslint-disable unused-imports/no-unused-vars */
 
 export interface WrappedItemUpdateFormOptions<
   TModel extends Model = Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
-  TModelList extends ModelList = ModelList,
+  TSchema extends StoreSchema = StoreSchema,
 > {
   // to be extended
 }

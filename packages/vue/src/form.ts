@@ -1,5 +1,5 @@
 import { emptySchema } from '@rstore/core'
-import { type Awaitable, type CreateFormObject, type FormObjectBase, type Model, type ModelDefaults, type ModelList, pickNonSpecialProps, type ResolvedModelItem, type StandardSchemaV1, type UpdateFormObject } from '@rstore/shared'
+import { type Awaitable, type CreateFormObject, type FormObjectBase, type Model, type ModelDefaults, pickNonSpecialProps, type ResolvedModelItem, type StandardSchemaV1, type StoreSchema, type UpdateFormObject } from '@rstore/shared'
 import { createEventHook, type EventHookOn } from '@vueuse/core'
 import { markRaw, nextTick, reactive } from 'vue'
 
@@ -49,8 +49,8 @@ type VueFormObject<
 export type VueCreateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = CreateFormObject<TModel, TModelDefaults, TModelList> & VueFormObject<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  TSchema extends StoreSchema,
+> = CreateFormObject<TModel, TModelDefaults, TSchema> & VueFormObject<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
 /**
  * Object returned by `store.<Model>.updateForm()`
@@ -58,8 +58,8 @@ export type VueCreateFormObject<
 export type VueUpdateFormObject<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = UpdateFormObject<TModel, TModelDefaults, TModelList> & VueFormObject<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  TSchema extends StoreSchema,
+> = UpdateFormObject<TModel, TModelDefaults, TSchema> & VueFormObject<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
 export function createFormObject<
   TData extends Record<string, any> = Record<string, any>,

@@ -1,6 +1,6 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { Model, ModelDefaults, ModelList } from '@rstore/vue'
+import type { Model, ModelDefaults, StoreSchema } from '@rstore/vue'
 import type { RstoreDrizzleCondition } from './utils/types'
 
 declare module '@rstore/vue' {
@@ -12,7 +12,7 @@ declare module '@rstore/vue' {
   export interface FindOptions<
     TModel extends Model,
     TModelDefaults extends ModelDefaults,
-    TModelList extends ModelList,
+    TSchema extends StoreSchema,
   > {
     where?: RstoreDrizzleCondition
   }
@@ -20,7 +20,7 @@ declare module '@rstore/vue' {
   export interface CustomParams<
     TModel extends Model,
     TModelDefaults extends ModelDefaults,
-    TModelList extends ModelList,
+    TSchema extends StoreSchema,
   > {
     /**
      * @deprecated Use \`findOptions.where\` instead

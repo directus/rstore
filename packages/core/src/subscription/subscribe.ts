@@ -1,22 +1,22 @@
-import type { CustomHookMeta, FindOptions, Model, ModelDefaults, ModelList, ResolvedModel, StoreCore } from '@rstore/shared'
+import type { CustomHookMeta, FindOptions, Model, ModelDefaults, ResolvedModel, StoreCore, StoreSchema } from '@rstore/shared'
 
 export interface SubscribeOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>
+  store: StoreCore<TSchema, TModelDefaults>
+  model: ResolvedModel<TModel, TModelDefaults, TSchema>
   subscriptionId: string
   key?: string | number
-  findOptions?: FindOptions<TModel, TModelDefaults, TModelList>
+  findOptions?: FindOptions<TModel, TModelDefaults, TSchema>
   meta?: CustomHookMeta
 }
 
 export async function subscribe<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 >({
   store,
   model,
@@ -24,7 +24,7 @@ export async function subscribe<
   key,
   findOptions,
   meta,
-}: SubscribeOptions<TModel, TModelDefaults, TModelList>): Promise<void> {
+}: SubscribeOptions<TModel, TModelDefaults, TSchema>): Promise<void> {
   meta ??= {}
 
   await store.$hooks.callHook('subscribe', {

@@ -1,16 +1,16 @@
-import type { CustomHookMeta, FindFirstOptions, Model, ModelDefaults, ModelList, QueryResult, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
+import type { CustomHookMeta, FindFirstOptions, Model, ModelDefaults, QueryResult, ResolvedModel, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
 export interface PeekFirstOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
+  store: StoreCore<TSchema, TModelDefaults>
   meta?: CustomHookMeta
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  findOptions: string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>
+  model: ResolvedModel<TModel, TModelDefaults, TSchema>
+  findOptions: string | number | FindFirstOptions<TModel, TModelDefaults, TSchema>
   force?: boolean
 }
 
@@ -20,17 +20,17 @@ export interface PeekFirstOptions<
 export function peekFirst<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 >({
   store,
   meta,
   model,
   findOptions: keyOrOptions,
   force,
-}: PeekFirstOptions<TModel, TModelDefaults, TModelList>): QueryResult<WrappedItem<TModel, TModelDefaults, TModelList> | null> {
+}: PeekFirstOptions<TModel, TModelDefaults, TSchema>): QueryResult<WrappedItem<TModel, TModelDefaults, TSchema> | null> {
   meta ??= {}
 
-  const findOptions: FindFirstOptions<TModel, TModelDefaults, TModelList> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
+  const findOptions: FindFirstOptions<TModel, TModelDefaults, TSchema> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
     ? {
         key: keyOrOptions,
       }

@@ -1,34 +1,34 @@
-import type { CustomHookMeta, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, StoreCore } from '@rstore/shared'
+import type { CustomHookMeta, Model, ModelDefaults, ResolvedModel, ResolvedModelItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 
 export interface CreateOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  store: StoreCore<TSchema, TModelDefaults>
+  model: ResolvedModel<TModel, TModelDefaults, TSchema>
+  item: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
   skipCache?: boolean
 }
 
 export async function createItem<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 >({
   store,
   model,
   item,
   skipCache,
-}: CreateOptions<TModel, TModelDefaults, TModelList>): Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>> {
+}: CreateOptions<TModel, TModelDefaults, TSchema>): Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>> {
   const meta: CustomHookMeta = {}
 
-  item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
   store.$processItemSerialization(model, item)
 
-  let result: ResolvedModelItem<TModel, TModelDefaults, TModelList> | undefined
+  let result: ResolvedModelItem<TModel, TModelDefaults, TSchema> | undefined
 
   await store.$hooks.callHook('beforeMutation', {
     store,
@@ -40,7 +40,7 @@ export async function createItem<
       set(item, path, value)
     },
     setItem: (newItem) => {
-      item = newItem
+      item = newItem as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
     },
   })
 
@@ -51,7 +51,7 @@ export async function createItem<
     item,
     getResult: () => result,
     setResult: (newResult) => {
-      result = newResult
+      result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
     },
   })
 
@@ -63,7 +63,7 @@ export async function createItem<
     item,
     getResult: () => result,
     setResult: (newResult) => {
-      result = newResult
+      result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
     },
   })
 

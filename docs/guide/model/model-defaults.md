@@ -42,7 +42,7 @@ export default definePlugin({
 
 ```ts
 const store = createStore({
-  models,
+  schema,
   plugins,
   modelDefaults: {
     getKey: (modelName, item) => item.customId,
@@ -54,7 +54,7 @@ const store = createStore({
 
 ```ts
 const store = createStore({
-  models,
+  schema,
   plugins,
   modelDefaults: {
     isInstanceOf: model => item => item.__typename === model.name
@@ -72,7 +72,7 @@ function parseDate(value: any): Date {
 }
 
 const store = createStore({
-  models,
+  schema,
   plugins,
   modelDefaults: {
     fields: {

@@ -39,6 +39,7 @@ export default defineNuxtModule<ModuleOptions>({
       'defineRstoreModule',
       'createRstoreModule',
       'useStore',
+      'RStoreSchema',
     ].map(name => ({ from: importsFile, name })))
     addImports([
       'StoreRawModels',
@@ -103,7 +104,7 @@ export default [
       filename: '$rstore-model-const.d.ts',
       getContents: async () => {
         const files = await resolveModelFiles()
-        return `import type { ModelList } from '@rstore/shared'
+        return `import type { StoreSchema } from '@rstore/shared'
 ${files.map((file, index) => `import M${index} from '${file}'`).join('\n')}
 type EnsureArray<T> = T extends any[] ? T : [T]
 function ensureArray<T>(value: T): EnsureArray<T> {
@@ -111,7 +112,7 @@ function ensureArray<T>(value: T): EnsureArray<T> {
 }
 export const constModels = [
   ${files.map((file, index) => `...ensureArray(M${index}),`).join('\n')}
-] satisfies ModelList`
+] satisfies StoreSchema`
       },
     })
 

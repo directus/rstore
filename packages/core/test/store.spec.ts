@@ -1,4 +1,4 @@
-import type { Cache, FetchPolicy, ModelDefaults, ModelList, Plugin } from '@rstore/shared'
+import type { Cache, FetchPolicy, ModelDefaults, Plugin, StoreSchema } from '@rstore/shared'
 import type { CreateStoreCoreOptions } from '../src/store'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,7 +11,7 @@ describe('createStoreCore', () => {
   beforeEach(() => {
     options = {
       cache: {} as Cache,
-      models: [] as ModelList,
+      schema: [] as StoreSchema,
       modelDefaults: {} as ModelDefaults,
       plugins: [],
       hooks: {
@@ -58,7 +58,7 @@ describe('createStoreCore', () => {
 
   describe('field parsing', () => {
     it('calls custom field parse', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Test',
           fields: {
@@ -68,7 +68,7 @@ describe('createStoreCore', () => {
           },
         },
       ]
-      options.models = models
+      options.schema = schema
       options.hooks = createHooks()
 
       const store = await createStoreCore(options)
@@ -80,15 +80,16 @@ describe('createStoreCore', () => {
     })
 
     it('handle nested relations in result', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Message',
           relations: {
             author: {
               to: {
                 User: {
-                  on: 'id',
-                  eq: 'authorId',
+                  on: {
+                    id: 'authorId',
+                  },
                 },
               },
             },
@@ -103,7 +104,7 @@ describe('createStoreCore', () => {
           },
         },
       ]
-      options.models = models
+      options.schema = schema
       options.hooks = createHooks()
 
       const store = await createStoreCore(options)
@@ -127,7 +128,7 @@ describe('createStoreCore', () => {
 
   describe('field serialization', () => {
     it('calls custom field serialize', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Test',
           fields: {
@@ -137,7 +138,7 @@ describe('createStoreCore', () => {
           },
         },
       ]
-      options.models = models
+      options.schema = schema
       options.hooks = createHooks()
 
       const store = await createStoreCore(options)
@@ -150,7 +151,7 @@ describe('createStoreCore', () => {
 
     it('skips serialization if value is null', async () => {
       const serializeMock = vi.fn()
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Test',
           fields: {
@@ -160,7 +161,7 @@ describe('createStoreCore', () => {
           },
         },
       ]
-      options.models = models
+      options.schema = schema
       options.hooks = createHooks()
 
       const store = await createStoreCore(options)
@@ -172,7 +173,7 @@ describe('createStoreCore', () => {
     })
 
     it('handles nested fields with dot notation', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Test',
           fields: {
@@ -182,7 +183,7 @@ describe('createStoreCore', () => {
           },
         },
       ]
-      options.models = models
+      options.schema = schema
       options.hooks = createHooks()
 
       const store = await createStoreCore(options)
@@ -223,7 +224,7 @@ describe('createStoreCore', () => {
 
   describe('getModel', () => {
     it('should return the correct model for an item', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Test',
           isInstanceOf: (item: any) => item.__typename === 'Test',
@@ -233,7 +234,7 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => item.__typename === 'AnotherTest',
         },
       ]
-      options.models = models
+      options.schema = schema
       const store = await createStoreCore(options)
 
       const testItem = { __typename: 'Test' }
@@ -244,7 +245,7 @@ describe('createStoreCore', () => {
     })
 
     it('should return the correct model for an item with no typename', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'User',
           isInstanceOf: (item: any) => 'username' in item,
@@ -254,7 +255,7 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => 'botname' in item,
         },
       ]
-      options.models = models
+      options.schema = schema
       const store = await createStoreCore(options)
 
       const testItem = { username: 'toto' }
@@ -265,13 +266,13 @@ describe('createStoreCore', () => {
     })
 
     it('should return null if no model matches the item', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Test',
           isInstanceOf: (item: any) => item.__typename === 'Test',
         },
       ]
-      options.models = models
+      options.schema = schema
       const store = await createStoreCore(options)
 
       const unknownItem = { __typename: 'Unknown' }
@@ -280,7 +281,7 @@ describe('createStoreCore', () => {
     })
 
     it('should search in only specified types', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'User',
           isInstanceOf: (item: any) => 'username' in item,
@@ -294,7 +295,7 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => 'botname' in item,
         },
       ]
-      options.models = models
+      options.schema = schema
       const store = await createStoreCore(options)
 
       const testItem = { username: 'toto' }
@@ -304,7 +305,7 @@ describe('createStoreCore', () => {
     })
 
     it('should return if only one specified model', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'User',
           isInstanceOf: (item: any) => 'username' in item,
@@ -318,7 +319,7 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => 'fooname' in item,
         },
       ]
-      options.models = models
+      options.schema = schema
       const store = await createStoreCore(options)
 
       const testItem = { username: 'toto' }

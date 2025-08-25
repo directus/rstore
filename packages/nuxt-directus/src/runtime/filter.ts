@@ -40,7 +40,7 @@ const FUNCTION_PARAMETERS = {
   },
 }
 
-export function filterItem(store: VueStore, model: ResolvedModel<any, any, any>, item: any, filter: QueryFilter<any, any>): boolean {
+export function filterItem(store: VueStore, model: ResolvedModel, item: any, filter: QueryFilter<any, any>): boolean {
   // TODO relation filter
   // TODO user-related dynamic variables
   // TODO $FOLLOW

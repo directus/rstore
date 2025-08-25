@@ -1,4 +1,4 @@
-import type { HookPayload, ModelDefaults, ModelList, Plugin, RegisteredPlugin, StoreCore } from '@rstore/shared'
+import type { HookPayload, ModelDefaults, Plugin, RegisteredPlugin, StoreCore, StoreSchema } from '@rstore/shared'
 
 const mergedModelDefaultsFields = [
   'computed',
@@ -10,9 +10,9 @@ const deepMergedModelDefaultsFields = [
 ] as Array<keyof ModelDefaults>
 
 export async function setupPlugin<
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
   TModelDefaults extends ModelDefaults,
->(store: StoreCore<TModelList, TModelDefaults>, plugin: RegisteredPlugin) {
+>(store: StoreCore<TSchema, TModelDefaults>, plugin: RegisteredPlugin) {
   await plugin.setup({
     hook(name, callback, options) {
       plugin.hooks[name] ??= []

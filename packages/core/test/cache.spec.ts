@@ -4,28 +4,30 @@ import { defaultMarker, getMarker } from '../src'
 
 describe('defaultMarker', () => {
   it('should generate marker with empty findOptions', () => {
-    const model: ResolvedModel<any, any, any> = {
-      name: 'TestType',
-      computed: {},
-      fields: {},
-      getKey: () => '',
-      isInstanceOf: () => true,
-      relations: [],
-      formSchema: {} as any,
+    const model: ResolvedModel = {
+      '~resolved': true,
+      'name': 'TestType',
+      'computed': {},
+      'fields': {},
+      'getKey': () => '',
+      'isInstanceOf': () => true,
+      'relations': {},
+      'formSchema': {} as any,
     }
     const result = defaultMarker(model)
     expect(result).toBe('TestType:{}:{}')
   })
 
   it('should generate marker with findOptions', () => {
-    const model: ResolvedModel<any, any, any> = {
-      name: 'TestType',
-      computed: {},
-      fields: {},
-      getKey: () => '',
-      isInstanceOf: () => true,
-      relations: [],
-      formSchema: {} as any,
+    const model: ResolvedModel = {
+      '~resolved': true,
+      'name': 'TestType',
+      'computed': {},
+      'fields': {},
+      'getKey': () => '',
+      'isInstanceOf': () => true,
+      'relations': {},
+      'formSchema': {} as any,
     }
     const findOptions = { filter: { id: 1 } }
     const result = defaultMarker(model, findOptions as any)
@@ -33,14 +35,15 @@ describe('defaultMarker', () => {
   })
 
   it('should generate marker with findOptions and non-function filter', () => {
-    const model: ResolvedModel<any, any, any> = {
-      name: 'TestType',
-      computed: {},
-      fields: {},
-      getKey: () => '',
-      isInstanceOf: () => true,
-      relations: [],
-      formSchema: {} as any,
+    const model: ResolvedModel = {
+      '~resolved': true,
+      'name': 'TestType',
+      'computed': {},
+      'fields': {},
+      'getKey': () => '',
+      'isInstanceOf': () => true,
+      'relations': {},
+      'formSchema': {} as any,
     }
     const findOptions = { filter: { id: 1 }, sort: 'asc' }
     const result = defaultMarker(model, findOptions as any)
@@ -48,14 +51,15 @@ describe('defaultMarker', () => {
   })
 
   it('should generate marker with findOptions and function filter and params', () => {
-    const model: ResolvedModel<any, any, any> = {
-      name: 'TestType',
-      computed: {},
-      fields: {},
-      getKey: () => '',
-      isInstanceOf: () => true,
-      relations: [],
-      formSchema: {} as any,
+    const model: ResolvedModel = {
+      '~resolved': true,
+      'name': 'TestType',
+      'computed': {},
+      'fields': {},
+      'getKey': () => '',
+      'isInstanceOf': () => true,
+      'relations': {},
+      'formSchema': {} as any,
     }
     const findOptions = { filter: () => true, params: { foo: 'bar' } }
     const result = defaultMarker(model, findOptions)

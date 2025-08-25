@@ -16,7 +16,7 @@
     "lint": "eslint --cache .",
     "test": "vitest run",
     "test:dev": "vitest",
-    "test:types": "pnpm run -r test:types",
+    "test:types": "pnpm run --parallel -r test:types",
     "copy-readme": "echo ./packages/* | xargs -n 1 cp README.md",
     "release": "pnpm run copy-readme && pnpm run lint && pnpm run test && pnpm run test:types && pnpm run build && sheep release -b main --force",
     "docs:dev": "vitepress dev docs",

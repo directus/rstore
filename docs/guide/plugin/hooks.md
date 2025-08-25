@@ -499,13 +499,13 @@ const { data: user } = store.users.queryFirst(() => ({
 If you are using TypeScript, you can augment the `` interface to customize the type of the `filter` find option:
 
 ```ts
-import type { Model, ModelDefaults, ModelList } from '@rstore/shared'
+import type { Model, ModelDefaults, StoreSchema } from '@rstore/shared'
 
 declare module '@rstore/vue' {
   export interface CustomFilterOption<
     TModel extends Model,
     TModelDefaults extends ModelDefaults,
-    TModelList extends ModelList,
+    TSchema extends StoreSchema,
   > {
     email?: string
   }
@@ -638,13 +638,13 @@ const { data: users } = store.users.queryMany(() => ({
 If you are using TypeScript, you can augment the `` interface to customize the type of the `filter` find option:
 
 ```ts
-import type { Model, ModelDefaults, ModelList } from '@rstore/shared'
+import type { Model, ModelDefaults, StoreSchema } from '@rstore/shared'
 
 declare module '@rstore/vue' {
   export interface CustomFilterOption<
     TModel extends Model,
     TModelDefaults extends ModelDefaults,
-    TModelList extends ModelList,
+    TSchema extends StoreSchema,
   > {
     email?: string
   }

@@ -1,11 +1,11 @@
-import { createHooks, type ModelDefaults, type ModelList, type RegisteredPlugin, type StoreCore } from '@rstore/shared'
+import { createHooks, type ModelDefaults, type RegisteredPlugin, type StoreCore, type StoreSchema } from '@rstore/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { setupPlugin } from '../src/plugin'
 
 describe('setupPlugin', () => {
   it('should call plugin.setup', async () => {
     const mockHook = vi.fn()
-    const mockStore: StoreCore<ModelList, ModelDefaults> = {
+    const mockStore: StoreCore<StoreSchema, ModelDefaults> = {
       $hooks: {
         hook: mockHook,
       },
@@ -27,7 +27,7 @@ describe('setupPlugin', () => {
 
   it('should handle async plugin setup', async () => {
     const mockHook = vi.fn()
-    const mockStore: StoreCore<ModelList, ModelDefaults> = {
+    const mockStore: StoreCore<StoreSchema, ModelDefaults> = {
       $hooks: {
         hook: mockHook,
       },
@@ -46,7 +46,7 @@ describe('setupPlugin', () => {
 
   it('should throw if plugin setup fails', async () => {
     const mockHook = vi.fn()
-    const mockStore: StoreCore<ModelList, ModelDefaults> = {
+    const mockStore: StoreCore<StoreSchema, ModelDefaults> = {
       $hooks: {
         hook: mockHook,
       },
@@ -64,7 +64,7 @@ describe('setupPlugin', () => {
   describe('hook', () => {
     it('should register hook', async () => {
       const mockHook = vi.fn()
-      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+      const mockStore: StoreCore<StoreSchema, ModelDefaults> = {
         $hooks: {
           hook: mockHook,
         },
@@ -84,7 +84,7 @@ describe('setupPlugin', () => {
     })
 
     it('should filter hook with scopeId', async () => {
-      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+      const mockStore: StoreCore<StoreSchema, ModelDefaults> = {
         $hooks: createHooks(),
       } as any
 
@@ -120,7 +120,7 @@ describe('setupPlugin', () => {
     })
 
     it('should not filter hook with scopeId with ignoreScope', async () => {
-      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+      const mockStore: StoreCore<StoreSchema, ModelDefaults> = {
         $hooks: createHooks(),
       } as any
 
@@ -159,7 +159,7 @@ describe('setupPlugin', () => {
     })
 
     it('should not filter hook with model without scope', async () => {
-      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+      const mockStore: StoreCore<StoreSchema, ModelDefaults> = {
         $hooks: createHooks(),
       } as any
 
@@ -194,7 +194,7 @@ describe('setupPlugin', () => {
     })
 
     it('should not filter hook with plugin without scope', async () => {
-      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+      const mockStore: StoreCore<StoreSchema, ModelDefaults> = {
         $hooks: createHooks(),
       } as any
 
@@ -234,7 +234,7 @@ describe('setupPlugin', () => {
     describe('addModelDefaults', () => {
       it('should add model defaults to the store', async () => {
         const mockHook = vi.fn()
-        const mockStore: StoreCore<ModelList, ModelDefaults> = {
+        const mockStore: StoreCore<StoreSchema, ModelDefaults> = {
           $hooks: {
             hook: mockHook,
           },
@@ -262,7 +262,7 @@ describe('setupPlugin', () => {
 
       it('should merge model defaults with existing defaults', async () => {
         const mockHook = vi.fn()
-        const mockStore: StoreCore<ModelList, ModelDefaults> = {
+        const mockStore: StoreCore<StoreSchema, ModelDefaults> = {
           $hooks: {
             hook: mockHook,
           },
@@ -295,7 +295,7 @@ describe('setupPlugin', () => {
 
       it('should overwrite existing model defaults if specified', async () => {
         const mockHook = vi.fn()
-        const mockStore: StoreCore<ModelList, ModelDefaults> = {
+        const mockStore: StoreCore<StoreSchema, ModelDefaults> = {
           $hooks: {
             hook: mockHook,
           },

@@ -1,4 +1,4 @@
-import type { Model, ModelDefaults, ModelList } from '@rstore/shared'
+import type { Model, ModelDefaults, StoreSchema } from '@rstore/shared'
 import { describe, expect, it } from 'vitest'
 import { defaultGetKey, defaultIsInstanceOf, resolveModels } from '../src/model'
 
@@ -41,7 +41,7 @@ describe('default isInstanceOf', () => {
 
 describe('model', () => {
   it('should resolve model with defaults', () => {
-    const modelTypes: ModelList = [
+    const modelTypes: StoreSchema = [
       {
         name: 'TestModel',
         meta: {
@@ -65,14 +65,14 @@ describe('model', () => {
       path: '/test',
       test: 'meow',
     })
-    expect(resolved[1].getKey({ id: 'foo' })).toBe(modelTypes[1].getKey?.({ id: 'foo' }))
+    expect(resolved[1].getKey({ id: 'foo' })).toBe((modelTypes[1] as Model).getKey?.({ id: 'foo' }))
     expect(resolved[1].meta).toEqual({
       test: 'meow',
     })
   })
 
   it('should resolve all model props', () => {
-    const modelTypes: ModelList = [
+    const modelTypes: StoreSchema = [
       {
         name: 'TestModel',
         getKey: (item: any) => item.id,
@@ -80,8 +80,9 @@ describe('model', () => {
           test: {
             to: {
               Test2: {
-                on: 'testId',
-                eq: 'id',
+                on: {
+                  testId: 'id',
+                },
               },
             },
           },
@@ -118,13 +119,14 @@ describe('model', () => {
 
     const resolved = resolveModels(modelTypes)
 
-    expect(resolved[0].getKey({ id: 'foo' })).toBe(modelTypes[0].getKey?.({ id: 'foo' }))
+    expect(resolved[0].getKey({ id: 'foo' })).toBe((modelTypes[0] as Model).getKey?.({ id: 'foo' }))
     expect(resolved[0].relations).toEqual({
       test: {
         to: {
           Test2: {
-            on: 'testId',
-            eq: 'id',
+            on: {
+              testId: 'id',
+            },
           },
         },
       },
@@ -139,7 +141,7 @@ describe('model', () => {
   })
 
   it('should resolve all default props', () => {
-    const modelTypes: ModelList = [
+    const modelTypes: StoreSchema = [
       {
         name: 'TestModel',
       },

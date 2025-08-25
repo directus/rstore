@@ -1,16 +1,16 @@
-import type { CustomHookMeta, FindManyOptions, Model, ModelDefaults, ModelList, QueryResult, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
+import type { CustomHookMeta, FindManyOptions, Model, ModelDefaults, QueryResult, ResolvedModel, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
 export interface PeekManyOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
+  store: StoreCore<TSchema, TModelDefaults>
   meta?: CustomHookMeta
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  findOptions?: FindManyOptions<TModel, TModelDefaults, TModelList>
+  model: ResolvedModel<TModel, TModelDefaults, TSchema>
+  findOptions?: FindManyOptions<TModel, TModelDefaults, TSchema>
   force?: boolean
 }
 
@@ -20,14 +20,14 @@ export interface PeekManyOptions<
 export function peekMany<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 >({
   store,
   meta,
   model,
   findOptions,
   force,
-}: PeekManyOptions<TModel, TModelDefaults, TModelList>): QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelList>>> {
+}: PeekManyOptions<TModel, TModelDefaults, TSchema>): QueryResult<Array<WrappedItem<TModel, TModelDefaults, TSchema>>> {
   meta ??= {}
 
   const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
@@ -61,7 +61,7 @@ export function peekMany<
       findOptions,
       getResult: () => result,
       setResult: (value) => {
-        result = value
+        result = value as Array<WrappedItem<TModel, TModelDefaults, TSchema>>
       },
     })
     return {

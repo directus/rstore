@@ -1,15 +1,15 @@
-import type { CustomHookMeta, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, StoreCore } from '@rstore/shared'
+import type { CustomHookMeta, Model, ModelDefaults, ResolvedModel, ResolvedModelItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 import { peekFirst } from '../query'
 
 export interface UpdateOptions<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  store: StoreCore<TSchema, TModelDefaults>
+  model: ResolvedModel<TModel, TModelDefaults, TSchema>
+  item: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
   key?: string | number | null
   skipCache?: boolean
 }
@@ -17,17 +17,17 @@ export interface UpdateOptions<
 export async function updateItem<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 >({
   store,
   model,
   item,
   key,
   skipCache,
-}: UpdateOptions<TModel, TModelDefaults, TModelList>): Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>> {
+}: UpdateOptions<TModel, TModelDefaults, TSchema>): Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>> {
   const meta: CustomHookMeta = {}
 
-  item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
   store.$processItemSerialization(model, item)
 
@@ -48,11 +48,11 @@ export async function updateItem<
       set(item, path, value)
     },
     setItem: (newItem) => {
-      item = newItem
+      item = newItem as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
     },
   })
 
-  let result: ResolvedModelItem<TModel, TModelDefaults, TModelList> | null = peekFirst({
+  let result: ResolvedModelItem<TModel, TModelDefaults, TSchema> | null = peekFirst({
     store,
     meta,
     model,
@@ -62,7 +62,7 @@ export async function updateItem<
   }).result
 
   if (result) {
-    result = pickNonSpecialProps(result) as ResolvedModelItem<TModel, TModelDefaults, TModelList>
+    result = pickNonSpecialProps(result) as ResolvedModelItem<TModel, TModelDefaults, TSchema>
   }
 
   await store.$hooks.callHook('updateItem', {
@@ -71,9 +71,9 @@ export async function updateItem<
     model,
     key,
     item,
-    getResult: () => result,
+    getResult: () => result ?? undefined,
     setResult: (newResult) => {
-      result = newResult
+      result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
     },
   })
 
@@ -84,9 +84,9 @@ export async function updateItem<
     mutation: 'update',
     key,
     item,
-    getResult: () => result,
+    getResult: () => result ?? undefined,
     setResult: (newResult) => {
-      result = newResult
+      result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
     },
   })
 

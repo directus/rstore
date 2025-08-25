@@ -1,7 +1,7 @@
 import type { constModels } from '#build/$rstore-model-const'
 import type { ModelByName, ModelNameMap, ResolvedModelItem, WrappedItem } from '@rstore/shared'
-import type { CreateFormObject, UpdateFormObject, VueStore } from '@rstore/vue'
 import { useNuxtApp } from '#app'
+import { type CreateFormObject, defineRelations, type UpdateFormObject, type VueStore, withItemType } from '@rstore/vue'
 
 export * from '@rstore/vue'
 
@@ -10,6 +10,11 @@ export {
   defineModule as defineRstoreModule,
   definePlugin as defineRstorePlugin,
 } from '@rstore/vue'
+
+export const RStoreSchema = {
+  withItemType,
+  defineRelations,
+}
 
 export type StoreRawModels = typeof constModels
 

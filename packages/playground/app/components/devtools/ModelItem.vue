@@ -3,7 +3,7 @@ import type { ModelRelation, ResolvedModel } from '@rstore/shared'
 import { codeToHtml } from 'shiki'
 
 const props = defineProps<{
-  item: ResolvedModel<any, any, any>
+  item: ResolvedModel
 }>()
 
 const cache = useCache()

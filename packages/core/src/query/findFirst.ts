@@ -1,4 +1,4 @@
-import { type CustomHookMeta, dedupePromise, type FindFirstOptions, type Model, type ModelDefaults, type ModelList, type QueryResult, type ResolvedModel, type StoreCore, type WrappedItem } from '@rstore/shared'
+import { type CustomHookMeta, dedupePromise, type FindFirstOptions, type Model, type ModelDefaults, type QueryResult, type ResolvedModel, type StoreCore, type StoreSchema, type WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekFirst } from './peekFirst'
@@ -6,12 +6,12 @@ import { peekFirst } from './peekFirst'
 export interface FindFirstParams<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
+  store: StoreCore<TSchema, TModelDefaults>
   meta?: CustomHookMeta
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  findOptions: string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>
+  model: ResolvedModel<TModel, TModelDefaults, TSchema>
+  findOptions: string | number | FindFirstOptions<TModel, TModelDefaults, TSchema>
 }
 
 /**
@@ -20,13 +20,13 @@ export interface FindFirstParams<
 export async function findFirst<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 >({
   store,
   meta,
   model,
   findOptions: keyOrOptions,
-}: FindFirstParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<WrappedItem<TModel, TModelDefaults, TModelList> | null>> {
+}: FindFirstParams<TModel, TModelDefaults, TSchema>): Promise<QueryResult<WrappedItem<TModel, TModelDefaults, TSchema> | null>> {
   if (typeof keyOrOptions === 'object' && keyOrOptions?.dedupe === false) {
     return _findFirst({
       store,
@@ -48,16 +48,16 @@ export async function findFirst<
 async function _findFirst<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TSchema extends StoreSchema,
 >({
   store,
   meta,
   model,
   findOptions: keyOrOptions,
-}: FindFirstParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<WrappedItem<TModel, TModelDefaults, TModelList> | null>> {
+}: FindFirstParams<TModel, TModelDefaults, TSchema>): Promise<QueryResult<WrappedItem<TModel, TModelDefaults, TSchema> | null>> {
   meta ??= {}
 
-  const findOptions: FindFirstOptions<TModel, TModelDefaults, TModelList> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
+  const findOptions: FindFirstOptions<TModel, TModelDefaults, TSchema> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
     ? {
         key: keyOrOptions,
       }
