@@ -132,4 +132,19 @@ describe('cache', () => {
     const items = cache.readItems({ model: mockModel, marker: 'otherMarker' })
     expect(items).toHaveLength(0)
   })
+
+  it('should filter the items', () => {
+    const cache = createCache({ getStore })
+    cache.writeItem({ model: mockModel, key: 1, item: { id: 1, label: 'Meow' }, marker: 'testMarker' })
+    cache.writeItem({ model: mockModel, key: 2, item: { id: 2, label: 'Woof' }, marker: 'testMarker' })
+
+    const items = cache.readItems({ model: mockModel, marker: 'testMarker', filter: item => item.label === 'Meow' })
+    const items2 = cache.readItems({ model: mockModel, marker: 'testMarker', filter: item => item.label === 'Woof' })
+
+    expect(items).toHaveLength(1)
+    expect(items[0]).toEqual({ id: 1, label: 'Meow' })
+
+    expect(items2).toHaveLength(1)
+    expect(items2[0]).toEqual({ id: 2, label: 'Woof' })
+  })
 })

@@ -41,18 +41,31 @@ describe('peekFirst', () => {
   })
 
   it('should return the first item from the cache by filter', () => {
+    const filter = (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '2'
+    let receivedFilter = null
+    mockStore.$cache.readItems = ({ filter }) => {
+      receivedFilter = filter
+      return [{ id: '2', name: 'Test Item 2' }] as any
+    }
     const result = peekFirst({
       store: mockStore,
       model,
       findOptions: {
-        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '2',
+        filter,
       },
     })
 
     expect(result.result).toEqual({ id: '2', name: 'Test Item 2' })
+    expect(receivedFilter).toBe(filter)
   })
 
   it('should return null if no item matches the filter', () => {
+    mockStore.$cache.readItems = ({ filter }) => {
+      if (filter) {
+        return [] as any
+      }
+      return [{ id: '2', name: 'Test Item 2' }] as any
+    }
     const result = peekFirst({
       store: mockStore,
       model,

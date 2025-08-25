@@ -1,4 +1,4 @@
-import type { CustomHookMeta, FindFirstOptions, Model, ModelDefaults, QueryResult, ResolvedModel, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { CustomHookMeta, FindFirstOptions, Model, ModelDefaults, QueryResult, ResolvedModel, ResolvedModelItemBase, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
@@ -56,20 +56,22 @@ export function peekFirst<
       result = store.$cache.readItem({ model, key })
     }
     else if (typeof findOptions?.filter === 'function') {
-      const filterFn = findOptions.filter
+      const filterFn = findOptions.filter as (item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>) => boolean
 
       // Try with first marker first
       result = store.$cache.readItems({
         model,
         marker: force ? undefined : getMarker('first', marker),
-      }).filter(item => filterFn(item))?.[0] ?? null
+        filter: filterFn,
+      })?.[0] ?? null
 
       // Fallback to many marker
       if (!result) {
         result = store.$cache.readItems({
           model,
           marker: getMarker('many', marker),
-        }).filter(item => filterFn(item))?.[0] ?? null
+          filter: filterFn,
+        })?.[0] ?? null
       }
     }
 
@@ -83,11 +85,21 @@ export function peekFirst<
       },
       key,
       findOptions,
-      readItemsFromCache: () => {
+      readItemsFromCache: (options) => {
+        function getFilter() {
+          if (options?.applyFilter === true) {
+            return findOptions?.filter as (item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>) => boolean
+          }
+          else if (typeof options?.applyFilter === 'function') {
+            return options.applyFilter
+          }
+        }
+
         // Try with first marker first
         let items = store.$cache.readItems({
           model,
           marker: force ? undefined : getMarker('first', marker),
+          filter: getFilter(),
         }) ?? []
 
         // Fallback to many marker
@@ -95,6 +107,7 @@ export function peekFirst<
           items = store.$cache.readItems({
             model,
             marker: getMarker('many', marker),
+            filter: getFilter(),
           }) ?? []
         }
         return items
