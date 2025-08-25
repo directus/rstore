@@ -191,7 +191,7 @@ Another important difference is that rstore is based on a normalized cache and i
 
 ### Vue-Promised
 
-[Vue-Promised](https://github.com/posva/vue-promised) is a library to provide low-level utilities to help handle async operations in Vue. It is not a state management library and does not provide any caching or data fetching capabilities. Compared to rstire, it is very minimalistic and does not provide any structure or opinionated way to manage data.
+[Vue-Promised](https://github.com/posva/vue-promised) is a library to provide low-level utilities to help handle async operations in Vue. It is not a state management library and does not provide any caching or data fetching capabilities. Compared to rstore, it is very minimalistic and does not provide any structure or opinionated way to manage data.
 
 ### swrv
 
