@@ -102,7 +102,12 @@ export function wrapItem<
               store,
               model: targetModel,
               findOptions: {
-                filter: foreignItem => foreignItem[targetModelConfig.on] === value,
+                filter: (foreignItem) => {
+                  if (Array.isArray(value)) {
+                    return value.includes(foreignItem[targetModelConfig.on])
+                  }
+                  return foreignItem[targetModelConfig.on] === value
+                },
               },
               force: true,
             }).result
