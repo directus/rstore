@@ -48,7 +48,7 @@
     "@nuxt/test-utils": "^3.17.2",
     "@types/node": "latest",
     "nuxt": "^3.16.0",
-    "typescript": "~5.8.2",
+    "typescript": "catalog:",
     "vitest": "^3.0.9",
     "vue-tsc": "^2.2.8"
   }

@@ -3,3 +3,4 @@ packages:
 
 catalog:
   vitest: ^3.0.7
+  typescript: ^5.9.2

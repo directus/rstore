@@ -39,7 +39,7 @@
     "@standard-schema/spec": "^1.0.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
+    "typescript": "catalog:",
     "unbuild": "^3.2.0",
     "vitest": "catalog:"
   }

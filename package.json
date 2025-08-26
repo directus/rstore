@@ -35,7 +35,7 @@
     "pathe": "^2.0.3",
     "simple-git-hooks": "^2.11.1",
     "tailwindcss": "4.0.7",
-    "typescript": "^5.7.2",
+    "typescript": "catalog:",
     "vitepress": "^1.6.3",
     "vitest": "catalog:",
     "vue": "^3.2.29"

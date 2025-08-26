@@ -44,7 +44,7 @@
     "@vueuse/core": "^12.7.0"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
+    "typescript": "catalog:",
     "unbuild": "^3.2.0",
     "vitest": "catalog:",
     "vue": "^3.2.29"

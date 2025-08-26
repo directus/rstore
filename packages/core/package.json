@@ -39,7 +39,7 @@
     "@rstore/shared": "workspace:^"
   },
   "devDependencies": {
-    "typescript": "^5.7.2",
+    "typescript": "catalog:",
     "unbuild": "^3.2.0",
     "vitest": "catalog:"
   }

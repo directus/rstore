@@ -60,7 +60,7 @@
     "@vueuse/nuxt": "^12.7.0",
     "nuxt": "^3.15.4",
     "shiki": "^3.1.0",
-    "typescript": "~5.7.3",
+    "typescript": "catalog:",
     "vitest": "catalog:",
     "vue-tsc": "^2.2.0"
   }
