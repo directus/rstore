@@ -16,7 +16,7 @@ export function defineItemType<
      * Define a typed model.
      */
     model: <
-      const TModel extends Exactly<Omit<Model<TItem>, '~type'>, TModel>,
+      const TModel extends Exactly<Omit<Model<TItem>, '~type' | '~item'>, TModel>,
     > (model: TModel): TModel & { '~type': 'model', '~item': TItem } => model as any,
   }
 }
@@ -30,7 +30,9 @@ export function withItemType<
   /**
    * Define a typed model.
    */
-  defineModel: <const TModel extends Omit<Model<TItem>, '~type' | '~item'>> (model: TModel) => TModel & {
+  defineModel: <
+    const TModel extends Exactly<Omit<Model<TItem>, '~type' | '~item'>, TModel>,
+  > (model: TModel) => TModel & {
     '~type': undefined
     '~item': TItem
   }
