@@ -1,6 +1,6 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { Model, ModelDefaults, ResolvedModelItem, StoreSchema } from './model'
+import type { Model, ModelByName, ModelDefaults, ModelRelation, RelationsByName, ResolvedModelItem, StoreSchema } from './model'
 
 export interface CustomParams<
   TModel extends Model,
@@ -42,6 +42,40 @@ export interface FindOptions<
  */
 export type FetchPolicy = 'cache-first' | 'cache-and-fetch' | 'fetch-only' | 'cache-only' | 'no-cache'
 
+export type FindOptionsInclude<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TSchema extends StoreSchema,
+> = {
+  [K in keyof TModel['relations']]?:
+  K extends string
+    ? TModel['relations'] extends Record<string, infer TRelation extends ModelRelation>
+      ? TRelation['to'] extends Record<infer TTargetModelName extends string, any>
+        ? ModelByName<TSchema, TTargetModelName> extends infer TTargetModel extends Model
+          ? FindOptionsIncludeItem<TTargetModel, TModelDefaults, TSchema>
+          : never
+        : never
+      : never
+    : never
+} & {
+  [K in keyof NonNullable<RelationsByName<TSchema, TModel['name']>>]?:
+  K extends string
+    ? NonNullable<RelationsByName<TSchema, TModel['name']>>[K] extends infer TRelation extends ModelRelation
+      ? TRelation['to'] extends Record<string, infer TTargetModelData extends {
+        '~model': Model
+      }>
+        ? FindOptionsIncludeItem<TTargetModelData['~model'], TModelDefaults, TSchema>
+        : never
+      : never
+    : never
+}
+
+export type FindOptionsIncludeItem<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TSchema extends StoreSchema,
+> = boolean | FindOptionsInclude<TModel, TModelDefaults, TSchema>
+
 export interface FindOptionsBase<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
@@ -62,9 +96,7 @@ export interface FindOptionsBase<
   /**
    * Include the related items.
    */
-  include?: {
-    [TKey in keyof TModel['relations']]?: boolean
-  }
+  include?: FindOptionsInclude<TModel, TModelDefaults, TSchema>
   /**
    * Fetch policy for the query.
    *
