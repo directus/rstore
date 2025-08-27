@@ -9,7 +9,7 @@ export const defaultIsInstanceOf: DefaultIsInstanceOf = model => item => item.__
  * @deprecated Use `withItemType().defineModel()` instead (or `RStoreSchema.withItemType().defineModel()` in Nuxt).
  */
 export function defineItemType<
-  TItem extends Record<string, any>,
+  TItem,
 >() {
   return {
     /**
@@ -25,7 +25,7 @@ export function defineItemType<
  * Allow typing the model item type thanks to currying.
  */
 export function withItemType<
-  TItem extends Record<string, any>,
+  TItem,
 >(): {
   /**
    * Define a typed model.
@@ -49,7 +49,10 @@ export function defineDataModel(model: Model): Model {
   return model
 }
 
-export function defineRelations<TModel extends Model, const TRelations extends Record<string, ModelRelation<TModel>>>(
+export function defineRelations<
+  TModel extends Model,
+  const TRelations extends Exactly<Record<string, ModelRelation<TModel>>, TRelations>,
+>(
   model: TModel,
   relations: (payload: {
     model: <TTargetModel extends Model, T extends ModelRelationReference<TModel, TTargetModel>> (model: TTargetModel, relation: T) => { [key in TTargetModel['name']]: T & { '~model': TTargetModel } }

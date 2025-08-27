@@ -152,7 +152,7 @@ export interface HookDefinitions<
       meta: CustomHookMeta
       model: ResolvedModel<TModel, TModelDefaults, TSchema>
       key?: string | number
-      findOptions: FindOptions<TModel, TModelDefaults, TSchema> & NonNullable<FindOptions<TModel, TModelDefaults, TSchema>['include']>
+      findOptions: FindOptions<TModel, TModelDefaults, TSchema> & { include: NonNullable<FindOptions<TModel, TModelDefaults, TSchema>['include']> }
       many: boolean
       getResult: () => ResolvedModelItemBase<TModel, TModelDefaults, TSchema>
     }

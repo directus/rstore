@@ -17,7 +17,7 @@ export interface ModelSchemas<
 }
 
 export interface Model<
-  TItem extends Record<string, any> = Record<string, any>,
+  TItem = any,
   TComputed extends Record<string, any> = Record<string, any>,
   TSchemas extends ModelSchemas = ModelSchemas,
 > {
@@ -51,7 +51,7 @@ export interface Model<
   /**
    * Relations to other models.
    *
-   * It's recommended to use `defineRelations` instead.
+   * @deprecated It's recommended to use `defineRelations` instead.
    */
   'relations'?: Record<string, ModelRelation>
 
@@ -87,8 +87,6 @@ export interface Model<
    * This is useful when you have multiple data sources.
    */
   'scopeId'?: string
-
-  'state'?: () => Record<string, any>
 
   'meta'?: CustomModelMeta
 

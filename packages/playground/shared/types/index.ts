@@ -16,6 +16,14 @@ declare module '@rstore/vue' {
     email?: string
   }
 
+  export interface CustomParams<
+    TModel extends Model,
+    TModelDefaults extends ModelDefaults,
+    TSchema extends StoreSchema,
+  > {
+    hello?: string
+  }
+
   export interface CustomHookMeta {
     storeHistoryItem?: Pick<StoreHistoryItem, 'started'>
   }

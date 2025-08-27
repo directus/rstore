@@ -1,4 +1,5 @@
-import { type CustomHookMeta, dedupePromise, type FindFirstOptions, type Model, type ModelDefaults, type QueryResult, type ResolvedModel, type StoreCore, type StoreSchema, type WrappedItem } from '@rstore/shared'
+import type { CustomHookMeta, FindFirstOptions, FindOptions, Model, ModelDefaults, QueryResult, ResolvedModel, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekFirst } from './peekFirst'
@@ -149,7 +150,7 @@ async function _findFirst<
       meta,
       model,
       key: findOptions.key,
-      findOptions,
+      findOptions: findOptions as FindOptions<TModel, TModelDefaults, TSchema> & { include: NonNullable<FindOptions<TModel, TModelDefaults, TSchema>['include']> },
       many: false,
       getResult: () => result,
     })

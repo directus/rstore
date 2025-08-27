@@ -1,6 +1,6 @@
 {
   "extends": "./.nuxt/tsconfig.json",
   "compilerOptions": {
-    "noErrorTruncation": true
+    // "noErrorTruncation": true
   }
 }

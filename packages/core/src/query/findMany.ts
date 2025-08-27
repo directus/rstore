@@ -1,4 +1,5 @@
-import { type CustomHookMeta, dedupePromise, type FindManyOptions, type Model, type ModelDefaults, type QueryResult, type ResolvedModel, type StoreCore, type StoreSchema, type WrappedItem, type WriteItem } from '@rstore/shared'
+import type { CustomHookMeta, FindManyOptions, FindOptions, Model, ModelDefaults, QueryResult, ResolvedModel, StoreCore, StoreSchema, WrappedItem, WriteItem } from '@rstore/shared'
+import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekMany } from './peekMany'
@@ -148,7 +149,7 @@ async function _findMany<
       store,
       meta,
       model,
-      findOptions,
+      findOptions: findOptions as FindOptions<TModel, TModelDefaults, TSchema> & { include: NonNullable<FindOptions<TModel, TModelDefaults, TSchema>['include']> },
       many: true,
       getResult: () => result,
     })

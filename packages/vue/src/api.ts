@@ -1,4 +1,4 @@
-import type { CustomHookMeta, Exactly, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueLiveQueryReturn } from './live'
 import type { VueQueryReturn } from './query'
@@ -33,10 +33,8 @@ export interface VueModelApi<
   /**
    * Create a reactive query for the first item that matches the given options.
    */
-  queryFirst: <
-    const TOptions extends string | number | Exactly<FindFirstOptions<TModel, TModelDefaults, TSchema>, TOptions> | { enabled: false },
-  > (
-    options: MaybeRefOrGetter<TOptions>,
+  queryFirst: (
+    options: MaybeRefOrGetter<string | number | FindFirstOptions<TModel, TModelDefaults, TSchema> | { enabled: false }>,
   ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, TItem | null>>
 
   /**
@@ -56,10 +54,8 @@ export interface VueModelApi<
   /**
    * Create a reactive query for all items that match the given options.
    */
-  queryMany: <
-    const TOptions extends Exactly<FindManyOptions<TModel, TModelDefaults, TSchema>, TOptions> | undefined | { enabled: false },
-  > (
-    options?: MaybeRefOrGetter<TOptions>,
+  queryMany: (
+    options?: MaybeRefOrGetter<FindManyOptions<TModel, TModelDefaults, TSchema> | undefined | { enabled: false }>,
   ) => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, Array<TItem>>>
 
   /**
