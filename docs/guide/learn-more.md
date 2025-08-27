@@ -47,13 +47,13 @@ rstore design makes it easy to add support for real-time updates and collaborati
 
 The reactive normalized cache in rstore is a key feature that ensures your application's data is always consistent and up-to-date. This cache automatically normalizes the data, meaning it stores data in a structured format that eliminates redundancy and allows maintaining relationships between different items.
 
-The cache is also reactive, meaning reading from the cache in a `computed` will always keep the components updated. In fact, each time you use `store.Todo.queryMany()` you get a computed ref that reads from the cache.
+The cache is also reactive, meaning reading from the cache in a `computed` will always keep the components updated. In fact, each time you use `store.Todo.query()` you get a computed ref that reads from the cache.
 
 The reactive normalized cache in rstore offers several benefits.
 - Consistency is maintained by normalizing the data, ensuring a single source of truth for each item, which prevents duplication and inconsistencies.
 - Reactivity is another advantage, as the cache automatically updates any part of your application that depends on the data whenever changes occur, keeping your UI in sync with the latest state.
 - Efficiency is achieved through the structured format of normalized data, allowing for quicker and less overhead-intensive queries and updates.
-- Co-locating the data requirements with the components that use them is a powerful pattern. By using the `queryMany` and `queryFirst` composables, you can easily fetch and display data in your components without worrying about deduplicating or synchronizing with other components.
+- Co-locating the data requirements with the components that use them is a powerful pattern. By using the `query` composable, you can easily fetch and display data in your components without worrying about deduplicating or synchronizing with other components.
 
 ![schema of rstore cache](./img/rstore-cache-dark.svg){.dark-only}{.small}
 ![schema of rstore cache](./img/rstore-cache.svg){.light-only}{.small}

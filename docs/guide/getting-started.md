@@ -258,7 +258,7 @@ import { useStore } from '@/rstore'
 
 const store = useStore()
 
-const { data: todos } = store.todos.queryMany()
+const { data: todos } = store.todos.query(q => q.many())
 </script>
 
 <template>
@@ -426,7 +426,7 @@ In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and 
 <script setup>
 const store = useStore()
 
-const { data: todos } = await store.todos.queryMany()
+const { data: todos } = await store.todos.query(q => q.many())
 </script>
 
 <template>
@@ -491,7 +491,7 @@ You can already use the store in your components without any additional configur
 <script setup>
 const store = useStore()
 
-const { data: todos } = await store.todos.queryMany()
+const { data: todos } = await store.todos.query(q => q.many())
 </script>
 
 <template>

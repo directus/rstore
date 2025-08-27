@@ -21,7 +21,8 @@ declare module '@rstore/vue' {
     TModelDefaults extends ModelDefaults,
     TSchema extends StoreSchema,
   > {
-    hello?: string
+    /** Sent to the server */
+    filter?: string
   }
 
   export interface CustomHookMeta {

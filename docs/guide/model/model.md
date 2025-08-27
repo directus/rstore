@@ -199,7 +199,7 @@ You can then use the computed field in your application just like any other fiel
 ```ts
 const store = useStore()
 
-const { data: user } = store.users.queryFirst('some-id')
+const { data: user } = store.users.query(q => q.first('some-id'))
 
 watchEffect(() => {
   console.log(user.value?.fullName) // This is a computed field

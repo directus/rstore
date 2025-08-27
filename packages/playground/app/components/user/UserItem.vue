@@ -5,7 +5,7 @@ const props = defineProps<{
 
 const store = useStore()
 
-const { data: user } = await store.User.queryFirst(props.id)
+const { data: user } = await store.User.query(q => q.first(props.id))
 </script>
 
 <template>

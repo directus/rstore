@@ -5,9 +5,9 @@ const props = defineProps<{
 
 const store = useStore()
 
-const { data: collections } = await store.DataCollection.queryMany({
+const { data: collections } = await store.DataCollection.query(q => q.many({
   filter: c => c.dataSourceId === props.source.id,
-})
+}))
 </script>
 
 <template>

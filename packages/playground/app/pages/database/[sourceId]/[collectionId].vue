@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 const route = useRoute()
 const store = useStore()
-const { data: collection } = await store.DataCollection.queryFirst(() => ({
+const { data: collection } = await store.DataCollection.query(q => q.first({
   filter: c => c.id === route.params.collectionId,
 }))
 </script>

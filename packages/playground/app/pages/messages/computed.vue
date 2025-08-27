@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 const store = useStore()
 
-const { data: messages } = await store.Message.queryMany()
+const { data: messages } = await store.Message.query(q => q.many())
 </script>
 
 <template>

@@ -8,13 +8,13 @@ export const useAuth = defineRstoreModule(() => {
     },
   })
 
-  const currentUser = store.User.queryFirst(() => state.currentUserKey
+  const currentUser = store.User.query(q => q.first(state.currentUserKey
     ? {
         key: state.currentUserKey,
       }
     : {
         enabled: false,
-      })
+      }))
 
   const requestFetch = useRequestFetch()
 

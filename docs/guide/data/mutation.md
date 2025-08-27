@@ -44,10 +44,10 @@ if (todo) {
 }
 ```
 
-This also works with the reactive `queryFirst` and `queryMany` methods:
+This also works with the reactive `query` and `liveQuery` methods:
 
 ```ts
-const { data: todo } = await store.todos.queryFirst('some-id')
+const { data: todo } = await store.todos.query(q => q.first('some-id'))
 
 async function toggle() {
   if (todo.value) {

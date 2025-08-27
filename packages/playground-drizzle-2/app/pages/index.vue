@@ -3,7 +3,7 @@ const store = useStore()
 
 const email = ref('')
 
-const { data: users } = await store.users.queryMany(() => ({
+const { data: users } = await store.users.query(q => q.many({
   params: {
     where: email.value ? eq('email', email.value) : undefined,
   },

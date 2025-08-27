@@ -6,7 +6,7 @@ const props = defineProps<{
 
 const store = useStore()
 
-const { data: message } = await store.Message.queryFirst(props.id)
+const { data: message } = await store.Message.query(q => q.first(props.id))
 
 async function updateText() {
   const { faker } = await import('@faker-js/faker')

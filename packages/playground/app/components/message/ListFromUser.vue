@@ -5,7 +5,7 @@ const props = defineProps<{
 
 const store = useStore()
 
-const { data: userWithMessages } = await store.User.queryFirst(() => ({
+const { data: userWithMessages } = await store.User.query(q => q.first({
   key: props.userId,
   include: {
     receivedMessages: true,

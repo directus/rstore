@@ -30,7 +30,7 @@ export interface VueCreateQueryOptions<
   store: VueStore<TSchema, TModelDefaults>
   fetchMethod: (options: TOptions | undefined, meta: CustomHookMeta) => Promise<TResult>
   cacheMethod: (options: TOptions | undefined, meta: CustomHookMeta) => TResult
-  defaultValue: TResult
+  defaultValue: MaybeRefOrGetter<TResult>
   options?: MaybeRefOrGetter<TOptions | undefined | { enabled: boolean }>
 }
 
@@ -62,7 +62,7 @@ export function createQuery<
 
   let fetchPolicy = store.$getFetchPolicy(getOptions()?.fetchPolicy)
 
-  const result: Ref<TResult> = shallowRef(defaultValue)
+  const result: Ref<TResult> = shallowRef(toValue(defaultValue))
   const meta = ref<CustomHookMeta>({})
 
   // @TODO include nested relations in no-cache results

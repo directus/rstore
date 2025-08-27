@@ -96,7 +96,7 @@ You can already use the store in your components without any additional configur
 <script setup>
 const store = useStore()
 
-const { data: todos } = await store.todos.queryMany()
+const { data: todos } = await store.todos.query(q => q.many())
 </script>
 
 <template>
@@ -124,7 +124,7 @@ const store = useStore()
 
 const email = ref('')
 
-const { data: users } = await store.users.queryMany(() => ({
+const { data: users } = await store.users.query(q => q.many({
   where: email.value ? eq('email', email.value) : undefined,
 }))
 </script>
@@ -142,7 +142,7 @@ You can use the `include` option to include related models in the query. [Learn 
 <script lang="ts" setup>
 const store = useStore()
 
-const { data: users } = await store.users.queryMany(() => ({
+const { data: users } = await store.users.query(q => q.many({
   include: {
     posts: true,
   },

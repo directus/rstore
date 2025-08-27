@@ -3,9 +3,9 @@ const store = useStore()
 
 // Load all messages
 const queries = await Promise.all([
-  store.DataSource.queryMany(),
-  store.DataCollection.queryMany(),
-  store.DataField.queryMany(),
+  store.DataSource.query(q => q.many()),
+  store.DataCollection.query(q => q.many()),
+  store.DataField.query(q => q.many()),
 ])
 
 async function refresh() {

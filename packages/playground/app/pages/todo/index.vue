@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 const store = useStore()
 
-const { data: todos, refresh } = await store.Todo.queryMany()
+const { data: todos, refresh } = await store.Todo.query(q => q.many())
 
 const createTodo = store.Todo.createForm()
 const createInput = useTemplateRef('input')

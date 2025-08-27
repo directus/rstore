@@ -12,15 +12,15 @@ const store = await createStore({
   ],
   plugins: [],
 })
-const { data: todos } = store.Todo.queryMany()
-const { data: users } = store.users.queryMany()
+const { data: todos } = store.Todo.query(q => q.many())
+const { data: users } = store.users.query(q => q.many())
 ```
 
 ## Query composables
 
 The query composables are the recommended way to fetch data from the server. They are designed to be used in a Vue component and return a reactive result to be used in the components.
 
-The `queryFirst` and `queryMany` composables return an object with the following properties:
+The `query` and `liveQuery` composables return an object with the following properties:
 
 - `data`: a ref that contains the data.
 
@@ -38,25 +38,37 @@ The composables also return a promise so they can be used with async setup.
 <script setup>
 const store = useStore()
 // Plays nice with Nuxt SSR!
-const { data: todos } = await store.Todo.queryMany()
+const { data: todos } = await store.Todo.query(q => q.many())
 </script>
 ```
 
 ### Query first
 
-Composable function that reads the first item that matches the key or the filter in the cache and fetches it if not found.
+With the `first` query buillder method, the `query` function can be used the first item that matches the key or the filter in the cache and fetches it if not found.
+
+```ts
+const { data: todo } = store.Todo.query(q => q.first('some-key'))
+```
 
 ```ts
 const someKey = ref('some-key')
 
-const { data: todo } = store.Todo.queryFirst(someKey)
+const { data: todo } = store.Todo.query(q => q.first(someKey))
 ```
-With filtering:
+
+```ts
+const route = useRoute()
+
+const { data: todo } = store.Todo.query(q =>
+  q.first(route.params.someKey))
+```
+
+Example with filtering:
 
 ```ts
 const email = ref('cat@acme.com')
 
-const { data: someUsers } = store.User.queryFirst(() => ({
+const { data: someUsers } = store.User.query(q => q.first({
   filter: item => item.email === email.value,
   params: {
     email: email.value,
@@ -74,13 +86,15 @@ We can also create our own convention for the `params` and `filter`. For example
 
 ### Query many
 
-Composable function that reads all items that match the (optional) filter in the cache and fetches them if not found.
+With the `many` query buillder method, the `query` function can be used to find all items that match the (optional) filter in the cache or fetches them if not found.
 
 ```ts
-const { data: todos } = store.Todo.queryMany()
+const { data: todos } = store.Todo.query(q => q.many()) // All todos
+```
 
+```ts
 const email = ref('@acme.com')
-const { data: someUsers } = store.User.queryMany(() => ({
+const { data: someUsers } = store.User.query(q => q.many({
   filter: item => item.email.endsWith(email.value),
   params: {
     email: {
@@ -97,7 +111,7 @@ You can disable a query by returning the `{ enabled: false }` flag as the find o
 ```ts
 const enabled = ref(false)
 
-const { data: todos } = store.Todo.queryMany(() => ({
+const { data: todos } = store.Todo.query(q => q.many({
   enabled: enabled.value,
 }))
 ```
@@ -105,9 +119,9 @@ const { data: todos } = store.Todo.queryMany(() => ({
 ```ts
 const enabled = ref(false)
 
-const { data: todos } = store.Todo.queryFirst(
-  () => enabled.value ? 'some-id' : { enabled: false }
-)
+const { data: todo } = store.Todo.query(q => q.first(
+  enabled.value ? 'some-id' : { enabled: false }
+))
 ```
 
 This syntax is useful when you use TS as it will allow guarding against nullish values at the same time:
@@ -115,31 +129,34 @@ This syntax is useful when you use TS as it will allow guarding against nullish 
 ```ts
 const someItem = ref<Record<string, any> | null>(null)
 
-const { data: parent } = store.Item.queryFirst(() => someItem.value
-  ? {
-      params: {
-        // `someItem.value` is not nullish here
-        id: someItem.value.parentId,
+const { data: parent } = store.Item.query(q => q.first(
+  someItem.value
+    ? {
+        params: {
+          // `someItem.value` is not nullish here
+          id: someItem.value.parentId,
+        }
       }
-    }
-  : { enabled: false }
-)
+    : { enabled: false }
+))
 ```
 
 ### Dependent queries
 
 ```ts
 // Get the user
-const { data: user } = store.User.queryFirst({ /* ... */ })
+const { data: user } = store.User.query({ /* ... */ })
 
 // Then get the user's projects
-const { data: projects } = store.Project.queryMany(() => user.value
-  ? {
-      params: {
-        userId: user.value.id,
+const { data: projects } = store.Project.query(q => q.many(
+  user.value
+    ? {
+        params: {
+          userId: user.value.id,
+        }
       }
-    }
-  : { enabled: false })
+    : { enabled: false }
+))
 ```
 
 ## Cache read
@@ -160,6 +177,14 @@ const result = store.User.peekFirst({
 })
 ```
 
+It can be used within a computed property or a watcher to reactively read an item from the cache:
+
+```ts
+const someKey = ref('some-key')
+
+const cachedTodo = computed(() => store.Todo.peekFirst(someKey.value))
+```
+
 ### Peek many
 
 Read all items that match the (optional) filter in the cache without doing any fetching.
@@ -172,19 +197,29 @@ const someUsers = store.User.peekMany({
 })
 ```
 
+It can be used within a computed property or a watcher to reactively read items from the cache:
+
+```ts
+const email = ref('@acme.com')
+
+const cachedUsers = computed(() => store.User.peekMany({
+  filter: item => item.email.endsWith(email.value),
+}))
+```
+
 ## Simple queries
 
 ### Find first
 
-Find the first item that matches the key or the filter in the cache or fetches it if not found.
+Find the first item that matches the key or the filter in the cache or fetches it if not found. The result is **not** reactive - the method is intended to be used for one-off queries. If you need the result to be reactive, use the `query` or `liveQuery` composables instead.
 
 ```ts
-const todo = store.Todo.findFirst('some-key')
+const todo = await store.Todo.findFirst('some-key')
 ```
 With filtering:
 
 ```ts
-const someUsers = store.User.findFirst({
+const someUsers = await store.User.findFirst({
   filter: item => item.email === 'cat@acme.com',
   params: {
     email: 'cat@acme.com',
@@ -194,12 +229,12 @@ const someUsers = store.User.findFirst({
 
 ### Find many
 
-Find all items that match the (optional) filter in the cache or fetches them if not found.
+Find all items that match the (optional) filter in the cache or fetches them if not found. The result is **not** reactive - the method is intended to be used for one-off queries. If you need the result to be reactive, use the `query` or `liveQuery` composables instead.
 
 ```ts
-const todos = store.Todo.findMany()
+const todos = await store.Todo.findMany()
 
-const someUsers = store.User.findMany({
+const someUsers = await store.User.findMany({
   filter: item => item.email.endsWith('@acme.com'),
   params: {
     email: {
@@ -234,9 +269,9 @@ const store = createStore({
 The fetch policy can be set per query using the `fetchPolicy` option:
 
 ```ts
-const { data: todos } = store.Todo.queryMany({
+const { data: todos } = store.Todo.query(q => q.many({
   fetchPolicy: 'fetch-only',
-})
+}))
 ```
 
 ### Possible fetch policies
@@ -249,7 +284,7 @@ const { data: todos } = store.Todo.queryMany({
 
 ## Items list
 
-Usually we write list item components that are used to display a list of items. It is recommended to only pass the key to the list item component and then use `queryFirst` to fetch the data in the list item component. By default the fetch policy is `cache-first`, so the data will be red from the cache in the item component and no unnecessary requests will be made for each items.
+Usually we write list item components that are used to display a list of items. It is recommended to only pass the key to the list item component and then use `query` to fetch the data in the list item component. By default the fetch policy is `cache-first`, so the data will be red from the cache in the item component and no unnecessary requests will be made for each items.
 
 The benefits are that the data is co-located with the component that uses it and there is no need to specify the types of the item prop again (usually a simple `id: string | number` is enough). The item component is also easier to potentially reuse in totally different contexts.
 
@@ -258,7 +293,7 @@ The benefits are that the data is co-located with the component that uses it and
 ```vue [TodoList.vue]
 <script lang="ts" setup>
 const store = useStore()
-const { data: todos } = await store.Todo.queryMany()
+const { data: todos } = await store.Todo.query(q => q.many())
 </script>
 
 <template>
@@ -280,7 +315,7 @@ const props = defineProps<{
 
 const store = useStore()
 // No additional request is made here, the data is read from the cache
-const { data: todo } = await store.Todo.queryFirst(props.id)
+const { data: todo } = await store.Todo.query(q => q.first(props.id))
 // Enjoy inferred types here too!
 </script>
 ```
@@ -297,7 +332,7 @@ The best of both worlds! You can co-locate the queries with the components that 
 <script lang="ts" setup>
 const store = useStore()
 // The query is co-located with the component, not in a store somewhere else
-const { data: user } = await store.User.queryFirst('user-id')
+const { data: user } = await store.User.query(q => q.first('user-id'))
 </script>
 
 <template>
@@ -311,7 +346,7 @@ const { data: user } = await store.User.queryFirst('user-id')
 <script lang="ts" setup>
 const store = useStore()
 // The centralized cache ensures that the data is up to date here too
-const { data: user } = await store.User.queryFirst('user-id')
+const { data: user } = await store.User.query(q => q.first('user-id'))
 </script>
 
 <template>
@@ -329,11 +364,15 @@ const { data: user } = await store.User.queryFirst('user-id')
 You can pass an `include` option to the query to fetch related data. The `include` option is an object where the keys are the names of the relations. Learn more about how to define relations [here](../model/relations.md).
 
 ```ts
-const { data: comments } = store.comments.queryMany({
+const { data: comments } = store.comments.query(q => q.many({
   include: {
     author: true,
+    relatedPost: { // Nested relation
+      author: true,
+      topComments: true,
+    },
   },
-})
+}))
 ```
 
 The cache will automatically resolve the relations as soon as the data is available in the cache.

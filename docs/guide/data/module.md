@@ -80,13 +80,13 @@ const { state, resolve } = createModule(store, {
   },
 })
 
-const currentUser = store.User.queryFirst(() => state.currentUserKey
+const currentUser = store.User.query(q => q.first(state.currentUserKey
   ? {
       key: state.currentUserKey,
     }
   : {
       enabled: false,
-    })
+    }))
 
 return resolve({
   currentUser,
@@ -112,7 +112,7 @@ const { state, resolve, onResolve, defineMutation } = createModule(store, {
   },
 })
 
-const currentUser = store.User.queryFirst(() => { /* ... */ })
+const currentUser = store.User.query(q => q.first({ /* ... */ }))
 
 const requestFetch = useRequestFetch()
 

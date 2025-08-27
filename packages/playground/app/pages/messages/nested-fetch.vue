@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 const store = useStore()
 
-const { data: users } = await store.User.queryMany()
+const { data: users } = await store.User.query(q => q.many())
 
 const selectedUser = shallowRef<typeof users.value[number] | null>(users.value?.[0] ?? null)
 </script>

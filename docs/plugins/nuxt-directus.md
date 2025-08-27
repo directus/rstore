@@ -44,7 +44,7 @@ export default defineNuxtConfig({
 const store = useStore()
 
 const filter = ref<'all' | 'unfinished' | 'finished'>('all')
-const { data: todos } = await store.Todos.queryMany(() => ({
+const { data: todos } = await store.Todos.query(q => q.many({
   filter: filter.value === 'all'
     ? undefined
     : {

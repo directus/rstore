@@ -1,3 +1,5 @@
+import { z } from 'zod'
+
 const DataSourceModel = RStoreSchema.withItemType<DataSource>().defineModel({
   name: 'DataSource',
   meta: {
@@ -16,7 +18,26 @@ const DataFieldModel = RStoreSchema.withItemType<DataField>().defineModel({
   name: 'DataField',
   meta: {
     path: 'dataFields',
+    // meow: true,
   },
+  // meow: true,
+  getKey: item => item.id,
+  // isInstanceOf: _item => true,
+  computed: {
+    foo: item => `Field: ${item.name}`,
+  },
+  fields: {
+    name: {
+      parse: (value: any) => String(value).toUpperCase(),
+      serialize: (value: string) => value.toLowerCase(),
+    },
+    // meow: 'meow',
+  },
+  formSchema: {
+    create: z.object({}),
+    update: z.object({}),
+  },
+  // scopeId: 'datasource-1',
   // relations: {
   //   collection: {
   //     to: {

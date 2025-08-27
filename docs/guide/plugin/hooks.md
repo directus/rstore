@@ -307,11 +307,11 @@ const commentModel = defineDataModel({
 Example query:
 
 ```ts
-const { data: comments } = store.comments.queryMany({
+const { data: comments } = store.comments.query(q => q.many({
   include: {
     author: true,
   },
-})
+}))
 ```
 
 Example that uses `findMany` to fetch the relations:
@@ -369,7 +369,7 @@ hook('fetchRelations', async (payload) => {
 
 ## Custom Cache filtering
 
-By default rstore doesn't know how to filter the cache based on the parameters passed to the queries. That's why you need to also pass a `filter` function to the `findOptions` object for `queryFirst`, `queryMany` and [the other ones](../data/query.md).
+By default rstore doesn't know how to filter the cache based on the parameters passed to the queries. That's why you need to also pass a `filter` function to the `findOptions` object for `query` and [the other ones](../data/query.md).
 
 However, it is possible to automatically apply a filtering logic depending on the parameters used in your project with the `cacheFilterFirst` and `cacheFilterMany` hooks.
 
@@ -475,7 +475,7 @@ Before:
 
 ```ts{3-8}
 const email = ref('cat@acme.com')
-const { data: user } = store.users.queryFirst(() => ({
+const { data: user } = store.users.query(q => q.first({
   // This is used to filter the data in the cache
   filter: item => item.email === email.value,
   params: {
@@ -489,7 +489,7 @@ After:
 
 ```ts{3-5}
 const email = ref('cat@acme.com')
-const { data: user } = store.users.queryFirst(() => ({
+const { data: user } = store.users.query(q => q.first({
   // This is used to filter the data in the cache
   // and to fetch the data from the server
   filter: { email: email.value },
@@ -614,7 +614,7 @@ Before:
 
 ```ts{3-8}
 const email = ref('cat@acme.com')
-const { data: users } = store.users.queryMany(() => ({
+const { data: users } = store.users.query(q => q.many({
   // This is used to filter the data in the cache
   filter: item => item.email === email.value,
   params: {
@@ -628,7 +628,7 @@ After:
 
 ```ts{3-5}
 const email = ref('cat@acme.com')
-const { data: users } = store.users.queryMany(() => ({
+const { data: users } = store.users.query(q => q.many({
   // This is used to filter the data in the cache
   // and to fetch the data from the server
   filter: { email: email.value },

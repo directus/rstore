@@ -3,7 +3,7 @@ const store = useStore()
 
 const email = ref('user1@acme.com')
 
-const { data: user } = await store.User.queryFirst(() => ({
+const { data: user } = await store.User.query(q => q.first({
   filter: item => item.email === email.value,
   params: {
     filter: `email:${email.value}`,
