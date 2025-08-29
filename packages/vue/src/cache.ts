@@ -52,12 +52,13 @@ export function createCache<
     readItem({ model, key }) {
       return getWrappedItem(model, state.value[model.name]?.[key])
     },
-    readItems({ model, marker, filter }) {
+    readItems({ model, marker, filter, limit }) {
       if (marker && !state.value._markers?.[marker]) {
         return []
       }
       const data: Array<ResolvedModelItemBase<any, any, any>> = Object.values(state.value[model.name] ?? {})
       const result: Array<WrappedItem<any, any, any>> = []
+      let count = 0
       for (const item of data) {
         if (item) {
           if (filter && !filter(item)) {
@@ -66,6 +67,10 @@ export function createCache<
           const wrappedItem = getWrappedItem(model, item)
           if (wrappedItem) {
             result.push(wrappedItem)
+            count++
+            if (limit != null && count >= limit) {
+              break
+            }
           }
         }
       }

@@ -65,6 +65,10 @@ export interface Cache<
      * Filter the items to include.
      */
     filter?: (item: WrappedItem<TModel, TModelDefaults, TSchema>) => boolean
+    /**
+     * Limit the number of items returned.
+     */
+    limit?: number
   }) => Array<WrappedItem<TModel, TModelDefaults, TSchema>>
 
   writeItems: <TModel extends Model = Model>(params: {

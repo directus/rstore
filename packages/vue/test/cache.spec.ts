@@ -147,4 +147,27 @@ describe('cache', () => {
     expect(items2).toHaveLength(1)
     expect(items2[0]).toEqual({ id: 2, label: 'Woof' })
   })
+
+  it('should limit the number of items', () => {
+    const cache = createCache({ getStore })
+    cache.writeItem({ model: mockModel, key: 1, item: { id: 1, label: 'Item 1' }, marker: 'testMarker' })
+    cache.writeItem({ model: mockModel, key: 2, item: { id: 2, label: 'Item 2' }, marker: 'testMarker' })
+    cache.writeItem({ model: mockModel, key: 3, item: { id: 3, label: 'Item 3' }, marker: 'testMarker' })
+
+    const items = cache.readItems({ model: mockModel, marker: 'testMarker', limit: 2 })
+    expect(items).toHaveLength(2)
+    expect(items[0]).toEqual({ id: 1, label: 'Item 1' })
+    expect(items[1]).toEqual({ id: 2, label: 'Item 2' })
+  })
+
+  it('should filter and limit the items', () => {
+    const cache = createCache({ getStore })
+    cache.writeItem({ model: mockModel, key: 1, item: { id: 1, label: 'Meow' }, marker: 'testMarker' })
+    cache.writeItem({ model: mockModel, key: 2, item: { id: 2, label: 'Woof' }, marker: 'testMarker' })
+    cache.writeItem({ model: mockModel, key: 3, item: { id: 3, label: 'Meow' }, marker: 'testMarker' })
+
+    const items = cache.readItems({ model: mockModel, marker: 'testMarker', filter: item => item.label === 'Meow', limit: 1 })
+    expect(items).toHaveLength(1)
+    expect(items[0]).toEqual({ id: 1, label: 'Meow' })
+  })
 })
