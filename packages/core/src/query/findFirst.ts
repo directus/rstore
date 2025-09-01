@@ -141,6 +141,8 @@ async function _findFirst<
           })
         }
       }
+
+      result = store.$cache.wrapItem({ model, item: result })
     }
   }
 

@@ -98,4 +98,9 @@ export interface Cache<
   clearModel: (params: {
     model: ResolvedModel<Model, ModelDefaults, StoreSchema>
   }) => void
+
+  wrapItem: <TModel extends Model = Model>(params: {
+    model: ResolvedModel<TModel, TModelDefaults, TSchema>
+    item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>
+  }) => WrappedItem<TModel, TModelDefaults, TSchema>
 }

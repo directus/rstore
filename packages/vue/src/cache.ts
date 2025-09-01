@@ -49,6 +49,9 @@ export function createCache<
   }
 
   return {
+    wrapItem({ model, item }) {
+      return getWrappedItem(model, item)!
+    },
     readItem({ model, key }) {
       return getWrappedItem(model, state.value[model.name]?.[key])
     },

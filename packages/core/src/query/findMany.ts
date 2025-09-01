@@ -1,4 +1,4 @@
-import type { CustomHookMeta, FindManyOptions, FindOptions, Model, ModelDefaults, QueryResult, ResolvedModel, StoreCore, StoreSchema, WrappedItem, WriteItem } from '@rstore/shared'
+import type { CustomHookMeta, FindManyOptions, FindOptions, Model, ModelDefaults, QueryResult, ResolvedModel, ResolvedModelItemBase, StoreCore, StoreSchema, WrappedItem, WriteItem } from '@rstore/shared'
 import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
@@ -153,6 +153,10 @@ async function _findMany<
       many: true,
       getResult: () => result,
     })
+  }
+
+  if (result?.length) {
+    result = result.map((item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>) => store.$cache.wrapItem({ model, item }))
   }
 
   return {
