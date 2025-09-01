@@ -51,20 +51,10 @@ createTodo.$onSuccess(() => {
       </UButtonGroup>
     </UForm>
 
-    <TodoItem
-      v-for="{ id } in todos"
-      :id
-      :key="id"
-    />
-
-    <div class="mt-2 opacity-50 text-center">
-      {{ todos.length }} item{{ todos.length !== 1 ? 's' : '' }}
-    </div>
+    <div>{{ todos.length }}</div>
 
     <div v-if="!todos.length" class="text-center text-gray-500 p-12">
       Nothing here yet
     </div>
   </div>
-
-  <Output :data="todos" title="todos" />
 </template>

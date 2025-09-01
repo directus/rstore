@@ -2,7 +2,7 @@ import type { Model, ModelDefaults, ResolvedModel, ResolvedModelItem, StandardSc
 import type { VueModelApi } from './api'
 import type { VueStore } from './store'
 import { peekFirst, peekMany } from '@rstore/core'
-import { markRaw } from 'vue'
+import { markRaw, type Ref } from 'vue'
 
 export interface WrapItemOptions<
   TModel extends Model,
@@ -11,7 +11,8 @@ export interface WrapItemOptions<
 > {
   store: VueStore<TSchema, TModelDefaults>
   model: ResolvedModel<TModel, TModelDefaults, TSchema>
-  item: ResolvedModelItem<TModel, TModelDefaults, TSchema>
+  item: Ref<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+  metadata: WrappedItemMetadata<TModel, TModelDefaults, TSchema>
 }
 
 export function wrapItem<
@@ -22,12 +23,13 @@ export function wrapItem<
   store,
   model,
   item,
+  metadata,
 }: WrapItemOptions<TModel, TModelDefaults, TSchema>): WrappedItem<TModel, TModelDefaults, TSchema> {
   function getApi(): VueModelApi<TModel, TModelDefaults, TSchema, WrappedItem<TModel, TModelDefaults, TSchema>> {
     return store[model.name as keyof typeof store] as any
   }
 
-  const proxy = new Proxy(item, {
+  const proxy = new Proxy({}, {
     get: (target, key) => {
       switch (key) {
         case '$model':
@@ -35,7 +37,7 @@ export function wrapItem<
 
         case '$getKey':
           return () => {
-            const key = model.getKey(item)
+            const key = model.getKey(item.value)
             if (!key) {
               throw new Error('Key is undefined on item')
             }
@@ -44,7 +46,7 @@ export function wrapItem<
 
         case '$updateForm':
           return (async (options?: WrappedItemUpdateFormOptions<TModel, TModelDefaults, TSchema>) => {
-            const key = model.getKey(item)
+            const key = model.getKey(item.value)
             if (!key) {
               throw new Error('Key is required on item to update')
             }
@@ -61,7 +63,7 @@ export function wrapItem<
 
         case '$update':
           return ((data: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>) => {
-            const key = model.getKey(item)
+            const key = model.getKey(item.value)
             return getApi().update(data, {
               key,
             })
@@ -69,12 +71,15 @@ export function wrapItem<
 
         case '$delete':
           return (() => {
-            const key = model.getKey(item)
+            const key = model.getKey(item.value)
             if (!key) {
               throw new Error('Key is required on item to delete')
             }
             return getApi().delete(key)
           }) satisfies WrappedItemBase<TModel, TModelDefaults, TSchema>['$delete']
+
+        case '$meta':
+          return metadata
       }
 
       // Resolve computed properties
@@ -137,11 +142,23 @@ export function wrapItem<
         }
       }
 
-      return Reflect.get(target, key)
+      return Reflect.get(item.value, key)
     },
 
     set: () => {
       throw new Error('Items are read-only. Use `item.$updateForm()` to update the item.')
+    },
+
+    ownKeys: () => Reflect.ownKeys(item.value),
+
+    has: (_target, key) => Reflect.has(item.value, key),
+
+    getOwnPropertyDescriptor: (_target, key) => Reflect.getOwnPropertyDescriptor(item.value, key),
+
+    defineProperty: (_target, property, attributes) => Reflect.defineProperty(item.value, property, attributes),
+
+    deleteProperty: () => {
+      throw new Error('Items are read-only. Use `item.$delete()` to delete the item.')
     },
   })
 
@@ -168,4 +185,21 @@ declare module '@rstore/shared' {
      */
     schema?: StandardSchemaV1
   }
+
+  export interface WrappedItemBase<
+    TModel extends Model,
+    TModelDefaults extends ModelDefaults,
+    TSchema extends StoreSchema,
+  > {
+    $meta: WrappedItemMetadata<TModel, TModelDefaults, TSchema>
+  }
+}
+
+export interface WrappedItemMetadata<
+  _TModel extends Model,
+  _TModelDefaults extends ModelDefaults,
+  _TSchema extends StoreSchema,
+> {
+  queries: Set<any>
+  dirtyQueries: Set<any>
 }

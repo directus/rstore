@@ -15,6 +15,10 @@ export interface CreateStoreOptions<
   plugins: Array<Plugin>
   findDefaults?: Partial<FindOptions<any, any, any>>
   isServer?: boolean
+  /**
+   * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
+   */
+  experimentalGarbageCollection?: boolean
 }
 
 export type VueStoreModelApiProxy<
@@ -30,6 +34,7 @@ export type VueStore<
 > = StoreCore<TSchema, TModelDefaults> & VueStoreModelApiProxy<TSchema, TModelDefaults> & {
   $model: (modelName: string) => VueModelApi<any, TModelDefaults, TSchema, WrappedItem<any, TModelDefaults, TSchema>>
   $onCacheReset: (callback: () => void) => () => void
+  $experimentalGarbageCollection?: boolean
 }
 
 interface PrivateVueStore {
@@ -88,6 +93,10 @@ export async function createStore<
 
           if (key === '$onCacheReset') {
             return cacheResetEvent.on
+          }
+
+          if (typeof key === 'string' && key.startsWith('$experimental') && Reflect.has(options, key.substring(1))) {
+            return Reflect.get(options, key.substring(1))
           }
 
           if (key === '$wrapMutation') {

@@ -1,7 +1,7 @@
 import type { VueStore } from './store'
 import { type Cache, type Model, type ModelDefaults, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, type ResolvedModelItemBase, type StoreSchema, type WrappedItem } from '@rstore/shared'
-import { ref, toRaw } from 'vue'
-import { wrapItem } from './item'
+import { computed, ref, toRaw } from 'vue'
+import { wrapItem, type WrappedItemMetadata } from './item'
 
 export interface CreateCacheOptions<
   TSchema extends StoreSchema,
@@ -20,7 +20,20 @@ export function createCache<
     _markers: {},
   })
 
-  let wrappedItems = new WeakMap<ResolvedModelItem<Model, TModelDefaults, TSchema>, WrappedItem<Model, TModelDefaults, TSchema>>()
+  const wrappedItems = new Map<string | number, WrappedItem<Model, TModelDefaults, TSchema>>()
+  const wrappedItemsMetadata = new Map<string | number, WrappedItemMetadata<Model, TModelDefaults, TSchema>>()
+
+  function getItemWrapKey(model: ResolvedModel<any, any, any>, key: string | number) {
+    return `${model.name}:${key}`
+  }
+
+  function getItemKey(model: ResolvedModel<any, any, any>, item: ResolvedModelItem<any, any, any>): string | number {
+    const key = model.getKey(item)
+    if (key == null) {
+      throw new Error(`Item does not have a key for model ${model.name}: ${item}`)
+    }
+    return key
+  }
 
   function getWrappedItem<TModel extends Model>(
     model: ResolvedModel<TModel, TModelDefaults, TSchema>,
@@ -29,14 +42,25 @@ export function createCache<
     if (!item) {
       return undefined
     }
-    let wrappedItem = wrappedItems.get(item)
+    const key = getItemKey(model, item)
+    const wrapKey = getItemWrapKey(model, key)
+    let wrappedItem = wrappedItems.get(wrapKey)
     if (!wrappedItem) {
+      let metadata = wrappedItemsMetadata.get(wrapKey)
+      if (!metadata) {
+        metadata = {
+          queries: new Set(),
+          dirtyQueries: new Set(),
+        }
+        wrappedItemsMetadata.set(wrapKey, metadata)
+      }
       wrappedItem = wrapItem({
         store: getStore(),
         model,
-        item,
+        item: computed(() => state.value[model.name]?.[key] ?? item),
+        metadata,
       })
-      wrappedItems.set(item, wrappedItem)
+      wrappedItems.set(wrapKey, wrappedItem)
     }
     return wrappedItem
   }
@@ -46,6 +70,31 @@ export function createCache<
       state.value._markers = {}
     }
     state.value._markers[marker] = true
+  }
+
+  function deleteItem(model: ResolvedModel<any, any, any>, key: string | number) {
+    const item = state.value[model.name]?.[key]
+    if (item) {
+      delete state.value[model.name]?.[key]
+      const wrapKey = getItemWrapKey(model, key)
+      wrappedItems.delete(wrapKey)
+      wrappedItemsMetadata.delete(wrapKey)
+      const store = getStore()
+      store.$hooks.callHookSync('afterCacheWrite', {
+        store,
+        meta: {},
+        model,
+        key,
+        operation: 'delete',
+      })
+    }
+  }
+
+  function garbageCollectItem<TModel extends Model>(model: ResolvedModel<TModel, TModelDefaults, TSchema>, item: WrappedItem<TModel, TModelDefaults, TSchema>) {
+    if (item.$meta.queries.size === 0) {
+      const key = getItemKey(model, item)
+      deleteItem(model, key)
+    }
   }
 
   return {
@@ -197,19 +246,7 @@ export function createCache<
       })
     },
     deleteItem({ model, key }) {
-      const item = state.value[model.name]?.[key]
-      if (item) {
-        delete state.value[model.name]?.[key]
-        wrappedItems.delete(item)
-        const store = getStore()
-        store.$hooks.callHookSync('afterCacheWrite', {
-          store,
-          meta: {},
-          model,
-          key,
-          operation: 'delete',
-        })
-      }
+      deleteItem(model, key)
     },
     getModuleState(name, initState) {
       const cacheKey = `$${name}`
@@ -221,7 +258,8 @@ export function createCache<
     },
     setState(value) {
       state.value = value
-      wrappedItems = new WeakMap()
+      wrappedItems.clear()
+      wrappedItemsMetadata.clear()
 
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', {
@@ -231,7 +269,8 @@ export function createCache<
     },
     clear() {
       state.value = {}
-      wrappedItems = new WeakMap()
+      wrappedItems.clear()
+      wrappedItemsMetadata.clear()
 
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', {
@@ -247,15 +286,36 @@ export function createCache<
         }
       }
     },
+    garbageCollectItem({ model, item }) {
+      garbageCollectItem(model, item)
+    },
+    garbageCollect() {
+      for (const modelName in state.value) {
+        if (modelName === '_markers' || modelName.startsWith('$')) {
+          continue
+        }
+        const model = getStore().$models.find(m => m.name === modelName)
+        if (!model) {
+          continue
+        }
+        const itemsForType = state.value[modelName]
+        for (const key in itemsForType) {
+          const wrappedItem = this.wrapItem({ model, item: itemsForType[key] })
+          garbageCollectItem(model, wrappedItem)
+        }
+      }
+    },
     _private: {
       state,
       wrappedItems,
+      wrappedItemsMetadata,
       getWrappedItem,
     },
   } satisfies Cache & {
     _private: {
       state: typeof state
       wrappedItems: typeof wrappedItems
+      wrappedItemsMetadata: typeof wrappedItemsMetadata
       getWrappedItem: typeof getWrappedItem
     }
   } as any

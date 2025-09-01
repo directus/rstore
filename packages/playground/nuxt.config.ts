@@ -57,4 +57,8 @@ export default defineNuxtConfig({
       wsEndpoint: process.env.WS_ENDPOINT || '/_ws',
     },
   },
+
+  rstore: {
+    experimentalGarbageCollection: true,
+  },
 })

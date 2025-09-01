@@ -103,4 +103,11 @@ export interface Cache<
     model: ResolvedModel<TModel, TModelDefaults, TSchema>
     item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>
   }) => WrappedItem<TModel, TModelDefaults, TSchema>
+
+  garbageCollectItem: <TModel extends Model = Model>(params: {
+    model: ResolvedModel<TModel, TModelDefaults, TSchema>
+    item: WrappedItem<TModel, TModelDefaults, TSchema>
+  }) => void
+
+  garbageCollect: () => void
 }

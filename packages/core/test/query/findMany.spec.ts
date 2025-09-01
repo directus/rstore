@@ -29,6 +29,19 @@ describe('findMany', () => {
       $cache: {
         readItems: () => [{ id: '1', name: 'Test Item 1' }, { id: '2', name: 'Test Item 2' }],
         writeItems: vi.fn(),
+        wrapItem: ({ item }: any) => {
+          return new Proxy(item, {
+            get: (target, key) => {
+              if (key === '$meta') {
+                return {
+                  queries: new Set(),
+                  dirtyQueries: new Set(),
+                }
+              }
+              return Reflect.get(target, key)
+            },
+          })
+        },
       },
       $hooks: createHooks(),
       $getFetchPolicy: () => 'cache-first',

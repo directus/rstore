@@ -2,6 +2,8 @@ import type { Plugin, StoreSchema } from '@rstore/shared'
 
 import { defineNuxtPlugin } from '#app'
 // @ts-expect-error virtual file
+import options from '#build/$restore-options'
+// @ts-expect-error virtual file
 import _schema from '#build/$rstore-model'
 // @ts-expect-error virtual file
 import * as _plugins from '#build/$rstore-plugins'
@@ -31,6 +33,7 @@ export default defineNuxtPlugin({
       plugins,
       schema,
       isServer: !!import.meta.server,
+      ...options,
     })
 
     const cacheKey = '$srstore'

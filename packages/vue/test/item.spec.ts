@@ -1,9 +1,9 @@
-import type { VueStore } from '../src'
+import type { VueStore } from '../src/store'
 import { emptySchemas, peekMany } from '@rstore/core'
 import { createHooks, type ResolvedModel, type StandardSchemaV1 } from '@rstore/shared'
 import { beforeEach, describe, expect, it, type Mock, type MockedFunction, vi } from 'vitest'
-import { markRaw } from 'vue'
-import { wrapItem } from '../src/item'
+import { markRaw, ref } from 'vue'
+import { wrapItem, type WrappedItemMetadata } from '../src/item'
 
 vi.mock('@rstore/core', async (importOriginal) => {
   return {
@@ -13,8 +13,13 @@ vi.mock('@rstore/core', async (importOriginal) => {
   }
 })
 
+type Schema = [
+  { name: 'testModel' },
+  { name: 'relatedModel' },
+]
+
 describe('wrapItem', () => {
-  let mockStore: VueStore
+  let mockStore: VueStore<Schema, any>
 
   let mockModel: ResolvedModel & {
     getKey: Mock<ResolvedModel['getKey']>
@@ -25,23 +30,14 @@ describe('wrapItem', () => {
 
   let mockItem: any
 
-  beforeEach(() => {
-    mockStore = {
-      $models: [
-        { name: 'relatedModel', getKey: vi.fn(), computed: {}, relations: {} },
-      ],
-      $getFetchPolicy: () => 'cache-first',
-      $hooks: createHooks(),
-      relatedModel: {
-        peekMany: vi.fn(),
-      },
-      testModel: {
-        updateForm: vi.fn(),
-        update: vi.fn(),
-        delete: vi.fn(),
-      },
-    } as any
+  function createMetadata(): WrappedItemMetadata<any, any, any> {
+    return {
+      queries: new Set(),
+      dirtyQueries: new Set(),
+    }
+  }
 
+  beforeEach(() => {
     mockModel = {
       '~resolved': true,
       'name': 'testModel',
@@ -62,33 +58,50 @@ describe('wrapItem', () => {
       'isInstanceOf': () => true,
     }
 
-    mockItem = {
+    mockStore = {
+      $models: [
+        mockModel,
+        { name: 'relatedModel', getKey: vi.fn(), computed: {}, relations: {} },
+      ],
+      $getFetchPolicy: () => 'cache-first',
+      $hooks: createHooks(),
+      relatedModel: {
+        peekMany: vi.fn(),
+      },
+      testModel: {
+        updateForm: vi.fn(),
+        update: vi.fn(),
+        delete: vi.fn(),
+      },
+    } as any
+
+    mockItem = ref({
       id: 1,
       foreignKey: 2,
-    }
+    })
   })
 
   it('should return a proxy with $model property', () => {
-    const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, model: mockModel, item: mockItem, metadata: createMetadata() })
     expect(wrappedItem.$model).toBe('testModel')
   })
 
   it('should return the key using $getKey', () => {
     mockModel.getKey.mockReturnValue('itemKey')
-    const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, model: mockModel, item: mockItem, metadata: createMetadata() })
     expect(wrappedItem.$getKey()).toBe('itemKey')
   })
 
   it('should throw an error if key is undefined in $getKey', () => {
     mockModel.getKey.mockReturnValue(undefined)
-    const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, model: mockModel, item: mockItem, metadata: createMetadata() })
     expect(() => wrappedItem.$getKey()).toThrow('Key is undefined on item')
   })
 
   it('should call updateForm with correct arguments in $updateForm', async () => {
     const mockForm = { $schema: null }
     ;(mockStore.testModel.updateForm as MockedFunction<any>).mockResolvedValue(mockForm)
-    const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, model: mockModel, item: mockItem, metadata: createMetadata() })
     const schema = { type: 'object' } as unknown as StandardSchemaV1
     const form = await wrappedItem.$updateForm({ schema })
     expect(mockStore.testModel.updateForm).toHaveBeenCalledWith(
@@ -99,7 +112,7 @@ describe('wrapItem', () => {
   })
 
   it('should call update with correct arguments in $update', () => {
-    const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, model: mockModel, item: mockItem, metadata: createMetadata() })
     wrappedItem.$update({ name: 'updatedName' })
     expect(mockStore.testModel.update).toHaveBeenCalledWith(
       { name: 'updatedName' },
@@ -108,14 +121,14 @@ describe('wrapItem', () => {
   })
 
   it('should call delete with correct arguments in $delete', () => {
-    const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, model: mockModel, item: mockItem, metadata: createMetadata() })
     wrappedItem.$delete()
     expect(mockStore.testModel.delete).toHaveBeenCalledWith(1)
   })
 
   it('should resolve computed properties', () => {
     mockModel.computed.computedProp.mockReturnValue('computedValue')
-    const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem }) as any
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, model: mockModel, item: mockItem, metadata: createMetadata() }) as any
     expect(wrappedItem.computedProp).toBe('computedValue')
   })
 
@@ -131,7 +144,7 @@ describe('wrapItem', () => {
         result: relatedItems.filter(filter),
       }
     })
-    const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem }) as any
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, model: mockModel, item: mockItem, metadata: createMetadata() }) as any
     expect(wrappedItem.relatedItems.length).toBe(2)
     expect(wrappedItem.relatedItems[0].id).toBe(2)
     expect(wrappedItem.relatedItems[1].id).toBe(3)
@@ -142,10 +155,10 @@ describe('wrapItem', () => {
       'relatedModel.foreignKey1': 'testModel.id1',
       'foreignKey2': 'id2',
     }
-    mockItem = {
+    mockItem = ref({
       id1: 1,
       id2: 2,
-    }
+    })
     const relatedItems = [
       { meow: 'meow', foreignKey1: 1, foreignKey2: 2 },
       { meow: 'purr', foreignKey1: 1, foreignKey2: 3 },
@@ -156,13 +169,13 @@ describe('wrapItem', () => {
         result: relatedItems.filter(filter),
       }
     })
-    const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem }) as any
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, model: mockModel, item: mockItem, metadata: createMetadata() }) as any
     expect(wrappedItem.relatedItems.length).toBe(1)
     expect(wrappedItem.relatedItems[0].meow).toBe('meow')
   })
 
   it('should throw an error when trying to set a property', () => {
-    const wrappedItem = wrapItem({ store: mockStore, model: mockModel, item: mockItem })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, model: mockModel, item: mockItem, metadata: createMetadata() })
     expect(() => {
       (wrappedItem as any).newProp = 'value'
     }).toThrow('Items are read-only. Use `item.$updateForm()` to update the item.')

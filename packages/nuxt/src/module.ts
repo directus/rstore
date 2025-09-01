@@ -17,6 +17,11 @@ export interface ModuleOptions {
    * @default `['rstore']`
    */
   rstoreDirs?: string[]
+
+  /**
+   * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
+   */
+  experimentalGarbageCollection?: boolean
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -88,6 +93,11 @@ export default defineNuxtModule<ModuleOptions>({
       files.push(...nuxt.options._rstorePluginImports ?? [])
       return files
     }
+
+    addTemplate({
+      filename: '$restore-options.ts',
+      getContents: () => `export default ${JSON.stringify({ experimentalGarbageCollection: options.experimentalGarbageCollection || false })}`,
+    })
 
     addTemplate({
       filename: '$rstore-model.ts',

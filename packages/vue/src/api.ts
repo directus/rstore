@@ -287,6 +287,7 @@ export function createModelApi<
   }) {
     return createQuery<TModel, TModelDefaults, TSchema, any, WrappedItem<TModel, TModelDefaults, TSchema> | null | Array<WrappedItem<TModel, TModelDefaults, TSchema>>>({
       store,
+      model,
       fetchMethod: (options, meta) => toValue(type) === 'first'
         ? findFirst({ store, model, findOptions: options!, meta }).then(r => r.result)
         : findMany({ store, model, findOptions: options, meta }).then(r => r.result),
@@ -295,6 +296,7 @@ export function createModelApi<
         : peekMany({ store, model, findOptions: options, meta, force: true }).result,
       defaultValue: () => toValue(type) === 'first' ? null : [],
       options: boundOptionsGetter,
+      name: type,
     })
   }
 
