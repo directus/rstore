@@ -7,12 +7,13 @@ export interface CreateFormObjectOptions<
   TData extends Record<string, any>,
   TSchema extends StandardSchemaV1,
   TAdditionalProps,
+  TResult = TData,
 > {
   defaultValues?: (() => Partial<TData>) | undefined
   resetDefaultValues?: (() => Awaitable<Partial<TData>>) | undefined
   schema?: TSchema
   transformData?: (data: Partial<TData>) => Partial<TData>
-  submit: (data: Partial<TData>) => Promise<TData>
+  submit: (data: Partial<TData>) => Promise<TResult>
   additionalProps?: TAdditionalProps
 }
 
