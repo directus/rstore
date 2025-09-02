@@ -65,6 +65,14 @@ const filteredCache = computed(() => {
   result = filteredByContent(result)
   return result
 })
+
+// Force update the item values when cache is updated
+
+const forceUpdate = ref(0)
+
+watch(cache, () => {
+  forceUpdate.value++
+})
 </script>
 
 <template>
@@ -143,7 +151,7 @@ const filteredCache = computed(() => {
                 </div>
               </div>
             </div>
-            <CodeSnippet :code="value" class="text-xs p-2" />
+            <CodeSnippet :key="forceUpdate" :code="value" class="text-xs p-2" />
           </div>
         </div>
       </div>
