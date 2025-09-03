@@ -52,9 +52,9 @@ createTodo.$onSuccess(() => {
     </UForm>
 
     <TodoItem
-      v-for="{ id } in todos"
-      :id
-      :key="id"
+      v-for="todo in todos"
+      :id="todo.$getKey()"
+      :key="todo.$getKey()"
     />
 
     <div class="mt-2 opacity-50 text-center">

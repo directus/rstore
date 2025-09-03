@@ -1,3 +1,4 @@
+import type { CreateOptions, DeleteOptions, UpdateOptions } from '@rstore/core'
 import type { CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, Model, ModelDefaults, ResolvedModel, ResolvedModelItem, ResolvedModelItemBase, StandardSchemaV1, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueLiveQueryReturn } from './live'
@@ -159,6 +160,7 @@ export interface VueModelApi<
    */
   create: (
     item: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>,
+    createOptions?: Pick<CreateOptions<TModel, TModelDefaults, TSchema>, 'optimistic'>
   ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
   /**
@@ -177,7 +179,7 @@ export interface VueModelApi<
        * @default model.schema.create
        */
       schema?: StandardSchemaV1
-    },
+    } & Pick<CreateOptions<TModel, TModelDefaults, TSchema>, 'optimistic'>,
   ) => VueCreateFormObject<TModel, TModelDefaults, TSchema>
 
   /**
@@ -185,9 +187,7 @@ export interface VueModelApi<
    */
   update: (
     item: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>,
-    updateOptions?: {
-      key?: string | number | null
-    }
+    updateOptions?: Pick<UpdateOptions<TModel, TModelDefaults, TSchema>, 'key' | 'optimistic'>,
   ) => Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
   /**
@@ -209,7 +209,7 @@ export interface VueModelApi<
        * @default model.schema.update
        */
       schema?: StandardSchemaV1
-    },
+    } & Pick<UpdateOptions<TModel, TModelDefaults, TSchema>, 'optimistic'>,
   ) => Promise<VueUpdateFormObject<TModel, TModelDefaults, TSchema>>
 
   /**
@@ -217,6 +217,7 @@ export interface VueModelApi<
    */
   delete: (
     keyOrItem: string | number | Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>,
+    DeleteOptions?: Pick<DeleteOptions<TModel, TModelDefaults, TSchema>, 'optimistic'>,
   ) => Promise<void>
 
   getKey: (
@@ -424,7 +425,8 @@ export function createModelApi<
 
     subscribe: optionsGetter => _subscribe(optionsGetter(c => c)),
 
-    create: item => createItem({
+    create: (item, options) => createItem({
+      ...options,
       store,
       model,
       item,
@@ -437,15 +439,17 @@ export function createModelApi<
       >({
         defaultValues: formOptions?.defaultValues,
         schema: formOptions?.schema ?? model.formSchema.create,
-        submit: data => api.create(data),
+        submit: data => api.create(data, {
+          optimistic: formOptions?.optimistic,
+        }),
       }) as TReturn
     },
 
     update: (item, updateOptions) => updateItem({
+      ...updateOptions,
       store,
       model,
       item,
-      key: updateOptions?.key,
     }),
 
     updateForm: async (options, formOptions) => {
@@ -480,12 +484,13 @@ export function createModelApi<
         },
         submit: data => api.update(data, {
           key: model.getKey(initialData),
+          optimistic: formOptions?.optimistic,
         }),
       })
       return form
     },
 
-    delete: (keyOrItem) => {
+    delete: (keyOrItem, options) => {
       let key: string | number | number
       if (typeof keyOrItem !== 'string' && typeof keyOrItem !== 'number') {
         const result = model.getKey(keyOrItem)
@@ -499,6 +504,7 @@ export function createModelApi<
       }
 
       return deleteItem({
+        ...options,
         store,
         model,
         key,

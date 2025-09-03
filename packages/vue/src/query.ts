@@ -122,6 +122,11 @@ export function createQuery<
     _result: result,
   }
 
+  /**
+   * Indicates if a fetch is in progress
+   */
+  let fetching = false
+
   async function load(force: boolean = false) {
     if (!isDisabled()) {
       loading.value = true
@@ -142,6 +147,8 @@ export function createQuery<
         if (force) {
           finalOptions.fetchPolicy = 'fetch-only'
         }
+
+        fetching = true
 
         result.value = await fetchMethod(finalOptions, meta.value)
       }
@@ -192,26 +199,34 @@ export function createQuery<
       if (Array.isArray(oldResultValue)) {
         for (const item of oldResultValue as Array<WrappedItem<TModel, TModelDefaults, TSchema>>) {
           item.$meta.queries.delete(queryId)
-          item.$meta.dirtyQueries.add(queryId)
+          if (fetching && !item.$layer) {
+            item.$meta.dirtyQueries.add(queryId)
+          }
         }
       }
       else {
         const item = oldResultValue as WrappedItem<TModel, TModelDefaults, TSchema> | undefined
         item?.$meta.queries.delete(queryId)
-        item?.$meta.dirtyQueries.add(queryId)
+        if (fetching && !item?.$layer) {
+          item?.$meta.dirtyQueries.add(queryId)
+        }
       }
 
       // Old cached result
       if (Array.isArray(oldDataValue)) {
         for (const item of oldDataValue as Array<WrappedItem<TModel, TModelDefaults, TSchema>>) {
           item.$meta.queries.delete(queryId)
-          item.$meta.dirtyQueries.add(queryId)
+          if (fetching && !item.$layer) {
+            item.$meta.dirtyQueries.add(queryId)
+          }
         }
       }
       else {
         const item = oldDataValue as WrappedItem<TModel, TModelDefaults, TSchema> | undefined
         item?.$meta.queries.delete(queryId)
-        item?.$meta.dirtyQueries.add(queryId)
+        if (fetching && !item?.$layer) {
+          item?.$meta.dirtyQueries.add(queryId)
+        }
       }
 
       // New result
@@ -226,6 +241,8 @@ export function createQuery<
         item?.$meta.queries.add(queryId)
         item?.$meta.dirtyQueries.delete(queryId)
       }
+
+      fetching = false
     })
 
     // Unmark items on unmount

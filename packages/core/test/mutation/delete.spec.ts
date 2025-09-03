@@ -13,6 +13,9 @@ describe('deleteItem', () => {
       $hooks: createHooks(),
       $cache: {
         deleteItem: vi.fn(),
+        readItem: vi.fn(),
+        addLayer: vi.fn(),
+        removeLayer: vi.fn(),
       },
       $mutationHistory: [],
     } as any

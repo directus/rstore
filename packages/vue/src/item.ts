@@ -1,7 +1,7 @@
-import type { Model, ModelDefaults, ResolvedModel, ResolvedModelItem, StandardSchemaV1, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions } from '@rstore/shared'
+import type { Model, ModelDefaults, ResolvedModel, ResolvedModelItem, StandardSchemaV1, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions, WrappedItemUpdateOptions } from '@rstore/shared'
 import type { VueModelApi } from './api'
 import type { VueStore } from './store'
-import { peekFirst, peekMany } from '@rstore/core'
+import { peekFirst, peekMany, type UpdateOptions } from '@rstore/core'
 import { markRaw, type Ref } from 'vue'
 
 export interface WrapItemOptions<
@@ -62,9 +62,10 @@ export function wrapItem<
           }) satisfies WrappedItemBase<TModel, TModelDefaults, TSchema>['$updateForm']
 
         case '$update':
-          return ((data: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>) => {
+          return ((data: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>, options?: WrappedItemUpdateOptions<TModel, TModelDefaults, TSchema>) => {
             const key = model.getKey(item.value)
             return getApi().update(data, {
+              ...options,
               key,
             })
           }) satisfies WrappedItemBase<TModel, TModelDefaults, TSchema>['$update']
@@ -173,7 +174,7 @@ declare module '@rstore/shared' {
     TModel extends Model = Model,
     TModelDefaults extends ModelDefaults = ModelDefaults,
     TSchema extends StoreSchema = StoreSchema,
-  > {
+  > extends Pick<UpdateOptions<TModel, TModelDefaults, TSchema>, 'optimistic'> {
     /**
      * Default values set in the form object initially and when it is reset.
      *
@@ -187,6 +188,13 @@ declare module '@rstore/shared' {
      * @default model.schema.update
      */
     schema?: StandardSchemaV1
+  }
+
+  export interface WrappedItemUpdateOptions<
+    TModel extends Model = Model,
+    TModelDefaults extends ModelDefaults = ModelDefaults,
+    TSchema extends StoreSchema = StoreSchema,
+  > extends Pick<UpdateOptions<TModel, TModelDefaults, TSchema>, 'optimistic'> {
   }
 
   export interface WrappedItemBase<

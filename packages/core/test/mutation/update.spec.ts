@@ -21,6 +21,9 @@ describe('updateItem', () => {
       $processItemSerialization: vi.fn(),
       $cache: {
         writeItem: vi.fn(),
+        readItem: vi.fn(),
+        addLayer: vi.fn(),
+        removeLayer: vi.fn(),
       },
       $mutationHistory: [],
     } as unknown as StoreCore<StoreSchema, ModelDefaults>

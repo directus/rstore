@@ -16,6 +16,9 @@ describe('createItem', () => {
       processItemParsing: vi.fn(),
       $cache: {
         writeItem: vi.fn(),
+        readItem: vi.fn(),
+        addLayer: vi.fn(),
+        removeLayer: vi.fn(),
       },
       $mutationHistory: [],
       $processItemParsing: vi.fn(),

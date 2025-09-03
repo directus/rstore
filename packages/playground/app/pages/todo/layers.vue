@@ -17,11 +17,11 @@ const addedItemLayer = {
   state: {
     Todo: {
       'new-from-layer': {
-        id: 'new-from-layer',
+        $overrideKey: 'new-from-layer',
         text: 'This todo was added from a layer',
         completed: false,
         createdAt: new Date(),
-      } satisfies StoreResolvedModelItem<'Todo'>,
+      } satisfies Omit<StoreResolvedModelItem<'Todo'>, 'id'> & { $overrideKey: string },
     },
   },
   deletedItems: {},
@@ -175,9 +175,9 @@ function addDeleteItemLayer() {
     </UForm>
 
     <TodoItem
-      v-for="{ id } in todos"
-      :id
-      :key="id"
+      v-for="todo in todos"
+      :id="todo.$getKey()"
+      :key="todo.$getKey()"
     />
 
     <div class="mt-2 opacity-50 text-center">

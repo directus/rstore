@@ -1,4 +1,4 @@
-import type { CustomHookMeta, Model, ModelDefaults, ResolvedModel, ResolvedModelItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CacheLayer, CustomHookMeta, Model, ModelDefaults, ResolvedModel, ResolvedModelItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 import { peekFirst } from '../query'
 
@@ -12,6 +12,7 @@ export interface UpdateOptions<
   item: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
   key?: string | number | null
   skipCache?: boolean
+  optimistic?: boolean | Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 }
 
 export async function updateItem<
@@ -24,18 +25,29 @@ export async function updateItem<
   item,
   key,
   skipCache,
+  optimistic = true,
 }: UpdateOptions<TModel, TModelDefaults, TSchema>): Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>> {
   const meta: CustomHookMeta = {}
 
   item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
-
-  store.$processItemSerialization(model, item)
 
   key = key ?? model.getKey(item)
 
   if (!key) {
     throw new Error('Item update failed: key is not defined')
   }
+
+  // Check if existing item has a layer that prevents update
+  const existingItem = store.$cache.readItem({ model, key })
+  if (existingItem?.$layer) {
+    const layer = existingItem.$layer as CacheLayer
+    if (layer.prevent?.update) {
+      console.error(layer)
+      throw new Error(`Item update prevented by the layer: ${layer.id}`)
+    }
+  }
+
+  store.$processItemSerialization(model, item)
 
   await store.$hooks.callHook('beforeMutation', {
     store,
@@ -65,52 +77,86 @@ export async function updateItem<
     result = pickNonSpecialProps(result) as ResolvedModelItem<TModel, TModelDefaults, TSchema>
   }
 
-  await store.$hooks.callHook('updateItem', {
-    store,
-    meta,
-    model,
-    key,
-    item,
-    getResult: () => result ?? undefined,
-    setResult: (newResult) => {
-      result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
-    },
-  })
+  let layer: CacheLayer | undefined
 
-  await store.$hooks.callHook('afterMutation', {
-    store,
-    meta,
-    model,
-    mutation: 'update',
-    key,
-    item,
-    getResult: () => result ?? undefined,
-    setResult: (newResult) => {
-      result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
-    },
-  })
-
-  if (result) {
-    store.$processItemParsing(model, result)
-
-    if (!skipCache) {
-      store.$cache.writeItem({
-        model,
-        key,
-        item: result,
-      })
+  if (!skipCache && optimistic) {
+    layer = {
+      id: crypto.randomUUID(),
+      state: {
+        [model.name]: {
+          [key]: {
+            ...item,
+            ...typeof optimistic === 'object' ? optimistic : {},
+            $overrideKey: key,
+          },
+        },
+      },
+      deletedItems: {},
+      optimistic: true,
     }
-  }
-  else {
-    throw new Error('Item update failed: result is nullish')
+
+    store.$cache.addLayer(layer)
   }
 
-  store.$mutationHistory.push({
-    operation: 'update',
-    model,
-    key,
-    payload: item,
-  })
+  try {
+    await store.$hooks.callHook('updateItem', {
+      store,
+      meta,
+      model,
+      key,
+      item,
+      getResult: () => result ?? undefined,
+      setResult: (newResult) => {
+        result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
+      },
+    })
+
+    await store.$hooks.callHook('afterMutation', {
+      store,
+      meta,
+      model,
+      mutation: 'update',
+      key,
+      item,
+      getResult: () => result ?? undefined,
+      setResult: (newResult) => {
+        result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
+      },
+    })
+
+    if (result) {
+      store.$processItemParsing(model, result)
+
+      if (!skipCache) {
+        if (layer) {
+          store.$cache.removeLayer(layer.id)
+        }
+
+        store.$cache.writeItem({
+          model,
+          key,
+          item: result,
+        })
+      }
+    }
+    else {
+      throw new Error('Item update failed: result is nullish')
+    }
+
+    store.$mutationHistory.push({
+      operation: 'update',
+      model,
+      key,
+      payload: item,
+    })
+  }
+  catch (error) {
+    // Rollback optimistic layer in case of error
+    if (layer) {
+      store.$cache.removeLayer(layer.id)
+    }
+    throw error
+  }
 
   return result
 }

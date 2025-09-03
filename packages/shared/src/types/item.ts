@@ -23,7 +23,7 @@ export interface WrappedItemBase<
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
    */
-  $update: (data: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>) => Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+  $update: (data: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>, options?: WrappedItemUpdateOptions<TModel, TModelDefaults, TSchema>) => Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
   /**
    * Delete the item.
@@ -35,6 +35,8 @@ export interface WrappedItemBase<
   $isOptimistic: boolean
 
   $layer?: CacheLayer | undefined
+
+  $overrideKey?: string | number
 }
 
 /**
@@ -49,6 +51,14 @@ export type WrappedItem<
 /* eslint-disable unused-imports/no-unused-vars */
 
 export interface WrappedItemUpdateFormOptions<
+  TModel extends Model = Model,
+  TModelDefaults extends ModelDefaults = ModelDefaults,
+  TSchema extends StoreSchema = StoreSchema,
+> {
+  // to be extended
+}
+
+export interface WrappedItemUpdateOptions<
   TModel extends Model = Model,
   TModelDefaults extends ModelDefaults = ModelDefaults,
   TSchema extends StoreSchema = StoreSchema,

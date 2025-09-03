@@ -1,4 +1,6 @@
 export default defineEventHandler(async (event) => {
+  await wait(1500)
+
   const { type, id } = getRouterParams(event) as { type: keyof Db, id: string }
   const schema = updateValidationSchemas[type as keyof UpdateValidationSchemas]
   const body = schema ? await readValidatedBody(event, data => schema.parse(data)) : await readBody(event)

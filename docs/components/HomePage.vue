@@ -151,14 +151,9 @@ const heroHover = ref(false)
         details: 'Cache reads are computed on the client, enabling offline and realtime apps.',
       },
       {
-        icon: '🔌',
-        title: 'Plugin System',
-        details: 'Fetch any data from any source with the very flexible plugin system.',
-      },
-      {
-        icon: '📍',
-        title: 'Colocated Queries',
-        details: 'Write queries and mutations right inside the components that need them.',
+        icon: '🚀',
+        title: 'Optimistic Mutations',
+        details: `Creating, updating and deleting data instantly updates your UI and doesn't wait for the server.`,
       },
       {
         icon: '✒️',
@@ -166,14 +161,19 @@ const heroHover = ref(false)
         details: 'Create form objects to handle data, validation, submitting, error and more.',
       },
       {
+        icon: '🔍',
+        title: 'TypeScript Support',
+        details: 'Enjoy full type safety and autocomplete for your queries and mutations.',
+      },
+      {
         icon: '💫',
         title: 'Scale Up & Down',
         details: 'Use rstore for small prototypes or big enterprise apps. It scales with your needs.',
       },
       {
-        icon: '🔍',
-        title: 'TypeScript Support',
-        details: 'Enjoy full type safety and autocomplete for your queries and mutations.',
+        icon: '🔌',
+        title: 'Plugin System',
+        details: 'Fetch any data from any source with the very flexible plugin system.',
       },
       {
         icon: { src: '/nuxt.svg' },

@@ -108,7 +108,7 @@ export function resolveModel<
   return {
     '~resolved': true,
     'name': model.name,
-    'getKey': item => (model.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
+    'getKey': item => item.$overrideKey ?? (model.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
     'isInstanceOf': item => model.isInstanceOf?.(item) || defaults?.isInstanceOf?.(model)(item) || defaultIsInstanceOf(model)(item),
     'relations': model.relations ?? {},
     'computed': {

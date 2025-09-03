@@ -74,10 +74,7 @@ export function createCache<
         store: getStore(),
         model,
         item: computed(() => layer
-          ? {
-              ...layer.state[model.name]?.[key],
-              $layer: layer,
-            }
+          ? item
           : state.value[model.name]?.[key] ?? item),
         metadata,
       })

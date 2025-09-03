@@ -1,4 +1,6 @@
-export default defineEventHandler((event) => {
+export default defineEventHandler(async (event) => {
+  await wait(1500)
+
   const { type, id } = getRouterParams(event) as { type: keyof Db, id: string }
   const itemIndex = db[type].findIndex(item => item.id === id)
 
