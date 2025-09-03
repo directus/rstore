@@ -1,7 +1,7 @@
 import type { FindOptions } from '@rstore/shared'
 
 export interface StoreHistoryItem {
-  operation: 'fetchFirst' | 'fetchMany' | 'create' | 'update' | 'delete' | 'cacheWrite'
+  operation: 'fetchFirst' | 'fetchMany' | 'create' | 'update' | 'delete' | 'cacheWrite' | 'itemGarbageCollect' | 'cacheLayerAdd' | 'cacheLayerRemove'
   model: string
   key?: string
   findOptions?: FindOptions<any, any, any>

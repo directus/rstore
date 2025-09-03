@@ -15,7 +15,7 @@ const showCacheOps = useLocalStorage('rstore-devtools-show-cache-ops', false)
 
     <div v-else class="flex flex-col-reverse p-1 gap-1">
       <DevtoolsHistoryItem
-        v-for="(item, index) in showCacheOps ? stats.history : stats.history.filter((item) => !item.operation.startsWith('cache'))"
+        v-for="(item, index) in showCacheOps ? stats.history : stats.history.filter((item) => !item.operation.startsWith('cache') && item.operation !== 'itemGarbageCollect')"
         :key="index"
         :item
       />

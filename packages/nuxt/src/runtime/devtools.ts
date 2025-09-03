@@ -122,6 +122,35 @@ export const devtoolsPlugin = definePlugin({
       historyUpdated.trigger()
     })
 
+    hook('itemGarbageCollect', (payload) => {
+      storeStats.value.history.push({
+        operation: 'itemGarbageCollect',
+        model: payload.model.name,
+        ended: new Date(),
+        key: payload.key,
+        result: payload.item,
+      })
+      historyUpdated.trigger()
+    })
+
+    hook('cacheLayerAdd', (payload) => {
+      storeStats.value.history.push({
+        operation: 'cacheLayerAdd',
+        result: payload.layer,
+        ended: new Date(),
+      })
+      historyUpdated.trigger()
+    })
+
+    hook('cacheLayerRemove', (payload) => {
+      storeStats.value.history.push({
+        operation: 'cacheLayerRemove',
+        result: payload.layer,
+        ended: new Date(),
+      })
+      historyUpdated.trigger()
+    })
+
     // Subscriptions
 
     const subscriptionsUpdated = nuxtApp.$rstoreSubscriptionsUpdated = createEventHook()

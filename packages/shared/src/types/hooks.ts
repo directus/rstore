@@ -1,3 +1,4 @@
+import type { CacheLayer } from './layer'
 import type { Model, ModelDefaults, ResolvedModel, ResolvedModelItemBase, StoreSchema } from './model'
 import type { ResolvedModule } from './module'
 import type { FindOptions } from './query'
@@ -316,6 +317,31 @@ export interface HookDefinitions<
     payload: {
       store: StoreCore<TSchema, TModelDefaults>
       module: ResolvedModule<any, any>
+    }
+  ) => Awaitable<void>
+
+  itemGarbageCollect: <
+    TModel extends Model,
+  > (
+    payload: {
+      store: StoreCore<TSchema, TModelDefaults>
+      model: ResolvedModel<TModel, TModelDefaults, TSchema>
+      key: string | number
+      item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>
+    }
+  ) => Awaitable<void>
+
+  cacheLayerAdd: (
+    payload: {
+      store: StoreCore<TSchema, TModelDefaults>
+      layer: CacheLayer
+    }
+  ) => Awaitable<void>
+
+  cacheLayerRemove: (
+    payload: {
+      store: StoreCore<TSchema, TModelDefaults>
+      layer: CacheLayer
     }
   ) => Awaitable<void>
 }

@@ -113,6 +113,13 @@ export function createCache<
     if (item.$meta.queries.size === 0) {
       const key = getItemKey(model, item)
       deleteItem(model, key)
+      const store = getStore()
+      store.$hooks.callHookSync('itemGarbageCollect', {
+        store,
+        model,
+        item,
+        key,
+      })
     }
   }
 
@@ -357,6 +364,11 @@ export function createCache<
     },
     addLayer(layer) {
       layers.value.push(layer)
+      const store = getStore()
+      store.$hooks.callHookSync('cacheLayerAdd', {
+        store,
+        layer,
+      })
     },
     getLayer(layerId) {
       return layers.value.find(l => l.id === layerId)
@@ -374,6 +386,11 @@ export function createCache<
           wrappedItemKeysPerLayer.delete(layer.id)
         }
         layers.value.splice(index, 1)
+        const store = getStore()
+        store.$hooks.callHookSync('cacheLayerRemove', {
+          store,
+          layer,
+        })
       }
     },
     _private: {
