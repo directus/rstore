@@ -88,3 +88,66 @@ You can also use the `store.<modelName>.clearItem` method:
 ```ts
 store.User.clearItem('abc')
 ```
+
+## Layers
+
+A cache layer is a way to create a temporary state modification that can be easily reverted. This is how [optimistic updates](./mutation.md#optimistic-updates) are implemented.
+
+To create a new layer, use the `addLayer` method:
+
+```ts
+store.$cache.addLayer({
+  id: 'some-layer-id',
+  state: {
+    Messages: {
+      'some-message-id': {
+        $overrideKey: 'some-message-id',
+        text: 'This is an optimistic message',
+      },
+    },
+  },
+  deleteItems: {},
+  optimistic: true, // Optional
+  prevent: { // Optional
+    update: false,
+    delete: false,
+  },
+  skip: false, // Optional
+})
+```
+
+In this example, the layer will override the `text` property of the `Messages` item with id `some-message-id`.
+
+::: tip
+If the layer contains records that do not exist in the cache, it will act as if those records were created.
+:::
+
+```ts
+store.$cache.addLayer({
+  id: 'some-layer-id',
+  state: {},
+  deleteItems: {
+    Messages: new Set(['some-message-id']),
+  },
+})
+```
+
+In this second example, the layer will delete the `Messages` item with id `some-message-id`.
+
+::: tip
+If multiple layers, they are applied in the order they were added.
+:::
+
+To get a layer, use the `getLayer` method:
+
+```ts
+const layer = store.$cache.getLayer('some-layer-id')
+```
+
+To remove a layer, use the `removeLayer` method:
+
+```ts
+store.$cache.removeLayer('some-layer-id')
+```
+
+It will effectively rollback all the changes applied by the layer.
