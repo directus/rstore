@@ -78,6 +78,9 @@ export function wrapItem<
             return getApi().delete(key)
           }) satisfies WrappedItemBase<TModel, TModelDefaults, TSchema>['$delete']
 
+        case '$isOptimistic':
+          return item.value.$layer?.optimistic
+
         case '$meta':
           return metadata
       }

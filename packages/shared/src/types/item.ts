@@ -1,3 +1,4 @@
+import type { CacheLayer } from './layer'
 import type { Model, ModelDefaults, ResolvedModelItem, StoreSchema } from './model'
 import type { UpdateFormObject } from './mutation'
 
@@ -30,6 +31,10 @@ export interface WrappedItemBase<
   $delete: () => Promise<void>
 
   $getKey: () => string
+
+  $isOptimistic: boolean
+
+  $layer?: CacheLayer | undefined
 }
 
 /**

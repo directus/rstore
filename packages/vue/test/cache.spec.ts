@@ -1,4 +1,4 @@
-import type { ResolvedModel } from '@rstore/shared'
+import type { CacheLayer, ResolvedModel } from '@rstore/shared'
 import type { VueStore } from '../src'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, type MockedFunction, vi } from 'vitest'
@@ -222,5 +222,89 @@ describe('cache', () => {
     expect(state.TestModel[1]).toBeUndefined()
     expect(state.TestModel[2]).toBeDefined()
     expect(state.TestModel[3]).toBeUndefined()
+  })
+
+  describe('layers', () => {
+    it('should add a new item from a layer', () => {
+      const cache = createCache({ getStore })
+      cache.writeItem({ model: mockModel, key: 1, item: { id: 1, name: 'item1' } })
+
+      expect(cache.readItems({ model: mockModel })).toHaveLength(1)
+
+      const layer: CacheLayer = {
+        id: 'layer1',
+        state: {
+          TestModel: {
+            2: { id: 2, name: 'item2' },
+          },
+        },
+        deletedItems: {},
+      }
+      cache.addLayer(layer)
+
+      const items = cache.readItems({ model: mockModel })
+      expect(items).toHaveLength(2)
+      expect(items.find(i => i.id === 1)).toBeDefined()
+      expect(items.find(i => i.id === 2)).toBeDefined()
+
+      cache.removeLayer('layer1')
+
+      const itemsAfter = cache.readItems({ model: mockModel })
+      expect(itemsAfter).toHaveLength(1)
+      expect(itemsAfter.find(i => i.id === 1)).toBeDefined()
+      expect(itemsAfter.find(i => i.id === 2)).toBeUndefined()
+    })
+
+    it('should modify an existing item from a layer', () => {
+      const cache = createCache({ getStore })
+      cache.writeItem({ model: mockModel, key: 1, item: { id: 1, name: 'item1' } })
+
+      expect(cache.readItems({ model: mockModel })[0].name).toBe('item1')
+
+      const layer: CacheLayer = {
+        id: 'layer1',
+        state: {
+          TestModel: {
+            1: { id: 1, name: 'modified item1' },
+          },
+        },
+        deletedItems: {},
+      }
+      cache.addLayer(layer)
+
+      expect(cache.readItems({ model: mockModel })[0].name).toBe('modified item1')
+
+      cache.removeLayer('layer1')
+
+      expect(cache.readItems({ model: mockModel })[0].name).toBe('item1')
+    })
+
+    it('should delete an existing item from a layer', () => {
+      const cache = createCache({ getStore })
+      cache.writeItem({ model: mockModel, key: 1, item: { id: 1, name: 'item1' } })
+      cache.writeItem({ model: mockModel, key: 2, item: { id: 2, name: 'item2' } })
+
+      expect(cache.readItems({ model: mockModel })).toHaveLength(2)
+
+      const layer: CacheLayer = {
+        id: 'layer1',
+        state: {},
+        deletedItems: {
+          TestModel: new Set([2]),
+        },
+      }
+      cache.addLayer(layer)
+
+      const items = cache.readItems({ model: mockModel })
+      expect(items).toHaveLength(1)
+      expect(items[0].id).toBe(1)
+
+      cache.removeLayer('layer1')
+
+      const itemsAfter = cache.readItems({ model: mockModel })
+      expect(itemsAfter).toHaveLength(2)
+      expect(itemsAfter.find(i => i.id === 1)).toBeDefined()
+      expect(itemsAfter.find(i => i.id === 2)).toBeDefined()
+    })
   })
 })

@@ -47,6 +47,14 @@ const editOpen = ref(false)
       {{ todo.text }}
     </span>
 
+    <UBadge
+      v-if="todo.$isOptimistic"
+      label="Optimistic"
+      color="info"
+      icon="lucide:hourglass"
+      size="sm"
+    />
+
     <span class="opacity-50">{{ timeAgo }}</span>
 
     <UPopover

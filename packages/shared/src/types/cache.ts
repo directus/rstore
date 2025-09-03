@@ -1,4 +1,5 @@
 import type { WrappedItem } from './item'
+import type { CacheLayer } from './layer'
 import type { Model, ModelDefaults, ModelRelation, ResolvedModel, ResolvedModelItemBase, StoreSchema } from './model'
 import type { Module, ResolvedModuleState } from './module'
 
@@ -110,4 +111,10 @@ export interface Cache<
   }) => void
 
   garbageCollect: () => void
+
+  addLayer: (layer: CacheLayer) => void
+
+  getLayer: (layerId: string) => CacheLayer | undefined
+
+  removeLayer: (layerId: string) => void
 }

@@ -90,10 +90,11 @@ export function createQuery<
       if ((options?.experimentalGarbageCollection ?? store.$experimentalGarbageCollection) || (options?.experimentalFilterDirty)) {
         const queryId = getQueryId()
         if (Array.isArray(cacheResult)) {
-          return cacheResult.filter((item: WrappedItem<TModel, TModelDefaults, TSchema>) => !item.$meta.dirtyQueries.has(queryId))
+          return cacheResult.filter((item: WrappedItem<TModel, TModelDefaults, TSchema>) => item.$layer || !item.$meta.dirtyQueries.has(queryId))
         }
         else {
-          if ((cacheResult as unknown as WrappedItem<TModel, TModelDefaults, TSchema> | undefined)?.$meta.dirtyQueries.has(queryId)) {
+          const item = cacheResult as unknown as WrappedItem<TModel, TModelDefaults, TSchema> | undefined
+          if (item && (!item.$layer && item.$meta.dirtyQueries.has(queryId))) {
             return undefined
           }
           else {

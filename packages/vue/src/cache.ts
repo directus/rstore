@@ -1,5 +1,5 @@
 import type { VueStore } from './store'
-import { type Cache, type Model, type ModelDefaults, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, type ResolvedModelItemBase, type StoreSchema, type WrappedItem } from '@rstore/shared'
+import { type Cache, type CacheLayer, type Model, type ModelDefaults, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, type ResolvedModelItemBase, type StoreSchema, type WrappedItem } from '@rstore/shared'
 import { computed, ref, toRaw } from 'vue'
 import { wrapItem, type WrappedItemMetadata } from './item'
 
@@ -20,11 +20,14 @@ export function createCache<
     _markers: {},
   })
 
-  const wrappedItems = new Map<string | number, WrappedItem<Model, TModelDefaults, TSchema>>()
-  const wrappedItemsMetadata = new Map<string | number, WrappedItemMetadata<Model, TModelDefaults, TSchema>>()
+  const layers = ref<CacheLayer[]>([])
 
-  function getItemWrapKey(model: ResolvedModel<any, any, any>, key: string | number) {
-    return `${model.name}:${key}`
+  const wrappedItems = new Map<string, WrappedItem<Model, TModelDefaults, TSchema>>()
+  const wrappedItemsMetadata = new Map<string, WrappedItemMetadata<Model, TModelDefaults, TSchema>>()
+  const wrappedItemKeysPerLayer = new Map<string, Set<string>>()
+
+  function getItemWrapKey(model: ResolvedModel<any, any, any>, key: string | number, layer: CacheLayer | undefined) {
+    return [layer?.id, model.name, key].filter(Boolean).join(':')
   }
 
   function getItemKey(model: ResolvedModel<any, any, any>, item: ResolvedModelItem<any, any, any>): string | number {
@@ -35,6 +38,18 @@ export function createCache<
     return key
   }
 
+  function addWrappedItemKeyToLayer(layer: CacheLayer | undefined, wrapKey: string) {
+    if (!layer) {
+      return
+    }
+    let keys = wrappedItemKeysPerLayer.get(layer.id)
+    if (!keys) {
+      keys = new Set()
+      wrappedItemKeysPerLayer.set(layer.id, keys)
+    }
+    keys.add(wrapKey)
+  }
+
   function getWrappedItem<TModel extends Model>(
     model: ResolvedModel<TModel, TModelDefaults, TSchema>,
     item: ResolvedModelItem<TModel, TModelDefaults, TSchema> | null | undefined,
@@ -43,7 +58,8 @@ export function createCache<
       return undefined
     }
     const key = getItemKey(model, item)
-    const wrapKey = getItemWrapKey(model, key)
+    const layer = item.$layer as CacheLayer | undefined
+    const wrapKey = getItemWrapKey(model, key, layer)
     let wrappedItem = wrappedItems.get(wrapKey)
     if (!wrappedItem) {
       let metadata = wrappedItemsMetadata.get(wrapKey)
@@ -57,10 +73,16 @@ export function createCache<
       wrappedItem = wrapItem({
         store: getStore(),
         model,
-        item: computed(() => state.value[model.name]?.[key] ?? item),
+        item: computed(() => layer
+          ? {
+              ...layer.state[model.name]?.[key],
+              $layer: layer,
+            }
+          : state.value[model.name]?.[key] ?? item),
         metadata,
       })
       wrappedItems.set(wrapKey, wrappedItem)
+      addWrappedItemKeyToLayer(item.$layer, wrapKey)
     }
     return wrappedItem
   }
@@ -76,7 +98,7 @@ export function createCache<
     const item = state.value[model.name]?.[key]
     if (item) {
       delete state.value[model.name]?.[key]
-      const wrapKey = getItemWrapKey(model, key)
+      const wrapKey = getItemWrapKey(model, key, undefined)
       wrappedItems.delete(wrapKey)
       wrappedItemsMetadata.delete(wrapKey)
       const store = getStore()
@@ -97,18 +119,49 @@ export function createCache<
     }
   }
 
+  function getStateForModel(modelName: string) {
+    const result = Object.assign({}, state.value[modelName] ?? {})
+
+    // Add & modify from layers
+    for (const layer of layers.value) {
+      if (!layer.skip && layer.state[modelName]) {
+        const layerState: Record<string | number, any> = {}
+        for (const [key, value] of Object.entries(layer.state[modelName])) {
+          const data = {
+            ...result[key],
+            ...value,
+            $layer: layer,
+          }
+          layerState[key] = data
+        }
+        Object.assign(result, layerState)
+      }
+    }
+
+    // Delete from layers
+    for (const layer of layers.value) {
+      if (!layer.skip && layer.deletedItems[modelName]) {
+        for (const key of layer.deletedItems[modelName]) {
+          delete result[key]
+        }
+      }
+    }
+
+    return result
+  }
+
   return {
     wrapItem({ model, item }) {
       return getWrappedItem(model, item)!
     },
     readItem({ model, key }) {
-      return getWrappedItem(model, state.value[model.name]?.[key])
+      return getWrappedItem(model, getStateForModel(model.name)[key])
     },
     readItems({ model, marker, filter, limit }) {
       if (marker && !state.value._markers?.[marker]) {
         return []
       }
-      const data: Array<ResolvedModelItemBase<any, any, any>> = Object.values(state.value[model.name] ?? {})
+      const data: Array<ResolvedModelItemBase<any, any, any>> = Object.values(getStateForModel(model.name))
       const result: Array<WrappedItem<any, any, any>> = []
       let count = 0
       for (const item of data) {
@@ -303,6 +356,27 @@ export function createCache<
           const wrappedItem = this.wrapItem({ model, item: itemsForType[key] })
           garbageCollectItem(model, wrappedItem)
         }
+      }
+    },
+    addLayer(layer) {
+      layers.value.push(layer)
+    },
+    getLayer(layerId) {
+      return layers.value.find(l => l.id === layerId)
+    },
+    removeLayer(layerId) {
+      const index = layers.value.findIndex(l => l.id === layerId)
+      if (index !== -1) {
+        const layer = layers.value[index]
+        const keys = wrappedItemKeysPerLayer.get(layer.id)
+        if (keys) {
+          for (const key of keys) {
+            wrappedItems.delete(key)
+            wrappedItemsMetadata.delete(key)
+          }
+          wrappedItemKeysPerLayer.delete(layer.id)
+        }
+        layers.value.splice(index, 1)
       }
     },
     _private: {
