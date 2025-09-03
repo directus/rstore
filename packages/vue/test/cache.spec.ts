@@ -170,4 +170,57 @@ describe('cache', () => {
     expect(items).toHaveLength(1)
     expect(items[0]).toEqual({ id: 1, label: 'Meow' })
   })
+
+  it('should garbage collect an item that is not referenced by any query', () => {
+    const cache = createCache({ getStore })
+    cache.writeItem({ model: mockModel, key: 1, item: mockItem })
+
+    const item = cache.readItem({ model: mockModel, key: 1 })
+    expect(item.$meta.queries.size).toBe(0)
+
+    cache.garbageCollectItem({ model: mockModel, item })
+
+    const item2 = cache.readItem({ model: mockModel, key: 1 })
+    expect(item2).toBeUndefined()
+  })
+
+  it('should not garbage collect an item that is referenced by a query', () => {
+    const cache = createCache({ getStore })
+    cache.writeItem({ model: mockModel, key: 1, item: mockItem })
+
+    const item = cache.readItem({ model: mockModel, key: 1 })
+    item.$meta.queries.add('testQuery')
+
+    cache.garbageCollectItem({ model: mockModel, item })
+
+    const item2 = cache.readItem({ model: mockModel, key: 1 })
+    expect(item2).toBeDefined()
+  })
+
+  it('should garbage collect all items that are not referenced by any query', () => {
+    const mockStore = {
+      $hooks: createHooks(),
+      $models: [mockModel],
+    } as unknown as VueStore
+    const cache = createCache({ getStore: () => mockStore })
+    cache.writeItem({ model: mockModel, key: 1, item: { id: 1, name: 'item 1' } })
+    cache.writeItem({ model: mockModel, key: 2, item: { id: 2, name: 'item 2' } })
+    cache.writeItem({ model: mockModel, key: 3, item: { id: 3, name: 'item 3' } })
+
+    // Reference item 2
+    const item2 = cache.readItem({ model: mockModel, key: 2 })!
+    item2.$meta.queries.add('testQuery')
+
+    let state = cache.getState() as any
+    expect(state.TestModel[1]).toBeDefined()
+    expect(state.TestModel[2]).toBeDefined()
+    expect(state.TestModel[3]).toBeDefined()
+
+    cache.garbageCollect()
+
+    state = cache.getState() as any
+    expect(state.TestModel[1]).toBeUndefined()
+    expect(state.TestModel[2]).toBeDefined()
+    expect(state.TestModel[3]).toBeUndefined()
+  })
 })
