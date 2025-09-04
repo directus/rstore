@@ -6,6 +6,9 @@ const itemSearchContent = ref('')
 const store = useNonNullRstore()
 const cache = useStoreCache()
 
+// Force update the item values when cache is updated
+const forceUpdate = ref(0)
+
 const showRawCache = useLocalStorage('rstore-devtools-show-raw-cache', false)
 const selectedModel = useLocalStorage<string | null>('rstore-devtools-selected-cache-model', null)
 const cacheModelSearch = useLocalStorage('rstore-devtools-cache-model-search', '')
@@ -56,19 +59,19 @@ const filteredCache = computed(() => {
       return result
     }
     catch (error) {
-      console.error(error)
+      console.warn(`[rstore devtools] Invalid filter: ${itemSearchContent.value}`)
+      console.warn(error)
       return cache
     }
   }
+
+  // eslint-disable-next-line ts/no-unused-expressions
+  forceUpdate.value // track changes
 
   let result = filteredByKey(selectedCache.value)
   result = filteredByContent(result)
   return result
 })
-
-// Force update the item values when cache is updated
-
-const forceUpdate = ref(0)
 
 watch(cache, () => {
   forceUpdate.value++
