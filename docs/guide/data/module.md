@@ -35,6 +35,7 @@ With the `@rstore/nuxt` module, you can directly use the auto-imported `defineRs
 - **Encapsulation**: Modules allow you to encapsulate related state, queries and mutations, making your code more organized and easier to maintain.
 - **Reusability**: You can create reusable modules that can be shared across different parts of your application or even across different applications.
 - **Shared**: rstore modules are automatically shared across all components that use them, so they are only created once.
+- **Code-splitting**: You can lazy-load modules when needed, reducing the initial bundle size of your application.
 - **SSR**: Modules are automatically SSR compatible, so you don't have to worry about the state being lost during server-side rendering.
 - **Async**: You can use async code (see `onResolve` below) to initialize the module.
 - **Hybrid promise**: Awaiting a module is optional, all exposed properties are also available directly.
