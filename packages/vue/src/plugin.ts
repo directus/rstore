@@ -1,5 +1,5 @@
-import type { VueStore } from './store'
 import { type App, inject, type InjectionKey } from 'vue'
+import { getActiveStore, type VueStore } from './store'
 
 export interface RstoreVueGlobal {
   store: VueStore
@@ -18,9 +18,9 @@ export function install(vueApp: App, options: PluginOptions) {
 }
 
 export function useStore(): RstoreVueGlobal['store'] {
-  const injected = inject(injectionKey, null)
+  const injected = inject(injectionKey, null)?.store ?? getActiveStore()
   if (!injected) {
-    throw new Error('Rstore is not installed. Make sure to install the plugin with `app.use(RstorePlugin, { store })`.')
+    throw new Error('Rstore is not installed. Make sure to install the plugin with `app.use(RstorePlugin, { store })`. For tests, use `setActiveStore(store)`.')
   }
-  return injected.store
+  return injected
 }

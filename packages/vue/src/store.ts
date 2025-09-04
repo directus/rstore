@@ -176,3 +176,19 @@ declare module '@rstore/shared' {
     $time: Ref<number>
   }
 }
+
+let activeStore: VueStore | null = null
+
+/**
+ * Set the active store for testing modules or code outside of Vue components that need to access the store.
+ */
+export function setActiveStore(store: VueStore | null) {
+  activeStore = store
+}
+
+/**
+ * Get the active store. This is useful for testing modules or code outside of Vue components that need to access the store.
+ */
+export function getActiveStore(): VueStore | null {
+  return activeStore
+}
