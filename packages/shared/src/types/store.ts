@@ -1,7 +1,7 @@
 import type { Hooks } from '../utils/hooks'
 import type { Cache } from './cache'
 import type { Model, ModelDefaults, ResolvedModel, ResolvedModelList, StoreSchema } from './model'
-import type { CreateModuleApi, Module, ResolvedModule } from './module'
+import type { ResolvedModule } from './module'
 import type { MutationOperation, MutationSpecialProps } from './mutation'
 import type { RegisteredPlugin } from './plugin'
 import type { FetchPolicy, FindOptions } from './query'
@@ -32,10 +32,6 @@ export interface StoreCore<
    * @private
    */
   $dedupePromises: Map<string, Promise<any>>
-  /**
-   * @deprecated Use `createModule` import instead.
-   */
-  $createModule: <TModule extends Module> (module: TModule) => CreateModuleApi<TModule>
   /**
    * @private
    */

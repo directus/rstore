@@ -1,23 +1,36 @@
+import type { Awaitable, CreateModuleApi, Module, ResolvedModule } from '@rstore/shared'
 import { defineModule as _defineModule } from '@rstore/core'
-import { hasInjectionContext, inject } from 'vue'
-import { injectionKey } from './plugin'
+import { hasInjectionContext } from 'vue'
+import { useStore } from './plugin'
 
-export const defineModule: typeof _defineModule = ((cb) => {
-  return () => {
-    const rstoreGlobal = hasInjectionContext() ? inject(injectionKey, undefined) : undefined
+type TStore = ReturnType<typeof useStore>
 
-    if (rstoreGlobal) {
+export function defineModule<
+  const TModule extends Module,
+  const TModuleExposed extends Record<string, any>,
+>(
+  name: TModule['name'],
+  cb: (api: CreateModuleApi<TStore>) => TModuleExposed,
+): (store?: TStore | null) => Awaitable<ResolvedModule<TModule, TModuleExposed>> & ResolvedModule<TModule, TModuleExposed> {
+  return (_store) => {
+    const hasContext = hasInjectionContext()
+
+    const store = hasContext ? useStore() : _store
+
+    if (store) {
       // Reuse the module if it was already created
-      if (rstoreGlobal.modules.has(cb)) {
-        return rstoreGlobal.modules.get(cb)
+      if (store.$modulesCache.has(cb)) {
+        return store.$modulesCache.get(cb)
       }
 
       // Create a new module and add it to the global store
-      const module = _defineModule(cb)()
-      rstoreGlobal.modules.set(cb, module)
+      const module = _defineModule(store, name, cb)()
+      store.$modulesCache.set(cb, module)
       return module
     }
-
-    return _defineModule(cb)()
+    else {
+      // TODO active store for testing
+      throw new Error('Rstore module used outside of a Vue component setup or without active store. Make sure to call this function inside a setup() function or with an active store.')
+    }
   }
-}) as typeof _defineModule
+}

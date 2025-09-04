@@ -1,9 +1,7 @@
-import type { ResolvedModule } from '@rstore/shared'
 import type { VueStore } from './store'
 import { type App, inject, type InjectionKey } from 'vue'
 
 export interface RstoreVueGlobal {
-  modules: WeakMap<() => ResolvedModule<any, any>, ResolvedModule<any, any>>
   store: VueStore
 }
 
@@ -15,7 +13,6 @@ export const injectionKey = Symbol('rstore') as InjectionKey<RstoreVueGlobal>
 
 export function install(vueApp: App, options: PluginOptions) {
   vueApp.provide(injectionKey, {
-    modules: new WeakMap(),
     store: options.store,
   })
 }

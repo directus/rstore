@@ -88,7 +88,7 @@ export interface Cache<
     childItem: any
   }) => void
 
-  getModuleState: <TModule extends Module> (name: TModule['name'], initState: TModule['state']) => ResolvedModuleState<TModule>
+  getModuleState: <TModule extends Module> (name: TModule['name'], key: string, initState: TModule['state']) => ResolvedModuleState<TModule>
 
   getState: () => CustomCacheState
 

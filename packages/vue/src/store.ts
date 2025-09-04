@@ -1,4 +1,4 @@
-import type { FindOptions, Model, ModelDefaults, ModelsFromStoreSchema, Plugin, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { FindOptions, Model, ModelDefaults, ModelsFromStoreSchema, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { createStoreCore, resolveModel } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook } from '@vueuse/core'
@@ -35,6 +35,7 @@ export type VueStore<
   $model: (modelName: string) => VueModelApi<any, TModelDefaults, TSchema, WrappedItem<any, TModelDefaults, TSchema>>
   $onCacheReset: (callback: () => void) => () => void
   $experimentalGarbageCollection?: boolean
+  $modulesCache: WeakMap<(...args: any[]) => ResolvedModule<any, any>, ResolvedModule<any, any>>
 }
 
 interface PrivateVueStore {
@@ -46,6 +47,8 @@ export async function createStore<
   const TModelDefaults extends ModelDefaults,
 >(options: CreateStoreOptions<TSchema, TModelDefaults>): Promise<VueStore<TSchema, TModelDefaults>> {
   let storeProxy = undefined as unknown as VueStore<TSchema, TModelDefaults>
+
+  const modulesCache = new WeakMap<(...args: any[]) => ResolvedModule<any, any>, ResolvedModule<any, any>>()
 
   return createStoreCore<TSchema, TModelDefaults>({
     schema: options.schema,
@@ -125,6 +128,10 @@ export async function createStore<
               wrappedMutation.$time = $time
               return wrappedMutation
             }
+          }
+
+          if (key === '$modulesCache') {
+            return modulesCache
           }
 
           return Reflect.get(store, key)

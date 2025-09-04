@@ -2,7 +2,6 @@ import type { Cache, CustomHookMeta, FindOptions, Hooks, ModelDefaults, Mutation
 import { get, set } from '@rstore/shared'
 import { defaultFetchPolicy } from './fetchPolicy'
 import { addModelRelations, isModelRelations, resolveModels } from './model'
-import { createModule } from './module'
 import { setupPlugin } from './plugin'
 
 export interface CreateStoreCoreOptions<
@@ -80,9 +79,6 @@ export async function createStoreCore<
     $mutationHistory: [],
     $isServer: options.isServer ?? false,
     $dedupePromises: new Map(),
-    $createModule(module) {
-      return createModule(store, module)
-    },
     $registeredModules: new Map(),
     $wrapMutation: mutation => mutation as typeof mutation & MutationSpecialProps,
   }

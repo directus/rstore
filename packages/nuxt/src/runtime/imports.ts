@@ -6,7 +6,6 @@ import { type CreateFormObject, defineRelations, type UpdateFormObject, type Vue
 export * from '@rstore/vue'
 
 export {
-  createModule as createRstoreModule,
   defineModule as defineRstoreModule,
   definePlugin as defineRstorePlugin,
 } from '@rstore/vue'

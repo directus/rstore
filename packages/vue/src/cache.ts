@@ -305,8 +305,8 @@ export function createCache<
     deleteItem({ model, key }) {
       deleteItem(model, key)
     },
-    getModuleState(name, initState) {
-      const cacheKey = `$${name}`
+    getModuleState(name, key, initState) {
+      const cacheKey = `$${name}:${key}`
       state.value[cacheKey] ??= initState
       return state.value[cacheKey]
     },

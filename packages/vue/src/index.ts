@@ -29,7 +29,6 @@ export type {
 
 export {
   addModelRelations,
-  createModule,
   defineDataModel,
   defineItemType,
   definePlugin,
