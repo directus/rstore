@@ -1,4 +1,6 @@
 <script lang="ts" setup>
+import { useStore } from '@rstore/vue'
+
 const props = defineProps<{
   id: string
 }>()

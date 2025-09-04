@@ -163,7 +163,7 @@ import { createStore } from '@rstore/vue'
 import { todoModel } from './model'
 import myPlugin from './plugin'
 
-export async function rstore(app) {
+export async function setupRstore(app) {
   const store = await createStore({
     schema: [
       todoModel,
@@ -181,7 +181,7 @@ import { createStore } from '@rstore/vue'
 import { schema } from './model'
 import myPlugin from './plugin'
 
-export async function rstore(app: App) {
+export async function setupRstore(app: App) {
   const store = await createStore({
     schema,
     plugins: [
@@ -193,50 +193,36 @@ export async function rstore(app: App) {
 
 :::
 
-5. Expose the store to your components with a composable:
+5. Install the store into the app:
 
 ::: code-group
 
 ```js{1,8,11-17} [src/rstore/index.js]
-const injectStoreKey = Symbol('rstore')
+import { RstorePlugin } from '@rstore/vue'
 
-export async function rstore(app) {
+export async function setupRstore(app) {
   const store = await createStore({
     // ...
   })
 
-  app.provide(injectStoreKey, store)
-}
-
-export function useStore () {
-  const store = inject(injectStoreKey, null)
-  if (store == null) {
-    throw new Error('No rstore provided.')
-  }
-  return store
+  app.use(RstorePlugin, { store })
 }
 ```
 
 ```ts{1,2,4,11,14-20} [src/rstore/index.ts]
-import type { VueStore } from '@rstore/vue'
-import type { InjectionKey } from 'vue'
+import { RstorePlugin, type VueStore } from '@rstore/vue'
 
-const injectStoreKey = Symbol('rstore') as InjectionKey<VueStore<typeof schema>>
-
-export async function rstore(app: App) {
+export async function setupRstore(app: App) {
   const store = await createStore({
     // ...
   })
 
-  app.provide(injectStoreKey, store)
+  app.use(RstorePlugin, { store })
 }
 
-export function useStore () {
-  const store = inject(injectStoreKey, null)
-  if (store == null) {
-    throw new Error('No rstore provided.')
-  }
-  return store
+// Augment the `useStore` type
+declare module '@rstore/vue' {
+  export function useStore(): VueStore<typeof schema>
 }
 ```
 
@@ -245,16 +231,16 @@ export function useStore () {
 6. Add the store to your app:
 
 ```js
-import { rstore } from './rstore'
+import { setupRstore } from './rstore'
 
-app.use(rstore)
+app.use(setupRstore)
 ```
 
 7. Use the store in a component:
 
 ```vue
 <script setup>
-import { useStore } from '@/rstore'
+import { useStore } from '@rstore/vue'
 
 const store = useStore()
 

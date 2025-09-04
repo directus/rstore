@@ -14,6 +14,7 @@ export {
 
 export {
   install as RstorePlugin,
+  useStore,
 } from './plugin'
 
 export {

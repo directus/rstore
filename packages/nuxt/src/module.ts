@@ -134,6 +134,16 @@ export const constModels = [
       },
     })
 
+    addTypeTemplate({
+      filename: 'types/rstore.d.ts',
+      getContents: () => `import type { Store } from '#imports'
+declare module '@rstore/vue' {
+  export function useStore(): Store
+}
+  
+export {}`,
+    })
+
     addPlugin(resolve('./runtime/plugin'))
 
     setupDevToolsUI(nuxt, resolver)
