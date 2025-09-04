@@ -88,7 +88,7 @@ Here is what the cache can look like:
 
 rstore is designed with a local-first approach, meaning that it prioritizes local data access and computation. This design choice allows for faster data retrieval and manipulation, as well as improved performance in scenarios where network connectivity may be unreliable or slow.
 
-In practice this means that all data reads in components are computed client-size from the cache, including filtering and sorting.
+In practice this means that all data reads in components are computed client-side from the cache, including filtering and sorting.
 
 ![schema of rstore local-first](./img/rstore-local-first-dark.svg){.dark-only}
 ![schema of rstore local-first](./img/rstore-local-first.svg){.light-only}
