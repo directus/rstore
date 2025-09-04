@@ -63,6 +63,12 @@ export async function createStoreCore<
       if (modelNames?.length === 1) {
         return store.$models.find(m => m.name === modelNames[0]) ?? null
       }
+      if (typeof item?.$model === 'string') {
+        const result = store.$models.find(m => m.name === item.$model)
+        if (result) {
+          return result
+        }
+      }
       const models = modelNames ? store.$models.filter(m => modelNames?.includes(m.name)) : store.$models
       for (const model of models) {
         if (model.isInstanceOf(item)) {
