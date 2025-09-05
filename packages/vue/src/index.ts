@@ -44,6 +44,8 @@ export type {
   CustomParams,
   CustomPluginMeta,
   CustomSortOption,
+  FindFirstOptions,
+  FindManyOptions,
   FindOptions,
   Model,
   ModelDefaults,

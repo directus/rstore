@@ -378,3 +378,26 @@ const { data: comments } = store.comments.query(q => q.many({
 The cache will automatically resolve the relations as soon as the data is available in the cache.
 
 Plugins hooked on the `fetchRelations` hook will also be called to potentially fetch the data of the relations. See [Plugin hooks](../plugin/hooks.md#fetching-relations) for more details.
+
+## Customizing Find Options Types
+
+You can customize the `FindOptions` type used in the `first` and `many` query builder methods and in the `peek*`/`find*` methods by declaring a module augmentation for `@rstore/vue` and extending the `FindOptions` interface.
+
+Create a `rstore.d.ts` file in your project with the following content:
+
+```ts
+declare module '@rstore/vue' {
+  export interface FindOptions<
+    TModel extends Model,
+    TModelDefaults extends ModelDefaults,
+    TSchema extends StoreSchema,
+  > extends FindOptionsBase<TModel, TModelDefaults, TSchema> {
+    // Your custom properties here
+
+    // For example, replace the `filter` property with a custom syntax
+    filter?: MyFilterSyntax
+  }
+}
+
+export {}
+```

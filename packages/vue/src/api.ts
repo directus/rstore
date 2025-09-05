@@ -13,6 +13,18 @@ import { createQuery } from './query'
 
 export type QueryType = 'first' | 'many'
 
+type QueryFirstOptions<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TSchema extends StoreSchema,
+> = string | number | FindFirstOptions<TModel, TModelDefaults, TSchema> | { enabled: false }
+
+type QueryManyOptions<
+  TModel extends Model,
+  TModelDefaults extends ModelDefaults,
+  TSchema extends StoreSchema,
+> = FindManyOptions<TModel, TModelDefaults, TSchema> | { enabled: false }
+
 export interface QueryBuilder<
   TModel extends Model,
   TModelDefaults extends ModelDefaults,
@@ -21,12 +33,12 @@ export interface QueryBuilder<
   /**
    * Create a reactive query for the first item that matches the given options.
    */
-  first: (options: string | number | FindFirstOptions<TModel, TModelDefaults, TSchema> | { enabled: false }) => (FindFirstOptions<TModel, TModelDefaults, TSchema> | { enabled: false }) & { '~type': 'first' }
+  first: (options: QueryFirstOptions<TModel, TModelDefaults, TSchema>) => QueryFirstOptions<TModel, TModelDefaults, TSchema> & { '~type': 'first' }
 
   /**
    * Create a reactive query for all items that match the given options.
    */
-  many: (options?: FindManyOptions<TModel, TModelDefaults, TSchema> | undefined | { enabled: false }) => (FindManyOptions<TModel, TModelDefaults, TSchema> | Record<PropertyKey, never> | { enabled: false }) & { '~type': 'many' }
+  many: (() => { '~type': 'many' }) & ((options: QueryManyOptions<TModel, TModelDefaults, TSchema>) => QueryManyOptions<TModel, TModelDefaults, TSchema> & { '~type': 'many' })
 }
 
 export interface LiveQueryBuilder<
@@ -37,12 +49,12 @@ export interface LiveQueryBuilder<
   /**
    * Create a reactive live query for the first item that matches the given options and subscribe to real-time updates (for example from WebSockets).
    */
-  first: (options: string | number | FindFirstOptions<TModel, TModelDefaults, TSchema> | { enabled: false }) => (FindFirstOptions<TModel, TModelDefaults, TSchema> | { enabled: false }) & { '~type': 'first' }
+  first: (options: QueryFirstOptions<TModel, TModelDefaults, TSchema>) => QueryFirstOptions<TModel, TModelDefaults, TSchema> & { '~type': 'first' }
 
   /**
    * Create a reactive live query for all items that match the given options and subscribe to real-time updates (for example from WebSockets).
    */
-  many: (options?: FindManyOptions<TModel, TModelDefaults, TSchema> | undefined | { enabled: false }) => (FindManyOptions<TModel, TModelDefaults, TSchema> | Record<PropertyKey, never> | { enabled: false }) & { '~type': 'many' }
+  many: (() => { '~type': 'many' }) & ((options: QueryManyOptions<TModel, TModelDefaults, TSchema>) => QueryManyOptions<TModel, TModelDefaults, TSchema> & { '~type': 'many' })
 }
 
 export type SubscriptionQueryBuilder<
@@ -254,11 +266,11 @@ export function createModelApi<
     _live: IsLive,
   ) {
     const queryBuilder = {
-      first: options => ({
+      first: (options: QueryFirstOptions<TModel, TModelDefaults, TSchema>) => ({
         ...typeof options === 'object' ? options : { key: options },
         '~type': 'first' satisfies QueryType,
       }),
-      many: options => ({
+      many: (options: QueryManyOptions<TModel, TModelDefaults, TSchema> | undefined) => ({
         ...options,
         '~type': 'many' satisfies QueryType,
       }),
