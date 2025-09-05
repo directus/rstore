@@ -481,6 +481,9 @@ importers:
       '@standard-schema/spec':
         specifier: ^1.0.0
         version: 1.0.0
+      klona:
+        specifier: ^2.0.6
+        version: 2.0.6
     devDependencies:
       typescript:
         specifier: 'catalog:'

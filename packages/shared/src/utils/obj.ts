@@ -1,4 +1,5 @@
 import type { FilterNotStartingWith, FilterStartsWith, Path, PathValue } from '../types'
+import { klona } from 'klona'
 
 export function get<TObject, TPath extends Path<TObject>>(obj: TObject, path: TPath): PathValue<TObject, TPath> | undefined {
   let current: any = obj
@@ -28,7 +29,7 @@ export function pickNonSpecialProps<TItem extends Record<string, any>>(item: TIt
   const result: any = {}
   for (const key in item) {
     if (!key.startsWith('$')) {
-      result[key] = item[key]
+      result[key] = klona(item[key])
     }
   }
   return result
@@ -38,7 +39,7 @@ export function pickSpecialProps<TItem extends Record<string, any>>(item: TItem)
   const result: any = {}
   for (const key in item) {
     if (key.startsWith('$')) {
-      result[key] = item[key]
+      result[key] = klona(item[key])
     }
   }
   return result
