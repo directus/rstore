@@ -1,8 +1,11 @@
 <script lang="ts">
-const itemSearchContent = ref('')
 </script>
 
 <script lang="ts" setup>
+import type { ResolvedModel } from '@rstore/shared'
+
+const itemSearchContent = ref('')
+
 const store = useNonNullRstore()
 const cache = useStoreCache()
 
@@ -15,10 +18,14 @@ const cacheModelSearch = useLocalStorage('rstore-devtools-cache-model-search', '
 const itemSearchKey = useLocalStorage('rstore-devtools-cache-item-search-key', '')
 
 const filteredModels = computed(() => {
+  let result: Array<ResolvedModel> = []
   if (!cacheModelSearch.value) {
-    return store.value.$models
+    result = store.value.$models
   }
-  return store.value.$models.filter(m => m.name.toLowerCase().includes(cacheModelSearch.value.toLowerCase()))
+  else {
+    result = store.value.$models.filter(m => m.name.toLowerCase().includes(cacheModelSearch.value.toLowerCase()))
+  }
+  return result.sort((a, b) => a.name.localeCompare(b.name))
 })
 
 const modelSearchEl = useTemplateRef('modelSearchEl')
