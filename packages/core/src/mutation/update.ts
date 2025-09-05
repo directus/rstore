@@ -29,6 +29,8 @@ export async function updateItem<
 }: UpdateOptions<TModel, TModelDefaults, TSchema>): Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>> {
   const meta: CustomHookMeta = {}
 
+  const originalItem = item
+
   item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
   key = key ?? model.getKey(item)
@@ -85,7 +87,7 @@ export async function updateItem<
       state: {
         [model.name]: {
           [key]: {
-            ...item,
+            ...originalItem,
             ...typeof optimistic === 'object' ? optimistic : {},
             $overrideKey: key,
           },
