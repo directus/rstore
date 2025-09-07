@@ -9,7 +9,7 @@
     "dev:prepare": "nuxi prepare"
   },
   "dependencies": {
-    "@nuxt/kit": "^4.1.1",
+    "@nuxt/kit": "^4.0.0",
     "@rstore/nuxt": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
