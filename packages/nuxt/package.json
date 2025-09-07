@@ -44,7 +44,7 @@
   },
   "dependencies": {
     "@nuxt/devtools-kit": "^2.2.1",
-    "@nuxt/kit": "catalog:",
+    "@nuxt/kit": "^4.1.1",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
     "sirv": "^3.0.1"

@@ -36,7 +36,7 @@
   },
   "dependencies": {
     "@directus/sdk": "^19.0.1",
-    "@nuxt/kit": "catalog:",
+    "@nuxt/kit": "^4.1.1",
     "@rstore/nuxt": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^"

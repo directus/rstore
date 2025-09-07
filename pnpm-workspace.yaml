@@ -2,7 +2,6 @@ packages:
   - packages/*
 
 catalog:
-  '@nuxt/kit': ^4.1.1
   '@nuxt/schema': ^4.1.1
   '@nuxt/ui': ^3.3.3
   '@types/node': ^24.3.1
