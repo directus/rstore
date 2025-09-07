@@ -32,14 +32,14 @@ export default eventHandler(async (event) => {
 
   const q = {} as NonNullable<Parameters<typeof dbQuery[typeof modelName]['findMany']>[0]>
 
-  const where: any[] = []
+  const whereConditions: any[] = []
 
   if (query.where) {
     try {
       const where = JSON.parse(query.where as string) as any
       if (where) {
         const condition = getDrizzleCondition(table, where)
-        where.push(condition)
+        whereConditions.push(condition)
       }
     }
     catch (e) {
@@ -53,11 +53,11 @@ export default eventHandler(async (event) => {
 
   for (const transform of transforms) {
     transform({
-      where: (condition) => { where.push(condition) },
+      where: (condition) => { whereConditions.push(condition) },
     })
   }
 
-  q.where = where.length ? and(...where) : undefined
+  q.where = whereConditions.length ? and(...whereConditions) : undefined
 
   if (query.limit != null) {
     q.limit = Number.parseInt(query.limit)

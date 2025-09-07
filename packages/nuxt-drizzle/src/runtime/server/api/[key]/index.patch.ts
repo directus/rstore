@@ -24,18 +24,18 @@ export default defineEventHandler(async (event) => {
 
   const { table, primaryKeys } = getDrizzleTableFromModel(modelName)
 
-  const where: any[] = [
+  const whereConditions: any[] = [
     getDrizzleKeyWhere(key, primaryKeys, table),
   ]
 
   for (const transform of transforms) {
     transform({
-      where: (condition) => { where.push(condition) },
+      where: (condition) => { whereConditions.push(condition) },
     })
   }
 
   const q = rstoreUseDrizzle().update(table as any).set(body).where(and(
-    ...where,
+    ...whereConditions,
   ))
 
   let result: any
@@ -48,7 +48,7 @@ export default defineEventHandler(async (event) => {
   else {
     await q
     const select = await rstoreUseDrizzle().select().from(table as any).where(and(
-      ...where,
+      ...whereConditions,
     )).limit(1)
     result = select[0]
   }

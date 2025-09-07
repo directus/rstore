@@ -23,10 +23,10 @@ export default defineEventHandler(async (event) => {
 
   const { table, primaryKeys } = getDrizzleTableFromModel(modelName)
 
-  const where: any[] = []
+  const whereConditions: any[] = []
   for (const transform of transforms) {
     transform({
-      where: (condition) => { where.push(condition) },
+      where: (condition) => { whereConditions.push(condition) },
     })
   }
 
@@ -34,7 +34,7 @@ export default defineEventHandler(async (event) => {
   let result: any = await dbQuery[modelName]!.findFirst({
     where: and(
       getDrizzleKeyWhere(key, primaryKeys, table),
-      ...where,
+      ...whereConditions,
     ),
     with: query.with ? JSON.parse(query.with) : undefined,
     columns: query.columns ? JSON.parse(query.columns) : undefined,

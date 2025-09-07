@@ -22,18 +22,18 @@ export default defineEventHandler(async (event) => {
 
   const { table, primaryKeys } = getDrizzleTableFromModel(modelName)
 
-  const where: any[] = [
+  const whereConditions: any[] = [
     getDrizzleKeyWhere(key, primaryKeys, table),
   ]
 
   for (const transform of transforms) {
     transform({
-      where: (condition) => { where.push(condition) },
+      where: (condition) => { whereConditions.push(condition) },
     })
   }
 
   await rstoreUseDrizzle().delete(table as any).where(and(
-    ...where,
+    ...whereConditions,
   ))
 
   let result: any = null
