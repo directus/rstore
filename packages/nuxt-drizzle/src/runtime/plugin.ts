@@ -3,7 +3,7 @@ import { useRequestFetch } from '#app'
 // @ts-expect-error virtual module
 import { apiPath } from '#build/$rstore-drizzle-config.js'
 import { definePlugin, type VueStore } from '@rstore/vue'
-import { eq } from './utils/where'
+import { and, eq } from './utils/where'
 import { filterWhere } from './where'
 
 export default definePlugin({
@@ -95,8 +95,12 @@ export default definePlugin({
 
             await Promise.all(Object.keys(relation.to).map((modelName) => {
               const relationData = relation.to[modelName]!
+              const where: any[] = []
+              for (const key in relationData.on) {
+                where.push(eq(key, wrappedItem[relationData.on[key]!]))
+              }
               return store.$model(modelName).findMany({
-                where: eq(relationData.on, wrappedItem[relationData.eq]),
+                where: and(...where),
               })
             }))
           }
