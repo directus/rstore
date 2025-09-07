@@ -31,7 +31,7 @@ export default defineEventHandler(async (event) => {
   }
 
   const dbQuery = rstoreUseDrizzle().query as unknown as Record<string, RelationalQueryBuilder<any, any>>
-  let result: any = await dbQuery[modelName].findFirst({
+  let result: any = await dbQuery[modelName]!.findFirst({
     where: and(
       getDrizzleKeyWhere(key, primaryKeys, table),
       ...where,

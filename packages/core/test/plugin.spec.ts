@@ -116,7 +116,7 @@ describe('setupPlugin', () => {
       } as any)
 
       expect(hookCallback).toHaveBeenCalledOnce()
-      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
+      expect(hookCallback.mock.calls[0]![0].model.name).toBe('Todo')
     })
 
     it('should not filter hook with scopeId with ignoreScope', async () => {
@@ -154,8 +154,8 @@ describe('setupPlugin', () => {
       } as any)
 
       expect(hookCallback).toHaveBeenCalledTimes(2)
-      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
-      expect(hookCallback.mock.calls[1][0].model.name).toBe('Message')
+      expect(hookCallback.mock.calls[0]![0].model.name).toBe('Todo')
+      expect(hookCallback.mock.calls[1]![0].model.name).toBe('Message')
     })
 
     it('should not filter hook with model without scope', async () => {
@@ -189,8 +189,8 @@ describe('setupPlugin', () => {
       } as any)
 
       expect(hookCallback).toHaveBeenCalledTimes(2)
-      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
-      expect(hookCallback.mock.calls[1][0].model.name).toBe('Message')
+      expect(hookCallback.mock.calls[0]![0].model.name).toBe('Todo')
+      expect(hookCallback.mock.calls[1]![0].model.name).toBe('Message')
     })
 
     it('should not filter hook with plugin without scope', async () => {
@@ -225,8 +225,8 @@ describe('setupPlugin', () => {
       } as any)
 
       expect(hookCallback).toHaveBeenCalledTimes(2)
-      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
-      expect(hookCallback.mock.calls[1][0].model.name).toBe('Message')
+      expect(hookCallback.mock.calls[0]![0].model.name).toBe('Todo')
+      expect(hookCallback.mock.calls[1]![0].model.name).toBe('Message')
     })
   })
 
@@ -323,7 +323,7 @@ describe('setupPlugin', () => {
         expect(mockStore.$modelDefaults.computed).toEqual({
           test: expect.any(Function),
         })
-        expect(mockStore.$modelDefaults.computed?.test({})).toBe('new')
+        expect(mockStore.$modelDefaults.computed!.test!({})).toBe('new')
       })
     })
   })

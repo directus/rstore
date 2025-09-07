@@ -32,7 +32,9 @@ export class Hookable<
       plugin,
     })
     return () => {
-      this._hooks[name] = this._hooks[name].filter(cb => cb.callback !== callback)
+      if (this._hooks[name]) {
+        this._hooks[name] = this._hooks[name].filter(cb => cb.callback !== callback)
+      }
     }
   }
 

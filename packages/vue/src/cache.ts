@@ -198,7 +198,7 @@ export function createCache<
           const rawItem = rawData[field]
 
           // TODO: figure out deletions
-          if (!rawItem) {
+          if (!rawItem || !relation) {
             continue
           }
 
@@ -376,7 +376,7 @@ export function createCache<
     removeLayer(layerId) {
       const index = layers.value.findIndex(l => l.id === layerId)
       if (index !== -1) {
-        const layer = layers.value[index]
+        const layer = layers.value[index]!
         const keys = wrappedItemKeysPerLayer.get(layer.id)
         if (keys) {
           for (const key of keys) {

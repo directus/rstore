@@ -88,7 +88,7 @@ export function wrapItem<
 
       // Resolve computed properties
       if (key in model.computed) {
-        return model.computed[key as string](proxy)
+        return model.computed[key as string]!(proxy)
       }
 
       // Resolve related items in the cache
@@ -98,10 +98,10 @@ export function wrapItem<
           return Reflect.get(target, key)
         }
         else {
-          const relation = model.relations[key as string]
+          const relation = model.relations[key as string]!
           const result: Array<any> = []
           for (const targetModelName in relation.to) {
-            const targetModelConfig = relation.to[targetModelName]
+            const targetModelConfig = relation.to[targetModelName]!
             const targetModel = store.$models.find(m => m.name === targetModelName)
             if (!targetModel) {
               throw new Error(`Model "${targetModelName}" does not exist in the store`)
@@ -110,7 +110,7 @@ export function wrapItem<
             const on = targetModelConfig.on as Record<string, string>
             for (const key in on) {
               const foreignKey = key.replace(`${targetModel.name}.`, '')
-              const currentKey = on[key].replace(`${model.name}.`, '')
+              const currentKey = on[key]!.replace(`${model.name}.`, '')
               values[foreignKey] = Reflect.get(proxy, currentKey)
             }
             const cacheResultForTarget = (relation.many ? peekMany : peekFirst)({

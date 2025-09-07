@@ -1,4 +1,3 @@
-// @ts-expect-error virtual module
 import { useRequestFetch } from '#app'
 // @ts-expect-error virtual module
 import { apiPath } from '#build/$rstore-drizzle-config.js'
@@ -135,10 +134,10 @@ export default definePlugin({
           items.sort((a: any, b: any) => {
             for (const param of orderBy) {
               const [key, order] = param.split('.')
-              if (a[key] < b[key]) {
+              if (a[key!] < b[key!]) {
                 return order === 'asc' ? -1 : 1
               }
-              if (a[key] > b[key]) {
+              if (a[key!] > b[key!]) {
                 return order === 'asc' ? 1 : -1
               }
             }

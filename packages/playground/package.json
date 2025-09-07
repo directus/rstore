@@ -33,7 +33,7 @@
     "nuxt-auth-utils": "0.5.18",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "vue-tsc": "^2.2.0",
+    "vue-tsc": "catalog:",
     "zod": "^3.24.2"
   }
 }

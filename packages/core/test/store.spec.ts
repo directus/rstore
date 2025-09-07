@@ -13,7 +13,7 @@ describe('createStoreCore', () => {
       cache: {} as Cache,
       schema: [] as StoreSchema,
       modelDefaults: {} as ModelDefaults,
-      plugins: [],
+      plugins: []!,
       hooks: {
         callHookSync: vi.fn(),
         callHook: vi.fn(),
@@ -74,7 +74,7 @@ describe('createStoreCore', () => {
       const store = await createStoreCore(options)
       const item = { name: 'test' }
 
-      store.$processItemParsing(store.$models[0], item)
+      store.$processItemParsing(store.$models[0]!, item)
 
       expect(item.name).toBe('TEST')
     })
@@ -119,7 +119,7 @@ describe('createStoreCore', () => {
         },
       }
 
-      store.$processItemParsing(store.$models[0], message)
+      store.$processItemParsing(store.$models[0]!, message)
 
       expect(message.author.createdAt).toBeInstanceOf(Date)
       expect(message.author.createdAt.toISOString()).toBe('2023-01-01T00:00:00.000Z')
@@ -144,7 +144,7 @@ describe('createStoreCore', () => {
       const store = await createStoreCore(options)
       const item = { date: new Date('2023-01-01T00:00:00Z') }
 
-      store.$processItemSerialization(store.$models[0], item)
+      store.$processItemSerialization(store.$models[0]!, item)
 
       expect(item.date).toBe('2023-01-01T00:00:00.000Z')
     })
@@ -167,7 +167,7 @@ describe('createStoreCore', () => {
       const store = await createStoreCore(options)
       const item = { optionalField: null }
 
-      store.$processItemSerialization(store.$models[0], item)
+      store.$processItemSerialization(store.$models[0]!, item)
 
       expect(serializeMock).not.toHaveBeenCalled()
     })
@@ -193,7 +193,7 @@ describe('createStoreCore', () => {
         },
       }
 
-      store.$processItemSerialization(store.$models[0], item)
+      store.$processItemSerialization(store.$models[0]!, item)
 
       expect(item.metadata.createdAt).toBe('2023-01-01T00:00:00.000Z')
     })

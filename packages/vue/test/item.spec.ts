@@ -151,7 +151,7 @@ describe('wrapItem', () => {
   })
 
   it('should resolve related items with multiple foreign keys', () => {
-    mockModel.relations.relatedItems.to.relatedModel.on = {
+    mockModel.relations.relatedItems!.to.relatedModel!.on = {
       'relatedModel.foreignKey1': 'testModel.id1',
       'foreignKey2': 'id2',
     }

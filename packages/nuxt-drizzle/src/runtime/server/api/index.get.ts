@@ -88,12 +88,12 @@ export default eventHandler(async (event) => {
       }
       const [columnName, order] = parts
       const operator = orderByOperators[order as 'asc' | 'desc']
-      orderBy.push(operator((table as any)[columnName]))
+      orderBy.push(operator((table as any)[columnName!]))
     }
     q.orderBy = orderBy
   }
 
-  let result = await dbQuery[modelName].findMany(q)
+  let result = await dbQuery[modelName]!.findMany(q)
   result ??= []
 
   await rstoreDrizzleHooks.callHook('index.get.after', {

@@ -17,6 +17,8 @@ export function set<TObject, TPath extends Path<TObject>>(obj: TObject, path: TP
   const keys = path.split('.')
   for (let i = 0; i < keys.length - 1; i++) {
     const key = keys[i]
+    if (!key)
+      continue
     if (current[key] == null) {
       current[key] = {}
     }

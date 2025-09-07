@@ -283,7 +283,7 @@ export default defineNuxtModule<ModuleOptions>({
             to: {
               [targetModel.name]: {
                 on: {
-                  [getColumnKey(relation.referencedTable, targetRelation.config!.fields[0])]: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]),
+                  [getColumnKey(relation.referencedTable, targetRelation.config!.fields[0]!)]: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]!),
                 },
               },
             },
@@ -341,7 +341,7 @@ export default defineNuxtModule<ModuleOptions>({
             to: {
               [targetModel.name]: {
                 on: {
-                  [getColumnKey(relation.referencedTable, targetRelation.config!.fields[0])]: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]),
+                  [getColumnKey(relation.referencedTable, targetRelation.config!.fields[0]!)]: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]!),
                 },
               },
             },

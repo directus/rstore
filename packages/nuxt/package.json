@@ -39,7 +39,8 @@
     "client:prepare": "nuxi prepare client",
     "prepare:all": "nuxi prepare playground && pnpm run dev:prepare && pnpm run client:prepare",
     "test": "vitest run",
-    "test:watch": "vitest watch"
+    "test:watch": "vitest watch",
+    "test:types": "vue-tsc --noEmit"
   },
   "dependencies": {
     "@nuxt/devtools-kit": "^2.2.1",
@@ -62,6 +63,6 @@
     "shiki": "^3.1.0",
     "typescript": "catalog:",
     "vitest": "catalog:",
-    "vue-tsc": "^2.2.0"
+    "vue-tsc": "catalog:"
   }
 }
