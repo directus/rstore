@@ -215,6 +215,9 @@ importers:
       h3:
         specifier: ^1.15.1
         version: 1.15.4
+      hookable:
+        specifier: ^5.5.3
+        version: 5.5.3
       jiti:
         specifier: ^2.4.2
         version: 2.5.1

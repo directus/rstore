@@ -43,6 +43,7 @@
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
     "h3": "^1.15.1",
+    "hookable": "^5.5.3",
     "jiti": "^2.4.2",
     "pathe": "^2.0.3"
   },
