@@ -26,11 +26,6 @@ export interface ModuleOptions {
   drizzleImport?: {
     name: string
     from: string
-
-    /**
-     * @deprecated
-     */
-    default: { name: string, from: string }
   }
 
   /**
@@ -400,7 +395,7 @@ export default defineNuxtModule<ModuleOptions>({
         }
 
         return `import * as schema from '${drizzleSchemaPath}'
-import { ${options.drizzleImport?.name ?? options.drizzleImport?.default?.name ?? 'useDrizzle'} as _drizzleDefault } from '${options.drizzleImport?.from ?? options.drizzleImport?.default?.from ?? '~~/server/utils/drizzle'}'
+import { ${options.drizzleImport?.name ?? 'useDrizzle'} as _drizzleDefault } from '${options.drizzleImport?.from ?? '~~/server/utils/drizzle'}'
 
 export const tables = schema
 export const modelMetas = ${JSON.stringify(modelMetas, null, 2)}
