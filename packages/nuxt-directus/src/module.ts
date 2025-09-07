@@ -1,7 +1,7 @@
 import type { DirectusCollection, DirectusField } from '@directus/sdk'
 import type { Model } from '@rstore/shared'
 import { authentication, createDirectus, readCollections, readFieldsByCollection, rest } from '@directus/sdk'
-import { addImportsDir, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule } from '@nuxt/kit'
+import { addImportsDir, addTemplate, addTypeTemplate, createResolver, defineNuxtModule } from '@nuxt/kit'
 
 export interface ModuleOptions {
   /**
@@ -22,6 +22,9 @@ export default defineNuxtModule<ModuleOptions>({
   },
   // Default configuration options of the Nuxt module
   defaults: {},
+  moduleDependencies: {
+    '@rstore/nuxt': {},
+  },
   async setup(options, nuxt) {
     const { resolve } = createResolver(import.meta.url)
 
@@ -29,10 +32,6 @@ export default defineNuxtModule<ModuleOptions>({
     nuxt.hook('prepare:types', ({ references }) => {
       references.push({ path: resolve('./runtime/types.ts') })
     })
-
-    if (!hasNuxtModule('@rstore/nuxt')) {
-      await installModule('@rstore/nuxt')
-    }
 
     if (!options.url) {
       console.error('Directus API URL is required')
