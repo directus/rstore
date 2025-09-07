@@ -67,7 +67,7 @@ export function createFormObject<
   TSchema extends StandardSchemaV1 = StandardSchemaV1,
   const TAdditionalProps = Record<string, never>,
 >(options: CreateFormObjectOptions<TData, TSchema, TAdditionalProps>) {
-  let initialData = pickNonSpecialProps(options.defaultValues?.() ?? {}) as Partial<TData>
+  let initialData = pickNonSpecialProps(options.defaultValues?.() ?? {}, true) as Partial<TData>
 
   const onSuccess = createEventHook()
   const onError = createEventHook<Error>()
@@ -88,10 +88,10 @@ export function createFormObject<
       }
       if (options.resetDefaultValues) {
         const values = await options.resetDefaultValues()
-        initialData = pickNonSpecialProps(values) as Partial<TData>
+        initialData = pickNonSpecialProps(values, true) as Partial<TData>
       }
       else if (options.defaultValues) {
-        initialData = pickNonSpecialProps(options.defaultValues()) as Partial<TData>
+        initialData = pickNonSpecialProps(options.defaultValues(), true) as Partial<TData>
       }
       Object.assign(form, initialData)
     },
@@ -99,7 +99,7 @@ export function createFormObject<
       form.$loading = true
       form.$error = null
       try {
-        const data = options?.transformData ? options.transformData(form as unknown as Partial<TData>) : pickNonSpecialProps(form) as Partial<TData>
+        const data = options?.transformData ? options.transformData(form as unknown as Partial<TData>) : pickNonSpecialProps(form, true) as Partial<TData>
         const { issues } = await this.$schema['~standard'].validate(data)
         if (issues) {
           const error = new Error(issues.map(i => i.message).join(', '))

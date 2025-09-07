@@ -28,7 +28,7 @@ export async function createItem<
 
   const originalItem = item
 
-  item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+  item = pickNonSpecialProps(item, true) as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
 
   store.$processItemSerialization(model, item)
 

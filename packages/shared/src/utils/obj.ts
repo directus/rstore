@@ -25,21 +25,21 @@ export function set<TObject, TPath extends Path<TObject>>(obj: TObject, path: TP
   current[keys.at(-1)!] = value
 }
 
-export function pickNonSpecialProps<TItem extends Record<string, any>>(item: TItem): Pick<TItem, FilterNotStartingWith<keyof TItem, '$'>> {
+export function pickNonSpecialProps<TItem extends Record<string, any>>(item: TItem, clone = false): Pick<TItem, FilterNotStartingWith<keyof TItem, '$'>> {
   const result: any = {}
   for (const key in item) {
     if (!key.startsWith('$')) {
-      result[key] = klona(item[key])
+      result[key] = clone ? klona(item[key]) : item[key]
     }
   }
   return result
 }
 
-export function pickSpecialProps<TItem extends Record<string, any>>(item: TItem): Pick<TItem, FilterStartsWith<keyof TItem, '$'>> {
+export function pickSpecialProps<TItem extends Record<string, any>>(item: TItem, clone = false): Pick<TItem, FilterStartsWith<keyof TItem, '$'>> {
   const result: any = {}
   for (const key in item) {
     if (key.startsWith('$')) {
-      result[key] = klona(item[key])
+      result[key] = clone ? klona(item[key]) : item[key]
     }
   }
   return result

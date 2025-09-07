@@ -188,7 +188,7 @@ export function createCache<
     writeItem({ model, key, item, marker, fromWriteItems }) {
       state.value[model.name] ??= {}
       const itemsForType = state.value[model.name]
-      const rawData = pickNonSpecialProps(item)
+      const rawData = pickNonSpecialProps(item, true)
 
       // Handle relations
       const data = {} as Record<string, any>

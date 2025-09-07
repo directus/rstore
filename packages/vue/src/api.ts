@@ -472,7 +472,7 @@ export function createModelApi<
           throw new Error('Item not found')
         }
 
-        return pickNonSpecialProps(item)
+        return pickNonSpecialProps(item, true)
       }
 
       const initialData = await getFormData()
