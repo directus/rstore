@@ -434,12 +434,12 @@ export const useDrizzles = {
       filename: '$rstore-drizzle-models.d.ts',
       getContents: async () => {
         const models = await getModelsFromDrizzleSchema()
-        return `import { defineItemType } from '@rstore/vue'
+        return `import { withItemType } from '@rstore/vue'
 import * as schema from '${drizzleSchemaPath}'
 
 export default [
   ${models.map((model) => {
-    let code = `defineItemType<typeof schema.${model.name}.$inferSelect>().model({`
+    let code = `withItemType<typeof schema.${model.name}.$inferSelect>().defineModel({`
     code += `name: '${model.name}',`
     code += `meta: ${JSON.stringify(model.meta)},`
     if (model.relations) {
