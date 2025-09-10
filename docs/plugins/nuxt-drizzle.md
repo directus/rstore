@@ -150,6 +150,78 @@ const { data: users } = await store.users.query(q => q.many({
 </script>
 ```
 
+## Hooks
+
+You can use hooks to run code before or after certain actions on the collections. You can register global hooks for all collections using the `rstoreDrizzleHooks` import, or specific hooks for a given table using the `hooksForTable` function.
+
+You can use the following hooks:
+
+- `index.get.before` - before fetching a list of items
+- `index.get.after` - after fetching a list of items
+- `index.post.before` - before creating a new item
+- `index.post.after` - after creating a new item
+- `item.get.before` - before fetching a single item
+- `item.get.after` - after fetching a single item
+- `item.patch.before` - before updating a single item
+- `item.patch.after` - after updating a single item
+- `item.delete.before` - before deleting a single item
+- `item.delete.after` - after deleting a single item
+
+If you throw an error in a `before` hook, the action will be aborted and the error will be returned to the client.
+
+```ts
+export default defineNitroPlugin(() => {
+  rstoreDrizzleHooks.hook('index.get.before', async (payload) => {
+    console.log('index.get.before', payload.collection, payload.query, payload.params)
+  })
+  rstoreDrizzleHooks.hook('index.get.after', async (payload) => {
+    console.log('index.get.after', payload.collection)
+  })
+  rstoreDrizzleHooks.hook('index.post.before', async (payload) => {
+    console.log('index.post.before', payload.collection, payload.body)
+  })
+  rstoreDrizzleHooks.hook('index.post.after', async (payload) => {
+    console.log('index.post.after', payload.collection)
+  })
+  rstoreDrizzleHooks.hook('item.get.before', async (payload) => {
+    console.log('item.get.before', payload.collection, payload.params)
+  })
+  rstoreDrizzleHooks.hook('item.get.after', async (payload) => {
+    console.log('item.get.after', payload.collection)
+  })
+  rstoreDrizzleHooks.hook('item.patch.before', async (payload) => {
+    console.log('item.patch.before', payload.collection, payload.params, payload.body)
+  })
+  rstoreDrizzleHooks.hook('item.patch.after', async (payload) => {
+    console.log('item.patch.after', payload.collection)
+  })
+  rstoreDrizzleHooks.hook('item.delete.before', async (payload) => {
+    console.log('item.delete.before', payload.collection, payload.params)
+  })
+  rstoreDrizzleHooks.hook('item.delete.after', async (payload) => {
+    console.log('item.delete.after', payload.collection)
+  })
+})
+```
+
+```ts
+import * as tables from 'path-to-your-drizzle-schema'
+
+export default defineNitroPlugin(() => {
+  hooksForTable(tables.todos, {
+    'index.get.before': async (payload) => {
+      console.log('Specific hook for todos - index.get.before', payload.collection, payload.query, payload.params)
+    },
+    'index.get.after': async (payload) => {
+      console.log('Specific hook for todos - index.get.after', payload.collection, payload.result.map(r => r.id))
+    },
+    'item.patch.after': async (payload) => {
+      console.log('Specific hook for todos - item.patch.after', payload.collection, payload.result.id)
+    },
+  })
+})
+```
+
 ## Configuration
 
 ### apiPath

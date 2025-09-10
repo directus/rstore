@@ -34,6 +34,17 @@ export function getDrizzleTableFromCollection(collectionName: string) {
   }
 }
 
+export function getDrizzleCollectionNameFromTable(table: Table) {
+  const collectionName = Object.keys(tables).find(name => (tables as any)[name] === table)
+  if (!collectionName) {
+    throw createError({
+      statusCode: 404,
+      statusMessage: `Collection not found for table ${table._.name}`,
+    })
+  }
+  return collectionName
+}
+
 export function getDrizzleCondition(table: Table, condition: RstoreDrizzleCondition): any {
   if (condition == null) {
     return undefined

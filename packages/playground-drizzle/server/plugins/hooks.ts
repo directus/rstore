@@ -31,4 +31,16 @@ export default defineNitroPlugin(() => {
   rstoreDrizzleHooks.hook('item.delete.after', async (payload) => {
     console.log('item.delete.after', payload.collection)
   })
+
+  hooksForTable(tables.todos, {
+    'index.get.before': async (payload) => {
+      console.log('Specific hook for todos - index.get.before', payload.collection, payload.query, payload.params)
+    },
+    'index.get.after': async (payload) => {
+      console.log('Specific hook for todos - index.get.after', payload.collection, payload.result.map(r => r.id))
+    },
+    'item.patch.after': async (payload) => {
+      console.log('Specific hook for todos - item.patch.after', payload.collection, payload.result.id)
+    },
+  })
 })

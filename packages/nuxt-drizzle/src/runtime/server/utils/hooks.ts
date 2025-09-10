@@ -1,7 +1,9 @@
 import type { Awaitable } from '@rstore/shared'
+import type { InferSelectModel, Table, TableConfig } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { QueryObject } from 'ufo'
 import { createHooks } from 'hookable'
+import { getDrizzleCollectionNameFromTable } from './index'
 
 export interface RstoreDrizzleMeta {
 }
@@ -55,7 +57,7 @@ export interface RstoreDrizzleHooks<
   TResult = any,
 > {
   'index.get.before': (payload: RstoreDrizzleBeforeHookPayload) => Awaitable<void>
-  'index.get.after': (payload: RstoreDrizzleAfterHookPayload<TResult>) => Awaitable<void>
+  'index.get.after': (payload: RstoreDrizzleAfterHookPayload<Array<TResult>>) => Awaitable<void>
   'index.post.before': (payload: RstoreDrizzleBeforeHookPayload) => Awaitable<void>
   'index.post.after': (payload: RstoreDrizzleAfterHookPayload<TResult>) => Awaitable<void>
   'item.get.before': (payload: RstoreDrizzleBeforeHookPayload) => Awaitable<void>
@@ -67,3 +69,16 @@ export interface RstoreDrizzleHooks<
 }
 
 export const rstoreDrizzleHooks = createHooks<RstoreDrizzleHooks>()
+
+export function hooksForTable<TTableConfig extends TableConfig, TTable extends Table<TTableConfig>>(table: TTable, hooks: Partial<RstoreDrizzleHooks<InferSelectModel<TTable, TTableConfig & { dbColumnNames: false }>>>) {
+  const collectionName = getDrizzleCollectionNameFromTable(table)
+
+  for (const hookName in hooks) {
+    const hookFn = hooks[hookName as keyof typeof hooks]!
+    rstoreDrizzleHooks.hook(hookName as keyof RstoreDrizzleHooks, async (payload: Parameters<typeof hookFn>[0]) => {
+      if (payload.collection === collectionName) {
+        await hookFn(payload as any)
+      }
+    })
+  }
+}
