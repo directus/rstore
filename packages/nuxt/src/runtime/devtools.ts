@@ -76,7 +76,7 @@ export const devtoolsPlugin = definePlugin({
       if (payload.meta.storeHistoryItem) {
         storeStats.value.history.push({
           operation: payload.many ? 'fetchMany' : 'fetchFirst',
-          model: payload.model.name,
+          collection: payload.collection.name,
           started: payload.meta.storeHistoryItem.started,
           ended: new Date(),
           result: payload.getResult(),
@@ -98,7 +98,7 @@ export const devtoolsPlugin = definePlugin({
       if (payload.meta.storeHistoryItem) {
         storeStats.value.history.push({
           operation: payload.mutation,
-          model: payload.model.name,
+          collection: payload.collection.name,
           started: payload.meta.storeHistoryItem.started,
           ended: new Date(),
           result: payload.getResult(),
@@ -113,7 +113,7 @@ export const devtoolsPlugin = definePlugin({
     hook('afterCacheWrite', (payload) => {
       storeStats.value.history.push({
         operation: 'cacheWrite',
-        model: payload.model.name,
+        collection: payload.collection.name,
         ended: new Date(),
         result: payload.result,
         key: payload.key,
@@ -125,7 +125,7 @@ export const devtoolsPlugin = definePlugin({
     hook('itemGarbageCollect', (payload) => {
       storeStats.value.history.push({
         operation: 'itemGarbageCollect',
-        model: payload.model.name,
+        collection: payload.collection.name,
         ended: new Date(),
         key: payload.key,
         result: payload.item,
@@ -158,7 +158,7 @@ export const devtoolsPlugin = definePlugin({
     hook('subscribe', (payload) => {
       storeStats.value.subscriptions.push({
         id: payload.subscriptionId,
-        model: payload.model.name,
+        collection: payload.collection.name,
         key: payload.key,
         findOptions: convertFunctionsToString(payload.findOptions),
         started: new Date(),

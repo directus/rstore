@@ -23,7 +23,7 @@
 
 rstore is a data store allowing you to handle all data in your application.
 
-Define a data model and then run queries or execute mutations (create, update and delete) on your data.
+Define a data collection and then run queries or execute mutations (create, update and delete) on your data.
 
 **FEATURES**
 

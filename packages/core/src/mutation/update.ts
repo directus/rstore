@@ -1,46 +1,46 @@
-import type { CacheLayer, CustomHookMeta, Model, ModelDefaults, ResolvedModel, ResolvedModelItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 import { peekFirst } from '../query'
 
 export interface UpdateOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > {
-  store: StoreCore<TSchema, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults, TSchema>
-  item: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+  store: StoreCore<TSchema, TCollectionDefaults>
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   key?: string | number | null
   skipCache?: boolean
-  optimistic?: boolean | Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+  optimistic?: boolean | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 }
 
 export async function updateItem<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 >({
   store,
-  model,
+  collection,
   item,
   key,
   skipCache,
   optimistic = true,
-}: UpdateOptions<TModel, TModelDefaults, TSchema>): Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>> {
+}: UpdateOptions<TCollection, TCollectionDefaults, TSchema>): Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> {
   const meta: CustomHookMeta = {}
 
   const originalItem = item
 
-  item = pickNonSpecialProps(item, true) as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+  item = pickNonSpecialProps(item, true) as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
-  key = key ?? model.getKey(item)
+  key = key ?? collection.getKey(item)
 
   if (!key) {
     throw new Error('Item update failed: key is not defined')
   }
 
   // Check if existing item has a layer that prevents update
-  const existingItem = store.$cache.readItem({ model, key })
+  const existingItem = store.$cache.readItem({ collection, key })
   if (existingItem?.$layer) {
     const layer = existingItem.$layer as CacheLayer
     if (layer.prevent?.update) {
@@ -49,12 +49,12 @@ export async function updateItem<
     }
   }
 
-  store.$processItemSerialization(model, item)
+  store.$processItemSerialization(collection, item)
 
   await store.$hooks.callHook('beforeMutation', {
     store,
     meta,
-    model,
+    collection,
     mutation: 'update',
     key,
     item,
@@ -62,21 +62,21 @@ export async function updateItem<
       set(item, path, value)
     },
     setItem: (newItem) => {
-      item = newItem as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+      item = newItem as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
     },
   })
 
-  let result: ResolvedModelItem<TModel, TModelDefaults, TSchema> | null = peekFirst({
+  let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null = peekFirst({
     store,
     meta,
-    model,
+    collection,
     findOptions: {
       key,
     },
   }).result
 
   if (result) {
-    result = pickNonSpecialProps(result) as ResolvedModelItem<TModel, TModelDefaults, TSchema>
+    result = pickNonSpecialProps(result) as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
   }
 
   let layer: CacheLayer | undefined
@@ -85,7 +85,7 @@ export async function updateItem<
     layer = {
       id: crypto.randomUUID(),
       state: {
-        [model.name]: {
+        [collection.name]: {
           [key]: {
             ...originalItem,
             ...typeof optimistic === 'object' ? optimistic : {},
@@ -104,30 +104,30 @@ export async function updateItem<
     await store.$hooks.callHook('updateItem', {
       store,
       meta,
-      model,
+      collection,
       key,
       item,
       getResult: () => result ?? undefined,
       setResult: (newResult) => {
-        result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
+        result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
       },
     })
 
     await store.$hooks.callHook('afterMutation', {
       store,
       meta,
-      model,
+      collection,
       mutation: 'update',
       key,
       item,
       getResult: () => result ?? undefined,
       setResult: (newResult) => {
-        result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
+        result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
       },
     })
 
     if (result) {
-      store.$processItemParsing(model, result)
+      store.$processItemParsing(collection, result)
 
       if (!skipCache) {
         if (layer) {
@@ -135,7 +135,7 @@ export async function updateItem<
         }
 
         store.$cache.writeItem({
-          model,
+          collection,
           key,
           item: result,
         })
@@ -147,7 +147,7 @@ export async function updateItem<
 
     store.$mutationHistory.push({
       operation: 'update',
-      model,
+      collection,
       key,
       payload: item,
     })

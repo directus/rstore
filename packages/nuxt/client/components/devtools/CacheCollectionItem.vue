@@ -1,14 +1,14 @@
 <script lang="ts" setup>
-import type { Model } from '@rstore/shared'
+import type { Collection } from '@rstore/shared'
 
 const props = defineProps<{
-  model: Model
+  collection: Collection
   selected?: boolean
 }>()
 
 const cache = useStoreCache()
 
-const cacheCount = computed(() => Object.keys((cache.value as any)[props.model.name] ?? {}).length)
+const cacheCount = computed(() => Object.keys((cache.value as any)[props.collection.name] ?? {}).length)
 </script>
 
 <template>
@@ -24,7 +24,7 @@ const cacheCount = computed(() => Object.keys((cache.value as any)[props.model.n
     class="w-full h-8 flex-none"
   >
     <span class="text-start flex-1 truncate min-w-0">
-      {{ model.name }}
+      {{ collection.name }}
     </span>
 
     <UBadge

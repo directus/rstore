@@ -1,43 +1,43 @@
-import type { Model, ModelDefaults, ResolvedModel, ResolvedModelItem, StandardSchemaV1, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions, WrappedItemUpdateOptions } from '@rstore/shared'
-import type { VueModelApi } from './api'
+import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions, WrappedItemUpdateOptions } from '@rstore/shared'
+import type { VueCollectionApi } from './api'
 import type { VueStore } from './store'
 import { peekFirst, peekMany, type UpdateOptions } from '@rstore/core'
 import { markRaw, type Ref } from 'vue'
 
 export interface WrapItemOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > {
-  store: VueStore<TSchema, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults, TSchema>
-  item: Ref<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
-  metadata: WrappedItemMetadata<TModel, TModelDefaults, TSchema>
+  store: VueStore<TSchema, TCollectionDefaults>
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  item: Ref<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
+  metadata: WrappedItemMetadata<TCollection, TCollectionDefaults, TSchema>
 }
 
 export function wrapItem<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 >({
   store,
-  model,
+  collection,
   item,
   metadata,
-}: WrapItemOptions<TModel, TModelDefaults, TSchema>): WrappedItem<TModel, TModelDefaults, TSchema> {
-  function getApi(): VueModelApi<TModel, TModelDefaults, TSchema, WrappedItem<TModel, TModelDefaults, TSchema>> {
-    return store[model.name as keyof typeof store] as any
+}: WrapItemOptions<TCollection, TCollectionDefaults, TSchema>): WrappedItem<TCollection, TCollectionDefaults, TSchema> {
+  function getApi(): VueCollectionApi<TCollection, TCollectionDefaults, TSchema, WrappedItem<TCollection, TCollectionDefaults, TSchema>> {
+    return store[collection.name as keyof typeof store] as any
   }
 
   const proxy = new Proxy({}, {
     get: (target, key) => {
       switch (key) {
-        case '$model':
-          return (model.name) satisfies WrappedItemBase<TModel, TModelDefaults, TSchema>['$model']
+        case '$collection':
+          return (collection.name) satisfies WrappedItemBase<TCollection, TCollectionDefaults, TSchema>['$collection']
 
         case '$getKey':
           return () => {
-            const key = model.getKey(item.value)
+            const key = collection.getKey(item.value)
             if (!key) {
               throw new Error('Key is undefined on item')
             }
@@ -45,8 +45,8 @@ export function wrapItem<
           }
 
         case '$updateForm':
-          return (async (options?: WrappedItemUpdateFormOptions<TModel, TModelDefaults, TSchema>) => {
-            const key = model.getKey(item.value)
+          return (async (options?: WrappedItemUpdateFormOptions<TCollection, TCollectionDefaults, TSchema>) => {
+            const key = collection.getKey(item.value)
             if (!key) {
               throw new Error('Key is required on item to update')
             }
@@ -59,25 +59,25 @@ export function wrapItem<
               form.$schema = markRaw(options.schema)
             }
             return form
-          }) satisfies WrappedItemBase<TModel, TModelDefaults, TSchema>['$updateForm']
+          }) satisfies WrappedItemBase<TCollection, TCollectionDefaults, TSchema>['$updateForm']
 
         case '$update':
-          return ((data: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>, options?: WrappedItemUpdateOptions<TModel, TModelDefaults, TSchema>) => {
-            const key = model.getKey(item.value)
+          return ((data: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>, options?: WrappedItemUpdateOptions<TCollection, TCollectionDefaults, TSchema>) => {
+            const key = collection.getKey(item.value)
             return getApi().update(data, {
               ...options,
               key,
             })
-          }) satisfies WrappedItemBase<TModel, TModelDefaults, TSchema>['$update']
+          }) satisfies WrappedItemBase<TCollection, TCollectionDefaults, TSchema>['$update']
 
         case '$delete':
           return (() => {
-            const key = model.getKey(item.value)
+            const key = collection.getKey(item.value)
             if (!key) {
               throw new Error('Key is required on item to delete')
             }
             return getApi().delete(key)
-          }) satisfies WrappedItemBase<TModel, TModelDefaults, TSchema>['$delete']
+          }) satisfies WrappedItemBase<TCollection, TCollectionDefaults, TSchema>['$delete']
 
         case '$isOptimistic':
           return item.value.$layer?.optimistic
@@ -87,35 +87,35 @@ export function wrapItem<
       }
 
       // Resolve computed properties
-      if (key in model.computed) {
-        return model.computed[key as string]!(proxy)
+      if (key in collection.computed) {
+        return collection.computed[key as string]!(proxy)
       }
 
       // Resolve related items in the cache
-      if (key in model.relations) {
+      if (key in collection.relations) {
         if (Reflect.has(target, key)) {
           // @TODO resolve references
           return Reflect.get(target, key)
         }
         else {
-          const relation = model.relations[key as string]!
+          const relation = collection.relations[key as string]!
           const result: Array<any> = []
-          for (const targetModelName in relation.to) {
-            const targetModelConfig = relation.to[targetModelName]!
-            const targetModel = store.$models.find(m => m.name === targetModelName)
-            if (!targetModel) {
-              throw new Error(`Model "${targetModelName}" does not exist in the store`)
+          for (const targetCollectionName in relation.to) {
+            const targetCollectionConfig = relation.to[targetCollectionName]!
+            const targetCollection = store.$collections.find(m => m.name === targetCollectionName)
+            if (!targetCollection) {
+              throw new Error(`Collection "${targetCollectionName}" does not exist in the store`)
             }
             const values: Record<string, any> = {}
-            const on = targetModelConfig.on as Record<string, string>
+            const on = targetCollectionConfig.on as Record<string, string>
             for (const key in on) {
-              const foreignKey = key.replace(`${targetModel.name}.`, '')
-              const currentKey = on[key]!.replace(`${model.name}.`, '')
+              const foreignKey = key.replace(`${targetCollection.name}.`, '')
+              const currentKey = on[key]!.replace(`${collection.name}.`, '')
               values[foreignKey] = Reflect.get(proxy, currentKey)
             }
             const cacheResultForTarget = (relation.many ? peekMany : peekFirst)({
               store,
-              model: targetModel,
+              collection: targetCollection,
               findOptions: {
                 filter: (foreignItem) => {
                   for (const key in values) {
@@ -166,49 +166,49 @@ export function wrapItem<
     },
   })
 
-  return proxy as WrappedItem<TModel, TModelDefaults, TSchema>
+  return proxy as WrappedItem<TCollection, TCollectionDefaults, TSchema>
 }
 
 declare module '@rstore/shared' {
   export interface WrappedItemUpdateFormOptions<
-    TModel extends Model = Model,
-    TModelDefaults extends ModelDefaults = ModelDefaults,
+    TCollection extends Collection = Collection,
+    TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
     TSchema extends StoreSchema = StoreSchema,
-  > extends Pick<UpdateOptions<TModel, TModelDefaults, TSchema>, 'optimistic'> {
+  > extends Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'> {
     /**
      * Default values set in the form object initially and when it is reset.
      *
      * By default `updateForm` will initialize the fields with the existing item data.
      */
-    defaultValues?: () => Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+    defaultValues?: () => Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
     /**
      * Schema to validate the form object.
      *
-     * @default model.schema.update
+     * @default collection.schema.update
      */
     schema?: StandardSchemaV1
   }
 
   export interface WrappedItemUpdateOptions<
-    TModel extends Model = Model,
-    TModelDefaults extends ModelDefaults = ModelDefaults,
+    TCollection extends Collection = Collection,
+    TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
     TSchema extends StoreSchema = StoreSchema,
-  > extends Pick<UpdateOptions<TModel, TModelDefaults, TSchema>, 'optimistic'> {
+  > extends Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'> {
   }
 
   export interface WrappedItemBase<
-    TModel extends Model,
-    TModelDefaults extends ModelDefaults,
+    TCollection extends Collection,
+    TCollectionDefaults extends CollectionDefaults,
     TSchema extends StoreSchema,
   > {
-    $meta: WrappedItemMetadata<TModel, TModelDefaults, TSchema>
+    $meta: WrappedItemMetadata<TCollection, TCollectionDefaults, TSchema>
   }
 }
 
 export interface WrappedItemMetadata<
-  _TModel extends Model,
-  _TModelDefaults extends ModelDefaults,
+  _TCollection extends Collection,
+  _TCollectionDefaults extends CollectionDefaults,
   _TSchema extends StoreSchema,
 > {
   queries: Set<any>

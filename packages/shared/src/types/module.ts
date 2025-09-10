@@ -1,4 +1,4 @@
-import type { StoreSchema } from './model'
+import type { StoreSchema } from './collection'
 import type { MutationSpecialProps } from './mutation'
 import type { StoreCore } from './store'
 import type { Awaitable, Brand } from './utils'

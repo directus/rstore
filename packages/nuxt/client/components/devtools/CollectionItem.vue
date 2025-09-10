@@ -1,8 +1,8 @@
 <script lang="ts" setup>
-import type { ModelRelation, ResolvedModel } from '@rstore/shared'
+import type { CollectionRelation, ResolvedCollection } from '@rstore/shared'
 
 const props = defineProps<{
-  item: ResolvedModel
+  item: ResolvedCollection
 }>()
 
 const cache = useStoreCache()
@@ -64,10 +64,10 @@ const cacheCount = computed(() => Object.keys((cache.value as any)[props.item.na
         <UIcon name="lucide:link" />
         Relations
       </div>
-      <DevtoolsModelRelation
-        v-for="(relation, key) in item.relations as Record<string, ModelRelation>"
+      <DevtoolsCollectionRelation
+        v-for="(relation, key) in item.relations as Record<string, CollectionRelation>"
         :key
-        :model="item"
+        :collection="item"
         :relation-name="key"
         :relation
       />

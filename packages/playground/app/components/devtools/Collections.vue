@@ -1,14 +1,14 @@
 <script lang="ts" setup>
-import type { Model, ModelDefaults, ResolvedModel, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollection, StoreSchema } from '@rstore/shared'
 
 const store = useStore()
 
 const search = ref('')
 
 const filteredTypes = computed(() => {
-  return store.$models.filter((model) => {
-    return model.name.toLowerCase().includes(search.value.toLowerCase())
-  }).sort((a, b) => a.name.localeCompare(b.name)) as ResolvedModel<Model, ModelDefaults, StoreSchema>[]
+  return store.$collections.filter((collection) => {
+    return collection.name.toLowerCase().includes(search.value.toLowerCase())
+  }).sort((a, b) => a.name.localeCompare(b.name)) as ResolvedCollection<Collection, CollectionDefaults, StoreSchema>[]
 })
 </script>
 
@@ -27,7 +27,7 @@ const filteredTypes = computed(() => {
     </div>
 
     <div class="flex-1 overlfow-auto min-h-0 flex flex-col p-1 gap-1">
-      <DevtoolsModelItem
+      <DevtoolsCollectionItem
         v-for="item in filteredTypes"
         :key="item.name"
         :item

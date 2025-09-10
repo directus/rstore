@@ -35,7 +35,7 @@ hook('fetchFirst', (payload) => {
   console.log(
     payload.store, // The store instance
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.key, // The key passed to the query
     payload.findOptions, // The find options passed to the query, such as filter or params
     payload.getResult, // A function to get the result of the query
@@ -57,13 +57,13 @@ Example:
 hook('fetchFirst', async (payload) => {
   if (payload.key) {
     // Based on a key
-    const result = await fetch(`/api/${payload.model.name}/${payload.key}`)
+    const result = await fetch(`/api/${payload.collection.name}/${payload.key}`)
       .then(r => r.json())
     payload.setResult(result)
   }
   else {
     // Using filters
-    const result = await fetch(`/api/${payload.model.name}?filter=${payload.findOptions.params.filter}&limit=1`)
+    const result = await fetch(`/api/${payload.collection.name}?filter=${payload.findOptions.params.filter}&limit=1`)
       .then(r => r.json())
     payload.setResult(result?.[0])
   }
@@ -74,12 +74,12 @@ hook('fetchFirst', async (payload) => {
 hook('fetchFirst', async (payload) => {
   if (payload.key) {
     // Based on a key
-    const result = await $fetch(`/api/${payload.model.name}/${payload.key}`)
+    const result = await $fetch(`/api/${payload.collection.name}/${payload.key}`)
     payload.setResult(result)
   }
   else {
     // Using filters
-    const result = await $fetch(`/api/${payload.model.name}`, {
+    const result = await $fetch(`/api/${payload.collection.name}`, {
       query: {
         filter: payload.findOptions.params.filter,
         limit: 1,
@@ -101,7 +101,7 @@ hook('fetchMany', (payload) => {
   console.log(
     payload.store, // The store instance
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.findOptions, // The find options passed to the query, such as filter or params
     payload.getResult, // A function to get the result of the query
     payload.setResult, // A function to update the result of the query
@@ -116,7 +116,7 @@ Example:
 
 ```ts [Vue]
 hook('fetchMany', async (payload) => {
-  const result = await fetch(`/api/${payload.model.name}?filter=${payload.findOptions.params.filter}`)
+  const result = await fetch(`/api/${payload.collection.name}?filter=${payload.findOptions.params.filter}`)
     .then(r => r.json())
   payload.setResult(result)
 })
@@ -124,7 +124,7 @@ hook('fetchMany', async (payload) => {
 
 ```ts [Nuxt]
 hook('fetchMany', async (payload) => {
-  const result = await $fetch(`/api/${payload.model.name}`, {
+  const result = await $fetch(`/api/${payload.collection.name}`, {
     query: {
       filter: payload.findOptions.params.filter,
     },
@@ -143,7 +143,7 @@ hook('createItem', (payload) => {
   console.log(
     payload.store, // The store instance
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.item, // The data for the item to create
     payload.getResult, // A function to get the result of the query
     payload.setResult, // A function to update the result of the query
@@ -157,7 +157,7 @@ Example:
 
 ```ts [Vue]
 hook('createItem', async (payload) => {
-  const result = await fetch(`/api/${payload.model.name}`, {
+  const result = await fetch(`/api/${payload.collection.name}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
@@ -170,7 +170,7 @@ hook('createItem', async (payload) => {
 
 ```ts [Nuxt]
 hook('createItem', async (payload) => {
-  const result = await $fetch(`/api/${payload.model.name}`, {
+  const result = await $fetch(`/api/${payload.collection.name}`, {
     method: 'POST',
     body: payload.item,
   })
@@ -189,7 +189,7 @@ hook('updateItem', (payload) => {
   console.log(
     payload.store, // The store instance
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.key, // The key of the item to update
     payload.item, // The data for the item to update
     payload.getResult, // A function to get the result of the query
@@ -204,7 +204,7 @@ Example:
 
 ```ts [Vue]
 hook('updateItem', async (payload) => {
-  const result = await fetch(`/api/${payload.model.name}/${payload.key}`, {
+  const result = await fetch(`/api/${payload.collection.name}/${payload.key}`, {
     method: 'PATCH',
     headers: {
       'Content-Type': 'application/json',
@@ -217,7 +217,7 @@ hook('updateItem', async (payload) => {
 
 ```ts [Nuxt]
 hook('updateItem', async (payload) => {
-  const result = await $fetch(`/api/${payload.model.name}/${payload.key}`, {
+  const result = await $fetch(`/api/${payload.collection.name}/${payload.key}`, {
     method: 'PATCH',
     body: payload.item,
   })
@@ -235,7 +235,7 @@ hook('deleteItem', (payload) => {
   console.log(
     payload.store, // The store instance
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.key, // The key of the item to delete
   )
 })
@@ -247,7 +247,7 @@ Example:
 
 ```ts [Vue]
 hook('deleteItem', async (payload) => {
-  await fetch(`/api/${payload.model.name}/${payload.key}`, {
+  await fetch(`/api/${payload.collection.name}/${payload.key}`, {
     method: 'DELETE',
   })
 })
@@ -255,7 +255,7 @@ hook('deleteItem', async (payload) => {
 
 ```ts [Nuxt]
 hook('deleteItem', async (payload) => {
-  await $fetch(`/api/${payload.model.name}/${payload.key}`, {
+  await $fetch(`/api/${payload.collection.name}/${payload.key}`, {
     method: 'DELETE',
   })
 })
@@ -264,7 +264,7 @@ hook('deleteItem', async (payload) => {
 
 ## Fetching relations
 
-Learn more about setting up relations [here](../model//relations.md) and how to query them [here](../data/query.md#fetching-relations).
+Learn more about setting up relations [here](../schema/relations.md) and how to query them [here](../data/query.md#fetching-relations).
 
 ### fetchRelations
 
@@ -275,7 +275,7 @@ hook('fetchRelations', (payload) => {
   console.log(
     payload.store, // The store instance
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.key, // The key of the item to fetch the relations for
     payload.findOptions, // The find options passed to the query with the `include` option
     payload.many, // Boolean indicating if the query is for many items or one item
@@ -286,10 +286,10 @@ hook('fetchRelations', (payload) => {
 
 Within callbacks to this hook, you can use any of the store methods to fetch the necessary data. For example, you can use `findFirst` or `findMany` to fetch the data for the relations.
 
-Example model:
+Example collection:
 
 ```ts
-const commentModel = defineDataModel({
+const commentCollection = defineCollection({
   name: 'Comment',
   relations: {
     author: {
@@ -327,11 +327,11 @@ hook('fetchRelations', async (payload) => {
 
   // Fetch relations in parallel
   await Promise.all(items.map(async (item) => {
-    const key = payload.model.getKey(item)
+    const key = payload.collection.getKey(item)
     if (key) {
       // Read the item from the cache to also include computed properties
       const currentItem = payload.store.cache.readItem({
-        model: payload.model,
+        collection: payload.collection,
         key,
       })
       if (!currentItem) {
@@ -344,18 +344,18 @@ hook('fetchRelations', async (payload) => {
           continue
         }
 
-        const relation = payload.model.relations[relationKey]
+        const relation = payload.collection.relations[relationKey]
         //    ^^^^^^^^
         //    { to: { User: { on: 'id', eq: 'authorId' } } }
         if (!relation) {
-          throw new Error(`Relation "${relationKey}" does not exist on model "${payload.model.name}"`)
+          throw new Error(`Relation "${relationKey}" does not exist on collection "${payload.collection.name}"`)
         }
 
-        await Promise.all(Object.keys(relation.to).map((modelName) => {
-          const relationData = relation.to[modelName]!
+        await Promise.all(Object.keys(relation.to).map((collectionName) => {
+          const relationData = relation.to[collectionName]!
           //    ^^^^^^^^^^^^
           //    { on: 'id', eq: 'authorId' }
-          return store.$model(modelName).findMany({
+          return store.$collection(collectionName).findMany({
             params: {
               filter: `${relationData.on}:${currentItem[relationData.eq]}`,
             },
@@ -382,12 +382,12 @@ hook('cacheFilterFirst', (payload) => {
   console.log(
     payload.store, // The store instance
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.key, // The key passed to the query
     payload.findOptions, // The find options passed to the query, such as filter or params
     payload.getResult, // A function to get the result of the query
     payload.setResult, // A function to update the result of the query
-    payload.readItemsFromCache(), // A function to read all items of the model from the cache
+    payload.readItemsFromCache(), // A function to read all items of the collection from the cache
   )
 })
 ```
@@ -401,7 +401,7 @@ hook('cacheFilterFirst', (payload) => {
   const { key, findOptions } = payload
 
   if (findOptions.filter && typeof findOptions.filter === 'object') {
-    // Implement our own filtering logic reused on the models
+    // Implement our own filtering logic reused on the collections
     const item = payload.readItemsFromCache().find((item) => {
       for (const [key, value] of Object.entries(findOptions.filter)) {
         if (item[key] !== value) {
@@ -418,8 +418,8 @@ hook('fetchFirst', async (payload) => {
   const { key, findOptions } = payload
 
   if (findOptions.filter && typeof findOptions.filter === 'object') {
-    // Implement our own fetching logic reused on the models
-    const result = await fetch(`/api/${payload.model.name}/${key}`, {
+    // Implement our own fetching logic reused on the collections
+    const result = await fetch(`/api/${payload.collection.name}/${key}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -438,7 +438,7 @@ hook('cacheFilterFirst', (payload) => {
   const { key, findOptions } = payload
 
   if (findOptions.filter && typeof findOptions.filter === 'object') {
-    // Implement our own filtering logic reused on the models
+    // Implement our own filtering logic reused on the collections
     const item = payload.readItemsFromCache().find((item) => {
       for (const [key, value] of Object.entries(findOptions.filter)) {
         if (item[key] !== value) {
@@ -455,8 +455,8 @@ hook('fetchFirst', async (payload) => {
   const { key, findOptions } = payload
 
   if (findOptions.filter && typeof findOptions.filter === 'object') {
-    // Implement our own fetching logic reused on the models
-    const result = await $fetch(`/api/${payload.model.name}/${key}`, {
+    // Implement our own fetching logic reused on the collections
+    const result = await $fetch(`/api/${payload.collection.name}/${key}`, {
       method: 'POST',
       body: {
         filter: findOptions.filter
@@ -499,12 +499,12 @@ const { data: user } = store.users.query(q => q.first({
 If you are using TypeScript, you can augment the `` interface to customize the type of the `filter` find option:
 
 ```ts
-import type { Model, ModelDefaults, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/shared'
 
 declare module '@rstore/vue' {
   export interface CustomFilterOption<
-    TModel extends Model,
-    TModelDefaults extends ModelDefaults,
+    TCollection extends Collection,
+    TCollectionDefaults extends CollectionDefaults,
     TSchema extends StoreSchema,
   > {
     email?: string
@@ -523,7 +523,7 @@ hook('cacheFilterMany', (payload) => {
   console.log(
     payload.store, // The store instance
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.findOptions, // The find options passed to the query, such as filter or params
     payload.getResult, // A function to get the result of the query
     payload.setResult, // A function to update the result of the query
@@ -540,7 +540,7 @@ hook('cacheFilterMany', (payload) => {
   const { findOptions } = payload
 
   if (findOptions.filter && typeof findOptions.filter === 'object') {
-    // Implement our own filtering logic reused on the models
+    // Implement our own filtering logic reused on the collections
     const items = payload.getResult().filter((item) => {
       for (const [key, value] of Object.entries(findOptions.filter)) {
         if (item[key] !== value) {
@@ -557,8 +557,8 @@ hook('fetchMany', async (payload) => {
   const { findOptions } = payload
 
   if (findOptions.filter && typeof findOptions.filter === 'object') {
-    // Implement our own fetching logic reused on the models
-    const result = await fetch(`/api/${payload.model.name}`, {
+    // Implement our own fetching logic reused on the collections
+    const result = await fetch(`/api/${payload.collection.name}`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -577,7 +577,7 @@ hook('cacheFilterMany', (payload) => {
   const { findOptions } = payload
 
   if (findOptions.filter && typeof findOptions.filter === 'object') {
-    // Implement our own filtering logic reused on the models
+    // Implement our own filtering logic reused on the collections
     const items = payload.getResult().filter((item) => {
       for (const [key, value] of Object.entries(findOptions.filter)) {
         if (item[key] !== value) {
@@ -594,8 +594,8 @@ hook('fetchMany', async (payload) => {
   const { findOptions } = payload
 
   if (findOptions.filter && typeof findOptions.filter === 'object') {
-    // Implement our own fetching logic reused on the models
-    const result = await $fetch(`/api/${payload.model.name}`, {
+    // Implement our own fetching logic reused on the collections
+    const result = await $fetch(`/api/${payload.collection.name}`, {
       method: 'POST',
       body: {
         filter: findOptions.filter
@@ -638,12 +638,12 @@ const { data: users } = store.users.query(q => q.many({
 If you are using TypeScript, you can augment the `` interface to customize the type of the `filter` find option:
 
 ```ts
-import type { Model, ModelDefaults, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/shared'
 
 declare module '@rstore/vue' {
   export interface CustomFilterOption<
-    TModel extends Model,
-    TModelDefaults extends ModelDefaults,
+    TCollection extends Collection,
+    TCollectionDefaults extends CollectionDefaults,
     TSchema extends StoreSchema,
   > {
     email?: string
@@ -657,14 +657,14 @@ export {}
 
 ### subscribe
 
-This hook is called when rstore needs to subscribe to a data model.
+This hook is called when rstore needs to subscribe to a data collection.
 
 ```ts
 hook('subscribe', (payload) => {
   console.log(
     payload.store, // The store instance
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.subscriptionId, // The unique ID of the subscription to help track it
     payload.key, // The key passed to the query
     payload.findOptions, // The find options passed to the query
@@ -674,14 +674,14 @@ hook('subscribe', (payload) => {
 
 ### unsubscribe
 
-This hook is called when rstore needs to unsubscribe from a data model.
+This hook is called when rstore needs to unsubscribe from a data collection.
 
 ```ts
 hook('unsubscribe', (payload) => {
   console.log(
     payload.store, // The store instance
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.subscriptionId, // The unique ID of the subscription to help track it
     payload.key, // The key passed to the query
     payload.findOptions, // The find options passed to the query
@@ -705,8 +705,8 @@ export default definePlugin({
     const countPerTopic: Record<string, number> = {}
 
     hook('subscribe', (payload) => {
-      if (payload.model.meta?.websocketTopic) {
-        const topic = payload.model.meta.websocketTopic
+      if (payload.collection.meta?.websocketTopic) {
+        const topic = payload.collection.meta.websocketTopic
 
         countPerTopic[topic] ??= 0
 
@@ -723,8 +723,8 @@ export default definePlugin({
     })
 
     hook('unsubscribe', (payload) => {
-      if (payload.model.meta?.websocketTopic) {
-        const topic = payload.model.meta.websocketTopic
+      if (payload.collection.meta?.websocketTopic) {
+        const topic = payload.collection.meta.websocketTopic
 
         countPerTopic[topic] ??= 1
         countPerTopic[topic]--
@@ -748,18 +748,18 @@ export default definePlugin({
           if (message.item) {
             const { item } = message
 
-            // Retrieve the model from the store
-            const model = payload.store.$getModel(item)
-            if (model) {
+            // Retrieve the collection from the store
+            const collection = payload.store.$getCollection(item)
+            if (collection) {
               // Compute the key for the item
-              const key = model.getKey(item)
+              const key = collection.getKey(item)
               if (!key) {
-                throw new Error(`Key not found for model ${model.name}`)
+                throw new Error(`Key not found for collection ${collection.name}`)
               }
 
               // Write the item to the cache
               payload.store.$cache.writeItem({
-                model,
+                collection,
                 key,
                 item,
               })
@@ -797,7 +797,7 @@ hook('beforeFetch', (payload) => {
   console.log(
     payload.store,
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.key, // The key passed to the query
     payload.findOptions, // The find options passed to the query, such as filter or params
     payload.many, // Boolean indicating if the query is for many items or one item
@@ -813,7 +813,7 @@ hook('afterFetch', (payload) => {
   console.log(
     payload.store,
     payload.meta,
-    payload.model, // The current model
+    payload.collection, // The current collection
     payload.key, // The key passed to the query
     payload.findOptions, // The find options passed to the query, such as filter or params
     payload.many, // Boolean indicating if the query is for many items or one item

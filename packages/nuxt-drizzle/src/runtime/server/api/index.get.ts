@@ -1,7 +1,7 @@
 import type { RelationalQueryBuilder } from 'drizzle-orm/pg-core/query-builders/query'
 import { and, asc, desc } from 'drizzle-orm'
 import { createError, eventHandler, getQuery, getRouterParams } from 'h3'
-import { getDrizzleCondition, getDrizzleTableFromModel, type RstoreDrizzleQueryParams, rstoreUseDrizzle } from '../utils'
+import { getDrizzleCondition, getDrizzleTableFromCollection, type RstoreDrizzleQueryParams, rstoreUseDrizzle } from '../utils'
 import { rstoreDrizzleHooks, type RstoreDrizzleMeta, type RstoreDrizzleTransformQuery } from '../utils/hooks'
 
 const orderByOperators = {
@@ -13,24 +13,24 @@ export default eventHandler(async (event) => {
   const meta: RstoreDrizzleMeta = {}
   const transforms: Array<RstoreDrizzleTransformQuery> = []
 
-  const params = getRouterParams(event) as { model: string }
-  const { model: modelName } = params
+  const params = getRouterParams(event) as { collection: string }
+  const { collection: collectionName } = params
   const query = getQuery(event) as RstoreDrizzleQueryParams
 
   await rstoreDrizzleHooks.callHook('index.get.before', {
     event,
-    model: modelName,
+    collection: collectionName,
     meta,
     params,
     query: query as Record<string, string | string[]>,
     transformQuery: (transform) => { transforms.push(transform) },
   })
 
-  const { table } = getDrizzleTableFromModel(modelName)
+  const { table } = getDrizzleTableFromCollection(collectionName)
 
   const dbQuery = rstoreUseDrizzle().query as unknown as Record<string, RelationalQueryBuilder<any, any>>
 
-  const q = {} as NonNullable<Parameters<typeof dbQuery[typeof modelName]['findMany']>[0]>
+  const q = {} as NonNullable<Parameters<typeof dbQuery[typeof collectionName]['findMany']>[0]>
 
   const whereConditions: any[] = []
 
@@ -93,12 +93,12 @@ export default eventHandler(async (event) => {
     q.orderBy = orderBy
   }
 
-  let result = await dbQuery[modelName]!.findMany(q)
+  let result = await dbQuery[collectionName]!.findMany(q)
   result ??= []
 
   await rstoreDrizzleHooks.callHook('index.get.after', {
     event,
-    model: modelName,
+    collection: collectionName,
     meta,
     params,
     query: query as Record<string, string | string[]>,

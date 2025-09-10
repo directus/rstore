@@ -1,64 +1,64 @@
-import type { CacheLayer, CustomHookMeta, Model, ModelDefaults, ResolvedModel, ResolvedModelItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 
 export interface CreateOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > {
-  store: StoreCore<TSchema, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults, TSchema>
-  item: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+  store: StoreCore<TSchema, TCollectionDefaults>
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   skipCache?: boolean
-  optimistic?: boolean | Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+  optimistic?: boolean | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 }
 
 export async function createItem<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 >({
   store,
-  model,
+  collection,
   item,
   skipCache,
   optimistic = true,
-}: CreateOptions<TModel, TModelDefaults, TSchema>): Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>> {
+}: CreateOptions<TCollection, TCollectionDefaults, TSchema>): Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> {
   const meta: CustomHookMeta = {}
 
   const originalItem = item
 
-  item = pickNonSpecialProps(item, true) as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+  item = pickNonSpecialProps(item, true) as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
-  store.$processItemSerialization(model, item)
+  store.$processItemSerialization(collection, item)
 
-  let result: ResolvedModelItem<TModel, TModelDefaults, TSchema> | undefined
+  let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | undefined
 
   await store.$hooks.callHook('beforeMutation', {
     store,
     meta,
-    model,
+    collection,
     mutation: 'create',
     item,
     modifyItem: (path: any, value: any) => {
       set(item, path, value)
     },
     setItem: (newItem) => {
-      item = newItem as Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+      item = newItem as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
     },
   })
 
   let layer: CacheLayer | undefined
 
   if (!skipCache && optimistic) {
-    let key = model.getKey(item)
+    let key = collection.getKey(item)
     if (!key) {
       key = crypto.randomUUID()
     }
     layer = {
       id: crypto.randomUUID(),
       state: {
-        [model.name]: {
+        [collection.name]: {
           [key]: {
             ...originalItem,
             ...typeof optimistic === 'object' ? optimistic : {},
@@ -81,39 +81,39 @@ export async function createItem<
     await store.$hooks.callHook('createItem', {
       store,
       meta,
-      model,
+      collection,
       item,
       getResult: () => result,
       setResult: (newResult) => {
-        result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
+        result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
       },
     })
 
     await store.$hooks.callHook('afterMutation', {
       store,
       meta,
-      model,
+      collection,
       mutation: 'create',
       item,
       getResult: () => result,
       setResult: (newResult) => {
-        result = newResult as ResolvedModelItem<TModel, TModelDefaults, TSchema>
+        result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
       },
     })
 
     if (result) {
-      store.$processItemParsing(model, result)
+      store.$processItemParsing(collection, result)
 
       if (!skipCache) {
         if (layer) {
           store.$cache.removeLayer(layer.id)
         }
 
-        const key = model.getKey(result)
+        const key = collection.getKey(result)
 
         if (key) {
           store.$cache.writeItem({
-            model,
+            collection,
             key,
             item: result,
           })
@@ -129,7 +129,7 @@ export async function createItem<
 
     store.$mutationHistory.push({
       operation: 'create',
-      model,
+      collection,
       payload: item,
     })
   }

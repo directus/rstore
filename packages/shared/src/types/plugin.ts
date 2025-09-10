@@ -1,5 +1,5 @@
+import type { CollectionDefaults, StoreSchema } from './collection.js'
 import type { HookDefinitions } from './hooks.js'
-import type { ModelDefaults, StoreSchema } from './model.js'
 import type { Awaitable } from './utils.js'
 
 export interface CustomPluginMeta {
@@ -21,7 +21,7 @@ export interface Plugin {
   setup: (api: PluginSetupApi) => Awaitable<void>
 
   /**
-   * Allows scoping the plugin to specific models with the same scopeId.
+   * Allows scoping the plugin to specific collections with the same scopeId.
    *
    * This is useful when you have multiple data sources.
    */
@@ -37,21 +37,21 @@ export interface RegisteredPlugin extends Plugin {
 
 export interface HookPluginOptions {
   /**
-   * Allows the hook to be called with any model, even with different scopeId.
+   * Allows the hook to be called with any collection, even with different scopeId.
    */
   ignoreScope?: boolean
 }
 
 export interface PluginSetupApi {
   /**
-   * Add options to the model defaults.
+   * Add options to the collection defaults.
    */
-  addModelDefaults: (modelDefaults: ModelDefaults) => void
+  addCollectionDefaults: (collectionDefaults: CollectionDefaults) => void
 
   hook: <
-    TName extends keyof HookDefinitions<StoreSchema, ModelDefaults>,
+    TName extends keyof HookDefinitions<StoreSchema, CollectionDefaults>,
   > (name: TName,
-    callback: HookDefinitions<StoreSchema, ModelDefaults>[TName],
+    callback: HookDefinitions<StoreSchema, CollectionDefaults>[TName],
     options?: HookPluginOptions
   ) => () => void
 }

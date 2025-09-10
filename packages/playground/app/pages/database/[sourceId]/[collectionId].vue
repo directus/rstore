@@ -38,9 +38,9 @@ const { data: collection } = await store.DataCollection.query(q => q.first({
     >
       <template #nullable-cell="{ row }">
         <USwitch
-          :model-value="row.original.nullable"
+          :collection-value="row.original.nullable"
           :label="row.original.nullable ? 'Yes' : 'No'"
-          @update:model-value="value => row.original.$update({ nullable: value })"
+          @update:collection-value="value => row.original.$update({ nullable: value })"
         />
       </template>
     </UTable>

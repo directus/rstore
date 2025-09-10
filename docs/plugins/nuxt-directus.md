@@ -13,7 +13,7 @@ npm install @rstore/nuxt-directus
 ![Directus Admin screenshot](./img/directus-admin-token.png)
 
 ::: tip Why the Admin Token is needed?
-This Admin Token will be used to automatically retrieve the collections in your Directus instance - then the module will generate from this introspection all of the necessary rstore models for you.
+This Admin Token will be used to automatically retrieve the collections in your Directus instance - then the module will generate from this introspection all of the necessary rstore collections for you.
 :::
 
 3. Create an `.env` file and put your Directus Admin Token there:

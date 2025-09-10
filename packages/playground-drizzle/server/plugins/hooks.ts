@@ -2,33 +2,33 @@
 
 export default defineNitroPlugin(() => {
   rstoreDrizzleHooks.hook('index.get.before', async (payload) => {
-    console.log('index.get.before', payload.model, payload.query, payload.params)
+    console.log('index.get.before', payload.collection, payload.query, payload.params)
   })
   rstoreDrizzleHooks.hook('index.get.after', async (payload) => {
-    console.log('index.get.after', payload.model)
+    console.log('index.get.after', payload.collection)
   })
   rstoreDrizzleHooks.hook('index.post.before', async (payload) => {
-    console.log('index.post.before', payload.model, payload.body)
+    console.log('index.post.before', payload.collection, payload.body)
   })
   rstoreDrizzleHooks.hook('index.post.after', async (payload) => {
-    console.log('index.post.after', payload.model)
+    console.log('index.post.after', payload.collection)
   })
   rstoreDrizzleHooks.hook('item.get.before', async (payload) => {
-    console.log('item.get.before', payload.model, payload.params)
+    console.log('item.get.before', payload.collection, payload.params)
   })
   rstoreDrizzleHooks.hook('item.get.after', async (payload) => {
-    console.log('item.get.after', payload.model)
+    console.log('item.get.after', payload.collection)
   })
   rstoreDrizzleHooks.hook('item.patch.before', async (payload) => {
-    console.log('item.patch.before', payload.model, payload.params, payload.body)
+    console.log('item.patch.before', payload.collection, payload.params, payload.body)
   })
   rstoreDrizzleHooks.hook('item.patch.after', async (payload) => {
-    console.log('item.patch.after', payload.model)
+    console.log('item.patch.after', payload.collection)
   })
   rstoreDrizzleHooks.hook('item.delete.before', async (payload) => {
-    console.log('item.delete.before', payload.model, payload.params)
+    console.log('item.delete.before', payload.collection, payload.params)
   })
   rstoreDrizzleHooks.hook('item.delete.after', async (payload) => {
-    console.log('item.delete.after', payload.model)
+    console.log('item.delete.after', payload.collection)
   })
 })

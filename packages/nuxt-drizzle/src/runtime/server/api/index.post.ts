@@ -1,20 +1,20 @@
 import { and, eq, type Table } from 'drizzle-orm'
 import { defineEventHandler, getQuery, getRouterParams, readBody } from 'h3'
-import { getDrizzleDialect, getDrizzleTableFromModel, rstoreUseDrizzle } from '../utils'
+import { getDrizzleDialect, getDrizzleTableFromCollection, rstoreUseDrizzle } from '../utils'
 import { rstoreDrizzleHooks, type RstoreDrizzleMeta, type RstoreDrizzleTransformQuery } from '../utils/hooks'
 
 export default defineEventHandler(async (event) => {
   const meta: RstoreDrizzleMeta = {}
   const transforms: Array<RstoreDrizzleTransformQuery> = []
 
-  const params = getRouterParams(event) as { model: string }
-  const { model: modelName } = params
+  const params = getRouterParams(event) as { collection: string }
+  const { collection: collectionName } = params
   const body = await readBody(event)
   const query = getQuery(event)
 
   await rstoreDrizzleHooks.callHook('index.post.before', {
     event,
-    model: modelName,
+    collection: collectionName,
     meta,
     params,
     query,
@@ -22,7 +22,7 @@ export default defineEventHandler(async (event) => {
     transformQuery: (transform) => { transforms.push(transform) },
   })
 
-  const { table } = getDrizzleTableFromModel(modelName)
+  const { table } = getDrizzleTableFromCollection(collectionName)
 
   const q = rstoreUseDrizzle().insert(table as any).values(body)
 
@@ -47,7 +47,7 @@ export default defineEventHandler(async (event) => {
 
   await rstoreDrizzleHooks.callHook('index.post.after', {
     event,
-    model: modelName,
+    collection: collectionName,
     meta,
     params,
     query,

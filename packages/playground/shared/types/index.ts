@@ -1,24 +1,24 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { Model, ModelDefaults, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/shared'
 
 declare module '@rstore/vue' {
-  export interface CustomModelMeta {
+  export interface CustomCollectionMeta {
     path?: string
     websocketTopic?: string
   }
 
   export interface CustomFilterOption<
-    TModel extends Model,
-    TModelDefaults extends ModelDefaults,
+    TCollection extends Collection,
+    TCollectionDefaults extends CollectionDefaults,
     TSchema extends StoreSchema,
   > {
     email?: string
   }
 
   export interface CustomParams<
-    TModel extends Model,
-    TModelDefaults extends ModelDefaults,
+    TCollection extends Collection,
+    TCollectionDefaults extends CollectionDefaults,
     TSchema extends StoreSchema,
   > {
     /** Sent to the server */

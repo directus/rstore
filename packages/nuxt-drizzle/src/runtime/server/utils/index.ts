@@ -1,9 +1,9 @@
-import type { CustomModelMeta } from '@rstore/vue'
+import type { CustomCollectionMeta } from '@rstore/vue'
 import type { Column, Dialect, Table } from 'drizzle-orm'
 import type { PgDatabase } from 'drizzle-orm/pg-core'
 import type { RstoreDrizzleCondition } from '../../utils/types'
 // @ts-expect-error virtual file
-import { dialect, modelMetas, tables, useDrizzles } from '$rstore-drizzle-server-utils.js'
+import { collectionMetas, dialect, tables, useDrizzles } from '$rstore-drizzle-server-utils.js'
 import * as drizzle from 'drizzle-orm'
 import { createError } from 'h3'
 
@@ -18,15 +18,15 @@ export interface RstoreDrizzleQueryParams {
 
 export type RstoreDrizzleQueryParamsOne = Omit<RstoreDrizzleQueryParams, 'limit' | 'offset' | 'orderBy'>
 
-export function getDrizzleTableFromModel(modelName: string) {
-  const table = (tables as any)[modelName] as Table
+export function getDrizzleTableFromCollection(collectionName: string) {
+  const table = (tables as any)[collectionName] as Table
   if (!table) {
     throw createError({
       statusCode: 404,
-      statusMessage: `Table not found for model ${modelName}`,
+      statusMessage: `Table not found for collection ${collectionName}`,
     })
   }
-  const { table: tableKey, primaryKeys } = (modelMetas as Record<string, CustomModelMeta>)[modelName]!
+  const { table: tableKey, primaryKeys } = (collectionMetas as Record<string, CustomCollectionMeta>)[collectionName]!
   return {
     table,
     tableKey,

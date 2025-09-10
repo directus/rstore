@@ -21,7 +21,7 @@ const addedItemLayer = {
         text: 'This todo was added from a layer',
         completed: false,
         createdAt: new Date(),
-      } satisfies Omit<StoreResolvedModelItem<'Todo'>, 'id'> & { $overrideKey: string },
+      } satisfies Omit<StoreResolvedCollectionItem<'Todo'>, 'id'> & { $overrideKey: string },
     },
   },
   deletedItems: {},
@@ -45,7 +45,7 @@ function addModifyItemLayer() {
         id: firstTodo.id,
         text: `${firstTodo.text} (modified by a layer)`,
         completed: !firstTodo.completed,
-      } satisfies Partial<StoreResolvedModelItem<'Todo'>> & Pick<StoreResolvedModelItem<'Todo'>, 'id'>,
+      } satisfies Partial<StoreResolvedCollectionItem<'Todo'>> & Pick<StoreResolvedCollectionItem<'Todo'>, 'id'>,
     }
     store.$cache.addLayer(modifyItemLayer)
   }

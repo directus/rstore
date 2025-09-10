@@ -3,12 +3,12 @@ import { faker } from '@faker-js/faker'
 export default defineRstorePlugin({
   name: 'my-rstore-plugin',
 
-  setup({ addModelDefaults, hook }) {
+  setup({ addCollectionDefaults, hook }) {
     function parseDate(value: any): Date {
       return typeof value === 'string' ? new Date(value) : value
     }
 
-    addModelDefaults({
+    addCollectionDefaults({
       fields: {
         createdAt: {
           parse: parseDate,
@@ -20,13 +20,13 @@ export default defineRstorePlugin({
     })
 
     hook('fetchFirst', async (payload) => {
-      if (payload.model.meta?.path) {
+      if (payload.collection.meta?.path) {
         if (payload.key) {
-          const result = await $fetch(`/api/rest/${payload.model.meta.path}/${payload.key}`)
+          const result = await $fetch(`/api/rest/${payload.collection.meta.path}/${payload.key}`)
           payload.setResult(result)
         }
         else {
-          const result: any = await $fetch(`/api/rest/${payload.model.meta.path}`, {
+          const result: any = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
             method: 'GET',
             query: payload.findOptions?.params,
           })
@@ -37,13 +37,13 @@ export default defineRstorePlugin({
       ignoreScope: true,
     })
     // hook('beforeCacheReadMany', (payload) => {
-    //   payload.setMarker(`many:${payload.model.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
+    //   payload.setMarker(`many:${payload.collection.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
     // })
     hook('fetchMany', async (payload) => {
-      // payload.setMarker(`many:${payload.model.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
+      // payload.setMarker(`many:${payload.collection.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
 
-      if (payload.model.meta?.path) {
-        const result = await $fetch(`/api/rest/${payload.model.meta.path}`, {
+      if (payload.collection.meta?.path) {
+        const result = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
           method: 'GET',
           query: payload.findOptions?.params,
         })
@@ -56,10 +56,10 @@ export default defineRstorePlugin({
       const payloadResult = payload.getResult()
       const items: any[] = Array.isArray(payloadResult) ? payloadResult : [payloadResult]
       await Promise.all(items.map(async (item) => {
-        const key = payload.model.getKey(item)
+        const key = payload.collection.getKey(item)
         if (key) {
           const wrappedItem = payload.store.$cache.readItem({
-            model: payload.model,
+            collection: payload.collection,
             key,
           })
           if (!wrappedItem) {
@@ -71,14 +71,14 @@ export default defineRstorePlugin({
               continue
             }
 
-            const relation = payload.model.relations[relationKey]
+            const relation = payload.collection.relations[relationKey]
             if (!relation) {
-              throw new Error(`Relation "${relationKey}" does not exist on model "${payload.model.name}"`)
+              throw new Error(`Relation "${relationKey}" does not exist on collection "${payload.collection.name}"`)
             }
 
-            await Promise.all(Object.keys(relation.to).map((modelName) => {
-              const relationData = relation.to[modelName]!
-              return store.$model(modelName).findMany({
+            await Promise.all(Object.keys(relation.to).map((collectionName) => {
+              const relationData = relation.to[collectionName]!
+              return store.$collection(collectionName).findMany({
                 params: {
                   filter: `${relationData.on}:${wrappedItem[relationData.eq]}`,
                 },
@@ -90,8 +90,8 @@ export default defineRstorePlugin({
     })
 
     hook('createItem', async (payload) => {
-      if (payload.model.meta?.path) {
-        const result = await $fetch(`/api/rest/${payload.model.meta.path}`, {
+      if (payload.collection.meta?.path) {
+        const result = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
           method: 'POST',
           body: payload.item,
         })
@@ -100,8 +100,8 @@ export default defineRstorePlugin({
     })
 
     hook('updateItem', async (payload) => {
-      if (payload.model.meta?.path) {
-        const result = await $fetch(`/api/rest/${payload.model.meta.path}/${payload.key}`, {
+      if (payload.collection.meta?.path) {
+        const result = await $fetch(`/api/rest/${payload.collection.meta.path}/${payload.key}`, {
           method: 'PATCH',
           body: {
             ...payload.item,
@@ -113,8 +113,8 @@ export default defineRstorePlugin({
     })
 
     hook('deleteItem', async (payload) => {
-      if (payload.model.meta?.path) {
-        await $fetch(`/api/rest/${payload.model.meta.path}/${payload.key}`, {
+      if (payload.collection.meta?.path) {
+        await $fetch(`/api/rest/${payload.collection.meta.path}/${payload.key}`, {
           method: 'DELETE',
         })
       }
@@ -132,7 +132,7 @@ export default defineRstorePlugin({
       if (payload.meta.storeHistoryItem) {
         storeStats.value.store.push({
           operation: payload.many ? 'fetchMany' : 'fetchFirst',
-          model: payload.model.name,
+          collection: payload.collection.name,
           started: payload.meta.storeHistoryItem.started,
           ended: new Date(),
           result: payload.getResult(),
@@ -153,7 +153,7 @@ export default defineRstorePlugin({
       if (payload.meta.storeHistoryItem) {
         storeStats.value.store.push({
           operation: payload.mutation,
-          model: payload.model.name,
+          collection: payload.collection.name,
           started: payload.meta.storeHistoryItem.started,
           ended: new Date(),
           result: payload.getResult(),
@@ -173,9 +173,9 @@ export default defineRstorePlugin({
       const userAvatar = faker.image.avatar()
 
       hook('createItem', (payload) => {
-        if (payload.model.meta?.websocketTopic) {
+        if (payload.collection.meta?.websocketTopic) {
           const newItem = {
-            __typename: payload.model.name,
+            __typename: payload.collection.name,
             id: crypto.randomUUID(),
             userName,
             userAvatar,
@@ -184,7 +184,7 @@ export default defineRstorePlugin({
           } as ChatMessage & { __typename: string }
           ws.send(JSON.stringify({
             type: 'publish',
-            topic: payload.model.meta.websocketTopic,
+            topic: payload.collection.meta.websocketTopic,
             payload: newItem,
           } satisfies WebsocketMessage))
           payload.setResult(newItem)
@@ -194,8 +194,8 @@ export default defineRstorePlugin({
       const countPerTopic: Record<string, number> = {}
 
       hook('subscribe', (payload) => {
-        if (payload.model.meta?.websocketTopic) {
-          const topic = payload.model.meta.websocketTopic
+        if (payload.collection.meta?.websocketTopic) {
+          const topic = payload.collection.meta.websocketTopic
           countPerTopic[topic] ??= 0
           if (countPerTopic[topic] === 0) {
             ws.send(JSON.stringify({
@@ -208,8 +208,8 @@ export default defineRstorePlugin({
       })
 
       hook('unsubscribe', (payload) => {
-        if (payload.model.meta?.websocketTopic) {
-          const topic = payload.model.meta.websocketTopic
+        if (payload.collection.meta?.websocketTopic) {
+          const topic = payload.collection.meta.websocketTopic
           countPerTopic[topic] ??= 1
           countPerTopic[topic]--
           if (countPerTopic[topic] === 0) {
@@ -227,14 +227,14 @@ export default defineRstorePlugin({
             const message = JSON.parse(data) as { item: any }
             if (message.item) {
               const { item } = message
-              const model = payload.store.$getModel(item)
-              if (model) {
-                const key = model.getKey(item)
+              const collection = payload.store.$getCollection(item)
+              if (collection) {
+                const key = collection.getKey(item)
                 if (!key) {
-                  throw new Error(`Key not found for model ${model.name}`)
+                  throw new Error(`Key not found for collection ${collection.name}`)
                 }
                 payload.store.$cache.writeItem({
-                  model,
+                  collection,
                   key,
                   item,
                 })

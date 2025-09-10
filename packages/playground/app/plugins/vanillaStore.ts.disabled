@@ -8,8 +8,8 @@ export default defineNuxtPlugin({
     }
 
     const store = await createStore({
-      models: vanillaModel,
-      modelDefaults: {
+      collections: vanillaCollection,
+      collectionDefaults: {
         fields: {
           createdAt: {
             parse: parseDate,
@@ -24,13 +24,13 @@ export default defineNuxtPlugin({
           name: 'vanilla-rstore-plugin',
           setup({ hook }) {
             hook('fetchFirst', async (payload) => {
-              if (payload.model.meta?.path) {
+              if (payload.collection.meta?.path) {
                 if (payload.key) {
-                  const result = await $fetch(`/api/rest/${payload.model.meta.path}/${payload.key}`)
+                  const result = await $fetch(`/api/rest/${payload.collection.meta.path}/${payload.key}`)
                   payload.setResult(result)
                 }
                 else {
-                  const result: any = await $fetch(`/api/rest/${payload.model.meta.path}`, {
+                  const result: any = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
                     method: 'GET',
                     query: payload.findOptions?.params,
                   })
@@ -39,13 +39,13 @@ export default defineNuxtPlugin({
               }
             })
             // hook('beforeCacheReadMany', (payload) => {
-            //   payload.setMarker(`many:${payload.model.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
+            //   payload.setMarker(`many:${payload.collection.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
             // })
             hook('fetchMany', async (payload) => {
-              // payload.setMarker(`many:${payload.model.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
+              // payload.setMarker(`many:${payload.collection.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
 
-              if (payload.model.meta?.path) {
-                const result = await $fetch(`/api/rest/${payload.model.meta.path}`, {
+              if (payload.collection.meta?.path) {
+                const result = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
                   method: 'GET',
                   query: payload.findOptions?.params,
                 })
@@ -57,10 +57,10 @@ export default defineNuxtPlugin({
               const payloadResult = payload.getResult()
               const items: any[] = Array.isArray(payloadResult) ? payloadResult : [payloadResult]
               await Promise.all(items.map(async (item) => {
-                const key = payload.model.getKey(item)
+                const key = payload.collection.getKey(item)
                 if (key) {
                   const wrappedItem = payload.store.cache.readItem({
-                    model: payload.model,
+                    collection: payload.collection,
                     key,
                   })
                   if (!wrappedItem) {
@@ -72,14 +72,14 @@ export default defineNuxtPlugin({
                       continue
                     }
 
-                    const relation = payload.model.relations[relationKey]
+                    const relation = payload.collection.relations[relationKey]
                     if (!relation) {
-                      throw new Error(`Relation "${relationKey}" does not exist on model "${payload.model.name}"`)
+                      throw new Error(`Relation "${relationKey}" does not exist on collection "${payload.collection.name}"`)
                     }
 
-                    await Promise.all(Object.keys(relation.to).map((modelKey) => {
-                      const relationData = relation.to[modelKey]!
-                      return store[modelKey as keyof typeof vanillaModel].findMany({
+                    await Promise.all(Object.keys(relation.to).map((collectionKey) => {
+                      const relationData = relation.to[collectionKey]!
+                      return store[collectionKey as keyof typeof vanillaCollection].findMany({
                         params: {
                           filter: `${relationData.on}:${wrappedItem[relationData.eq]}`,
                         },
@@ -91,8 +91,8 @@ export default defineNuxtPlugin({
             })
 
             hook('createItem', async (payload) => {
-              if (payload.model.meta?.path) {
-                const result = await $fetch(`/api/rest/${payload.model.meta.path}`, {
+              if (payload.collection.meta?.path) {
+                const result = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
                   method: 'POST',
                   body: payload.item,
                 })
@@ -101,8 +101,8 @@ export default defineNuxtPlugin({
             })
 
             hook('updateItem', async (payload) => {
-              if (payload.model.meta?.path) {
-                const result = await $fetch(`/api/rest/${payload.model.meta.path}/${payload.key}`, {
+              if (payload.collection.meta?.path) {
+                const result = await $fetch(`/api/rest/${payload.collection.meta.path}/${payload.key}`, {
                   method: 'PATCH',
                   body: {
                     ...payload.item,
@@ -114,8 +114,8 @@ export default defineNuxtPlugin({
             })
 
             hook('deleteItem', async (payload) => {
-              if (payload.model.meta?.path) {
-                await $fetch(`/api/rest/${payload.model.meta.path}/${payload.key}`, {
+              if (payload.collection.meta?.path) {
+                await $fetch(`/api/rest/${payload.collection.meta.path}/${payload.key}`, {
                   method: 'DELETE',
                 })
               }
@@ -133,7 +133,7 @@ export default defineNuxtPlugin({
               if (payload.meta.storeHistoryItem) {
                 storeStats.value.store.push({
                   operation: payload.many ? 'fetchMany' : 'fetchFirst',
-                  model: payload.model.name,
+                  collection: payload.collection.name,
                   started: payload.meta.storeHistoryItem.started,
                   ended: new Date(),
                   result: payload.getResult(),
@@ -154,7 +154,7 @@ export default defineNuxtPlugin({
               if (payload.meta.storeHistoryItem) {
                 storeStats.value.store.push({
                   operation: payload.mutation,
-                  model: payload.model.name,
+                  collection: payload.collection.name,
                   started: payload.meta.storeHistoryItem.started,
                   ended: new Date(),
                   result: payload.getResult(),

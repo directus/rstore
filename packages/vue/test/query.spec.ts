@@ -1,4 +1,4 @@
-import type { ResolvedModel } from '@rstore/shared'
+import type { ResolvedCollection } from '@rstore/shared'
 import type { VueStore } from '../src'
 import type { WrappedItemMetadata } from '../src/item'
 import { beforeEach, describe, expect, it, type MockedFunction, vi } from 'vitest'
@@ -7,15 +7,15 @@ import { createQuery } from '../src/query'
 
 describe('createQuery', () => {
   let mockStore: VueStore<any, any>
-  let mockModel: ResolvedModel<any, any, any>
+  let mockCollection: ResolvedCollection<any, any, any>
   let mockWrappedCache: Map<string, any>
 
   let mockFetchMethod: MockedFunction<any>
   let mockCacheMethod: MockedFunction<any>
 
   beforeEach(() => {
-    mockModel = {
-      name: 'testModel',
+    mockCollection = {
+      name: 'testCollection',
       getKey: (item: any) => item.id ?? 'foo',
     } as any
 
@@ -24,7 +24,7 @@ describe('createQuery', () => {
       $onCacheReset: vi.fn(),
       $cache: {
         wrapItem: vi.fn(({ item }) => {
-          const key = mockModel.getKey(item)
+          const key = mockCollection.getKey(item)
           if (mockWrappedCache?.has(key)) {
             return mockWrappedCache.get(key)
           }
@@ -58,11 +58,11 @@ describe('createQuery', () => {
       store: mockStore,
       fetchMethod: mockFetchMethod,
       cacheMethod: mockCacheMethod,
-      defaultValue: mockStore.$cache.wrapItem({ model: mockModel, item: defaultValue }),
+      defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options: ref({
         fetchPolicy: 'no-cache',
       }),
-      model: mockModel,
+      collection: mockCollection,
       name: 'query',
     })
 
@@ -72,15 +72,15 @@ describe('createQuery', () => {
   it('should call fetchMethod on load', async () => {
     const defaultValue = { text: 'default' }
     const cacheResult = { text: 'fetched' }
-    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ model: mockModel, item: cacheResult }))
+    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ collection: mockCollection, item: cacheResult }))
 
     const query = createQuery({
       store: mockStore,
       fetchMethod: mockFetchMethod,
       cacheMethod: mockCacheMethod,
-      defaultValue: mockStore.$cache.wrapItem({ model: mockModel, item: defaultValue }),
+      defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options: ref(undefined),
-      model: mockModel,
+      collection: mockCollection,
       name: 'query',
     })
 
@@ -98,9 +98,9 @@ describe('createQuery', () => {
       store: mockStore,
       fetchMethod: mockFetchMethod,
       cacheMethod: mockCacheMethod,
-      defaultValue: mockStore.$cache.wrapItem({ model: mockModel, item: defaultValue }),
+      defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options: ref(undefined),
-      model: mockModel,
+      collection: mockCollection,
       name: 'query',
     })
 
@@ -112,7 +112,7 @@ describe('createQuery', () => {
   it('should refresh data when option changes', async () => {
     const defaultValue = { text: 'default' }
     const cacheResult = { text: 'fetched' }
-    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ model: mockModel, item: cacheResult }))
+    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ collection: mockCollection, item: cacheResult }))
 
     const options = ref<any>({ params: { id: 1 } })
 
@@ -120,9 +120,9 @@ describe('createQuery', () => {
       store: mockStore,
       fetchMethod: mockFetchMethod,
       cacheMethod: mockCacheMethod,
-      defaultValue: mockStore.$cache.wrapItem({ model: mockModel, item: defaultValue }),
+      defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options,
-      model: mockModel,
+      collection: mockCollection,
       name: 'query',
     })
 
@@ -131,7 +131,7 @@ describe('createQuery', () => {
     expect(mockFetchMethod).toHaveBeenCalledTimes(1)
 
     const newFetchResult = { text: 'refreshed' }
-    mockFetchMethod.mockResolvedValue(mockStore.$cache.wrapItem({ model: mockModel, item: newFetchResult }))
+    mockFetchMethod.mockResolvedValue(mockStore.$cache.wrapItem({ collection: mockCollection, item: newFetchResult }))
 
     options.value.params.id = 2
 
@@ -144,15 +144,15 @@ describe('createQuery', () => {
   it('should refresh data when refresh is called', async () => {
     const defaultValue = { text: 'default' }
     const cacheResult = { text: 'fetched' }
-    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ model: mockModel, item: cacheResult }))
+    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ collection: mockCollection, item: cacheResult }))
 
     const query = createQuery({
       store: mockStore,
       fetchMethod: mockFetchMethod,
       cacheMethod: mockCacheMethod,
-      defaultValue: mockStore.$cache.wrapItem({ model: mockModel, item: defaultValue }),
+      defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options: ref(undefined),
-      model: mockModel,
+      collection: mockCollection,
       name: 'query',
     })
 
@@ -160,7 +160,7 @@ describe('createQuery', () => {
     expect(result.data.value).toEqual(cacheResult)
 
     const newFetchResult = { text: 'refreshed' }
-    mockFetchMethod.mockResolvedValue(mockStore.$cache.wrapItem({ model: mockModel, item: newFetchResult }))
+    mockFetchMethod.mockResolvedValue(mockStore.$cache.wrapItem({ collection: mockCollection, item: newFetchResult }))
 
     const refreshedResult = await result.refresh()
     expect(refreshedResult._result.value).toEqual(newFetchResult)
@@ -169,7 +169,7 @@ describe('createQuery', () => {
   it('should not load data when query is disabled', async () => {
     const defaultValue = { text: 'default' }
     const cacheResult = { text: 'fetched' }
-    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ model: mockModel, item: cacheResult }))
+    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ collection: mockCollection, item: cacheResult }))
 
     const options = ref<any>({ enabled: false })
 
@@ -177,9 +177,9 @@ describe('createQuery', () => {
       store: mockStore,
       fetchMethod: mockFetchMethod,
       cacheMethod: mockCacheMethod,
-      defaultValue: mockStore.$cache.wrapItem({ model: mockModel, item: defaultValue }),
+      defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options,
-      model: mockModel,
+      collection: mockCollection,
       name: 'query',
     })
 
@@ -192,8 +192,8 @@ describe('createQuery', () => {
   it('should re-enable query by setting option to object', async () => {
     const defaultValue = { text: 'default' }
     const cacheResult = { text: 'fetched' }
-    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ model: mockModel, item: cacheResult }))
-    mockFetchMethod.mockResolvedValue(mockStore.$cache.wrapItem({ model: mockModel, item: cacheResult }))
+    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ collection: mockCollection, item: cacheResult }))
+    mockFetchMethod.mockResolvedValue(mockStore.$cache.wrapItem({ collection: mockCollection, item: cacheResult }))
 
     const options = ref<any>({ enabled: false })
 
@@ -201,9 +201,9 @@ describe('createQuery', () => {
       store: mockStore,
       fetchMethod: mockFetchMethod,
       cacheMethod: mockCacheMethod,
-      defaultValue: mockStore.$cache.wrapItem({ model: mockModel, item: defaultValue }),
+      defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options,
-      model: mockModel,
+      collection: mockCollection,
       name: 'query',
     })
 
@@ -223,8 +223,8 @@ describe('createQuery', () => {
   it('should re-enable query by setting option to undefined', async () => {
     const defaultValue = { text: 'default' }
     const fetchResult = { text: 'fetched' }
-    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ model: mockModel, item: defaultValue }))
-    mockFetchMethod.mockResolvedValue(mockStore.$cache.wrapItem({ model: mockModel, item: fetchResult }))
+    mockCacheMethod.mockReturnValue(mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }))
+    mockFetchMethod.mockResolvedValue(mockStore.$cache.wrapItem({ collection: mockCollection, item: fetchResult }))
 
     const options = ref<any>({ enabled: false })
 
@@ -234,7 +234,7 @@ describe('createQuery', () => {
       cacheMethod: mockCacheMethod,
       defaultValue: [],
       options,
-      model: mockModel,
+      collection: mockCollection,
       name: 'query',
     })
 
@@ -256,8 +256,8 @@ describe('createQuery', () => {
 
     const cacheResult = [{ id: 1 }, { id: 2 }]
     const fetchResult = [{ id: 1 }]
-    mockCacheMethod.mockReturnValue(cacheResult.map(item => mockStore.$cache.wrapItem({ model: mockModel, item })))
-    mockFetchMethod.mockResolvedValue(fetchResult.map(item => mockStore.$cache.wrapItem({ model: mockModel, item })))
+    mockCacheMethod.mockReturnValue(cacheResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
+    mockFetchMethod.mockResolvedValue(fetchResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
 
     const query = createQuery({
       store: mockStore,
@@ -265,7 +265,7 @@ describe('createQuery', () => {
       cacheMethod: mockCacheMethod,
       defaultValue: [],
       options: {},
-      model: mockModel,
+      collection: mockCollection,
       name: 'query',
     })
 
@@ -274,7 +274,7 @@ describe('createQuery', () => {
     expect(mockFetchMethod).toHaveBeenCalledTimes(1)
     expect(result.data.value[0].$meta.dirtyQueries.size).toBe(0)
     expect(result.data.value[1].$meta.dirtyQueries.size).toBe(1)
-    expect(result.data.value[1].$meta.dirtyQueries.has('testModel:query:{}')).toBe(true)
+    expect(result.data.value[1].$meta.dirtyQueries.has('testCollection:query:{}')).toBe(true)
   })
 
   it('should garbage collect dirty items', async () => {
@@ -282,14 +282,14 @@ describe('createQuery', () => {
 
     const cacheResult = [{ id: 1 }, { id: 2 }]
     const fetchResult = [{ id: 1 }]
-    mockCacheMethod.mockReturnValue(cacheResult.map(item => mockStore.$cache.wrapItem({ model: mockModel, item })))
-    mockFetchMethod.mockResolvedValue(fetchResult.map(item => mockStore.$cache.wrapItem({ model: mockModel, item })))
+    mockCacheMethod.mockReturnValue(cacheResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
+    mockFetchMethod.mockResolvedValue(fetchResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
 
     const currentCache = cacheResult.slice()
     mockStore.$cache.garbageCollectItem = vi.fn(({ item }) => {
       if (item.$meta.queries.size === 0) {
         currentCache.splice(currentCache.findIndex(i => i.id === item.id), 1)
-        mockCacheMethod.mockReturnValue(currentCache.map(i => mockStore.$cache.wrapItem({ model: mockModel, item: i })))
+        mockCacheMethod.mockReturnValue(currentCache.map(i => mockStore.$cache.wrapItem({ collection: mockCollection, item: i })))
       }
     })
 
@@ -301,7 +301,7 @@ describe('createQuery', () => {
       options: {
         experimentalGarbageCollection: true,
       },
-      model: mockModel,
+      collection: mockCollection,
       name: 'query',
     })
 
@@ -315,14 +315,14 @@ describe('createQuery', () => {
 
     const cacheResult = [{ id: 1 }, { id: 2 }]
     const fetchResult = [{ id: 1 }]
-    mockCacheMethod.mockReturnValue(cacheResult.map(item => mockStore.$cache.wrapItem({ model: mockModel, item })))
-    mockFetchMethod.mockResolvedValue(fetchResult.map(item => mockStore.$cache.wrapItem({ model: mockModel, item })))
+    mockCacheMethod.mockReturnValue(cacheResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
+    mockFetchMethod.mockResolvedValue(fetchResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
 
     const currentCache = cacheResult.slice()
     mockStore.$cache.garbageCollectItem = vi.fn(({ item }) => {
       if (item.$meta.queries.size === 0) {
         currentCache.splice(currentCache.findIndex(i => i.id === item.id), 1)
-        mockCacheMethod.mockReturnValue(currentCache.map(i => mockStore.$cache.wrapItem({ model: mockModel, item: i })))
+        mockCacheMethod.mockReturnValue(currentCache.map(i => mockStore.$cache.wrapItem({ collection: mockCollection, item: i })))
       }
     })
 
@@ -334,7 +334,7 @@ describe('createQuery', () => {
       options: {
         experimentalGarbageCollection: true,
       },
-      model: mockModel,
+      collection: mockCollection,
       name: 'otherQuery',
     })
 
@@ -348,7 +348,7 @@ describe('createQuery', () => {
       options: {
         experimentalGarbageCollection: true,
       },
-      model: mockModel,
+      collection: mockCollection,
       name: 'query',
     })
 

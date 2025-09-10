@@ -37,14 +37,14 @@ export default definePlugin({
   setup(pluginApi) {
     pluginApi.hook('fetchFirst', async (payload) => {
       if (payload.key) {
-        const result = await fetch(`/api/${payload.model.name}/${payload.key}`)
+        const result = await fetch(`/api/${payload.collection.name}/${payload.key}`)
           .then(r => r.json())
         payload.setResult(result)
       }
     })
 
     pluginApi.hook('fetchMany', async (payload) => {
-      const result = await fetch(`/api/${payload.model.name}`)
+      const result = await fetch(`/api/${payload.collection.name}`)
         .then(r => r.json())
       payload.setResult(result)
     })
@@ -56,7 +56,7 @@ Explore the [Plugin hooks](./hooks.md) for a complete list of available hooks.
 
 ## Scope ID
 
-The scope ID allows filtering which plugins will handle the model. For example, if a model has a scope A, only plugins with the scope A will be able to handle it by default. This is very useful to handle multiple data sources.
+The scope ID allows filtering which plugins will handle the collection. For example, if a collection has a scope A, only plugins with the scope A will be able to handle it by default. This is very useful to handle multiple data sources.
 
 ```ts{3}
 export default definePlugin({
@@ -65,7 +65,7 @@ export default definePlugin({
 })
 ```
 
-In the following example, the `fetchMany` hook will only be called with the models that have the `my-scope` scope ID:
+In the following example, the `fetchMany` hook will only be called with the collections that have the `my-scope` scope ID:
 
 ```ts
 export default definePlugin({
@@ -73,7 +73,7 @@ export default definePlugin({
   scopeId: 'my-scope',
   setup({ hook }) {
     hook('fetchMany', async (payload) => {
-      // This will only be called for models with the scopeId 'my-scope'
+      // This will only be called for collections with the scopeId 'my-scope'
     })
   }
 })
@@ -87,7 +87,7 @@ export default definePlugin({
   scopeId: 'my-scope',
   setup({ hook }) {
     hook('fetchMany', async (payload) => {
-      // This will be called for all models regardless of their scopeId
+      // This will be called for all collections regardless of their scopeId
     }, {
       ignoreScope: true,
     })
@@ -95,11 +95,11 @@ export default definePlugin({
 })
 ```
 
-Learn more about federation and multi-source [here](../model/federation.md).
+Learn more about federation and multi-source [here](../schema/federation.md).
 
-## Adding model defaults
+## Adding collection defaults
 
-Plugins can define default options for all models using the `addModelDefaults` method:
+Plugins can define default options for all collections using the `addCollectionDefaults` method:
 
 ```ts
 import { definePlugin } from '@rstore/vue'
@@ -107,8 +107,8 @@ import { definePlugin } from '@rstore/vue'
 export default definePlugin({
   name: 'my-rstore-plugin',
   setup() {
-    addModelDefaults({
-      getKey: (modelName, item) => item.customId,
+    addCollectionDefaults({
+      getKey: (collectionName, item) => item.customId,
       // ...
     })
   }

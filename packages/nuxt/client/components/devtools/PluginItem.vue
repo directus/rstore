@@ -52,7 +52,7 @@ const meta = computed(() => {
         {{ plugin.scopeId }}
       </div>
       <div v-else class="italic opacity-50">
-        None (handle all models)
+        None (handle all collections)
       </div>
     </div>
 

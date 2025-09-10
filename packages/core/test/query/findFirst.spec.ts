@@ -1,13 +1,13 @@
-import type { Model, ModelDefaults, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollection, StoreCore, WrappedItem } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { findFirst } from '../../src/query/findFirst'
 
-interface TestModelDefaults extends ModelDefaults {
+interface TestCollectionDefaults extends CollectionDefaults {
   name: string
 }
 
-interface TestModelType extends Model {
+interface TestCollectionType extends Collection {
   id: string
 }
 
@@ -25,7 +25,7 @@ vi.mock('../../src/query/peekFirst', () => ({
 
 describe('findFirst', () => {
   let mockStore: StoreCore<any, any>
-  let model: ResolvedModel
+  let collection: ResolvedCollection
 
   beforeEach(() => {
     mockStore = {
@@ -53,7 +53,7 @@ describe('findFirst', () => {
       $dedupePromises: new Map(),
     } as any
 
-    model = {
+    collection = {
       getKey: (item: any) => item.id,
     } as any
   })
@@ -61,7 +61,7 @@ describe('findFirst', () => {
   it('should return the first item from the cache by key', async () => {
     const result = await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: '1',
     })
 
@@ -71,9 +71,9 @@ describe('findFirst', () => {
   it('should return the first item from the cache by filter', async () => {
     const result = await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
-        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '2',
+        filter: (item: WrappedItem<TestCollectionType, TestCollectionDefaults, any>) => item.id === '2',
       },
     })
 
@@ -83,9 +83,9 @@ describe('findFirst', () => {
   it('should return null if no item matches the filter', async () => {
     const result = await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
-        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '3',
+        filter: (item: WrappedItem<TestCollectionType, TestCollectionDefaults, any>) => item.id === '3',
       },
     })
 
@@ -97,7 +97,7 @@ describe('findFirst', () => {
 
     await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: '42',
     })
 
@@ -112,12 +112,12 @@ describe('findFirst', () => {
 
     const result = await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: '42',
     })
 
     expect(mockStore.$cache.writeItem).toHaveBeenCalledWith(expect.objectContaining({
-      model,
+      collection,
       key: '42',
       item: result.result,
     }))
@@ -127,7 +127,7 @@ describe('findFirst', () => {
     mockStore.$getFetchPolicy = () => 'no-cache'
     await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: '1',
     })
 
@@ -144,12 +144,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: '42',
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: '42',
         }),
       ])
@@ -161,7 +161,7 @@ describe('findFirst', () => {
       ])
     })
 
-    it('should not dedupe findFirst on different model', async () => {
+    it('should not dedupe findFirst on different collection', async () => {
       const fn = vi.fn((payload) => {
         payload.setResult({ foo: payload.findOptions.key })
       })
@@ -170,13 +170,13 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: '42',
         }),
         findFirst({
           store: mockStore,
-          model: {
-            ...model,
+          collection: {
+            ...collection,
             name: 'Other',
           },
           findOptions: '42',
@@ -199,12 +199,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: '42',
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: '43',
         }),
       ])
@@ -225,12 +225,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
       ])
@@ -251,12 +251,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '43' } } },
         }),
       ])
@@ -277,12 +277,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
         }),
       ])
@@ -303,12 +303,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
         }),
       ])

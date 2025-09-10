@@ -11,13 +11,13 @@ export default definePlugin({
   // @TODO multi directus instances
   scopeId: 'rstore-drizzle',
 
-  setup({ addModelDefaults, hook }) {
+  setup({ addCollectionDefaults, hook }) {
     function parseDate(value: any): Date {
       return typeof value === 'string' ? new Date(value) : value
     }
 
     // @TODO configurable or auto-generate from tables
-    addModelDefaults({
+    addCollectionDefaults({
       fields: {
         createdAt: {
           parse: parseDate,
@@ -34,18 +34,18 @@ export default definePlugin({
 
     hook('fetchFirst', async (payload) => {
       if (payload.key) {
-        const result = await requestFetch(`${apiPath}/${payload.model.name}/${payload.key}`, {
+        const result = await requestFetch(`${apiPath}/${payload.collection.name}/${payload.key}`, {
           query: payload.findOptions?.params,
         })
         if (result) {
           payload.setResult(result)
         }
         else {
-          console.warn(`No result found for ${payload.model.name} with key ${payload.key}`)
+          console.warn(`No result found for ${payload.collection.name} with key ${payload.key}`)
         }
       }
       else {
-        const result: any = await requestFetch(`${apiPath}/${payload.model.name}`, {
+        const result: any = await requestFetch(`${apiPath}/${payload.collection.name}`, {
           query: {
             where: payload.findOptions?.where,
             ...payload.findOptions?.params,
@@ -58,7 +58,7 @@ export default definePlugin({
 
     hook('fetchMany', async (payload) => {
       // @ts-expect-error excessive stack depth
-      payload.setResult(await requestFetch(`${apiPath}/${payload.model.name}`, {
+      payload.setResult(await requestFetch(`${apiPath}/${payload.collection.name}`, {
         query: {
           where: payload.findOptions?.where,
           ...payload.findOptions?.params,
@@ -71,11 +71,11 @@ export default definePlugin({
       const payloadResult = payload.getResult()
       const items: any[] = Array.isArray(payloadResult) ? payloadResult : [payloadResult]
       await Promise.all(items.map(async (item) => {
-        const key = payload.model.getKey(item)
+        const key = payload.collection.getKey(item)
         if (key) {
           // Get the full wrapped item with computed props etc.
           const wrappedItem = store.$cache.readItem({
-            model: payload.model,
+            collection: payload.collection,
             key,
           })
           if (!wrappedItem) {
@@ -87,18 +87,18 @@ export default definePlugin({
               continue
             }
 
-            const relation = payload.model.relations[relationKey]
+            const relation = payload.collection.relations[relationKey]
             if (!relation) {
-              throw new Error(`Relation "${relationKey}" does not exist on model "${payload.model.name}"`)
+              throw new Error(`Relation "${relationKey}" does not exist on collection "${payload.collection.name}"`)
             }
 
-            await Promise.all(Object.keys(relation.to).map((modelName) => {
-              const relationData = relation.to[modelName]!
+            await Promise.all(Object.keys(relation.to).map((collectionName) => {
+              const relationData = relation.to[collectionName]!
               const where: any[] = []
               for (const key in relationData.on) {
                 where.push(eq(key, wrappedItem[relationData.on[key]!]))
               }
-              return store.$model(modelName).findMany({
+              return store.$collection(collectionName).findMany({
                 where: and(...where),
               })
             }))
@@ -152,7 +152,7 @@ export default definePlugin({
     /* Mutations */
 
     hook('createItem', async (payload) => {
-      const result: any = await requestFetch(`${apiPath}/${payload.model.name}`, {
+      const result: any = await requestFetch(`${apiPath}/${payload.collection.name}`, {
         method: 'POST',
         body: payload.item,
       })
@@ -160,7 +160,7 @@ export default definePlugin({
     })
 
     hook('updateItem', async (payload) => {
-      const result: any = await requestFetch(`${apiPath}/${payload.model.name}/${payload.key}`, {
+      const result: any = await requestFetch(`${apiPath}/${payload.collection.name}/${payload.key}`, {
         method: 'PATCH',
         body: {
           ...payload.item,
@@ -171,7 +171,7 @@ export default definePlugin({
     })
 
     hook('deleteItem', async (payload) => {
-      await requestFetch(`${apiPath}/${payload.model.name}/${payload.key}`, {
+      await requestFetch(`${apiPath}/${payload.collection.name}/${payload.key}`, {
         method: 'DELETE',
       })
     })

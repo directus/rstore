@@ -1,6 +1,6 @@
 export * from './cache.js'
+export * from './collection.js'
 export * from './fetchPolicy.js'
-export * from './model.js'
 export * from './module.js'
 export * from './mutation/index.js'
 export * from './plugin.js'

@@ -1,29 +1,29 @@
-import type { CacheLayer, CustomHookMeta, Model, ModelDefaults, ResolvedModel, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 
 export interface DeleteOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > {
-  store: StoreCore<TSchema, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults, TSchema>
+  store: StoreCore<TSchema, TCollectionDefaults>
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
   key: string | number
   skipCache?: boolean
   optimistic?: boolean
 }
 
 export async function deleteItem<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 >({
   store,
-  model,
+  collection,
   key,
   skipCache,
   optimistic = true,
-}: DeleteOptions<TModel, TModelDefaults, TSchema>): Promise<void> {
-  const item = store.$cache.readItem({ model, key })
+}: DeleteOptions<TCollection, TCollectionDefaults, TSchema>): Promise<void> {
+  const item = store.$cache.readItem({ collection, key })
   if (item?.$layer) {
     const layer = item.$layer as CacheLayer
     if (layer.prevent?.delete) {
@@ -37,7 +37,7 @@ export async function deleteItem<
   await store.$hooks.callHook('beforeMutation', {
     store,
     meta,
-    model,
+    collection,
     mutation: 'delete',
     key,
     modifyItem: () => {},
@@ -51,7 +51,7 @@ export async function deleteItem<
       id: crypto.randomUUID(),
       state: {},
       deletedItems: {
-        [model.name]: new Set([key]),
+        [collection.name]: new Set([key]),
       },
       optimistic: true,
     }
@@ -62,14 +62,14 @@ export async function deleteItem<
     await store.$hooks.callHook('deleteItem', {
       store,
       meta,
-      model,
+      collection,
       key,
     })
 
     await store.$hooks.callHook('afterMutation', {
       store,
       meta,
-      model,
+      collection,
       mutation: 'delete',
       key,
       getResult: () => undefined,
@@ -82,14 +82,14 @@ export async function deleteItem<
       }
 
       store.$cache.deleteItem({
-        model,
+        collection,
         key,
       })
     }
 
     store.$mutationHistory.push({
       operation: 'delete',
-      model,
+      collection,
       key,
     })
   }

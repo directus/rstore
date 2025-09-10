@@ -1,18 +1,18 @@
-import type { ResolvedModel, StoreCore } from '@rstore/shared'
+import type { ResolvedCollection, StoreCore } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { unsubscribe } from '../../src/subscription/unsubscribe'
 
 describe('unsubscribe', () => {
   let mockStore: StoreCore<any, any>
-  let model: ResolvedModel
+  let collection: ResolvedCollection
 
   beforeEach(() => {
     mockStore = {
       $hooks: createHooks(),
     } as any
 
-    model = {
+    collection = {
       getKey: (item: any) => item.id,
     } as any
   })
@@ -22,13 +22,13 @@ describe('unsubscribe', () => {
 
     await unsubscribe({
       store: mockStore,
-      model,
+      collection,
       subscriptionId: 'sub-1',
     })
 
     expect(callHookSpy).toHaveBeenCalledWith('unsubscribe', expect.objectContaining({
       store: mockStore,
-      model,
+      collection,
       subscriptionId: 'sub-1',
     }))
   })
@@ -38,7 +38,7 @@ describe('unsubscribe', () => {
 
     await unsubscribe({
       store: mockStore,
-      model,
+      collection,
       subscriptionId: 'sub-2',
       key: 'key-1',
     })
@@ -54,7 +54,7 @@ describe('unsubscribe', () => {
 
     await unsubscribe({
       store: mockStore,
-      model,
+      collection,
       subscriptionId: 'sub-3',
       findOptions,
     })
@@ -70,7 +70,7 @@ describe('unsubscribe', () => {
 
     await unsubscribe({
       store: mockStore,
-      model,
+      collection,
       subscriptionId: 'sub-4',
       meta,
     })
@@ -85,7 +85,7 @@ describe('unsubscribe', () => {
 
     await unsubscribe({
       store: mockStore,
-      model,
+      collection,
       subscriptionId: 'sub-5',
     })
 

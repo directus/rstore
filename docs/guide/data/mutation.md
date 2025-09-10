@@ -23,7 +23,7 @@ const updatedTodo = await store.todos.update({
 })
 ```
 
-If you don't provide the key, rstore will attempt to compute the key from the object you pass to the `update` method. (See [getKey](../model/model.md#item-key) for more details on how to compute the key.)
+If you don't provide the key, rstore will attempt to compute the key from the object you pass to the `update` method. (See [getKey](../schema/collection.md#item-key) for more details on how to compute the key.)
 
 ```ts
 const updatedTodo = await store.todos.update({
@@ -66,7 +66,7 @@ To delete a record, you can use the `delete` method on the store. This method ta
 await store.todos.delete('some-id')
 ```
 
-You can also pass an object that contains the key of the record you want to delete. (See [getKey](../model/model.md#item-key) for more details on how to compute the key.)
+You can also pass an object that contains the key of the record you want to delete. (See [getKey](../schema/collection.md#item-key) for more details on how to compute the key.)
 
 ```ts
 await store.todos.delete({

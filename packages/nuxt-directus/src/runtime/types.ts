@@ -2,12 +2,12 @@ import type { QueryFilter } from '@directus/sdk'
 
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { Model, ModelDefaults, StoreSchema } from '@rstore/vue'
+import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/vue'
 
 declare module '@rstore/vue' {
   export interface FindOptions<
-    TModel extends Model,
-    TModelDefaults extends ModelDefaults,
+    TCollection extends Collection,
+    TCollectionDefaults extends CollectionDefaults,
     TSchema extends StoreSchema,
   > {
     filter?: QueryFilter<any, any>

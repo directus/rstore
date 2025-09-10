@@ -4,7 +4,7 @@ import { setupDevToolsUI } from './devtools'
 
 declare module '@nuxt/schema' {
   export interface NuxtOptions {
-    _rstoreModelImports?: Set<string>
+    _rstoreCollectionImports?: Set<string>
     _rstorePluginImports?: Set<string>
   }
 }
@@ -38,8 +38,8 @@ export default defineNuxtModule<ModuleOptions>({
     // Auto imports
     const importsFile = resolve('./runtime/imports')
     addImports([
-      'defineItemType',
-      'defineDataModel',
+      'withItemType',
+      'defineCollection',
       'defineRstorePlugin',
       'defineRstoreModule',
       'createRstoreModule',
@@ -47,30 +47,30 @@ export default defineNuxtModule<ModuleOptions>({
       'RStoreSchema',
     ].map(name => ({ from: importsFile, name })))
     addImports([
-      'StoreRawModels',
+      'StoreRawCollections',
       'Store',
-      'StoreResolvedModelItem',
+      'StoreResolvedCollectionItem',
       'StoreWrappedItem',
       'StoreCreateFormObject',
       'StoreUpdateFormObject',
     ].map(name => ({ from: importsFile, name, type: true })))
 
     // Scan folders
-    const rstoreModelDirs: string[] = []
+    const rstoreCollectionDirs: string[] = []
     const rstorePluginDirs: string[] = []
 
     for (const layer of nuxt.options._layers) {
       const layerRstoreDirs = (layer.config as unknown as { rstore: ModuleOptions } | null)?.rstore?.rstoreDirs ?? ['rstore']
       for (const dir of layerRstoreDirs) {
         const layerDir = resolve(layer.config.srcDir, dir)
-        rstoreModelDirs.push(layerDir)
+        rstoreCollectionDirs.push(layerDir)
         const layerPluginDir = resolve(layer.config.srcDir, dir, 'plugins')
         rstorePluginDirs.push(layerPluginDir)
       }
     }
 
-    async function resolveModelFiles() {
-      let files = (await Promise.all(rstoreModelDirs.map((dir) => {
+    async function resolveCollectionFiles() {
+      let files = (await Promise.all(rstoreCollectionDirs.map((dir) => {
         return resolveFiles(dir, ['./*{.ts,.js}'])
       }))).flat()
       files = files.map((file) => {
@@ -82,7 +82,7 @@ export default defineNuxtModule<ModuleOptions>({
         }
         return file
       }).filter(Boolean) as string[]
-      files.push(...nuxt.options._rstoreModelImports ?? [])
+      files.push(...nuxt.options._rstoreCollectionImports ?? [])
       return files
     }
 
@@ -100,9 +100,9 @@ export default defineNuxtModule<ModuleOptions>({
     })
 
     addTemplate({
-      filename: '$rstore-model.ts',
+      filename: '$rstore-collection.ts',
       getContents: async () => {
-        const files = await resolveModelFiles()
+        const files = await resolveCollectionFiles()
         return `${files.map((file, index) => `import M${index} from '${file}'`).join('\n')}
 export default [
   ${files.map((file, index) => `...Array.isArray(M${index}) ? M${index} : [M${index}],`).join('\n')}
@@ -111,16 +111,16 @@ export default [
     })
 
     addTypeTemplate({
-      filename: '$rstore-model-const.d.ts',
+      filename: '$rstore-collection-const.d.ts',
       getContents: async () => {
-        const files = await resolveModelFiles()
+        const files = await resolveCollectionFiles()
         return `import type { StoreSchema } from '@rstore/shared'
 ${files.map((file, index) => `import M${index} from '${file}'`).join('\n')}
 type EnsureArray<T> = T extends any[] ? T : [T]
 function ensureArray<T>(value: T): EnsureArray<T> {
   return Array.isArray(value) ? value : [value]
 }
-export const constModels = [
+export const constCollections = [
   ${files.map((file, index) => `...ensureArray(M${index}),`).join('\n')}
 ] satisfies StoreSchema`
       },

@@ -1,11 +1,11 @@
-import type { Model, ModelDefaults, ResolvedModel, StoreCore, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deleteItem } from '../../src/mutation/delete'
 
 describe('deleteItem', () => {
-  let mockStore: StoreCore<StoreSchema, ModelDefaults>
-  let mockModel: ResolvedModel<Model, ModelDefaults, StoreSchema>
+  let mockStore: StoreCore<StoreSchema, CollectionDefaults>
+  let mockCollection: ResolvedCollection<Collection, CollectionDefaults, StoreSchema>
   let mockKey: string
 
   beforeEach(() => {
@@ -20,23 +20,23 @@ describe('deleteItem', () => {
       $mutationHistory: [],
     } as any
 
-    mockModel = {} as any
+    mockCollection = {} as any
     mockKey = 'testKey'
   })
 
   it('should call deleteItem hook', async () => {
     const spy = vi.fn()
-    mockStore.$hooks.hook('deleteItem', ({ store, model, key }) => spy({ store, model, key }))
+    mockStore.$hooks.hook('deleteItem', ({ store, collection, key }) => spy({ store, collection, key }))
 
     await deleteItem({
       store: mockStore,
-      model: mockModel,
+      collection: mockCollection,
       key: mockKey,
     })
 
     expect(spy).toHaveBeenCalledWith({
       store: mockStore,
-      model: mockModel,
+      collection: mockCollection,
       key: mockKey,
     })
   })
@@ -44,13 +44,13 @@ describe('deleteItem', () => {
   it('should delete item from cache if skipCache is false', async () => {
     await deleteItem({
       store: mockStore,
-      model: mockModel,
+      collection: mockCollection,
       key: mockKey,
       skipCache: false,
     })
 
     expect(mockStore.$cache.deleteItem).toHaveBeenCalledWith({
-      model: mockModel,
+      collection: mockCollection,
       key: mockKey,
     })
   })
@@ -58,7 +58,7 @@ describe('deleteItem', () => {
   it('should not delete item from cache if skipCache is true', async () => {
     await deleteItem({
       store: mockStore,
-      model: mockModel,
+      collection: mockCollection,
       key: mockKey,
       skipCache: true,
     })
@@ -69,13 +69,13 @@ describe('deleteItem', () => {
   it('should push delete operation to mutationHistory', async () => {
     await deleteItem({
       store: mockStore,
-      model: mockModel,
+      collection: mockCollection,
       key: mockKey,
     })
 
     expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'delete',
-      model: mockModel,
+      collection: mockCollection,
       key: mockKey,
     })
   })

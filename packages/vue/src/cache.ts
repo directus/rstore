@@ -1,39 +1,39 @@
 import type { VueStore } from './store'
-import { type Cache, type CacheLayer, type Model, type ModelDefaults, pickNonSpecialProps, type ResolvedModel, type ResolvedModelItem, type ResolvedModelItemBase, type StoreSchema, type WrappedItem } from '@rstore/shared'
+import { type Cache, type CacheLayer, type Collection, type CollectionDefaults, pickNonSpecialProps, type ResolvedCollection, type ResolvedCollectionItem, type ResolvedCollectionItemBase, type StoreSchema, type WrappedItem } from '@rstore/shared'
 import { computed, ref, toRaw } from 'vue'
 import { wrapItem, type WrappedItemMetadata } from './item'
 
 export interface CreateCacheOptions<
   TSchema extends StoreSchema,
-  TModelDefaults extends ModelDefaults,
+  TCollectionDefaults extends CollectionDefaults,
 > {
-  getStore: () => VueStore<TSchema, TModelDefaults>
+  getStore: () => VueStore<TSchema, TCollectionDefaults>
 }
 
 export function createCache<
   TSchema extends StoreSchema,
-  TModelDefaults extends ModelDefaults,
+  TCollectionDefaults extends CollectionDefaults,
 >({
   getStore,
-}: CreateCacheOptions<TSchema, TModelDefaults>): Cache {
+}: CreateCacheOptions<TSchema, TCollectionDefaults>): Cache {
   const state = ref<Record<string, any>>({
     _markers: {},
   })
 
   const layers = ref<CacheLayer[]>([])
 
-  const wrappedItems = new Map<string, WrappedItem<Model, TModelDefaults, TSchema>>()
-  const wrappedItemsMetadata = new Map<string, WrappedItemMetadata<Model, TModelDefaults, TSchema>>()
+  const wrappedItems = new Map<string, WrappedItem<Collection, TCollectionDefaults, TSchema>>()
+  const wrappedItemsMetadata = new Map<string, WrappedItemMetadata<Collection, TCollectionDefaults, TSchema>>()
   const wrappedItemKeysPerLayer = new Map<string, Set<string>>()
 
-  function getItemWrapKey(model: ResolvedModel<any, any, any>, key: string | number, layer: CacheLayer | undefined) {
-    return [layer?.id, model.name, key].filter(Boolean).join(':')
+  function getItemWrapKey(collection: ResolvedCollection<any, any, any>, key: string | number, layer: CacheLayer | undefined) {
+    return [layer?.id, collection.name, key].filter(Boolean).join(':')
   }
 
-  function getItemKey(model: ResolvedModel<any, any, any>, item: ResolvedModelItem<any, any, any>): string | number {
-    const key = model.getKey(item)
+  function getItemKey(collection: ResolvedCollection<any, any, any>, item: ResolvedCollectionItem<any, any, any>): string | number {
+    const key = collection.getKey(item)
     if (key == null) {
-      throw new Error(`Item does not have a key for model ${model.name}: ${item}`)
+      throw new Error(`Item does not have a key for collection ${collection.name}: ${item}`)
     }
     return key
   }
@@ -50,16 +50,16 @@ export function createCache<
     keys.add(wrapKey)
   }
 
-  function getWrappedItem<TModel extends Model>(
-    model: ResolvedModel<TModel, TModelDefaults, TSchema>,
-    item: ResolvedModelItem<TModel, TModelDefaults, TSchema> | null | undefined,
-  ): WrappedItem<TModel, TModelDefaults, TSchema> | undefined {
+  function getWrappedItem<TCollection extends Collection>(
+    collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>,
+    item: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null | undefined,
+  ): WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined {
     if (!item) {
       return undefined
     }
-    const key = getItemKey(model, item)
+    const key = getItemKey(collection, item)
     const layer = item.$layer as CacheLayer | undefined
-    const wrapKey = getItemWrapKey(model, key, layer)
+    const wrapKey = getItemWrapKey(collection, key, layer)
     let wrappedItem = wrappedItems.get(wrapKey)
     if (!wrappedItem) {
       let metadata = wrappedItemsMetadata.get(wrapKey)
@@ -72,10 +72,10 @@ export function createCache<
       }
       wrappedItem = wrapItem({
         store: getStore(),
-        model,
+        collection,
         item: computed(() => layer
           ? item
-          : state.value[model.name]?.[key] ?? item),
+          : state.value[collection.name]?.[key] ?? item),
         metadata,
       })
       wrappedItems.set(wrapKey, wrappedItem)
@@ -91,46 +91,46 @@ export function createCache<
     state.value._markers[marker] = true
   }
 
-  function deleteItem(model: ResolvedModel<any, any, any>, key: string | number) {
-    const item = state.value[model.name]?.[key]
+  function deleteItem(collection: ResolvedCollection<any, any, any>, key: string | number) {
+    const item = state.value[collection.name]?.[key]
     if (item) {
-      delete state.value[model.name]?.[key]
-      const wrapKey = getItemWrapKey(model, key, undefined)
+      delete state.value[collection.name]?.[key]
+      const wrapKey = getItemWrapKey(collection, key, undefined)
       wrappedItems.delete(wrapKey)
       wrappedItemsMetadata.delete(wrapKey)
       const store = getStore()
       store.$hooks.callHookSync('afterCacheWrite', {
         store,
         meta: {},
-        model,
+        collection,
         key,
         operation: 'delete',
       })
     }
   }
 
-  function garbageCollectItem<TModel extends Model>(model: ResolvedModel<TModel, TModelDefaults, TSchema>, item: WrappedItem<TModel, TModelDefaults, TSchema>) {
+  function garbageCollectItem<TCollection extends Collection>(collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>, item: WrappedItem<TCollection, TCollectionDefaults, TSchema>) {
     if (item.$meta.queries.size === 0) {
-      const key = getItemKey(model, item)
-      deleteItem(model, key)
+      const key = getItemKey(collection, item)
+      deleteItem(collection, key)
       const store = getStore()
       store.$hooks.callHookSync('itemGarbageCollect', {
         store,
-        model,
+        collection,
         item,
         key,
       })
     }
   }
 
-  function getStateForModel(modelName: string) {
-    const result = Object.assign({}, state.value[modelName] ?? {})
+  function getStateForCollection(collectionName: string) {
+    const result = Object.assign({}, state.value[collectionName] ?? {})
 
     // Add & modify from layers
     for (const layer of layers.value) {
-      if (!layer.skip && layer.state[modelName]) {
+      if (!layer.skip && layer.state[collectionName]) {
         const layerState: Record<string | number, any> = {}
-        for (const [key, value] of Object.entries(layer.state[modelName])) {
+        for (const [key, value] of Object.entries(layer.state[collectionName])) {
           const data = {
             ...result[key],
             ...value,
@@ -144,8 +144,8 @@ export function createCache<
 
     // Delete from layers
     for (const layer of layers.value) {
-      if (!layer.skip && layer.deletedItems[modelName]) {
-        for (const key of layer.deletedItems[modelName]) {
+      if (!layer.skip && layer.deletedItems[collectionName]) {
+        for (const key of layer.deletedItems[collectionName]) {
           delete result[key]
         }
       }
@@ -155,17 +155,17 @@ export function createCache<
   }
 
   return {
-    wrapItem({ model, item }) {
-      return getWrappedItem(model, item)!
+    wrapItem({ collection, item }) {
+      return getWrappedItem(collection, item)!
     },
-    readItem({ model, key }) {
-      return getWrappedItem(model, getStateForModel(model.name)[key])
+    readItem({ collection, key }) {
+      return getWrappedItem(collection, getStateForCollection(collection.name)[key])
     },
-    readItems({ model, marker, filter, limit }) {
+    readItems({ collection, marker, filter, limit }) {
       if (marker && !state.value._markers?.[marker]) {
         return []
       }
-      const data: Array<ResolvedModelItemBase<any, any, any>> = Object.values(getStateForModel(model.name))
+      const data: Array<ResolvedCollectionItemBase<any, any, any>> = Object.values(getStateForCollection(collection.name))
       const result: Array<WrappedItem<any, any, any>> = []
       let count = 0
       for (const item of data) {
@@ -173,7 +173,7 @@ export function createCache<
           if (filter && !filter(item)) {
             continue
           }
-          const wrappedItem = getWrappedItem(model, item)
+          const wrappedItem = getWrappedItem(collection, item)
           if (wrappedItem) {
             result.push(wrappedItem)
             count++
@@ -185,16 +185,16 @@ export function createCache<
       }
       return result
     },
-    writeItem({ model, key, item, marker, fromWriteItems }) {
-      state.value[model.name] ??= {}
-      const itemsForType = state.value[model.name]
+    writeItem({ collection, key, item, marker, fromWriteItems }) {
+      state.value[collection.name] ??= {}
+      const itemsForType = state.value[collection.name]
       const rawData = pickNonSpecialProps(item, true)
 
       // Handle relations
       const data = {} as Record<string, any>
       for (const field in rawData) {
-        if (field in model.relations) {
-          const relation = model.relations[field]
+        if (field in collection.relations) {
+          const relation = collection.relations[field]
           const rawItem = rawData[field]
 
           // TODO: figure out deletions
@@ -203,16 +203,16 @@ export function createCache<
           }
 
           if (relation.many && !Array.isArray(rawItem)) {
-            throw new Error(`Expected array for relation ${model.name}.${field}`)
+            throw new Error(`Expected array for relation ${collection.name}.${field}`)
           }
           else if (!relation.many && Array.isArray(rawItem)) {
-            throw new Error(`Expected object for relation ${model.name}.${field}`)
+            throw new Error(`Expected object for relation ${collection.name}.${field}`)
           }
 
           if (Array.isArray(rawItem)) {
             for (const nestedItem of rawItem as any[]) {
               this.writeItemForRelation({
-                parentModel: model,
+                parentCollection: collection,
                 relationKey: field,
                 relation,
                 childItem: nestedItem,
@@ -221,7 +221,7 @@ export function createCache<
           }
           else if (rawItem) {
             this.writeItemForRelation({
-              parentModel: model,
+              parentCollection: collection,
               relationKey: field,
               relation,
               childItem: rawItem,
@@ -230,13 +230,13 @@ export function createCache<
           else {
             // TODO: figure out deletions
             // // If to-one relation is null, we delete the existing item
-            // const existingItem = this.readItem({ model, key })
+            // const existingItem = this.readItem({ collection, key })
             // if (existingItem) {
-            //   const childItem: WrappedItemBase<Model, ModelDefaults, StoreSchema> = existingItem[field]
-            //   const nestedItemModel = getStore().$getModel(childItem, [childItem.$model])
-            //   const nestedKey = nestedItemModel?.getKey(childItem)
-            //   if (nestedItemModel && nestedKey) {
-            //     this.deleteItem({ model: nestedItemModel, key: nestedKey })
+            //   const childItem: WrappedItemBase<Collection, CollectionDefaults, StoreSchema> = existingItem[field]
+            //   const nestedItemCollection = getStore().$getCollection(childItem, [childItem.$collection])
+            //   const nestedKey = nestedItemCollection?.getKey(childItem)
+            //   if (nestedItemCollection && nestedKey) {
+            //     this.deleteItem({ collection: nestedItemCollection, key: nestedKey })
             //   }
             // }
           }
@@ -261,7 +261,7 @@ export function createCache<
         store.$hooks.callHookSync('afterCacheWrite', {
           store,
           meta: {},
-          model,
+          collection,
           key,
           result: [item],
           marker,
@@ -269,41 +269,41 @@ export function createCache<
         })
       }
     },
-    writeItems({ model, items, marker }) {
+    writeItems({ collection, items, marker }) {
       for (const { key, value: item } of items) {
-        this.writeItem({ model, key, item, fromWriteItems: true })
+        this.writeItem({ collection, key, item, fromWriteItems: true })
       }
       mark(marker)
       const store = getStore()
       store.$hooks.callHookSync('afterCacheWrite', {
         store,
         meta: {},
-        model,
+        collection,
         result: items,
         marker,
         operation: 'write',
       })
     },
-    writeItemForRelation({ parentModel, relationKey, relation, childItem }) {
+    writeItemForRelation({ parentCollection, relationKey, relation, childItem }) {
       const store = getStore()
-      const possibleModels = Object.keys(relation.to)
-      const nestedItemModel = store.$getModel(childItem, possibleModels)
-      if (!nestedItemModel) {
-        throw new Error(`Could not determine type for relation ${parentModel.name}.${String(relationKey)}`)
+      const possibleCollections = Object.keys(relation.to)
+      const nestedItemCollection = store.$getCollection(childItem, possibleCollections)
+      if (!nestedItemCollection) {
+        throw new Error(`Could not determine type for relation ${parentCollection.name}.${String(relationKey)}`)
       }
-      const nestedKey = nestedItemModel.getKey(childItem)
+      const nestedKey = nestedItemCollection.getKey(childItem)
       if (!nestedKey) {
-        throw new Error(`Could not determine key for relation ${parentModel.name}.${String(relationKey)}`)
+        throw new Error(`Could not determine key for relation ${parentCollection.name}.${String(relationKey)}`)
       }
 
       this.writeItem({
-        model: nestedItemModel,
+        collection: nestedItemCollection,
         key: nestedKey,
         item: childItem,
       })
     },
-    deleteItem({ model, key }) {
-      deleteItem(model, key)
+    deleteItem({ collection, key }) {
+      deleteItem(collection, key)
     },
     getModuleState(name, key, initState) {
       const cacheKey = `$${name}:${key}`
@@ -335,30 +335,30 @@ export function createCache<
         meta: {},
       })
     },
-    clearModel({ model }) {
-      const itemsForType = state.value[model.name]
+    clearCollection({ collection }) {
+      const itemsForType = state.value[collection.name]
       if (itemsForType) {
         for (const key in itemsForType) {
-          this.deleteItem({ model, key })
+          this.deleteItem({ collection, key })
         }
       }
     },
-    garbageCollectItem({ model, item }) {
-      garbageCollectItem(model, item)
+    garbageCollectItem({ collection, item }) {
+      garbageCollectItem(collection, item)
     },
     garbageCollect() {
-      for (const modelName in state.value) {
-        if (modelName === '_markers' || modelName.startsWith('$')) {
+      for (const collectionName in state.value) {
+        if (collectionName === '_markers' || collectionName.startsWith('$')) {
           continue
         }
-        const model = getStore().$models.find(m => m.name === modelName)
-        if (!model) {
+        const collection = getStore().$collections.find(m => m.name === collectionName)
+        if (!collection) {
           continue
         }
-        const itemsForType = state.value[modelName]
+        const itemsForType = state.value[collectionName]
         for (const key in itemsForType) {
-          const wrappedItem = this.wrapItem({ model, item: itemsForType[key] })
-          garbageCollectItem(model, wrappedItem)
+          const wrappedItem = this.wrapItem({ collection, item: itemsForType[key] })
+          garbageCollectItem(collection, wrappedItem)
         }
       }
     },

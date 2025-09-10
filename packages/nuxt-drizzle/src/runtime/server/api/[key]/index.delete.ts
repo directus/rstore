@@ -1,26 +1,26 @@
 import { and } from 'drizzle-orm'
 import { defineEventHandler, getQuery, getRouterParams } from 'h3'
-import { getDrizzleKeyWhere, getDrizzleTableFromModel, rstoreUseDrizzle } from '../../utils'
+import { getDrizzleKeyWhere, getDrizzleTableFromCollection, rstoreUseDrizzle } from '../../utils'
 import { rstoreDrizzleHooks, type RstoreDrizzleMeta, type RstoreDrizzleTransformQuery } from '../../utils/hooks'
 
 export default defineEventHandler(async (event) => {
   const meta: RstoreDrizzleMeta = {}
   const transforms: Array<RstoreDrizzleTransformQuery> = []
 
-  const params = getRouterParams(event) as { model: string, key: string }
-  const { model: modelName, key } = params
+  const params = getRouterParams(event) as { collection: string, key: string }
+  const { collection: collectionName, key } = params
   const query = getQuery(event)
 
   await rstoreDrizzleHooks.callHook('item.delete.before', {
     event,
-    model: modelName,
+    collection: collectionName,
     meta,
     params,
     query,
     transformQuery: (transform) => { transforms.push(transform) },
   })
 
-  const { table, primaryKeys } = getDrizzleTableFromModel(modelName)
+  const { table, primaryKeys } = getDrizzleTableFromCollection(collectionName)
 
   const whereConditions: any[] = [
     getDrizzleKeyWhere(key, primaryKeys, table),
@@ -40,7 +40,7 @@ export default defineEventHandler(async (event) => {
 
   await rstoreDrizzleHooks.callHook('item.delete.after', {
     event,
-    model: modelName,
+    collection: collectionName,
     meta,
     params,
     query,

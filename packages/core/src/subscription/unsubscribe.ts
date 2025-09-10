@@ -1,36 +1,36 @@
-import type { CustomHookMeta, FindOptions, Model, ModelDefaults, ResolvedModel, StoreCore, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 
 export interface UnsubscribeOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > {
-  store: StoreCore<TSchema, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults, TSchema>
+  store: StoreCore<TSchema, TCollectionDefaults>
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
   subscriptionId: string
   key?: string | number
-  findOptions?: FindOptions<TModel, TModelDefaults, TSchema>
+  findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
   meta?: CustomHookMeta
 }
 
 export async function unsubscribe<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 >({
   store,
-  model,
+  collection,
   subscriptionId,
   key,
   findOptions,
   meta,
-}: UnsubscribeOptions<TModel, TModelDefaults, TSchema>): Promise<void> {
+}: UnsubscribeOptions<TCollection, TCollectionDefaults, TSchema>): Promise<void> {
   meta ??= {}
 
   await store.$hooks.callHook('unsubscribe', {
     store,
     meta,
-    model,
+    collection,
     subscriptionId,
     key,
     findOptions,

@@ -3,8 +3,8 @@ import type { TabsItem } from '@nuxt/ui'
 
 const tabs: Array<TabsItem> = [
   {
-    label: 'Models',
-    slot: 'model',
+    label: 'Collections',
+    slot: 'collection',
     icon: 'lucide:boxes',
   },
   {
@@ -67,8 +67,8 @@ const currentTab = computed(() => tabs[Number.parseInt(tab.value)] ?? tabs[0])
         <DevtoolsHistory />
       </template>
 
-      <template v-if="currentTab.slot === 'model'">
-        <DevtoolsModel />
+      <template v-if="currentTab.slot === 'collection'">
+        <DevtoolsCollections />
       </template>
 
       <template v-if="currentTab.slot === 'subscriptions'">

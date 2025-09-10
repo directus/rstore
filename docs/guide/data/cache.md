@@ -37,16 +37,16 @@ store.$onCacheReset(() => {
 Writing items to the cache is useful when you want to update the store with data that is not coming from a query. This can be used for example to add items from a websocket connection.
 
 ```ts
-const model = store.$getModel(item)
-const key = model.getKey(item)
+const collection = store.$getCollection(item)
+const key = collection.getKey(item)
 store.$cache.writeItem({
-  model,
+  collection,
   key,
   item,
 })
 ```
 
-You can also use the `store.<modelName>.writeItem` method:
+You can also use the `store.<collectionName>.writeItem` method:
 
 ```ts
 store.User.writeItem({
@@ -59,13 +59,13 @@ store.User.writeItem({
 To write multiple items at once, you can use the `writeItems` method:
 
 ```ts
-const model = store.$getModel(items[0])
+const collection = store.$getCollection(items[0])
 const writes = items.map(item => ({
-  key: model.getKey(item),
+  key: collection.getKey(item),
   value: item,
 }))
 store.$cache.writeItems({
-  model,
+  collection,
   items: writes,
 })
 ```
@@ -75,15 +75,15 @@ store.$cache.writeItems({
 Deleting items from the cache is useful when you want to remove items that are no longer needed. This can be used for example to remove items that are no longer in the store.
 
 ```ts
-const model = store.$getModel(item)
-const key = model.getKey(item)
+const collection = store.$getCollection(item)
+const key = collection.getKey(item)
 store.$cache.deleteItem({
-  model,
+  collection,
   key,
 })
 ```
 
-You can also use the `store.<modelName>.clearItem` method:
+You can also use the `store.<collectionName>.clearItem` method:
 
 ```ts
 store.User.clearItem('abc')

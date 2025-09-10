@@ -2,7 +2,7 @@
 
 [Online Demo](https://codesandbox.io/p/devbox/wonderful-sun-s4cgl6)
 
-In case you are using [Drizzle](https://orm.drizzle.team), you can install the `@rstore/nuxt-drizzle` module instead of `@rstore/nuxt` to automatically generate the models and plugins from your drizzle schema.
+In case you are using [Drizzle](https://orm.drizzle.team), you can install the `@rstore/nuxt-drizzle` module instead of `@rstore/nuxt` to automatically generate the collections and plugins from your drizzle schema.
 
 ```sh
 npm i @rstore/nuxt-drizzle
@@ -58,10 +58,10 @@ export default defineNuxtConfig({
 
 The module will automatically:
 - load the drizzle schema from the `drizzle.config.ts` file (configurable with the `rstoreDrizzle.drizzleConfigPath` option in the Nuxt config),
-- generate the models from the schema for each table with the relations,
+- generate the collections from the schema for each table with the relations,
 - generate a REST API under the `/api/rstore` path to handle the CRUD operations,
 - generate a plugin to handle the queries and mutations,
-- generate all the necessary types for the models and the API.
+- generate all the necessary types for the collections and the API.
 
 Example drizzle schema:
 
@@ -104,8 +104,8 @@ const { data: todos } = await store.todos.query(q => q.many())
 </template>
 ```
 
-::: tip Model Names
-The model names are infered from the exported variable names in the drizzle schema, **not** the table names.
+::: tip Collection Names
+The collection names are infered from the exported variable names in the drizzle schema, **not** the table names.
 :::
 
 ::: tip
@@ -136,7 +136,7 @@ Please note that only simple filters are supported - you can't do joins or subqu
 
 ## Relations
 
-You can use the `include` option to include related models in the query. [Learn more here](../guide/model/relations.md).
+You can use the `include` option to include related collections in the query. [Learn more here](../guide/schema/relations.md).
 
 ```vue
 <script lang="ts" setup>

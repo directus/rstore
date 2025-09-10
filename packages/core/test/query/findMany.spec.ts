@@ -1,13 +1,13 @@
-import type { Model, ModelDefaults, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollection, StoreCore, WrappedItem } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { findMany } from '../../src/query/findMany'
 
-interface TestModelDefaults extends ModelDefaults {
+interface TestCollectionDefaults extends CollectionDefaults {
   name: string
 }
 
-interface TestModelType extends Model {
+interface TestCollectionType extends Collection {
   id: string
 }
 
@@ -22,7 +22,7 @@ vi.mock('../../src/query/peekMany', () => ({
 
 describe('findMany', () => {
   let mockStore: StoreCore<any, any>
-  let model: ResolvedModel
+  let collection: ResolvedCollection
 
   beforeEach(() => {
     mockStore = {
@@ -49,7 +49,7 @@ describe('findMany', () => {
       $dedupePromises: new Map(),
     } as any
 
-    model = {
+    collection = {
       getKey: (item: any) => item.id,
     } as any
   })
@@ -57,9 +57,9 @@ describe('findMany', () => {
   it('should return items from the cache by filter', async () => {
     const result = await findMany({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
-        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '2',
+        filter: (item: WrappedItem<TestCollectionType, TestCollectionDefaults, any>) => item.id === '2',
       },
     })
 
@@ -69,9 +69,9 @@ describe('findMany', () => {
   it('should return an empty array if no items match the filter', async () => {
     const result = await findMany({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
-        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '3',
+        filter: (item: WrappedItem<TestCollectionType, TestCollectionDefaults, any>) => item.id === '3',
       },
     })
 
@@ -83,7 +83,7 @@ describe('findMany', () => {
 
     await findMany({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
         params: {
           email: '42',
@@ -102,7 +102,7 @@ describe('findMany', () => {
 
     const result = await findMany({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
         params: {
           email: '42',
@@ -111,7 +111,7 @@ describe('findMany', () => {
     })
 
     expect(mockStore.$cache.writeItems).toHaveBeenCalledWith(expect.objectContaining({
-      model,
+      collection,
       items: [{ key: '42', value: result.result[0] }],
       marker: expect.any(String),
     }))
@@ -121,7 +121,7 @@ describe('findMany', () => {
     mockStore.$getFetchPolicy = () => 'no-cache'
     await findMany({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
         params: {
           email: '42',
@@ -142,12 +142,12 @@ describe('findMany', () => {
       const result = await Promise.all([
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
       ])
@@ -159,7 +159,7 @@ describe('findMany', () => {
       ])
     })
 
-    it('should not dedupe findMany on different model', async () => {
+    it('should not dedupe findMany on different collection', async () => {
       const fn = vi.fn((payload) => {
         payload.setResult([{ foo: 'bar' }])
       })
@@ -168,13 +168,13 @@ describe('findMany', () => {
       const result = await Promise.all([
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
         findMany({
           store: mockStore,
-          model: {
-            ...model,
+          collection: {
+            ...collection,
             name: 'Other',
           },
           findOptions: { filter: { id: { eq: '42' } } },
@@ -197,12 +197,12 @@ describe('findMany', () => {
       const result = await Promise.all([
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '43' } } },
         }),
       ])
@@ -223,12 +223,12 @@ describe('findMany', () => {
       const result = await Promise.all([
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
         }),
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
         }),
       ])
@@ -249,12 +249,12 @@ describe('findMany', () => {
       const result = await Promise.all([
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
         }),
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
         }),
       ])

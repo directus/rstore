@@ -12,9 +12,9 @@ export interface RstoreDrizzleHookPayload {
    */
   event: H3Event
   /**
-   * Model name as received from the request.
+   * Collection name as received from the request.
    */
-  model: string
+  collection: string
   /**
    * Meta object that can be used to pass information between hooks.
    */

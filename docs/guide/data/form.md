@@ -133,7 +133,7 @@ updateTodo.$onSuccess(() => emit('close'))
 
 ## Schema Validation
 
-Both `createForm` and `updateForm` methods will by default validate the data using the model's schemas [see more info here](../model/model.md#schema-validation). You can override the schema by passing a new schema to the form object:
+Both `createForm` and `updateForm` methods will by default validate the data using the collection's schemas [see more info here](../schema/collection.md#schema-validation). You can override the schema by passing a new schema to the form object:
 
 ```ts
 import { z } from 'zod'

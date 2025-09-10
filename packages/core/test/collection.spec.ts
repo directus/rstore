@@ -1,6 +1,6 @@
-import type { Model, ModelDefaults, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/shared'
 import { describe, expect, it } from 'vitest'
-import { defaultGetKey, defaultIsInstanceOf, resolveModels } from '../src/model'
+import { defaultGetKey, defaultIsInstanceOf, resolveCollections } from '../src/collection'
 
 describe('default get key', () => {
   it('should return id if present', () => {
@@ -20,30 +20,30 @@ describe('default get key', () => {
 })
 
 describe('default isInstanceOf', () => {
-  it('should return true if item __typename matches model name', () => {
-    const model = { name: 'TestModel' } as Model
-    const item = { __typename: 'TestModel' }
-    expect(defaultIsInstanceOf(model)(item)).toBe(true)
+  it('should return true if item __typename matches collection name', () => {
+    const collection = { name: 'TestCollection' } as Collection
+    const item = { __typename: 'TestCollection' }
+    expect(defaultIsInstanceOf(collection)(item)).toBe(true)
   })
 
-  it('should return false if item __typename does not match model name', () => {
-    const model = { name: 'TestModel' } as Model
-    const item = { __typename: 'AnotherModel' }
-    expect(defaultIsInstanceOf(model)(item)).toBe(false)
+  it('should return false if item __typename does not match collection name', () => {
+    const collection = { name: 'TestCollection' } as Collection
+    const item = { __typename: 'AnotherCollection' }
+    expect(defaultIsInstanceOf(collection)(item)).toBe(false)
   })
 
   it('should return false if item does not have __typename', () => {
-    const model = { name: 'TestModel' } as Model
+    const collection = { name: 'TestCollection' } as Collection
     const item = { id: 123 }
-    expect(defaultIsInstanceOf(model)(item)).toBe(false)
+    expect(defaultIsInstanceOf(collection)(item)).toBe(false)
   })
 })
 
-describe('model', () => {
-  it('should resolve model with defaults', () => {
-    const modelTypes: StoreSchema = [
+describe('collection', () => {
+  it('should resolve collection with defaults', () => {
+    const collectionTypes: StoreSchema = [
       {
-        name: 'TestModel',
+        name: 'TestCollection',
         meta: {
           path: '/test',
         },
@@ -53,28 +53,28 @@ describe('model', () => {
         getKey: (item: any) => item.id,
       },
     ]
-    const defaults: ModelDefaults = {
+    const defaults: CollectionDefaults = {
       getKey: (item: any) => `${item.id}$default`,
       meta: {
         test: 'meow',
       },
     }
-    const resolved = resolveModels(modelTypes, defaults)
+    const resolved = resolveCollections(collectionTypes, defaults)
     expect(resolved[0]!.getKey({ id: 'foo' })).toBe(defaults.getKey?.({ id: 'foo' }))
     expect(resolved[0]!.meta).toEqual({
       path: '/test',
       test: 'meow',
     })
-    expect(resolved[1]!.getKey({ id: 'foo' })).toBe((modelTypes[1] as Model).getKey?.({ id: 'foo' }))
+    expect(resolved[1]!.getKey({ id: 'foo' })).toBe((collectionTypes[1] as Collection).getKey?.({ id: 'foo' }))
     expect(resolved[1]!.meta).toEqual({
       test: 'meow',
     })
   })
 
-  it('should resolve all model props', () => {
-    const modelTypes: StoreSchema = [
+  it('should resolve all collection props', () => {
+    const collectionTypes: StoreSchema = [
       {
-        name: 'TestModel',
+        name: 'TestCollection',
         getKey: (item: any) => item.id,
         relations: {
           test: {
@@ -117,9 +117,9 @@ describe('model', () => {
       },
     ]
 
-    const resolved = resolveModels(modelTypes)
+    const resolved = resolveCollections(collectionTypes)
 
-    expect(resolved[0]!.getKey({ id: 'foo' })).toBe((modelTypes[0] as Model).getKey?.({ id: 'foo' }))
+    expect(resolved[0]!.getKey({ id: 'foo' })).toBe((collectionTypes[0] as Collection).getKey?.({ id: 'foo' }))
     expect(resolved[0]!.relations).toEqual({
       test: {
         to: {
@@ -141,13 +141,13 @@ describe('model', () => {
   })
 
   it('should resolve all default props', () => {
-    const modelTypes: StoreSchema = [
+    const collectionTypes: StoreSchema = [
       {
-        name: 'TestModel',
+        name: 'TestCollection',
       },
     ]
 
-    const defaults: ModelDefaults = {
+    const defaults: CollectionDefaults = {
       getKey: (item: any) => item.id,
       computed: {
         calc: item => item.id + 1,
@@ -162,7 +162,7 @@ describe('model', () => {
       },
     }
 
-    const resolved = resolveModels(modelTypes, defaults)
+    const resolved = resolveCollections(collectionTypes, defaults)
 
     expect(resolved[0]!.getKey({ id: 0 })).toBe(defaults.getKey?.({ id: 0 }))
     expect(resolved[0]!.relations).toEqual({})

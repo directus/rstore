@@ -1,64 +1,64 @@
-import type { CustomHookMeta, FindFirstOptions, FindOptions, Model, ModelDefaults, QueryResult, ResolvedModel, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, FindOptions, QueryResult, ResolvedCollection, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekFirst } from './peekFirst'
 
 export interface FindFirstParams<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > {
-  store: StoreCore<TSchema, TModelDefaults>
+  store: StoreCore<TSchema, TCollectionDefaults>
   meta?: CustomHookMeta
-  model: ResolvedModel<TModel, TModelDefaults, TSchema>
-  findOptions: string | number | FindFirstOptions<TModel, TModelDefaults, TSchema>
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  findOptions: string | number | FindFirstOptions<TCollection, TCollectionDefaults, TSchema>
 }
 
 /**
  * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
  */
 export async function findFirst<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 >({
   store,
   meta,
-  model,
+  collection,
   findOptions: keyOrOptions,
-}: FindFirstParams<TModel, TModelDefaults, TSchema>): Promise<QueryResult<WrappedItem<TModel, TModelDefaults, TSchema> | null>> {
+}: FindFirstParams<TCollection, TCollectionDefaults, TSchema>): Promise<QueryResult<WrappedItem<TCollection, TCollectionDefaults, TSchema> | null>> {
   if (typeof keyOrOptions === 'object' && keyOrOptions?.dedupe === false) {
     return _findFirst({
       store,
       meta,
-      model,
+      collection,
       findOptions: keyOrOptions,
     })
   }
 
   const dedupeKey = typeof keyOrOptions === 'string' ? keyOrOptions : JSON.stringify(keyOrOptions)
-  return dedupePromise(store.$dedupePromises, `findFirst:${model.name}:${dedupeKey}`, () => _findFirst({
+  return dedupePromise(store.$dedupePromises, `findFirst:${collection.name}:${dedupeKey}`, () => _findFirst({
     store,
     meta,
-    model,
+    collection,
     findOptions: keyOrOptions,
   }))
 }
 
 async function _findFirst<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 >({
   store,
   meta,
-  model,
+  collection,
   findOptions: keyOrOptions,
-}: FindFirstParams<TModel, TModelDefaults, TSchema>): Promise<QueryResult<WrappedItem<TModel, TModelDefaults, TSchema> | null>> {
+}: FindFirstParams<TCollection, TCollectionDefaults, TSchema>): Promise<QueryResult<WrappedItem<TCollection, TCollectionDefaults, TSchema> | null>> {
   meta ??= {}
 
-  const findOptions: FindFirstOptions<TModel, TModelDefaults, TSchema> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
+  const findOptions: FindFirstOptions<TCollection, TCollectionDefaults, TSchema> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
     ? {
         key: keyOrOptions,
       }
@@ -72,7 +72,7 @@ async function _findFirst<
     const peekResult = peekFirst({
       store,
       meta,
-      model,
+      collection,
       findOptions,
     })
     result = peekResult.result
@@ -81,13 +81,13 @@ async function _findFirst<
 
   if (!result && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
     if (!marker) {
-      marker = defaultMarker(model, findOptions)
+      marker = defaultMarker(collection, findOptions)
     }
 
     await store.$hooks.callHook('beforeFetch', {
       store,
       meta,
-      model,
+      collection,
       key: findOptions.key,
       findOptions,
       many: false,
@@ -99,7 +99,7 @@ async function _findFirst<
     await store.$hooks.callHook('fetchFirst', {
       store,
       meta,
-      model,
+      collection,
       key: findOptions.key,
       findOptions,
       getResult: () => result,
@@ -114,7 +114,7 @@ async function _findFirst<
     await store.$hooks.callHook('afterFetch', {
       store,
       meta,
-      model,
+      collection,
       key: findOptions.key,
       findOptions,
       many: false,
@@ -125,16 +125,16 @@ async function _findFirst<
     })
 
     if (result) {
-      store.$processItemParsing(model, result)
+      store.$processItemParsing(collection, result)
 
       if (fetchPolicy !== 'no-cache') {
-        const key = model.getKey(result)
+        const key = collection.getKey(result)
         if (!key) {
-          console.warn(`Key is undefined for ${model.name}. Item was not written to cache.`)
+          console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
         }
         else {
           store.$cache.writeItem({
-            model,
+            collection,
             key,
             item: result,
             marker: getMarker('first', marker),
@@ -142,7 +142,7 @@ async function _findFirst<
         }
       }
 
-      result = store.$cache.wrapItem({ model, item: result })
+      result = store.$cache.wrapItem({ collection, item: result })
     }
   }
 
@@ -150,9 +150,9 @@ async function _findFirst<
     await store.$hooks.callHook('fetchRelations', {
       store,
       meta,
-      model,
+      collection,
       key: findOptions.key,
-      findOptions: findOptions as FindOptions<TModel, TModelDefaults, TSchema> & { include: NonNullable<FindOptions<TModel, TModelDefaults, TSchema>['include']> },
+      findOptions: findOptions as FindOptions<TCollection, TCollectionDefaults, TSchema> & { include: NonNullable<FindOptions<TCollection, TCollectionDefaults, TSchema>['include']> },
       many: false,
       getResult: () => result,
     })

@@ -44,7 +44,7 @@ const icons = {
           />
           <span>{{ item.operation }}</span>
         </span>
-        <span class="font-bold">{{ item.model }}</span>
+        <span class="font-bold">{{ item.collection }}</span>
         <span>(</span>
         <span v-if="item.key" class="text-emerald-500">{{ item.key }}</span>
         <span v-else-if="item.findOptions" class="whitespace-pre-wrap text-emerald-500">{{ JSON.stringify(item.findOptions, null, 2) }}</span>

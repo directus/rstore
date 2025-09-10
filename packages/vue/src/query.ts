@@ -1,19 +1,19 @@
-import type { CustomHookMeta, FindOptions, HybridPromise, Model, ModelDefaults, ResolvedModel, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, HybridPromise, ResolvedCollection, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueStore } from './store'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { computed, nextTick, ref, shallowRef, toValue, watch } from 'vue'
 
 export interface VueQueryReturn<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
   TResult,
 > {
   data: Ref<TResult>
   loading: Ref<boolean>
   error: Ref<Error | null>
-  refresh: () => HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, TResult>>
+  refresh: () => HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TResult>>
   meta: Ref<CustomHookMeta>
   /**
    * @private
@@ -22,14 +22,14 @@ export interface VueQueryReturn<
 }
 
 export interface VueCreateQueryOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
-  TOptions extends FindOptions<TModel, TModelDefaults, TSchema>,
+  TOptions extends FindOptions<TCollection, TCollectionDefaults, TSchema>,
   TResult,
 > {
-  store: VueStore<TSchema, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults, TSchema>
+  store: VueStore<TSchema, TCollectionDefaults>
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
   fetchMethod: (options: TOptions | undefined, meta: CustomHookMeta) => Promise<TResult>
   cacheMethod: (options: TOptions | undefined, meta: CustomHookMeta) => TResult
   defaultValue: MaybeRefOrGetter<TResult>
@@ -41,10 +41,10 @@ export interface VueCreateQueryOptions<
  * @private
  */
 export function createQuery<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
-  TOptions extends FindOptions<TModel, TModelDefaults, TSchema>,
+  TOptions extends FindOptions<TCollection, TCollectionDefaults, TSchema>,
   TResult,
 >({
   store,
@@ -52,9 +52,9 @@ export function createQuery<
   cacheMethod,
   defaultValue,
   options,
-  model,
+  collection,
   name,
-}: VueCreateQueryOptions<TModel, TModelDefaults, TSchema, TOptions, TResult>): HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, TResult>> {
+}: VueCreateQueryOptions<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>): HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TResult>> {
   function getOptions(): TOptions | undefined {
     const result = toValue(options)
     return typeof result === 'object' && 'enabled' in result && result.enabled === false ? undefined : result as TOptions
@@ -62,7 +62,7 @@ export function createQuery<
 
   function getQueryId(): string {
     const options = getOptions() ?? {}
-    return `${model.name}:${toValue(name)}:${JSON.stringify(options)}`
+    return `${collection.name}:${toValue(name)}:${JSON.stringify(options)}`
   }
 
   function isDisabled() {
@@ -90,10 +90,10 @@ export function createQuery<
       if ((options?.experimentalGarbageCollection ?? store.$experimentalGarbageCollection) || (options?.experimentalFilterDirty)) {
         const queryId = getQueryId()
         if (Array.isArray(cacheResult)) {
-          return cacheResult.filter((item: WrappedItem<TModel, TModelDefaults, TSchema>) => item.$layer || !item.$meta.dirtyQueries.has(queryId))
+          return cacheResult.filter((item: WrappedItem<TCollection, TCollectionDefaults, TSchema>) => item.$layer || !item.$meta.dirtyQueries.has(queryId))
         }
         else {
-          const item = cacheResult as unknown as WrappedItem<TModel, TModelDefaults, TSchema> | undefined
+          const item = cacheResult as unknown as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
           if (item && (!item.$layer && item.$meta.dirtyQueries.has(queryId))) {
             return undefined
           }
@@ -113,7 +113,7 @@ export function createQuery<
 
   const error = ref<Error | null>(null)
 
-  const returnObject: VueQueryReturn<TModel, TModelDefaults, TSchema, TResult> = {
+  const returnObject: VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TResult> = {
     data,
     loading,
     error,
@@ -141,7 +141,7 @@ export function createQuery<
           fetchMethod({
             ...finalOptions,
             fetchPolicy: 'fetch-only',
-          } as FindOptions<TModel, TModelDefaults, TSchema> as any, meta.value)
+          } as FindOptions<TCollection, TCollectionDefaults, TSchema> as any, meta.value)
         }
 
         if (force) {
@@ -171,12 +171,12 @@ export function createQuery<
     deep: true,
   })
 
-  let promise = load() as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, TResult>>
+  let promise = load() as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TResult>>
   Object.assign(promise, returnObject)
 
   function refresh() {
     if (!loading.value) {
-      promise = load(true) as HybridPromise<VueQueryReturn<TModel, TModelDefaults, TSchema, TResult>>
+      promise = load(true) as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TResult>>
       Object.assign(promise, returnObject)
     }
     return promise
@@ -197,7 +197,7 @@ export function createQuery<
 
       // Old result
       if (Array.isArray(oldResultValue)) {
-        for (const item of oldResultValue as Array<WrappedItem<TModel, TModelDefaults, TSchema>>) {
+        for (const item of oldResultValue as Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>) {
           item.$meta.queries.delete(queryId)
           if (fetching && !item.$layer) {
             item.$meta.dirtyQueries.add(queryId)
@@ -205,7 +205,7 @@ export function createQuery<
         }
       }
       else {
-        const item = oldResultValue as WrappedItem<TModel, TModelDefaults, TSchema> | undefined
+        const item = oldResultValue as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
         item?.$meta.queries.delete(queryId)
         if (fetching && !item?.$layer) {
           item?.$meta.dirtyQueries.add(queryId)
@@ -214,7 +214,7 @@ export function createQuery<
 
       // Old cached result
       if (Array.isArray(oldDataValue)) {
-        for (const item of oldDataValue as Array<WrappedItem<TModel, TModelDefaults, TSchema>>) {
+        for (const item of oldDataValue as Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>) {
           item.$meta.queries.delete(queryId)
           if (fetching && !item.$layer) {
             item.$meta.dirtyQueries.add(queryId)
@@ -222,7 +222,7 @@ export function createQuery<
         }
       }
       else {
-        const item = oldDataValue as WrappedItem<TModel, TModelDefaults, TSchema> | undefined
+        const item = oldDataValue as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
         item?.$meta.queries.delete(queryId)
         if (fetching && !item?.$layer) {
           item?.$meta.dirtyQueries.add(queryId)
@@ -231,13 +231,13 @@ export function createQuery<
 
       // New result
       if (Array.isArray(resultValue)) {
-        for (const item of resultValue as Array<WrappedItem<TModel, TModelDefaults, TSchema>>) {
+        for (const item of resultValue as Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>) {
           item.$meta.queries.add(queryId)
           item.$meta.dirtyQueries.delete(queryId)
         }
       }
       else {
-        const item = resultValue as WrappedItem<TModel, TModelDefaults, TSchema> | undefined
+        const item = resultValue as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
         item?.$meta.queries.add(queryId)
         item?.$meta.dirtyQueries.delete(queryId)
       }
@@ -249,12 +249,12 @@ export function createQuery<
     tryOnScopeDispose(() => {
       const queryId = getQueryId()
       if (Array.isArray(result.value)) {
-        for (const item of result.value as Array<WrappedItem<TModel, TModelDefaults, TSchema>>) {
+        for (const item of result.value as Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>) {
           item.$meta.queries.delete(queryId)
         }
       }
       else {
-        const item = result.value as WrappedItem<TModel, TModelDefaults, TSchema> | undefined
+        const item = result.value as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
         item?.$meta.queries.delete(queryId)
       }
     })
@@ -268,14 +268,14 @@ export function createQuery<
         // Defer to let other queries mark items as used if needed
         nextTick(() => {
           if (Array.isArray(previousData)) {
-            for (const item of previousData as Array<WrappedItem<TModel, TModelDefaults, TSchema>>) {
-              store.$cache.garbageCollectItem({ model, item })
+            for (const item of previousData as Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>) {
+              store.$cache.garbageCollectItem({ collection, item })
             }
           }
           else {
-            const item = previousData as WrappedItem<TModel, TModelDefaults, TSchema> | undefined
+            const item = previousData as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
             if (item) {
-              store.$cache.garbageCollectItem({ model, item })
+              store.$cache.garbageCollectItem({ collection, item })
             }
           }
         })

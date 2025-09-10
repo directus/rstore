@@ -1,16 +1,16 @@
-import type { CustomHookMeta, FindManyOptions, Model, ModelDefaults, QueryResult, ResolvedModel, ResolvedModelItemBase, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindManyOptions, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
 export interface PeekManyOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > {
-  store: StoreCore<TSchema, TModelDefaults>
+  store: StoreCore<TSchema, TCollectionDefaults>
   meta?: CustomHookMeta
-  model: ResolvedModel<TModel, TModelDefaults, TSchema>
-  findOptions?: FindManyOptions<TModel, TModelDefaults, TSchema>
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  findOptions?: FindManyOptions<TCollection, TCollectionDefaults, TSchema>
   force?: boolean
 }
 
@@ -18,27 +18,27 @@ export interface PeekManyOptions<
  * Find all items that match the query in the cache without fetching the data from the adapter plugins.
  */
 export function peekMany<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 >({
   store,
   meta,
-  model,
+  collection,
   findOptions,
   force,
-}: PeekManyOptions<TModel, TModelDefaults, TSchema>): QueryResult<Array<WrappedItem<TModel, TModelDefaults, TSchema>>> {
+}: PeekManyOptions<TCollection, TCollectionDefaults, TSchema>): QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>> {
   meta ??= {}
 
   const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
-    let marker = defaultMarker(model, findOptions)
-    let overrideFilter: ((item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>) => boolean) | undefined
+    let marker = defaultMarker(collection, findOptions)
+    let overrideFilter: ((item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean) | undefined
 
     store.$hooks.callHookSync('beforeCacheReadMany', {
       store,
       meta,
-      model,
+      collection,
       findOptions,
       setMarker: (value) => {
         marker = value
@@ -49,19 +49,19 @@ export function peekMany<
     })
 
     let result = store.$cache.readItems({
-      model,
+      collection,
       marker: force ? undefined : getMarker('many', marker),
-      filter: overrideFilter ?? (typeof findOptions?.filter === 'function' ? findOptions.filter as (item: ResolvedModelItemBase<TModel, TModelDefaults, TSchema>) => boolean : undefined),
+      filter: overrideFilter ?? (typeof findOptions?.filter === 'function' ? findOptions.filter as (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean : undefined),
     })
 
     store.$hooks.callHookSync('cacheFilterMany', {
       store,
       meta,
-      model,
+      collection,
       findOptions,
       getResult: () => result,
       setResult: (value) => {
-        result = value as Array<WrappedItem<TModel, TModelDefaults, TSchema>>
+        result = value as Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>
       },
     })
     return {

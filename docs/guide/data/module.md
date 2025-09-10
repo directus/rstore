@@ -47,7 +47,7 @@ With the `@rstore/nuxt` module, you can directly use the auto-imported `defineRs
 
 [Pinia](https://pinia.vuejs.org/) is an amazing state management library for Vue.js applications. While both rstore modules and Pinia stores serve the purpose of managing state in a Vue application, there are some key differences between the two:
 
-- **Integration with rstore**: rstore modules are designed to work seamlessly with rstore's data models and devtools, while Pinia is an external state management library.
+- **Integration with rstore**: rstore modules are designed to work seamlessly with rstore's data collections and devtools, while Pinia is an external state management library.
 - **Private state**: rstore modules allow you to define private state that is not exposed outside the module, while still retaining compatibility with SSR.
 - **Hybrid promise**: rstore modules can be awaited for async initialization, but can also be used directly without awaiting, while Pinia stores are synchronous.
 

@@ -3,9 +3,9 @@ import { formatTimeAgo } from '@vueuse/core'
 const reactiveTime = useTimestamp()
 const getTime = () => import.meta.server ? Date.now() : reactiveTime.value
 
-// Multiple models
+// Multiple collections
 export default [
-  defineItemType<User>().model({
+  withItemType<User>().defineCollection({
     name: 'User',
     relations: {
       receivedMessages: {
@@ -51,7 +51,7 @@ export default [
     },
   }),
 
-  defineItemType<Bot>().model({
+  withItemType<Bot>().defineCollection({
     name: 'Bot',
     relations: {
       receivedMessages: {
@@ -80,7 +80,7 @@ export default [
     },
   }),
 
-  defineItemType<Message>().model({
+  withItemType<Message>().defineCollection({
     name: 'Message',
     relations: {
       author: {

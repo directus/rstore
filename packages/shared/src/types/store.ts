@@ -1,6 +1,6 @@
 import type { Hooks } from '../utils/hooks'
 import type { Cache } from './cache'
-import type { Model, ModelDefaults, ResolvedModel, ResolvedModelList, StoreSchema } from './model'
+import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionList, StoreSchema } from './collection'
 import type { ResolvedModule } from './module'
 import type { MutationOperation, MutationSpecialProps } from './mutation'
 import type { RegisteredPlugin } from './plugin'
@@ -8,25 +8,25 @@ import type { FetchPolicy, FindOptions } from './query'
 
 export interface StoreCore<
   TSchema extends StoreSchema,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > {
-  $cache: Cache<TSchema, TModelDefaults>
-  $models: ResolvedModelList<TSchema, TModelDefaults>
-  $modelDefaults: TModelDefaults
+  $cache: Cache<TSchema, TCollectionDefaults>
+  $collections: ResolvedCollectionList<TSchema, TCollectionDefaults>
+  $collectionDefaults: TCollectionDefaults
   $plugins: Array<RegisteredPlugin>
-  $hooks: Hooks<TSchema, TModelDefaults>
+  $hooks: Hooks<TSchema, TCollectionDefaults>
   $findDefaults: Partial<FindOptions<any, any, any>>
   $getFetchPolicy: (value: FetchPolicy | null | undefined) => FetchPolicy
   /**
    * @private
    */
-  $processItemParsing: <TModel extends Model> (model: ResolvedModel<TModel, TModelDefaults, TSchema>, item: any) => void
+  $processItemParsing: <TCollection extends Collection> (collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>, item: any) => void
   /**
    * @private
    */
-  $processItemSerialization: <TModel extends Model> (model: ResolvedModel<TModel, TModelDefaults, TSchema>, item: any) => void
-  $getModel: (item: any, modelNames?: string[]) => ResolvedModel<Model, ModelDefaults, StoreSchema> | null
-  $mutationHistory: Array<MutationOperation<any, TModelDefaults, TSchema>>
+  $processItemSerialization: <TCollection extends Collection> (collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>, item: any) => void
+  $getCollection: (item: any, collectionNames?: string[]) => ResolvedCollection<Collection, CollectionDefaults, StoreSchema> | null
+  $mutationHistory: Array<MutationOperation<any, TCollectionDefaults, TSchema>>
   $isServer: boolean
   /**
    * @private

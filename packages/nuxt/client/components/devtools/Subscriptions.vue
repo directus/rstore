@@ -1,13 +1,13 @@
 <script lang="ts" setup>
 const stats = useStoreStats()
 
-const subscriptionsPerModel = computed(() => {
+const subscriptionsPerCollection = computed(() => {
   const result = new Map<string, Array<StoreSubscriptionItem>>()
   for (const s of stats.value?.subscriptions) {
-    if (!result.has(s.model)) {
-      result.set(s.model, [])
+    if (!result.has(s.collection)) {
+      result.set(s.collection, [])
     }
-    result.get(s.model)!.push(s)
+    result.get(s.collection)!.push(s)
   }
   return result
 })
@@ -15,12 +15,12 @@ const subscriptionsPerModel = computed(() => {
 
 <template>
   <div
-    v-for="([modelName, subscriptions]) in subscriptionsPerModel"
-    :key="modelName"
+    v-for="([collectionName, subscriptions]) in subscriptionsPerCollection"
+    :key="collectionName"
     class="m-1 border border-blue-500/10 rounded-lg p-1"
   >
     <h2 class="flex items-center gap-2 p-2">
-      <span class="truncate min-w-0 text-blue-500">{{ modelName }}</span>
+      <span class="truncate min-w-0 text-blue-500">{{ collectionName }}</span>
       <UBadge icon="lucide:bell" color="info" variant="soft">
         {{ subscriptions.length }}
       </UBadge>
@@ -34,7 +34,7 @@ const subscriptionsPerModel = computed(() => {
   </div>
 
   <Empty
-    v-if="!subscriptionsPerModel.size"
+    v-if="!subscriptionsPerCollection.size"
     icon="lucide:bell-off"
     title="No active subscriptions"
     class="h-full"

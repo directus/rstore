@@ -33,12 +33,12 @@ export default defineConfig({
           ],
         },
         {
-          text: 'Model',
+          text: 'Schema',
           items: [
-            { text: 'Model', link: '/guide/model/model' },
-            { text: 'Relations', link: '/guide/model/relations' },
-            { text: 'Federation', link: '/guide/model/federation' },
-            { text: 'Defaults', link: '/guide/model/model-defaults' },
+            { text: 'Collection', link: '/guide/schema/collection' },
+            { text: 'Relations', link: '/guide/schema/relations' },
+            { text: 'Federation', link: '/guide/schema/federation' },
+            { text: 'Defaults', link: '/guide/schema/collection-defaults' },
           ],
         },
         {

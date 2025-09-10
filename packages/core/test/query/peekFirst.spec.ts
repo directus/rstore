@@ -1,19 +1,19 @@
-import type { Model, ModelDefaults, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollection, StoreCore, WrappedItem } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { peekFirst } from '../../src/query/peekFirst'
 
-interface TestModelDefaults extends ModelDefaults {
+interface TestCollectionDefaults extends CollectionDefaults {
   name: string
 }
 
-interface TestModelType extends Model {
+interface TestCollectionType extends Collection {
   id: string
 }
 
 describe('peekFirst', () => {
   let mockStore: StoreCore<any, any>
-  let model: ResolvedModel
+  let collection: ResolvedCollection
 
   beforeEach(() => {
     mockStore = {
@@ -25,7 +25,7 @@ describe('peekFirst', () => {
       $getFetchPolicy: () => 'cache-first',
     } as any
 
-    model = {
+    collection = {
       getKey: (item: any) => item.id,
     } as any
   })
@@ -33,7 +33,7 @@ describe('peekFirst', () => {
   it('should return the first item from the cache by key', () => {
     const result = peekFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: '1',
     })
 
@@ -41,7 +41,7 @@ describe('peekFirst', () => {
   })
 
   it('should return the first item from the cache by filter', () => {
-    const filter = (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '2'
+    const filter = (item: WrappedItem<TestCollectionType, TestCollectionDefaults, any>) => item.id === '2'
     let receivedFilter = null
     mockStore.$cache.readItems = ({ filter }) => {
       receivedFilter = filter
@@ -49,7 +49,7 @@ describe('peekFirst', () => {
     }
     const result = peekFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
         filter,
       },
@@ -68,9 +68,9 @@ describe('peekFirst', () => {
     }
     const result = peekFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
-        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '3',
+        filter: (item: WrappedItem<TestCollectionType, TestCollectionDefaults, any>) => item.id === '3',
       },
     })
 
@@ -82,7 +82,7 @@ describe('peekFirst', () => {
 
     peekFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: '1',
     })
 

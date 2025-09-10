@@ -1,6 +1,6 @@
 # Querying Data
 
-For each model, the store a set of functions to query the data. It can be accessed by using the model name: `store.<model_name>.<method>`.
+For each collection, the store a set of functions to query the data. It can be accessed by using the collection name: `store.<collection_name>.<method>`.
 
 Here are some examples:
 
@@ -361,7 +361,7 @@ const { data: user } = await store.User.query(q => q.first('user-id'))
 
 ## Fetching relations
 
-You can pass an `include` option to the query to fetch related data. The `include` option is an object where the keys are the names of the relations. Learn more about how to define relations [here](../model/relations.md).
+You can pass an `include` option to the query to fetch related data. The `include` option is an object where the keys are the names of the relations. Learn more about how to define relations [here](../schema/relations.md).
 
 ```ts
 const { data: comments } = store.comments.query(q => q.many({
@@ -388,10 +388,10 @@ Create a `rstore.d.ts` file in your project with the following content:
 ```ts
 declare module '@rstore/vue' {
   export interface FindOptions<
-    TModel extends Model,
-    TModelDefaults extends ModelDefaults,
+    TCollection extends Collection,
+    TCollectionDefaults extends CollectionDefaults,
     TSchema extends StoreSchema,
-  > extends FindOptionsBase<TModel, TModelDefaults, TSchema> {
+  > extends FindOptionsBase<TCollection, TCollectionDefaults, TSchema> {
     // Your custom properties here
 
     // For example, replace the `filter` property with a custom syntax

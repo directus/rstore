@@ -4,7 +4,7 @@ rstore provides a set of methods to help build realtime applications. Plugins ca
 
 ## Subscribe
 
-Subscriptions are a way to listen for changes in the data store. You can subscribe to a specific model and plugins will update the store in realtime. You can pass the same parameters than in the [queries](./query.md).
+Subscriptions are a way to listen for changes in the data store. You can subscribe to a specific collection and plugins will update the store in realtime. You can pass the same parameters than in the [queries](./query.md).
 
 ```ts
 const store = useStore()

@@ -4,7 +4,7 @@
 
 rstore is a powerful data store that allows you to manage all the data in your application efficiently.
 
-With rstore, you can define a data model and then run queries or execute mutations (create, update, and delete) on your data seamlessly.
+With rstore, you can define a data collection and then run queries or execute mutations (create, update, and delete) on your data seamlessly.
 
 Its main features include:
 
@@ -25,7 +25,7 @@ Here are some use cases for which rstore can be a great data management solution
 
 ### Small apps and prototypes
 
-rstore is perfect for small applications and prototypes due to its simplicity and progressiveness. You can quickly set up a data model and start managing your data with a simple plugin to handle all REST calls. You can then take advantage of the powerful API provided by the store and quickly add more Models to your app as it grows. The reactive cache ensures that your UI components are always in sync with the latest data, making development simpler and less bug-prone.
+rstore is perfect for small applications and prototypes due to its simplicity and progressiveness. You can quickly set up a data collection and start managing your data with a simple plugin to handle all REST calls. You can then take advantage of the powerful API provided by the store and quickly add more Collections to your app as it grows. The reactive cache ensures that your UI components are always in sync with the latest data, making development simpler and less bug-prone.
 
 ### Enterprise
 
@@ -119,18 +119,18 @@ export default definePlugin({
   setup({ hook }) {
     hook('fetchFirst', async (payload) => {
       if (payload.key) {
-        const result = await $fetch(`/api/${payload.model.name}/${payload.key}`)
+        const result = await $fetch(`/api/${payload.collection.name}/${payload.key}`)
         payload.setResult(result)
       }
     })
 
     hook('fetchMany', async (payload) => {
-      const result = await $fetch(`/api/${payload.model.name}`)
+      const result = await $fetch(`/api/${payload.collection.name}`)
       payload.setResult(result)
     })
 
     hook('createItem', async (payload) => {
-      const result = await $fetch(`/api/${payload.model.name}`, {
+      const result = await $fetch(`/api/${payload.collection.name}`, {
         method: 'POST',
         body: payload.item,
       })
@@ -138,7 +138,7 @@ export default definePlugin({
     })
 
     hook('updateItem', async (payload) => {
-      const result = await $fetch(`/api/${payload.model.name}/${payload.key}`, {
+      const result = await $fetch(`/api/${payload.collection.name}/${payload.key}`, {
         method: 'PATCH',
         body: payload.item,
       })
@@ -146,7 +146,7 @@ export default definePlugin({
     })
 
     hook('deleteItem', async (payload) => {
-      await $fetch(`/api/${payload.model.name}/${payload.key}`, {
+      await $fetch(`/api/${payload.collection.name}/${payload.key}`, {
         method: 'DELETE',
       })
     })
@@ -182,7 +182,7 @@ Another important difference is that rstore is based on a normalized cache and i
 |--------|--------------|
 | Local-first (compute client-side) | Server-first with caching |
 | Normalized cache | Query-based cache |
-| Data structured with models | No mandatory structure |
+| Data structured with collections | No mandatory structure |
 | Fetching through plugins | Fetching in queries themselves |
 
 ### Tanstack Query

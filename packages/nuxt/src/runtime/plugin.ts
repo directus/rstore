@@ -4,7 +4,7 @@ import { defineNuxtPlugin } from '#app'
 // @ts-expect-error virtual file
 import options from '#build/$restore-options'
 // @ts-expect-error virtual file
-import _schema from '#build/$rstore-model'
+import _schema from '#build/$rstore-collection'
 // @ts-expect-error virtual file
 import * as _plugins from '#build/$rstore-plugins'
 

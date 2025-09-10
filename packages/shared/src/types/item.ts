@@ -1,29 +1,29 @@
+import type { Collection, CollectionDefaults, ResolvedCollectionItem, StoreSchema } from './collection'
 import type { CacheLayer } from './layer'
-import type { Model, ModelDefaults, ResolvedModelItem, StoreSchema } from './model'
 import type { UpdateFormObject } from './mutation'
 
 /**
  * The object is wrapped by the store with additional props and can be used to update the data.
  */
 export interface WrappedItemBase<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > {
   /**
-   * Name of the model.
+   * Name of the collection.
    */
-  $model: TModel['name']
+  $collection: TCollection['name']
 
   /**
    * (Recommended) The form object helps you updating the item.
    */
-  $updateForm: (options?: WrappedItemUpdateFormOptions<TModel, TModelDefaults, TSchema>) => Promise<UpdateFormObject<TModel, TModelDefaults, TSchema>>
+  $updateForm: (options?: WrappedItemUpdateFormOptions<TCollection, TCollectionDefaults, TSchema>) => Promise<UpdateFormObject<TCollection, TCollectionDefaults, TSchema>>
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
    */
-  $update: (data: Partial<ResolvedModelItem<TModel, TModelDefaults, TSchema>>, options?: WrappedItemUpdateOptions<TModel, TModelDefaults, TSchema>) => Promise<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+  $update: (data: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>, options?: WrappedItemUpdateOptions<TCollection, TCollectionDefaults, TSchema>) => Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
   /**
    * Delete the item.
@@ -43,24 +43,24 @@ export interface WrappedItemBase<
  * The object is wrapped by the store with additional props and can be used to update the data.
  */
 export type WrappedItem<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
-> = WrappedItemBase<TModel, TModelDefaults, TSchema> & ResolvedModelItem<TModel, TModelDefaults, TSchema>
+> = WrappedItemBase<TCollection, TCollectionDefaults, TSchema> & ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
 
 /* eslint-disable unused-imports/no-unused-vars */
 
 export interface WrappedItemUpdateFormOptions<
-  TModel extends Model = Model,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
+  TCollection extends Collection = Collection,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
   TSchema extends StoreSchema = StoreSchema,
 > {
   // to be extended
 }
 
 export interface WrappedItemUpdateOptions<
-  TModel extends Model = Model,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
+  TCollection extends Collection = Collection,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
   TSchema extends StoreSchema = StoreSchema,
 > {
   // to be extended

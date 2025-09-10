@@ -1,5 +1,5 @@
 import { emptySchema } from '@rstore/core'
-import { type Awaitable, type CreateFormObject, type FormObjectBase, type Model, type ModelDefaults, pickNonSpecialProps, type ResolvedModelItem, type StandardSchemaV1, type StoreSchema, type UpdateFormObject } from '@rstore/shared'
+import { type Awaitable, type Collection, type CollectionDefaults, type CreateFormObject, type FormObjectBase, pickNonSpecialProps, type ResolvedCollectionItem, type StandardSchemaV1, type StoreSchema, type UpdateFormObject } from '@rstore/shared'
 import { createEventHook, type EventHookOn } from '@vueuse/core'
 import { markRaw, nextTick, reactive } from 'vue'
 
@@ -45,22 +45,22 @@ type VueFormObject<
 > = FormObjectBase<TData, TSchema> & FormObjectAdditionalProps<TData> & TAdditionalProps & Partial<TData> & (() => Promise<TData>)
 
 /**
- * Object returned by `store.<Model>.createForm()`
+ * Object returned by `store.<Collection>.createForm()`
  */
 export type VueCreateFormObject<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
-> = CreateFormObject<TModel, TModelDefaults, TSchema> & VueFormObject<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+> = CreateFormObject<TCollection, TCollectionDefaults, TSchema> & VueFormObject<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
 /**
- * Object returned by `store.<Model>.updateForm()`
+ * Object returned by `store.<Collection>.updateForm()`
  */
 export type VueUpdateFormObject<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
-> = UpdateFormObject<TModel, TModelDefaults, TSchema> & VueFormObject<ResolvedModelItem<TModel, TModelDefaults, TSchema>>
+> = UpdateFormObject<TCollection, TCollectionDefaults, TSchema> & VueFormObject<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
 export function createFormObject<
   TData extends Record<string, any> = Record<string, any>,

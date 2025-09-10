@@ -1,14 +1,14 @@
 <script lang="ts" setup>
-import type { ModelRelation, ResolvedModel } from '@rstore/shared'
+import type { CollectionRelation, ResolvedCollection } from '@rstore/shared'
 
 defineProps<{
-  model: ResolvedModel
+  collection: ResolvedCollection
   relationName: string
-  relation: ModelRelation
+  relation: CollectionRelation
 }>()
 
-function stripModelName(name: string, modelName: string) {
-  return name.replace(new RegExp(`^${modelName}\\.`), '')
+function stripCollectionName(name: string, collectionName: string) {
+  return name.replace(new RegExp(`^${collectionName}\\.`), '')
 }
 </script>
 
@@ -20,8 +20,8 @@ function stripModelName(name: string, modelName: string) {
     </div>
     <div>
       <div
-        v-for="([targetModel, info], targetIndex) in Object.entries(relation.to)"
-        :key="targetModel"
+        v-for="([targetCollection, info], targetIndex) in Object.entries(relation.to)"
+        :key="targetCollection"
         class="flex items-center gap-2"
       >
         <div class="flex items-center">
@@ -44,19 +44,19 @@ function stripModelName(name: string, modelName: string) {
         >
           <span v-if="index > 0" class="opacity-50 mr-2">&amp;</span>
           <span class="text-purple-500">
-            {{ targetModel }}
+            {{ targetCollection }}
           </span>
           <span class="opacity-50">.</span>
           <span class="text-purple-500">
-            {{ stripModelName(key, targetModel) }}
+            {{ stripCollectionName(key, targetCollection) }}
           </span>
           <span class="opacity-50 mx-1">=</span>
           <span class="text-blue-500">
-            {{ model.name }}
+            {{ collection.name }}
           </span>
           <span class="opacity-50">.</span>
           <span class="text-blue-500">
-            {{ stripModelName(value, model.name) }}
+            {{ stripCollectionName(value, collection.name) }}
           </span>
         </div>
 

@@ -1,20 +1,20 @@
 import { z } from 'zod'
 
-const DataSourceModel = RStoreSchema.withItemType<DataSource>().defineModel({
+const DataSourceCollection = RStoreSchema.withItemType<DataSource>().defineCollection({
   name: 'DataSource',
   meta: {
     path: 'dataSources',
   },
 })
 
-const DataCollectionModel = RStoreSchema.withItemType<DataCollection>().defineModel({
+const DataCollectionCollection = RStoreSchema.withItemType<DataCollection>().defineCollection({
   name: 'DataCollection',
   meta: {
     path: 'dataCollections',
   },
 })
 
-const DataFieldModel = RStoreSchema.withItemType<DataField>().defineModel({
+const DataFieldCollection = RStoreSchema.withItemType<DataField>().defineCollection({
   name: 'DataField',
   meta: {
     path: 'dataFields',
@@ -52,11 +52,11 @@ const DataFieldModel = RStoreSchema.withItemType<DataField>().defineModel({
   // }
 })
 
-const DataSourceRelations = RStoreSchema.defineRelations(DataSourceModel, ({ model }) => ({
+const DataSourceRelations = RStoreSchema.defineRelations(DataSourceCollection, ({ collection }) => ({
   collections: {
     many: true,
     to: {
-      ...model(DataCollectionModel, {
+      ...collection(DataCollectionCollection, {
         on: {
           'DataCollection.dataSourceId': 'DataSource.id',
           // 'DataCollection.id': 'DataSource.id',
@@ -67,9 +67,9 @@ const DataSourceRelations = RStoreSchema.defineRelations(DataSourceModel, ({ mod
   },
 }))
 
-const DataCollectionRelations = RStoreSchema.defineRelations(DataCollectionModel, ({ model }) => ({
+const DataCollectionRelations = RStoreSchema.defineRelations(DataCollectionCollection, ({ collection }) => ({
   source: {
-    to: model(DataSourceModel, {
+    to: collection(DataSourceCollection, {
       on: {
         'DataSource.id': 'DataCollection.dataSourceId',
       },
@@ -77,7 +77,7 @@ const DataCollectionRelations = RStoreSchema.defineRelations(DataCollectionModel
   },
   fields: {
     many: true,
-    to: model(DataFieldModel, {
+    to: collection(DataFieldCollection, {
       on: {
         'DataField.dataCollectionId': 'DataCollection.id',
       },
@@ -85,9 +85,9 @@ const DataCollectionRelations = RStoreSchema.defineRelations(DataCollectionModel
   },
 }))
 
-const DataFieldRelations = RStoreSchema.defineRelations(DataFieldModel, ({ model }) => ({
+const DataFieldRelations = RStoreSchema.defineRelations(DataFieldCollection, ({ collection }) => ({
   collection: {
-    to: model(DataCollectionModel, {
+    to: collection(DataCollectionCollection, {
       on: {
         id: 'dataCollectionId',
       },
@@ -96,9 +96,9 @@ const DataFieldRelations = RStoreSchema.defineRelations(DataFieldModel, ({ model
 }))
 
 export default [
-  DataSourceModel,
-  DataCollectionModel,
-  DataFieldModel,
+  DataSourceCollection,
+  DataCollectionCollection,
+  DataFieldCollection,
   DataSourceRelations,
   DataCollectionRelations,
   DataFieldRelations,

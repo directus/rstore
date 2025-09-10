@@ -1,5 +1,5 @@
-import type { constModels } from '#build/$rstore-model-const'
-import type { ModelByName, ModelNameMap, ResolvedModelItem, WrappedItem } from '@rstore/shared'
+import type { constCollections } from '#build/$rstore-collection-const'
+import type { CollectionByName, CollectionNameMap, ResolvedCollectionItem, WrappedItem } from '@rstore/shared'
 import { useNuxtApp } from '#app'
 import { type CreateFormObject, defineRelations, type UpdateFormObject, type VueStore, withItemType } from '@rstore/vue'
 
@@ -15,47 +15,47 @@ export const RStoreSchema = {
   defineRelations,
 }
 
-export type StoreRawModels = typeof constModels
+export type StoreRawCollections = typeof constCollections
 
-export interface StoreModelDefaults {}
+export interface StoreCollectionDefaults {}
 
 export type Store = VueStore<
-  StoreRawModels,
-  StoreModelDefaults
+  StoreRawCollections,
+  StoreCollectionDefaults
 >
 
-type StoreModelNameMap = ModelNameMap<StoreRawModels>
+type StoreCollectionNameMap = CollectionNameMap<StoreRawCollections>
 
-export type StoreResolvedModelItem<
-  TModelName extends keyof StoreModelNameMap,
-> = ResolvedModelItem<
-  ModelByName<Store['$models'], TModelName, StoreModelNameMap>,
-  Store['$modelDefaults'],
-  StoreRawModels
+export type StoreResolvedCollectionItem<
+  TCollectionName extends keyof StoreCollectionNameMap,
+> = ResolvedCollectionItem<
+  CollectionByName<Store['$collections'], TCollectionName, StoreCollectionNameMap>,
+  Store['$collectionDefaults'],
+  StoreRawCollections
 >
 
 export type StoreWrappedItem<
-  TModelName extends keyof StoreModelNameMap,
+  TCollectionName extends keyof StoreCollectionNameMap,
 > = WrappedItem<
-  ModelByName<Store['$models'], TModelName, StoreModelNameMap>,
-  Store['$modelDefaults'],
-  StoreRawModels
+  CollectionByName<Store['$collections'], TCollectionName, StoreCollectionNameMap>,
+  Store['$collectionDefaults'],
+  StoreRawCollections
 >
 
 export type StoreCreateFormObject<
-  TModelName extends keyof StoreModelNameMap,
+  TCollectionName extends keyof StoreCollectionNameMap,
 > = CreateFormObject<
-  ModelByName<Store['$models'], TModelName, StoreModelNameMap>,
-  Store['$modelDefaults'],
-  StoreRawModels
+  CollectionByName<Store['$collections'], TCollectionName, StoreCollectionNameMap>,
+  Store['$collectionDefaults'],
+  StoreRawCollections
 >
 
 export type StoreUpdateFormObject<
-  TModelName extends keyof StoreModelNameMap,
+  TCollectionName extends keyof StoreCollectionNameMap,
 > = UpdateFormObject<
-  ModelByName<Store['$models'], TModelName, StoreModelNameMap>,
-  Store['$modelDefaults'],
-  StoreRawModels
+  CollectionByName<Store['$collections'], TCollectionName, StoreCollectionNameMap>,
+  Store['$collectionDefaults'],
+  StoreRawCollections
 >
 
 export function useStore(): Store {

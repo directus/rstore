@@ -2,7 +2,7 @@
 </script>
 
 <script lang="ts" setup>
-import type { ResolvedModel } from '@rstore/shared'
+import type { ResolvedCollection } from '@rstore/shared'
 
 const itemSearchContent = ref('')
 
@@ -13,26 +13,26 @@ const cache = useStoreCache()
 const forceUpdate = ref(0)
 
 const showRawCache = useLocalStorage('rstore-devtools-show-raw-cache', false)
-const selectedModel = useLocalStorage<string | null>('rstore-devtools-selected-cache-model', null)
-const cacheModelSearch = useLocalStorage('rstore-devtools-cache-model-search', '')
+const selectedCollection = useLocalStorage<string | null>('rstore-devtools-selected-cache-collection', null)
+const cacheCollectionSearch = useLocalStorage('rstore-devtools-cache-collection-search', '')
 const itemSearchKey = useLocalStorage('rstore-devtools-cache-item-search-key', '')
 
-const filteredModels = computed(() => {
-  let result: Array<ResolvedModel> = []
-  if (!cacheModelSearch.value) {
-    result = store.value.$models
+const filteredCollections = computed(() => {
+  let result: Array<ResolvedCollection> = []
+  if (!cacheCollectionSearch.value) {
+    result = store.value.$collections
   }
   else {
-    result = store.value.$models.filter(m => m.name.toLowerCase().includes(cacheModelSearch.value.toLowerCase()))
+    result = store.value.$collections.filter(m => m.name.toLowerCase().includes(cacheCollectionSearch.value.toLowerCase()))
   }
   return result.sort((a, b) => a.name.localeCompare(b.name))
 })
 
-const modelSearchEl = useTemplateRef('modelSearchEl')
+const collectionSearchEl = useTemplateRef('collectionSearchEl')
 
 // Selected cache
 
-const selectedCache = computed(() => cache.value[selectedModel.value as keyof typeof cache.value] as Record<string, any>)
+const selectedCache = computed(() => cache.value[selectedCollection.value as keyof typeof cache.value] as Record<string, any>)
 
 const filteredCache = computed(() => {
   function filteredByKey(cache: Record<string, any> | undefined) {
@@ -97,49 +97,49 @@ watch(cache, () => {
       v-else
       class="flex items-stretch h-full"
     >
-      <!-- Models -->
+      <!-- Collections -->
       <div class="flex flex-col w-1/4 max-w-60">
         <div class="p-1">
           <UInput
-            ref="modelSearchEl"
-            v-model="cacheModelSearch"
-            placeholder="Search models..."
+            ref="collectionSearchEl"
+            v-model="cacheCollectionSearch"
+            placeholder="Search collections..."
             icon="lucide:search"
             size="xs"
             class="w-full"
           >
-            <template v-if="cacheModelSearch" #trailing>
+            <template v-if="cacheCollectionSearch" #trailing>
               <UButton
                 icon="lucide:x"
                 size="xs"
                 variant="link"
                 color="neutral"
-                @click="cacheModelSearch = '';modelSearchEl?.inputRef?.focus()"
+                @click="cacheCollectionSearch = '';collectionSearchEl?.inputRef?.focus()"
               />
             </template>
           </UInput>
         </div>
         <div class="flex flex-col flex-1 overflow-auto p-1 gap-px">
-          <DevtoolsCacheModelItem
-            v-for="model in filteredModels"
-            :key="model.name"
-            :model
-            :selected="selectedModel === model.name"
-            @click="selectedModel = model.name"
+          <DevtoolsCacheCollectionItem
+            v-for="collection in filteredCollections"
+            :key="collection.name"
+            :collection
+            :selected="selectedCollection === collection.name"
+            @click="selectedCollection = collection.name"
           />
 
-          <div v-if="!filteredModels.length" class="p-2 text-xs italic opacity-50 text-center">
-            No models found.
+          <div v-if="!filteredCollections.length" class="p-2 text-xs italic opacity-50 text-center">
+            No collections found.
           </div>
         </div>
       </div>
 
       <!-- Items -->
-      <div v-if="selectedModel" class="overflow-auto flex-1">
+      <div v-if="selectedCollection" class="overflow-auto flex-1">
         <Empty
           v-if="!filteredCache || !Object.keys(selectedCache).length"
           icon="lucide:database"
-          title="No items for this model"
+          title="No items for this collection"
           class="h-full"
         />
         <Empty
