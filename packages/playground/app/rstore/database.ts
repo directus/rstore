@@ -1,20 +1,20 @@
 import { z } from 'zod'
 
-const DataSourceCollection = RStoreSchema.withItemType<DataSource>().defineCollection({
+export const DataSourceCollection = RStoreSchema.withItemType<DataSource>().defineCollection({
   name: 'DataSource',
   meta: {
     path: 'dataSources',
   },
 })
 
-const DataCollectionCollection = RStoreSchema.withItemType<DataCollection>().defineCollection({
+export const DataCollectionCollection = RStoreSchema.withItemType<DataCollection>().defineCollection({
   name: 'DataCollection',
   meta: {
     path: 'dataCollections',
   },
 })
 
-const DataFieldCollection = RStoreSchema.withItemType<DataField>().defineCollection({
+export const DataFieldCollection = RStoreSchema.withItemType<DataField>().defineCollection({
   name: 'DataField',
   meta: {
     path: 'dataFields',
@@ -52,7 +52,7 @@ const DataFieldCollection = RStoreSchema.withItemType<DataField>().defineCollect
   // }
 })
 
-const DataSourceRelations = RStoreSchema.defineRelations(DataSourceCollection, ({ collection }) => ({
+export const DataSourceRelations = RStoreSchema.defineRelations(DataSourceCollection, ({ collection }) => ({
   collections: {
     many: true,
     to: {
@@ -67,7 +67,7 @@ const DataSourceRelations = RStoreSchema.defineRelations(DataSourceCollection, (
   },
 }))
 
-const DataCollectionRelations = RStoreSchema.defineRelations(DataCollectionCollection, ({ collection }) => ({
+export const DataCollectionRelations = RStoreSchema.defineRelations(DataCollectionCollection, ({ collection }) => ({
   source: {
     to: collection(DataSourceCollection, {
       on: {
@@ -85,7 +85,7 @@ const DataCollectionRelations = RStoreSchema.defineRelations(DataCollectionColle
   },
 }))
 
-const DataFieldRelations = RStoreSchema.defineRelations(DataFieldCollection, ({ collection }) => ({
+export const DataFieldRelations = RStoreSchema.defineRelations(DataFieldCollection, ({ collection }) => ({
   collection: {
     to: collection(DataCollectionCollection, {
       on: {
@@ -94,12 +94,3 @@ const DataFieldRelations = RStoreSchema.defineRelations(DataFieldCollection, ({ 
     }),
   },
 }))
-
-export default [
-  DataSourceCollection,
-  DataCollectionCollection,
-  DataFieldCollection,
-  DataSourceRelations,
-  DataCollectionRelations,
-  DataFieldRelations,
-]

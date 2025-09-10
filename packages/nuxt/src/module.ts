@@ -76,8 +76,15 @@ export default defineNuxtModule<ModuleOptions>({
       files = files.map((file) => {
         const content = fs.readFileSync(file, 'utf-8')
         // Find `export default` statements
-        if (!/export default/.test(content)) {
-          console.warn(`No exported default found in ${file}`)
+        const doesExportDefault = /export default/.test(content)
+        const doesExportConst = /export const /.test(content)
+        if (!doesExportDefault && !doesExportConst) {
+          if (!doesExportDefault) {
+            console.warn(`No exported default found in ${file}`)
+          }
+          if (!doesExportConst) {
+            console.warn(`No exported const found in ${file}`)
+          }
           return null
         }
         return file
@@ -103,9 +110,9 @@ export default defineNuxtModule<ModuleOptions>({
       filename: '$rstore-collection.ts',
       getContents: async () => {
         const files = await resolveCollectionFiles()
-        return `${files.map((file, index) => `import M${index} from '${file}'`).join('\n')}
+        return `${files.map((file, index) => `import * as M${index} from '${file}'`).join('\n')}
 export default [
-  ${files.map((file, index) => `...Array.isArray(M${index}) ? M${index} : [M${index}],`).join('\n')}
+  ${files.map((file, index) => `...Object.values(M${index}),`).join('\n')}
 ]`
       },
     })
@@ -115,13 +122,9 @@ export default [
       getContents: async () => {
         const files = await resolveCollectionFiles()
         return `import type { StoreSchema } from '@rstore/shared'
-${files.map((file, index) => `import M${index} from '${file}'`).join('\n')}
-type EnsureArray<T> = T extends any[] ? T : [T]
-function ensureArray<T>(value: T): EnsureArray<T> {
-  return Array.isArray(value) ? value : [value]
-}
+${files.map((file, index) => `import * as M${index} from '${file}'`).join('\n')}
 export const constCollections = [
-  ${files.map((file, index) => `...ensureArray(M${index}),`).join('\n')}
+  ${files.map((file, index) => `...Object.values(M${index}),`).join('\n')}
 ] satisfies StoreSchema`
       },
     })

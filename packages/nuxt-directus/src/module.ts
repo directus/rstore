@@ -76,9 +76,9 @@ export default defineNuxtModule<ModuleOptions>({
     addTemplate({
       filename: '$rstore-directus-collections.js',
       getContents: async () => {
-        return `export default [${
-          collections.map((collection) => {
-            let code = `{`
+        return `${
+          collections.map((collection, index) => {
+            let code = `export const collection${index} = {`
             code += `name: '${collection.name}',`
             code += `scopeId: '${collection.scopeId}',`
             code += `meta: ${JSON.stringify(collection.meta)},`
@@ -87,8 +87,37 @@ export default defineNuxtModule<ModuleOptions>({
             }
             code += `}`
             return code
-          }).join(',\n')
-        }]`
+          }).join('\n')
+        }`
+      },
+    })
+
+    addTypeTemplate({
+      filename: '$rstore-directus-items.d.ts',
+      getContents: async () => {
+        return `${collections.map((collection) => {
+          let code = `export interface ${collection.name} {`
+          const fields = fieldsPerCollection.get(collection.name) ?? []
+          for (const field of fields) {
+            let type = 'any'
+            switch (field.type) {
+              case 'string':
+              case 'uuid':
+                type = 'string'
+                break
+              case 'integer':
+                type = 'number'
+                break
+              case 'boolean':
+                type = 'boolean'
+                break
+            }
+
+            code += `\n  ${field.field}: ${type}`
+          }
+          code += '}'
+          return code
+        }).join('\n')}`
       },
     })
 
@@ -97,46 +126,18 @@ export default defineNuxtModule<ModuleOptions>({
       getContents: async () => {
         return `import { withItemType } from '@rstore/vue'
 
-${collections.map((collection) => {
-  let code = `export interface ${collection.name} {`
-  const fields = fieldsPerCollection.get(collection.name) ?? []
-  for (const field of fields) {
-    if (field.meta.hidden) {
-      continue
-    }
+import {${collections.map(collection => collection.name).join(',\n')}} from '#build/$rstore-directus-items'
 
-    let type = 'any'
-    switch (field.type) {
-      case 'string':
-      case 'uuid':
-        type = 'string'
-        break
-      case 'integer':
-        type = 'number'
-        break
-      case 'boolean':
-        type = 'boolean'
-        break
-    }
-
-    code += `\n  ${field.field}: ${type}`
+${collections.map((collection, index) => {
+  let code = `export const collection${index} = withItemType<${collection.name}>().defineCollection({`
+  code += `name: '${collection.name}',`
+  code += `meta: ${JSON.stringify(collection.meta)},`
+  if (collection.relations) {
+    code += `relations: ${JSON.stringify(collection.relations)},`
   }
-  code += '}'
+  code += `}),`
   return code
 }).join('\n')}
-
-export default [
-  ${collections.map((collection) => {
-    let code = `withItemType<${collection.name}>().defineCollection({`
-    code += `name: '${collection.name}',`
-    code += `meta: ${JSON.stringify(collection.meta)},`
-    if (collection.relations) {
-      code += `relations: ${JSON.stringify(collection.relations)},`
-    }
-    code += `}),`
-    return code
-  }).join('\n')}
-]
 `
       },
     })

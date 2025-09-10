@@ -413,20 +413,18 @@ export const useDrizzles = {
       filename: '$rstore-drizzle-collections.js',
       getContents: async () => {
         const collections = await getCollectionsFromDrizzleSchema()
-        return `export default [${
-          collections.map((collection) => {
-            let code = `{`
-            code += `name: '${collection.name}',`
-            code += `scopeId: '${collection.scopeId}',`
-            code += `meta: ${JSON.stringify(collection.meta)},`
-            if (collection.relations) {
-              code += `relations: ${JSON.stringify(collection.relations)},`
-            }
-            code += `getKey: (item) => ${collection.meta?.primaryKeys?.length ? `(${collection.meta.primaryKeys.map(key => `item.${key}`).join(' + ')})` : 'item.id'},`
-            code += `}`
-            return code
-          }).join(',\n')
-        }]`
+        return collections.map((collection, index) => {
+          let code = `export const collection${index} = {`
+          code += `name: '${collection.name}',`
+          code += `scopeId: '${collection.scopeId}',`
+          code += `meta: ${JSON.stringify(collection.meta)},`
+          if (collection.relations) {
+            code += `relations: ${JSON.stringify(collection.relations)},`
+          }
+          code += `getKey: (item) => ${collection.meta?.primaryKeys?.length ? `(${collection.meta.primaryKeys.map(key => `item.${key}`).join(' + ')})` : 'item.id'},`
+          code += `}`
+          return code
+        }).join('\n')
       },
     })
 
@@ -437,18 +435,16 @@ export const useDrizzles = {
         return `import { withItemType } from '@rstore/vue'
 import * as schema from '${drizzleSchemaPath}'
 
-export default [
-  ${collections.map((collection) => {
-    let code = `withItemType<typeof schema.${collection.name}.$inferSelect>().defineCollection({`
-    code += `name: '${collection.name}',`
-    code += `meta: ${JSON.stringify(collection.meta)},`
-    if (collection.relations) {
-      code += `relations: ${JSON.stringify(collection.relations)},`
-    }
-    code += `}),`
-    return code
-  }).join('\n')}
-]
+${collections.map((collection, index) => {
+  let code = `export const collection${index} = withItemType<typeof schema.${collection.name}.$inferSelect>().defineCollection({`
+  code += `name: '${collection.name}',`
+  code += `meta: ${JSON.stringify(collection.meta)},`
+  if (collection.relations) {
+    code += `relations: ${JSON.stringify(collection.relations)},`
+  }
+  code += `})`
+  return code
+}).join('\n')}
 `
       },
     })
