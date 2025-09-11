@@ -82,3 +82,26 @@ export function hooksForTable<TTableConfig extends TableConfig, TTable extends T
     })
   }
 }
+
+let allowedCollections: Set<string> | null = null
+
+export function allowTables(tables: Table[]) {
+  const collectionNames = tables.map(getDrizzleCollectionNameFromTable)
+
+  if (!allowedCollections) {
+    allowedCollections = new Set(collectionNames)
+
+    for (const hookName of ['index.get.before', 'index.post.before', 'item.get.before', 'item.patch.before', 'item.delete.before'] as (keyof RstoreDrizzleHooks)[]) {
+      rstoreDrizzleHooks.hook(hookName, async (payload: RstoreDrizzleBeforeHookPayload) => {
+        if (!allowedCollections!.has(payload.collection)) {
+          throw new Error(`Collection "${payload.collection}" is not allowed.`)
+        }
+      })
+    }
+  }
+  else {
+    for (const name of collectionNames) {
+      allowedCollections.add(name)
+    }
+  }
+}

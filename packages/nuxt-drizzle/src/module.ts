@@ -96,6 +96,7 @@ export default defineNuxtModule<ModuleOptions>({
     addServerImports([
       'rstoreDrizzleHooks',
       'hooksForTable',
+      'allowTables',
     ].map(name => ({ from: resolve('./runtime/server/utils/hooks'), name })))
 
     const jiti = createJiti(import.meta.url, {

@@ -43,4 +43,8 @@ export default defineNitroPlugin(() => {
       console.log('Specific hook for todos - item.patch.after', payload.collection, payload.result.id)
     },
   })
+
+  allowTables([
+    tables.todos,
+  ])
 })

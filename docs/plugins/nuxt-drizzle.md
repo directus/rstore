@@ -150,9 +150,33 @@ const { data: users } = await store.users.query(q => q.many({
 </script>
 ```
 
+## Allowing tables
+
+By default, all tables in your Drizzle schema are exposed through the API. You can restrict the tables that are exposed by using the `allowTables` function.
+
+::: tip
+Put this code in a Nitro plugin in `server/plugins` so it's executed once when the server starts.
+:::
+
+```ts
+import * as tables from 'path-to-your-drizzle-schema'
+
+export default defineNitroPlugin(() => {
+  allowTables([
+    tables.todos,
+  ])
+})
+```
+
+Any table that is not explicitly listed will throw on all API endpoints. `allowTables` can be called multiple times, and the allowed tables will be merged.
+
 ## Hooks
 
-You can use hooks to run code before or after certain actions on the collections. You can register global hooks for all collections using the `rstoreDrizzleHooks` import, or specific hooks for a given table using the `hooksForTable` function.
+You can use hooks to run code before or after certain actions on the collections. You can register global hooks for all collections using the `rstoreDrizzleHooks` import, or specific hooks for a given table using the `hooksForTable` function (recommended).
+
+::: tip
+Put this code in a Nitro plugin in `server/plugins` so it's executed once when the server starts.
+:::
 
 You can use the following hooks:
 
@@ -168,6 +192,28 @@ You can use the following hooks:
 - `item.delete.after` - after deleting a single item
 
 If you throw an error in a `before` hook, the action will be aborted and the error will be returned to the client.
+
+```ts
+import * as tables from 'path-to-your-drizzle-schema'
+
+export default defineNitroPlugin(() => {
+  hooksForTable(tables.todos, {
+    'index.get.before': async (payload) => {
+      console.log('Specific hook for todos - index.get.before', payload.collection, payload.query, payload.params)
+    },
+    'index.get.after': async (payload) => {
+      console.log('Specific hook for todos - index.get.after', payload.collection, payload.result.map(r => r.id))
+    },
+    'item.patch.after': async (payload) => {
+      console.log('Specific hook for todos - item.patch.after', payload.collection, payload.result.id)
+    },
+  })
+})
+```
+
+<details>
+
+<summary>You can also register global hooks for all tables.</summary>
 
 ```ts
 export default defineNitroPlugin(() => {
@@ -204,19 +250,82 @@ export default defineNitroPlugin(() => {
 })
 ```
 
-```ts
-import * as tables from 'path-to-your-drizzle-schema'
+</details>
 
+## Recipes
+
+### Permission check with a query
+
+Throwing an error in a `before` hook to prevent the action:
+
+```ts
 export default defineNitroPlugin(() => {
-  hooksForTable(tables.todos, {
-    'index.get.before': async (payload) => {
-      console.log('Specific hook for todos - index.get.before', payload.collection, payload.query, payload.params)
+  hooksForTable(tables.projects, {
+    'index.post.before': async ({ body }) => {
+      const session = await requireUserSession(event)
+      // Check that the user is a member of the team
+      // they are trying to create the project for
+      const teamId = body.teamId
+
+      // Check that the user is a member of the team
+      const membership = await useDrizzle()
+        .select()
+        .from(tables.teamsToUsers)
+        .where(and(
+          eq(tables.teamsToUsers.teamId, teamId),
+          eq(tables.teamsToUsers.userId, session.user.id),
+        ))
+        .limit(1)
+        .get()
+
+      if (!membership) {
+        throw createError({
+          statusCode: 403,
+          statusMessage: 'You are not a member of this team'
+        })
+      }
     },
-    'index.get.after': async (payload) => {
-      console.log('Specific hook for todos - index.get.after', payload.collection, payload.result.map(r => r.id))
+  })
+})
+```
+
+### Implicit permission check
+
+By adding a SQL condition to the `where` clause of a query:
+
+```ts
+export default defineNitroPlugin(() => {
+  hooksForTable(tables.projects, {
+    'index.get.before': async ({ event, transformQuery }) => {
+      const session = await requireUserSession(event)
+      // Create a subquery to restrict the projects
+      // to those that belong to teams the user is a member of
+      const sq = useDrizzle()
+        .select({ id: tables.projects.id })
+        .from(tables.teamsToUsers)
+        .innerJoin(tables.projects, eq(tables.projects.teamId, tables.teamsToUsers.teamId))
+        .where(eq(tables.teamsToUsers.userId, session.user.id))
+      // Use the subquery in the main query
+      transformQuery(q => q.where(inArray(tables.projects.id, sq)))
     },
-    'item.patch.after': async (payload) => {
-      console.log('Specific hook for todos - item.patch.after', payload.collection, payload.result.id)
+  })
+})
+```
+
+### Automatic query
+
+Automatically execute a query after a specific action:
+
+```ts
+export default defineNitroPlugin(() => {
+  hooksForTable(tables.teams, {
+    'index.post.after': async ({ event, result }) => {
+      const session = await requireUserSession(event)
+      // Add the user as a member of the newly created team
+      await useDrizzle().insert(tables.teamsToUsers).values({
+        teamId: result.id,
+        userId: session.user.id,
+      })
     },
   })
 })
