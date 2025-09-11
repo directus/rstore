@@ -298,15 +298,13 @@ export default withItemType<Todo>().defineCollection({
 
 ```ts [app/rstore/multiple.ts]
 // Multiple Collections
-export default [
-  withItemType<User>().defineCollection({
-    name: 'users',
-  }),
+const users = withItemType<User>().defineCollection({
+  name: 'users',
+})
 
-  withItemType<Bot>().defineCollection({
-    name: 'bots',
-  }),
-]
+const bots = withItemType<Bot>().defineCollection({
+  name: 'bots',
+})
 ```
 
 ```ts [shared/types/collection.ts]
@@ -335,7 +333,7 @@ export interface Bot {
 :::
 
 ::: warning FILE SCANNING
-The rstore module will only scan exported defaults in files in the `rstore` folder and not in nested folders. If you want to split the collections in multiple folders, you need to re-export each variables (currently the module is looking for `export default` expressions) or use Nuxt layers (recommended).
+The rstore module will only scan exports in files in the `rstore` folder and not in nested folders. If you want to split the collections in multiple folders, you need to re-export each variables or use Nuxt layers (recommended).
 :::
 
 3. Create a plugin to interact with an API in the `rstore/plugins` folder:
