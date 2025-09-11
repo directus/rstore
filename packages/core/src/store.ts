@@ -2,7 +2,7 @@ import type { Cache, CollectionDefaults, CustomHookMeta, FindOptions, Hooks, Mut
 import { get, set } from '@rstore/shared'
 import { addCollectionRelations, isCollectionRelations, resolveCollections } from './collection'
 import { defaultFetchPolicy } from './fetchPolicy'
-import { setupPlugin } from './plugin'
+import { setupPlugin, sortPlugins } from './plugin'
 
 export interface CreateStoreCoreOptions<
   TSchema extends StoreSchema = StoreSchema,
@@ -95,7 +95,7 @@ export async function createStoreCore<
 
   // Setup plugins
 
-  for (const plugin of store.$plugins) {
+  for (const plugin of sortPlugins(store.$plugins)) {
     await setupPlugin(store, plugin)
   }
 

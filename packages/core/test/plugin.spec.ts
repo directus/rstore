@@ -1,6 +1,6 @@
 import { type CollectionDefaults, createHooks, type RegisteredPlugin, type StoreCore, type StoreSchema } from '@rstore/shared'
 import { describe, expect, it, vi } from 'vitest'
-import { setupPlugin } from '../src/plugin'
+import { setupPlugin, sortPlugins } from '../src/plugin'
 
 describe('setupPlugin', () => {
   it('should call plugin.setup', async () => {
@@ -325,6 +325,134 @@ describe('setupPlugin', () => {
         })
         expect(mockStore.$collectionDefaults.computed!.test!({})).toBe('new')
       })
+    })
+  })
+
+  describe('plugin sorting', () => {
+    it('should sort plugins based on order in the options', async () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-a', 'plugin-b', 'plugin-c'])
+    })
+
+    it('should sort plugins based on after property', async () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          after: ['plugin-b'],
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          after: ['plugin-b'],
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-b', 'plugin-a', 'plugin-c'])
+    })
+
+    it('should sort plugins based on before property', async () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          before: ['plugin-a'],
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-c', 'plugin-a', 'plugin-b'])
+    })
+
+    it('should sort plugins based on before and after properties', async () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          after: ['plugin-b'],
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          before: ['plugin-a'],
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-b', 'plugin-c', 'plugin-a'])
+    })
+
+    it('should handle circular dependencies by throwing an error', async () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          after: ['plugin-b'],
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          after: ['plugin-c'],
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          after: ['plugin-a'],
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      expect(() => sortPlugins(plugins)).toThrow('Circular dependency detected for plugin plugin-a')
     })
   })
 })

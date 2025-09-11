@@ -62,3 +62,86 @@ export async function setupPlugin<
 export function definePlugin(plugin: Plugin): Plugin {
   return plugin
 }
+
+export function sortPlugins(plugins: RegisteredPlugin[]): RegisteredPlugin[] {
+  const pluginByName = new Map<string, RegisteredPlugin>()
+  const beforeRelations = new Map<string, Set<string>>()
+  const afterRelations = new Map<string, Set<string>>()
+
+  // Process before/after relationships
+  for (const plugin of plugins) {
+    pluginByName.set(plugin.name, plugin)
+
+    // Process 'before' relationships
+    if (plugin.before) {
+      for (const beforeName of plugin.before) {
+        if (!beforeRelations.has(plugin.name)) {
+          beforeRelations.set(plugin.name, new Set())
+        }
+        beforeRelations.get(plugin.name)!.add(beforeName)
+
+        if (!afterRelations.has(beforeName)) {
+          afterRelations.set(beforeName, new Set())
+        }
+        afterRelations.get(beforeName)!.add(plugin.name)
+      }
+    }
+
+    // Process 'after' relationships
+    if (plugin.after) {
+      for (const afterName of plugin.after) {
+        if (!afterRelations.has(plugin.name)) {
+          afterRelations.set(plugin.name, new Set())
+        }
+        afterRelations.get(plugin.name)!.add(afterName)
+
+        if (!beforeRelations.has(afterName)) {
+          beforeRelations.set(afterName, new Set())
+        }
+        beforeRelations.get(afterName)!.add(plugin.name)
+      }
+    }
+  }
+
+  // Topological sort using depth-first search
+  const sorted: RegisteredPlugin[] = []
+  const visited = new Set<string>()
+  const visiting = new Set<string>()
+
+  function visit(name: string) {
+    if (visited.has(name))
+      return
+    if (visiting.has(name)) {
+      throw new Error(`Circular dependency detected for plugin ${name}`)
+    }
+
+    visiting.add(name)
+
+    // Process 'after' dependencies first (they should come before this plugin)
+    const afterDeps = afterRelations.get(name)
+    if (afterDeps) {
+      for (const afterName of afterDeps) {
+        if (pluginByName.has(afterName)) {
+          visit(afterName)
+        }
+      }
+    }
+
+    visiting.delete(name)
+    visited.add(name)
+
+    const plugin = pluginByName.get(name)
+    if (plugin) {
+      sorted.push(plugin)
+    }
+  }
+
+  // Process all plugins
+  for (const plugin of plugins) {
+    if (plugin.name && !visited.has(plugin.name)) {
+      visit(plugin.name)
+    }
+  }
+
+  return sorted
+}

@@ -27,6 +27,17 @@ export interface Plugin {
    */
   scopeId?: string
 
+  /**
+   * List of plugin names that this plugin depends on.
+   * The dependent plugins will be sorted before this plugin.
+   */
+  after?: string[]
+
+  /**
+   * List of plugin names that should be sorted after this plugin.
+   */
+  before?: string[]
+
   meta?: CustomPluginMeta
 }
 

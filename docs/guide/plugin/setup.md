@@ -114,3 +114,17 @@ export default definePlugin({
   }
 })
 ```
+
+## Sorting plugins
+
+Plugins are sorted based on their dependencies. You can specify that a plugin should be loaded before or after another plugin using the `before` and `after` options:
+
+```ts
+import { definePlugin } from '@rstore/vue'
+
+export default definePlugin({
+  name: 'my-plugin',
+  before: ['another-plugin'],
+  after: ['yet-another-plugin'],
+})
+```
