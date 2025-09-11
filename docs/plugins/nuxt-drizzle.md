@@ -1,4 +1,36 @@
+<script setup lang="ts">
+import { VPFeatures } from 'vitepress/theme'
+</script>
+
 # Nuxt + Drizzle
+
+<div class="py-12">
+  <VPFeatures
+    :features="[
+      {
+        icon: '🪄',
+        title: 'Auto-generated Collections',
+        details: `Collections are automatically generated from your Drizzle schema (including relations), alongside the necessary API and plugin.`,
+      },
+      {
+        icon: '📚',
+        title: 'Type Safety',
+        details: 'All collections are fully typed using your Drizzle schema.',
+      },
+      {
+        icon: '🔒',
+        title: 'Security',
+        details: 'Easily restrict the tables exposed through the API with the `allowTables` function.',
+      },
+      {
+        icon: '🔌',
+        title: 'Hooks',
+        details: 'Run code server-side before or after certain actions on the tables using hooks.',
+      },
+    ]"
+    class="px-0! [&_h2]:m-0! [&_.item]:w-1/2!"
+  />
+</div>
 
 [Online Demo](https://codesandbox.io/p/devbox/wonderful-sun-s4cgl6)
 
