@@ -70,7 +70,7 @@ export interface HookDefinitions<
       key?: string | number
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
-      setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>, options?: AbortableOptions) => void
+      setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined, options?: AbortableOptions) => void
       setMarker: (marker: string) => void
     }
   ) => Awaitable<void>

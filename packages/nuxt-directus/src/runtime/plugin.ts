@@ -8,6 +8,8 @@ import { filterItem } from './filter'
 export default definePlugin({
   name: 'rstore-directus',
 
+  category: 'remote',
+
   // @TODO multi directus instances
   scopeId: 'rstore-directus',
 

@@ -20,6 +20,38 @@ export default definePlugin({
 
 The `setup` function is called when the plugin is registered. It receives a `pluginApi` object that contains useful methods to customize the store.
 
+## Category
+
+Plugins can be categorized to define their role in the data flow. The available categories are:
+
+- `virtual`: Plugins that provide virtual/in-memory collections that do not have any persistent storage.
+- `local`: Plugins that handle local data sources in the current device, such as saving it to a client-side database or storage such as IndexedDB or LocalStorage.
+- `remote`: Plugins that handle remote data sources, such as REST APIs or GraphQL APIs.
+- `processing`: Plugins that process data, such as transforming or validating it.
+
+By default plugins will be sorted based on their category in the following order:
+
+1. `virtual`
+2. `local`
+3. `remote`
+4. `processing`
+
+You can customize the sorting using the `before` and `after` options (see [Sorting plugins](#sorting-plugins)).
+
+```ts{5-7}
+import { definePlugin } from '@rstore/vue'
+
+export default definePlugin({
+  name: 'my-plugin',
+  // Will be after 'virtual' and 'local' plugins
+  // and before 'processing' plugins
+  category: 'remote',
+  setup(pluginApi) {
+    // Plugin code goes here
+  },
+})
+```
+
 ## Hooks
 
 Hooks are the primary way to extend the functionality of the store. They allow you to run custom code at different points in the lifecycle of the store. The hooks are called in the order they are defined.
@@ -117,14 +149,32 @@ export default definePlugin({
 
 ## Sorting plugins
 
-Plugins are sorted based on their dependencies. You can specify that a plugin should be loaded before or after another plugin using the `before` and `after` options:
+Plugins are sorted based on their dependencies and category. You can specify that a plugin should be loaded before or after another plugin or category using the `before` and `after` options:
 
 ```ts
 import { definePlugin } from '@rstore/vue'
 
 export default definePlugin({
   name: 'my-plugin',
-  before: ['another-plugin'],
-  after: ['yet-another-plugin'],
+  before: {
+    plugins: ['another-plugin'],
+    categories: ['remote'],
+  },
+  after: {
+    plugins: ['yet-another-plugin'],
+    categories: ['virtual'],
+  },
 })
 ```
+
+Each property of `before` and `after` is optional, you can either specify `plugins`, `categories`, or both.
+
+::: warning
+Be mindful of circular dependencies when using `before` and `after`. For example, if Plugin A is set to load after Plugin B, and Plugin B is set to load after Plugin A, this will create a circular dependency that cannot be resolved. The system will detect such circular dependencies and handle them gracefully by skipping the remaining sorting rules (with a warning printed to the console).
+
+Prioritization is done in the following order:
+
+- `before.plugins` and `after.plugins` have the highest priority.
+- `before.categories` and `after.categories` have the next priority.
+- Default category order is applied last.
+:::

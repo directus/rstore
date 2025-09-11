@@ -3,6 +3,7 @@ import type { RegisteredPlugin } from '@rstore/shared'
 
 const props = defineProps<{
   plugin: RegisteredPlugin
+  index: number
 }>()
 
 const meta = computed(() => {
@@ -21,6 +22,20 @@ const meta = computed(() => {
 
   return result
 })
+
+const categoryIcons = {
+  virtual: 'lucide:cpu',
+  local: 'lucide:computer-desktop',
+  remote: 'lucide:cloud',
+  processing: 'lucide:settings',
+}
+
+const categoryClass = {
+  virtual: 'bg-purple-500/20 text-purple-500',
+  local: 'bg-blue-500/20 text-blue-500',
+  remote: 'bg-green-500/20 text-green-500',
+  processing: 'bg-yellow-500/20 text-yellow-500',
+}
 </script>
 
 <template>
@@ -37,10 +52,42 @@ const meta = computed(() => {
         variant="soft"
         icon="lucide:wrench"
       />
+
+      <div class="flex-1 flex justify-end items-center gap-2">
+        <UTooltip text="Plugin load order">
+          <UBadge
+            icon="lucide:hash"
+            variant="subtle"
+            color="neutral"
+          >
+            {{ String(index + 1).padStart(2, '0') }}
+          </UBadge>
+        </UTooltip>
+      </div>
     </div>
 
     <div v-if="plugin.meta?.description" class="text-xs font-mono border border-default rounded p-2">
       {{ plugin.meta.description }}
+    </div>
+
+    <div class="text-xs font-mono border border-default rounded p-2 flex gap-4">
+      <div class="opacity-75 flex items-center gap-1">
+        <UIcon name="lucide:list-ordered" />
+        Category
+      </div>
+      <div
+        v-if="plugin.category" class="font-bold rounded px-1 flex items-center gap-1"
+        :class="categoryClass[plugin.category] ?? 'bg-gray-500/25'"
+      >
+        <UIcon
+          v-if="categoryIcons[plugin.category]"
+          :name="categoryIcons[plugin.category]"
+        />
+        <span>{{ plugin.category }}</span>
+      </div>
+      <div v-else class="italic opacity-50">
+        Unspecified
+      </div>
     </div>
 
     <div class="text-xs font-mono border border-default rounded p-2 flex gap-4">
@@ -53,6 +100,76 @@ const meta = computed(() => {
       </div>
       <div v-else class="italic opacity-50">
         None (handle all collections)
+      </div>
+    </div>
+
+    <!-- after/before options -->
+    <div class="text-xs font-mono border border-default rounded p-2 flex gap-4">
+      <div class="opacity-75 flex items-center gap-1">
+        <UIcon name="lucide:arrow-up-down" />
+        Sorting overrides
+      </div>
+      <div v-if="plugin.after?.plugins?.length || plugin.after?.categories?.length" class="font-bold border border-gray-500/25 rounded px-1 flex items-center gap-1 py-1">
+        <UIcon name="lucide:arrow-down" />
+        After:
+        <template v-if="plugin.after.plugins?.length">
+          <span
+            v-for="dep in plugin.after.plugins"
+            :key="`after-plugin-${dep}`"
+            class="px-1 py-0.5 bg-gray-500/25 rounded flex items-center gap-1"
+          >
+            <UIcon name="lucide:puzzle" />
+            {{ dep }}
+          </span>
+        </template>
+        <template v-if="plugin.after.categories?.length">
+          <span
+            v-for="cat in plugin.after.categories"
+            :key="`after-cat-${cat}`"
+            class="px-1 py-0.5 rounded flex items-center gap-1"
+            :class="categoryClass[cat] ?? 'bg-gray-500/10 text-gray-500'"
+          >
+            <UIcon
+              v-if="categoryIcons[cat]"
+              :name="categoryIcons[cat]"
+            />
+            {{ cat }}
+          </span>
+        </template>
+      </div>
+      <div v-if="plugin.before?.plugins?.length || plugin.before?.categories?.length" class="font-bold border border-gray-500/25 rounded px-1 flex items-center gap-1 py-1">
+        <UIcon name="lucide:arrow-up" />
+        Before:
+        <template v-if="plugin.before.plugins?.length">
+          <span
+            v-for="dep in plugin.before.plugins"
+            :key="`before-plugin-${dep}`"
+            class="px-1 py-0.5 bg-gray-500/25 rounded flex items-center gap-1"
+          >
+            <UIcon name="lucide:puzzle" />
+            {{ dep }}
+          </span>
+        </template>
+        <template v-if="plugin.before.categories?.length">
+          <span
+            v-for="cat in plugin.before.categories"
+            :key="`before-cat-${cat}`"
+            class="px-1 py-0.5 rounded flex items-center gap-1"
+            :class="categoryClass[cat] ?? 'bg-gray-500/10 text-gray-500'"
+          >
+            <UIcon
+              v-if="categoryIcons[cat]"
+              :name="categoryIcons[cat]"
+            />
+            {{ cat }}
+          </span>
+        </template>
+      </div>
+      <div
+        v-if="!plugin.after?.plugins?.length && !plugin.after?.categories?.length && !plugin.before?.plugins?.length && !plugin.before?.categories?.length"
+        class="italic opacity-50"
+      >
+        None (default order)
       </div>
     </div>
 

@@ -7,11 +7,18 @@ export interface CustomPluginMeta {
   builtin?: boolean
 }
 
+export type PluginCategory = 'virtual' | 'local' | 'remote' | 'processing'
+
 export interface Plugin {
   /**
    * Helps to identify the adapter.
    */
   name: string
+
+  /**
+   * Category of the plugin.
+   */
+  category?: PluginCategory
 
   /**
    * Setups the adapter
@@ -28,15 +35,33 @@ export interface Plugin {
   scopeId?: string
 
   /**
-   * List of plugin names that this plugin depends on.
-   * The dependent plugins will be sorted before this plugin.
+   * Sort the plugin after other plugins.
    */
-  after?: string[]
+  after?: {
+    /**
+     * List of plugin names that this plugin depends on.
+     * The dependent plugins will be sorted before this plugin.
+     */
+    plugins?: string[]
+    /**
+     * Categories of plugins that should be sorted before this plugin.
+     */
+    categories?: Array<PluginCategory>
+  }
 
   /**
-   * List of plugin names that should be sorted after this plugin.
+   * Sort the plugin before other plugins.
    */
-  before?: string[]
+  before?: {
+    /**
+     * List of plugin names that should be sorted after this plugin.
+     */
+    plugins?: string[]
+    /**
+     * Categories of plugins that should be sorted after this plugin.
+     */
+    categories?: Array<PluginCategory>
+  }
 
   meta?: CustomPluginMeta
 }

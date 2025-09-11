@@ -33,6 +33,8 @@ function convertFunctionsToString(obj: Record<string, any> | undefined) {
 export const devtoolsPlugin = definePlugin({
   name: 'rstore-devtools',
 
+  category: 'processing',
+
   meta: {
     builtin: true,
     description: 'Integrate with Nuxt Devtools',

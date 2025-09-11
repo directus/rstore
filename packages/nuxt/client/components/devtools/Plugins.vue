@@ -34,6 +34,7 @@ const filteredPlugins = computed(() => {
         v-for="plugin in filteredPlugins"
         :key="plugin.name"
         :plugin
+        :index="plugins.indexOf(plugin)"
       />
 
       <div class="flex-none h-1" />

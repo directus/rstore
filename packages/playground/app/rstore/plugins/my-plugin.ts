@@ -3,6 +3,16 @@ import { faker } from '@faker-js/faker'
 export default defineRstorePlugin({
   name: 'my-rstore-plugin',
 
+  before: {
+    plugins: ['rstore-plugin-logger'],
+    categories: ['processing'],
+  },
+
+  after: {
+    plugins: ['rstore-plugin-virtual-relations'],
+    categories: ['remote'],
+  },
+
   setup({ addCollectionDefaults, hook }) {
     function parseDate(value: any): Date {
       return typeof value === 'string' ? new Date(value) : value

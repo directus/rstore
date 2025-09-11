@@ -8,6 +8,8 @@ import { filterWhere } from './where'
 export default definePlugin({
   name: 'rstore-drizzle',
 
+  category: 'remote',
+
   // @TODO multi directus instances
   scopeId: 'rstore-drizzle',
 
