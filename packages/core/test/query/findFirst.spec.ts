@@ -320,4 +320,88 @@ describe('findFirst', () => {
       ])
     })
   })
+
+  describe('abort fetchFirst', () => {
+    it('should abort fetchFirst if setResult is called', async () => {
+      const fetchFirstHook1 = vi.fn((payload) => {
+        payload.setResult({ id: '42' })
+      })
+      const fetchFirstHook2 = vi.fn((payload) => {
+        payload.setResult({ id: '43' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook1)
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook2)
+
+      const result = await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: '42',
+      })
+
+      expect(result.result).toEqual({ id: '42' })
+      expect(fetchFirstHook1).toHaveBeenCalled()
+      expect(fetchFirstHook2).not.toHaveBeenCalled()
+    })
+
+    it('should not abort if setResult is not called', async () => {
+      const fetchFirstHook1 = vi.fn()
+      const fetchFirstHook2 = vi.fn((payload) => {
+        payload.setResult({ id: '43' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook1)
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook2)
+
+      const result = await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: '42',
+      })
+
+      expect(result.result).toEqual({ id: '43' })
+      expect(fetchFirstHook1).toHaveBeenCalled()
+      expect(fetchFirstHook2).toHaveBeenCalled()
+    })
+
+    it('should not abort if setResult is called with abort: false', async () => {
+      const fetchFirstHook1 = vi.fn((payload) => {
+        payload.setResult({ id: '42' }, { abort: false })
+      })
+      const fetchFirstHook2 = vi.fn((payload) => {
+        payload.setResult({ id: '43' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook1)
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook2)
+
+      const result = await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: '42',
+      })
+
+      expect(result.result).toEqual({ id: '43' })
+      expect(fetchFirstHook1).toHaveBeenCalled()
+      expect(fetchFirstHook2).toHaveBeenCalled()
+    })
+
+    it('should not abort if result is nil', async () => {
+      const fetchFirstHook1 = vi.fn((payload) => {
+        payload.setResult(null)
+      })
+      const fetchFirstHook2 = vi.fn((payload) => {
+        payload.setResult({ id: '43' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook1)
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook2)
+
+      const result = await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: '42',
+      })
+
+      expect(result.result).toEqual({ id: '43' })
+      expect(fetchFirstHook1).toHaveBeenCalled()
+      expect(fetchFirstHook2).toHaveBeenCalled()
+    })
+  })
 })

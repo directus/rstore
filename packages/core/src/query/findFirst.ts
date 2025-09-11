@@ -96,6 +96,7 @@ async function _findFirst<
       },
     })
 
+    const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('fetchFirst', {
       store,
       meta,
@@ -103,8 +104,11 @@ async function _findFirst<
       key: findOptions.key,
       findOptions,
       getResult: () => result,
-      setResult: (value) => {
+      setResult: (value, options) => {
         result = value
+        if (result && options?.abort !== false) {
+          abort()
+        }
       },
       setMarker: (value) => {
         marker = value

@@ -266,4 +266,109 @@ describe('findMany', () => {
       ])
     })
   })
+
+  describe('abort fetchMany', () => {
+    it('should abort fetchMany if setResult is called', async () => {
+      const fetchManyHook1 = vi.fn((payload) => {
+        payload.setResult([{ id: '42' }])
+      })
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([{ id: '42' }])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).not.toHaveBeenCalled()
+    })
+
+    it('should not abort if setResult is not called', async () => {
+      const fetchManyHook1 = vi.fn()
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([{ id: '43' }])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).toHaveBeenCalled()
+    })
+
+    it('should not abort if setResult is called with abort: false', async () => {
+      const fetchManyHook1 = vi.fn((payload) => {
+        payload.setResult([{ id: '42' }], { abort: false })
+      })
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([{ id: '43' }])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).toHaveBeenCalled()
+    })
+
+    it('should not abort if result is nil', async () => {
+      const fetchManyHook1 = vi.fn((payload) => {
+        payload.setResult(null)
+      })
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([{ id: '43' }])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).toHaveBeenCalled()
+    })
+
+    it('should not abort if result is empty array', async () => {
+      const fetchManyHook1 = vi.fn((payload) => {
+        payload.setResult([])
+      })
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([{ id: '43' }])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).toHaveBeenCalled()
+    })
+  })
 })

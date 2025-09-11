@@ -49,6 +49,16 @@ hook('fetchFirst', (payload) => {
 Markers are used to remember if a query has already been fetched or not where it is not based on the item key. For example, if you have a query that fetches all items with a certain filter, the marker is used to remember if the query has already been fetched or not.
 :::
 
+::: warning Auto-abort remaining callbacks
+If a non-null result is set with `setResult`, the remaining callbacks for this hook will not be called by default. This is useful in case you have multiple plugins that can fetch the same collections (for example, one local and one remote). The first plugin to set a non-null result will abort the remaining callbacks.
+
+You can override this behavior by passing `{ abort: false }` as the second argument to `setResult`.
+
+```ts
+setResult(result, { abort: false })
+```
+:::
+
 Example:
 
 ::: code-group
@@ -109,6 +119,16 @@ hook('fetchMany', (payload) => {
   )
 })
 ```
+
+::: warning Auto-abort remaining callbacks
+If a non-null result is set with `setResult`, the remaining callbacks for this hook will not be called by default. This is useful in case you have multiple plugins that can fetch the same collections (for example, one local and one remote). The first plugin to set a non-null result will abort the remaining callbacks.
+
+You can override this behavior by passing `{ abort: false }` as the second argument to `setResult`.
+
+```ts
+setResult(result, { abort: false })
+```
+:::
 
 Example:
 

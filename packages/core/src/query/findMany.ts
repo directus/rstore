@@ -61,7 +61,7 @@ async function _findMany<
   findOptions = findOptions ?? {}
   const fetchPolicy = store.$getFetchPolicy(findOptions.fetchPolicy)
 
-  let result: any
+  let result: any[] | undefined
   let marker: string | undefined
 
   if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
@@ -91,14 +91,18 @@ async function _findMany<
       },
     })
 
+    const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('fetchMany', {
       store,
       meta,
       collection,
       findOptions,
-      getResult: () => result,
-      setResult: (value) => {
+      getResult: () => result ?? [],
+      setResult: (value, options) => {
         result = value
+        if (result?.length && options?.abort !== false) {
+          abort()
+        }
       },
       setMarker: (value) => {
         marker = value
@@ -121,25 +125,25 @@ async function _findMany<
       for (const item of result) {
         store.$processItemParsing(collection, item)
       }
-    }
 
-    if (fetchPolicy !== 'no-cache') {
-      const items = result
-      const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
-      for (const item of items) {
-        const key = collection.getKey(item)
-        if (!key) {
-          console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
-          continue
+      if (fetchPolicy !== 'no-cache') {
+        const items = result
+        const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
+        for (const item of items) {
+          const key = collection.getKey(item)
+          if (!key) {
+            console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
+            continue
+          }
+          writes.push({ key, value: item })
         }
-        writes.push({ key, value: item })
-      }
-      if (writes.length) {
-        store.$cache.writeItems<TCollection>({
-          collection,
-          items: writes,
-          marker: getMarker('many', marker),
-        })
+        if (writes.length) {
+          store.$cache.writeItems<TCollection>({
+            collection,
+            items: writes,
+            marker: getMarker('many', marker),
+          })
+        }
       }
     }
   }
@@ -160,7 +164,7 @@ async function _findMany<
   }
 
   return {
-    result,
+    result: result ?? [],
     marker,
   }
 }

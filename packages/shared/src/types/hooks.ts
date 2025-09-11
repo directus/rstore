@@ -9,6 +9,14 @@ import type { Awaitable, Path, PathValue } from './utils'
 
 export interface CustomHookMeta {}
 
+export interface AbortableOptions {
+  /**
+   * If true, the remaining hooks in the queue will not be called.
+   * @default true
+   */
+  abort?: boolean
+}
+
 export interface HookDefinitions<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
@@ -62,7 +70,7 @@ export interface HookDefinitions<
       key?: string | number
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
-      setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => void
+      setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>, options?: AbortableOptions) => void
       setMarker: (marker: string) => void
     }
   ) => Awaitable<void>
@@ -110,7 +118,7 @@ export interface HookDefinitions<
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
       getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
-      setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>) => void
+      setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>, options?: AbortableOptions) => void
       setMarker: (marker: string) => void
     }
   ) => Awaitable<void>
