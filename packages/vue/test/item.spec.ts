@@ -40,6 +40,7 @@ describe('wrapItem', () => {
   beforeEach(() => {
     mockCollection = {
       '~resolved': true,
+      'hooks': undefined,
       'name': 'testCollection',
       'getKey': vi.fn(item => item.id),
       'computed': {

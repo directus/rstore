@@ -1,5 +1,6 @@
 import type { Cache, CollectionDefaults, CustomHookMeta, FindOptions, Hooks, MutationSpecialProps, Plugin, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { get, set } from '@rstore/shared'
+import { builtinCollectionHooksPlugin } from './builtin/collectionHooks'
 import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollections } from './collection'
 import { defaultFetchPolicy } from './fetchPolicy'
 import { setupPlugin, sortPlugins } from './plugin'
@@ -26,11 +27,14 @@ export async function createStoreCore<
 
   const collections = resolveCollections(options.schema, options.collectionDefaults)
 
+  const optionPlugins = options.plugins ?? []
+  optionPlugins.unshift(builtinCollectionHooksPlugin)
+
   let store: StoreCore<TSchema, TCollectionDefaults> = {
     $cache: options.cache,
     $collections: collections,
     $collectionDefaults: options.collectionDefaults ?? {} as TCollectionDefaults,
-    $plugins: options.plugins?.map(p => ({ ...p, hooks: {} })) ?? [],
+    $plugins: sortPlugins(optionPlugins.map(p => ({ ...p, hooks: {} }))),
     $hooks: options.hooks,
     $findDefaults: options.findDefaults ?? {},
     $getFetchPolicy(value) {
@@ -97,7 +101,7 @@ export async function createStoreCore<
 
   // Setup plugins
 
-  for (const plugin of sortPlugins(store.$plugins)) {
+  for (const plugin of store.$plugins) {
     await setupPlugin(store, plugin)
   }
 

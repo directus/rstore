@@ -104,6 +104,7 @@ export function resolveCollection<
       update: collection.formSchema?.update ?? emptySchemas.update,
     },
     'scopeId': collection.scopeId,
+    'hooks': collection.hooks,
     'meta': {
       ...defaults?.meta,
       ...collection.meta,

@@ -6,6 +6,7 @@ describe('defaultMarker', () => {
   it('should generate marker with empty findOptions', () => {
     const collection: ResolvedCollection = {
       '~resolved': true,
+      'hooks': undefined,
       'name': 'TestType',
       'computed': {},
       'fields': {},
@@ -21,6 +22,7 @@ describe('defaultMarker', () => {
   it('should generate marker with findOptions', () => {
     const collection: ResolvedCollection = {
       '~resolved': true,
+      'hooks': undefined,
       'name': 'TestType',
       'computed': {},
       'fields': {},
@@ -37,6 +39,7 @@ describe('defaultMarker', () => {
   it('should generate marker with findOptions and non-function filter', () => {
     const collection: ResolvedCollection = {
       '~resolved': true,
+      'hooks': undefined,
       'name': 'TestType',
       'computed': {},
       'fields': {},
@@ -53,6 +56,7 @@ describe('defaultMarker', () => {
   it('should generate marker with findOptions and function filter and params', () => {
     const collection: ResolvedCollection = {
       '~resolved': true,
+      'hooks': undefined,
       'name': 'TestType',
       'computed': {},
       'fields': {},

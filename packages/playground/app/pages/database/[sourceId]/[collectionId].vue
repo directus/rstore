@@ -2,7 +2,8 @@
 const route = useRoute()
 const store = useStore()
 const { data: collection } = await store.DataCollection.query(q => q.first({
-  filter: c => c.id === route.params.collectionId,
+  key: String(route.params.collectionId),
+  fetchPolicy: 'cache-and-fetch',
 }))
 </script>
 

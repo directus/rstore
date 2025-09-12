@@ -88,9 +88,13 @@ export default defineRstorePlugin({
 
             await Promise.all(Object.keys(relation.to).map((collectionName) => {
               const relationData = relation.to[collectionName]!
+              const filters: Array<[string, any]> = []
+              for (const onKey in relationData.on) {
+                filters.push([String(relationData.on[onKey]), wrappedItem[onKey]])
+              }
               return store.$collection(collectionName).findMany({
                 params: {
-                  filter: `${relationData.on}:${wrappedItem[relationData.eq]}`,
+                  filter: filters.map(f => f.join(':')).join(','),
                 },
               })
             }))

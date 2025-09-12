@@ -9,6 +9,16 @@ export const DataSourceCollection = RStoreSchema.withItemType<DataSource>().defi
 
 export const DataCollectionCollection = RStoreSchema.withItemType<DataCollection>().defineCollection({
   name: 'DataCollection',
+  hooks: {
+    fetchFirst: async ({ key, params }) => {
+      // eslint-disable-next-line no-console
+      console.log('[collection hook] Fetching DataCollection with key', key, params)
+      const result = await $fetch(`/api/rest/dataCollections/${key ?? ''}`, {
+        query: params,
+      })
+      return Array.isArray(result) ? result[0] : result
+    },
+  },
   meta: {
     path: 'dataCollections',
   },

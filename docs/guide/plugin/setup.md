@@ -2,6 +2,10 @@
 
 Plugins allow you to extend the functionality of the store. You can create your own plugins or use existing ones. The main use case for plugins is to add support for different data sources, such as REST APIs, GraphQL APIs, or local storage. Plugins can also be used to add support for different data formats, such as JSON, XML, or CSV.
 
+::: info
+In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and other popular standards. Feel free to also share your own plugins with the community! 😸
+:::
+
 ## Defining a plugin
 
 To define a plugin, you can use the `definePlugin` helper to get auto-completion and type checking. The plugin is an object with a `name` and a `setup` function.
@@ -19,6 +23,45 @@ export default definePlugin({
 ```
 
 The `setup` function is called when the plugin is registered. It receives a `pluginApi` object that contains useful methods to customize the store.
+
+### Vue
+
+You can then add plugins to your store when creating it:
+
+```ts{10-12}
+import { createStore } from '@rstore/vue'
+import { todoCollection } from './collection'
+import myPlugin from './plugin'
+
+export async function setupRstore(app) {
+  const store = await createStore({
+    schema: [
+      todoCollection,
+    ],
+    plugins: [
+      myPlugin,
+    ],
+  })
+}
+```
+
+### Nuxt
+
+In Nuxt, you can add plugins by creating a file for each in the `app/rstore/plugins` directory. The plugin will be automatically registered when the store is created.
+
+```
+package.json
+nuxt.config.ts
+app/
+  rstore/
+    some-collection.ts
+    plugins/
+      my-plugin.ts
+```
+
+::: tip Nuxt Layers
+You can also add an `app/rstore` folder in Nuxt layers! rstore will automatically add those files too.
+:::
 
 ## Category
 

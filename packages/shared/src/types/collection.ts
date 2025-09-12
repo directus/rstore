@@ -1,4 +1,5 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
+import type { CollectionHooks } from './collectionHooks'
 import type { WrappedItem } from './item'
 import type { FilterArray, Full, KeysToUnion, Path, PathValue } from './utils'
 
@@ -88,6 +89,11 @@ export interface Collection<
    */
   'scopeId'?: string
 
+  /**
+   * Hooks to fetch or mutate data for this collection.
+   */
+  'hooks'?: CollectionHooks<this>
+
   'meta'?: CustomCollectionMeta
 
   /**
@@ -172,6 +178,7 @@ export interface ResolvedCollection<
   // 'state': () => ResolvedCollectionState<TCollection>
   // // 'global': NonNullable<TCollection['global']>
   // // 'mutations': NonNullable<TCollection['mutations']>
+  'hooks': TCollection['hooks']
   'meta'?: CustomCollectionMeta
   '~item'?: TCollection['~item']
 }

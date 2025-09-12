@@ -1,5 +1,6 @@
 export * from './cache.js'
 export * from './collection.js'
+export * from './collectionHooks.js'
 export * from './form.js'
 export * from './hooks.js'
 export * from './item.js'

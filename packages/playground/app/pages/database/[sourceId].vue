@@ -13,6 +13,7 @@ const { data: source } = await store.DataSource.query(q => q.first({
 
   params: {
     // meow: 'meow',
+    filter: `id:${route.params.sourceId}`,
   },
 
   // meow: 'meow',

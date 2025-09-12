@@ -5,7 +5,7 @@ const search = useLocalStorage('rstore-search-plugins', '')
 const filteredPlugins = computed(() => {
   return plugins.value.filter((plugin) => {
     return plugin.name.toLowerCase().includes(search.value.toLowerCase())
-  }).sort((a, b) => a.name.localeCompare(b.name))
+  })
 })
 </script>
 

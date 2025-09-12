@@ -104,5 +104,45 @@ const cacheCount = computed(() => Object.keys((cache.value as any)[props.item.na
         class="text-xs max-h-90 overflow-auto"
       />
     </div>
+
+    <div v-if="Object.keys(item.hooks ?? {}).length" class="text-xs font-mono border border-default rounded p-2 flex flex-wrap gap-2">
+      <div class="opacity-75 flex items-center gap-1">
+        <UIcon name="lucide:cable" />
+        Hooks
+      </div>
+
+      <template
+        v-for="(fn, name) in item.hooks!"
+        :key="name"
+      >
+        <UPopover
+          v-if="fn"
+          arrow
+        >
+          <template #default="{ open }">
+            <UButton
+              :label="name"
+              color="neutral"
+              variant="outline"
+              size="xs"
+              class="bg-transparent"
+              :class="{
+                'ring ring-green-500': open,
+              }"
+            />
+          </template>
+
+          <template #content>
+            <div class="p-2 max-w-120">
+              <CodeSnippet
+                :code="fn.toString()"
+                lang="js"
+                class="text-xs max-h-70 overflow-auto"
+              />
+            </div>
+          </template>
+        </UPopover>
+      </template>
+    </div>
   </div>
 </template>

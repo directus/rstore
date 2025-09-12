@@ -48,6 +48,14 @@ import { defineCollection } from '@rstore/vue'
 
 export const todoCollection = defineCollection({
   name: 'todos',
+  // Interact with a REST/GraphQL/etc. API
+  hooks: {
+    fetchFirst: ({ key }) => fetch(`/api/todos/${key}`).then(r => r.json()),
+    fetchMany: ({ params }) => fetch('/api/todos').then(r => r.json()),
+    create: ({ item }) => { /* ... */ },
+    update: ({ key, item }) => { /* ... */ },
+    delete: ({ key }) => { /* ... */ },
+  },
 })
 ```
 
@@ -75,6 +83,12 @@ export const schema = [
 ```
 
 :::
+
+::: info
+Instead of defining the hooks in the collection, you can also create a plugin to handle the fetching logic for many collections at once (see [Plugins](./plugin/setup.md)).
+:::
+
+<!--
 
 3. Create a plugin to interact with an API:
 
@@ -154,7 +168,9 @@ export default definePlugin({
 In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and other popular standards. Feel free to also share your own plugins with the community! 😸
 :::
 
-4. Create the store:
+-->
+
+3. Create the store:
 
 ::: code-group
 
@@ -193,7 +209,7 @@ export async function setupRstore(app: App) {
 
 :::
 
-5. Install the store into the app:
+4. Install the store into the app:
 
 ::: code-group
 
@@ -228,7 +244,7 @@ declare module '@rstore/vue' {
 
 :::
 
-6. Add the store to your app:
+5. Add the store to your app:
 
 ```js
 import { setupRstore } from './rstore'
@@ -236,7 +252,7 @@ import { setupRstore } from './rstore'
 app.use(setupRstore)
 ```
 
-7. Use the store in a component:
+6. Use the store in a component:
 
 ```vue
 <script setup>
@@ -285,7 +301,7 @@ export default defineNuxtConfig({
 
 :::
 
-2. Create some Collections in the `rstore` (or `app/rstore`) folder of your Nuxt app:
+2. Create some Collections in the `app/rstore` folder of your Nuxt app:
 
 ::: code-group
 
@@ -293,6 +309,14 @@ export default defineNuxtConfig({
 // One Collection
 export default withItemType<Todo>().defineCollection({
   name: 'todos',
+  // Interact with a REST/GraphQL/etc. API
+  hooks: {
+    fetchFirst: ({ key }) => $fetch(`/api/todos/${key}`),
+    fetchMany: ({ params }) => $fetch('/api/todos', { query: params }),
+    create: ({ item }) => { /* ... */ },
+    update: ({ key, item }) => { /* ... */ },
+    delete: ({ key }) => { /* ... */ },
+  },
 })
 ```
 
@@ -300,10 +324,26 @@ export default withItemType<Todo>().defineCollection({
 // Multiple Collections
 const users = withItemType<User>().defineCollection({
   name: 'users',
+  // Interact with a REST/GraphQL/etc. API
+  hooks: {
+    fetchFirst: ({ key }) => $fetch(`/api/users/${key}`),
+    fetchMany: ({ params }) => $fetch('/api/users', { query: params }),
+    create: ({ item }) => { /* ... */ },
+    update: ({ key, item }) => { /* ... */ },
+    delete: ({ key }) => { /* ... */ },
+  },
 })
 
 const bots = withItemType<Bot>().defineCollection({
   name: 'bots',
+  // Interact with a REST/GraphQL/etc. API
+  hooks: {
+    fetchFirst: ({ key }) => $fetch(`/api/bots/${key}`),
+    fetchMany: ({ params }) => $fetch('/api/bots', { query: params }),
+    create: ({ item }) => { /* ... */ },
+    update: ({ key, item }) => { /* ... */ },
+    delete: ({ key }) => { /* ... */ },
+  },
 })
 ```
 
@@ -335,6 +375,16 @@ export interface Bot {
 ::: warning FILE SCANNING
 The rstore module will only scan exports in files in the `rstore` folder and not in nested folders. If you want to split the collections in multiple folders, you need to re-export each variables or use Nuxt layers (recommended).
 :::
+
+::: info
+Instead of defining the hooks in the collection, you can also create a plugin to handle the fetching logic for many collections at once (see [Plugins](./plugin/setup.md)).
+:::
+
+::: tip Nuxt Layers
+You can also add an `app/rstore` folder in Nuxt layers! rstore will automatically add those files too.
+:::
+
+<!--
 
 3. Create a plugin to interact with an API in the `rstore/plugins` folder:
 
@@ -404,7 +454,9 @@ export default defineRstorePlugin({
 In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and other popular standards. Feel free to also share your own plugins with the community! 😸
 :::
 
-4. Use the store in a component:
+-->
+
+3. Use the store in a component:
 
 ```vue
 <script setup>

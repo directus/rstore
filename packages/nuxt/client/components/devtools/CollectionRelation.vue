@@ -6,10 +6,6 @@ defineProps<{
   relationName: string
   relation: CollectionRelation
 }>()
-
-function stripCollectionName(name: string, collectionName: string) {
-  return name.replace(new RegExp(`^${collectionName}\\.`), '')
-}
 </script>
 
 <template>
@@ -39,7 +35,7 @@ function stripCollectionName(name: string, collectionName: string) {
         </div>
 
         <div
-          v-for="([key, value], index) in Object.entries<string>(info.on)"
+          v-for="([key, value], index) in Object.entries<string>(info.on as Record<string, string>)"
           :key
         >
           <span v-if="index > 0" class="opacity-50 mr-2">&amp;</span>
@@ -48,7 +44,7 @@ function stripCollectionName(name: string, collectionName: string) {
           </span>
           <span class="opacity-50">.</span>
           <span class="text-purple-500">
-            {{ stripCollectionName(key, targetCollection) }}
+            {{ key }}
           </span>
           <span class="opacity-50 mx-1">=</span>
           <span class="text-blue-500">
@@ -56,7 +52,7 @@ function stripCollectionName(name: string, collectionName: string) {
           </span>
           <span class="opacity-50">.</span>
           <span class="text-blue-500">
-            {{ stripCollectionName(value, collection.name) }}
+            {{ value }}
           </span>
         </div>
 

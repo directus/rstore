@@ -29,7 +29,7 @@ describe('createStoreCore', () => {
     expect(store.$cache).toBe(options.cache)
     expect(store.$collections).toBeDefined()
     expect(store.$collectionDefaults).toEqual({})
-    expect(store.$plugins).toEqual([])
+    expect(store.$plugins.filter(p => !p.meta?.builtin)).toEqual([])
     expect(store.$hooks).toBe(options.hooks)
     expect(store.$findDefaults).toEqual({})
   })
