@@ -271,8 +271,8 @@ const { data: todos } = store.todos.query(q => q.many())
 ## Nuxt
 
 The Nuxt module will automatically:
-- scan the `rstore` folder in your Nuxt app for collections,
-- scan the `rstore/plugins` folder and register plugins (using `export default`),
+- scan the `app/rstore` folder in your Nuxt app for collections,
+- scan the `app/rstore/plugins` folder and register plugins (using `export default`),
 - create the store
 - handle SSR payload
 - expose the `useStore` composable typed according to the collection (from the `rstore` folder).
