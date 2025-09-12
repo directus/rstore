@@ -248,7 +248,7 @@ export interface HookDefinitions<
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
-      setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => void
+      setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>, options?: AbortableOptions) => void
       /**
        * Don't call the remaining hooks in the queue.
        */
@@ -269,7 +269,7 @@ export interface HookDefinitions<
       key: string | number
       item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
-      setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => void
+      setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>, options?: AbortableOptions) => void
       /**
        * Don't call the remaining hooks in the queue.
        */

@@ -142,6 +142,47 @@ describe('updateItem', () => {
     expect(payloadItem).toEqual({ text: 'test', serialized: true })
   })
 
+  it('should auto abort when calling setResult with a non-nullish value', async () => {
+    const hook1 = vi.fn(({ setResult }) => setResult({}))
+    const hook2 = vi.fn()
+    mockStore.$hooks.hook('updateItem', hook1)
+    mockStore.$hooks.hook('updateItem', hook2)
+    mockCollection.getKey = vi.fn(() => '1')
+
+    await updateItem(options)
+
+    expect(hook1).toHaveBeenCalled()
+    expect(hook2).not.toHaveBeenCalled()
+  })
+
+  it('should not auto abort when calling setResult with a non-nullish value and options.abort is false', async () => {
+    const hook1 = vi.fn(({ setResult }) => setResult({}, { abort: false }))
+    const hook2 = vi.fn(({ setResult }) => setResult({ id: '2' } as any))
+    mockStore.$hooks.hook('updateItem', hook1)
+    mockStore.$hooks.hook('updateItem', hook2)
+    mockCollection.getKey = vi.fn(() => '2')
+
+    const result = await updateItem(options)
+
+    expect(hook1).toHaveBeenCalled()
+    expect(hook2).toHaveBeenCalled()
+    expect(result).toEqual({ id: '2' })
+  })
+
+  it('should not auto abort when calling setResult with a nullish value', async () => {
+    const hook1 = vi.fn(({ setResult }) => setResult(null))
+    const hook2 = vi.fn(({ setResult }) => setResult({ id: '2' } as any))
+    mockStore.$hooks.hook('updateItem', hook1)
+    mockStore.$hooks.hook('updateItem', hook2)
+    mockCollection.getKey = vi.fn(() => '2')
+
+    const result = await updateItem(options)
+
+    expect(hook1).toHaveBeenCalled()
+    expect(hook2).toHaveBeenCalled()
+    expect(result).toEqual({ id: '2' })
+  })
+
   it('should abort when calling abort()', async () => {
     const hook1 = vi.fn(({ abort, setResult }) => {
       setResult({})

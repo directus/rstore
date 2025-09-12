@@ -171,6 +171,16 @@ hook('createItem', (payload) => {
 })
 ```
 
+::: warning Auto-abort remaining callbacks
+If a non-null result is set with `setResult`, the remaining callbacks for this hook will not be called by default. This is useful in case you have multiple plugins that can fetch the same collections (for example, one local and one remote). The first plugin to set a non-null result will abort the remaining callbacks.
+
+You can override this behavior by passing `{ abort: false }` as the second argument to `setResult`.
+
+```ts
+setResult(result, { abort: false })
+```
+:::
+
 Example:
 
 ::: code-group
@@ -217,6 +227,16 @@ hook('updateItem', (payload) => {
   )
 })
 ```
+
+::: warning Auto-abort remaining callbacks
+If a non-null result is set with `setResult`, the remaining callbacks for this hook will not be called by default. This is useful in case you have multiple plugins that can fetch the same collections (for example, one local and one remote). The first plugin to set a non-null result will abort the remaining callbacks.
+
+You can override this behavior by passing `{ abort: false }` as the second argument to `setResult`.
+
+```ts
+setResult(result, { abort: false })
+```
+:::
 
 Example:
 
@@ -287,10 +307,9 @@ hook('deleteItem', async (payload) => {
 If you have multiple plugins that can handle the same collections, you can abort the remaining callbacks for a *Data handling* hook by calling `abort()` on the payload.
 
 ```ts
-hook('createItem', (payload) => {
+hook('deleteItem', (payload) => {
   if (payload.collection.name === 'MyCollection') {
-    // Handle the creation of the item
-    payload.setResult(createdItem)
+    // ...
 
     // Abort the remaining callbacks for this hook
     payload.abort()
@@ -299,7 +318,7 @@ hook('createItem', (payload) => {
 ```
 
 ::: info
-For `fetchFirst` and `fetchMany`, the remaining callbacks are automatically aborted when a non-null result is set with `setResult`. You can override this behavior by passing `{ abort: false }` as the second argument to `setResult`.
+For `fetchFirst`, `fetchMany`, `createItem` and `updateItem`, the remaining callbacks are automatically aborted when a non-null result is set with `setResult`. You can override this behavior by passing `{ abort: false }` as the second argument to `setResult`.
 :::
 
 ## Fetching relations

@@ -109,8 +109,11 @@ export async function updateItem<
       key,
       item,
       getResult: () => result ?? undefined,
-      setResult: (newResult) => {
+      setResult: (newResult, options) => {
         result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+        if (result && options?.abort !== false) {
+          abort()
+        }
       },
       abort,
     })

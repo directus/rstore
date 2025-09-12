@@ -85,8 +85,11 @@ export async function createItem<
       collection,
       item,
       getResult: () => result,
-      setResult: (newResult) => {
+      setResult: (newResult, options) => {
         result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+        if (result && options?.abort !== false) {
+          abort()
+        }
       },
       abort,
     })
