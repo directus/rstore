@@ -1,6 +1,109 @@
 # Changelog
 
 
+## v0.7.0
+
+[compare changes](https://github.com/directus/rstore/compare/v0.6.18...v0.7.0)
+
+### 🚀 Enhancements
+
+- New schema and relation declarations ([844635b](https://github.com/directus/rstore/commit/844635b))
+- **devtools:** New cache tab ([5be73c2](https://github.com/directus/rstore/commit/5be73c2))
+- New query API ([04c4e34](https://github.com/directus/rstore/commit/04c4e34))
+- **cache:** ReadItems new limit option ([bc7d1fa](https://github.com/directus/rstore/commit/bc7d1fa))
+- Experimental garbage collection ([a119680](https://github.com/directus/rstore/commit/a119680))
+- **devtools:** Auto update cache ([e7326da](https://github.com/directus/rstore/commit/e7326da))
+- Cache layers ([43519e0](https://github.com/directus/rstore/commit/43519e0))
+- Optimistic updates ([04a5c63](https://github.com/directus/rstore/commit/04a5c63))
+- **devtools:** Gc + cache layer events in history ([9a1ccef](https://github.com/directus/rstore/commit/9a1ccef))
+- UseStore + new setup docs ([cbd97d6](https://github.com/directus/rstore/commit/cbd97d6))
+- New module API ([07c2c9c](https://github.com/directus/rstore/commit/07c2c9c))
+- SetActiveStore for tests ([d32cc67](https://github.com/directus/rstore/commit/d32cc67))
+- **nuxt-drizzle:** Remove deprecated option drizzleImport.default ([2e737ba](https://github.com/directus/rstore/commit/2e737ba))
+- **nuxt-drizzle:** Drizzle hooks ([c7cb660](https://github.com/directus/rstore/commit/c7cb660))
+- **nuxt-drizzle:** Adapt to new relations syntax ([f2a5088](https://github.com/directus/rstore/commit/f2a5088))
+- **nuxt-drizzle:** Use new define model syntax ([3edb432](https://github.com/directus/rstore/commit/3edb432))
+- Use nuxt module dependencies ([9be4ab5](https://github.com/directus/rstore/commit/9be4ab5))
+- **nuxt:** Simpler schema syntax with export const ([b6aa3fa](https://github.com/directus/rstore/commit/b6aa3fa))
+- **nuxt-drizzle:** HooksForTable ([6e9f3d0](https://github.com/directus/rstore/commit/6e9f3d0))
+- **nuxt-drizzle:** AllowTables ([c8361d3](https://github.com/directus/rstore/commit/c8361d3))
+- Sort plugins ([b727f31](https://github.com/directus/rstore/commit/b727f31))
+- **plugin:** Auto abort fetchFirst & fetchMany ([7ce07ae](https://github.com/directus/rstore/commit/7ce07ae))
+- **plugin:** Category ([ec1a41b](https://github.com/directus/rstore/commit/ec1a41b))
+- Collection hooks ([c6824b1](https://github.com/directus/rstore/commit/c6824b1))
+- **module:** $loading, $error, $time no longer Refs ([d98f1c2](https://github.com/directus/rstore/commit/d98f1c2))
+- **plugin:** Abort API ([541d41d](https://github.com/directus/rstore/commit/541d41d))
+- **plugin:** Abort API for fetchRelations ([b72474a](https://github.com/directus/rstore/commit/b72474a))
+- **plugin:** Auto abort createItem and updateItem ([0d8218a](https://github.com/directus/rstore/commit/0d8218a))
+
+### 🔥 Performance
+
+- Faster relation lookup ([#44](https://github.com/directus/rstore/pull/44))
+- Normalize relations eagerly ([1a25f54](https://github.com/directus/rstore/commit/1a25f54))
+
+### 🩹 Fixes
+
+- **devtools:** Cache model item height ([12b5ee9](https://github.com/directus/rstore/commit/12b5ee9))
+- Disallow excess properties in withItemType().defineModel() ([c7c2f1f](https://github.com/directus/rstore/commit/c7c2f1f))
+- Always wrap items out of find methods ([f7cc489](https://github.com/directus/rstore/commit/f7cc489))
+- Store.$getModel should use `item.$model` ([2383304](https://github.com/directus/rstore/commit/2383304))
+- **devtools:** Automatically update cache filtering ([52c6da2](https://github.com/directus/rstore/commit/52c6da2))
+- **devtools:** Sort models ([a50c7de](https://github.com/directus/rstore/commit/a50c7de))
+- Clone properties for mutations ([c1d614d](https://github.com/directus/rstore/commit/c1d614d))
+- Optimistic updates using serialized item ([8f21f2f](https://github.com/directus/rstore/commit/8f21f2f))
+- Don't always clone properties in pickNonSpecialProps ([86ceeff](https://github.com/directus/rstore/commit/86ceeff))
+- **devtools:** Cache model item height ([276b3c5](https://github.com/directus/rstore/commit/276b3c5))
+- Lower minimum dep version of @nuxt/kit ([8503aa5](https://github.com/directus/rstore/commit/8503aa5))
+- **nuxt-drizzle:** Missing getQuery import ([39d613e](https://github.com/directus/rstore/commit/39d613e))
+- **nuxt-drizzle:** Where.push is not a function ([be74a82](https://github.com/directus/rstore/commit/be74a82))
+
+### 💅 Refactors
+
+- Rename model to collection ([00b661d](https://github.com/directus/rstore/commit/00b661d))
+
+### 📖 Documentation
+
+- Typo ([#49](https://github.com/directus/rstore/pull/49))
+- Layers ([65a7cc1](https://github.com/directus/rstore/commit/65a7cc1))
+- Not about modules and code splitting ([418121c](https://github.com/directus/rstore/commit/418121c))
+- Typo ([#50](https://github.com/directus/rstore/pull/50))
+- Note about plugin change ([111f327](https://github.com/directus/rstore/commit/111f327))
+- Not about StoreResolvedCollectionItem in migration ([4243cdf](https://github.com/directus/rstore/commit/4243cdf))
+- Typo in migration guide ([9680a3a](https://github.com/directus/rstore/commit/9680a3a))
+- Update Nuxt multiple models ([5e32f67](https://github.com/directus/rstore/commit/5e32f67))
+- **nuxt-drizzle:** Features ([9db2c81](https://github.com/directus/rstore/commit/9db2c81))
+- Code diff in `vue` code snippets ([e128a72](https://github.com/directus/rstore/commit/e128a72))
+
+### 🌊 Types
+
+- Improvements and cleanup ([c37c460](https://github.com/directus/rstore/commit/c37c460))
+- Recursively typed `FindOptions.include` ([c64eb91](https://github.com/directus/rstore/commit/c64eb91))
+- **form:** CreateFormObject submit type can now be different ([f4d8821](https://github.com/directus/rstore/commit/f4d8821))
+- Fix query many without params + augment find options docs ([8c79bc4](https://github.com/directus/rstore/commit/8c79bc4))
+- Improvements, stricter types and more checking ([c29dafe](https://github.com/directus/rstore/commit/c29dafe))
+
+### 🏡 Chore
+
+- Move typescript to catalog ([82308bb](https://github.com/directus/rstore/commit/82308bb))
+- Update nuxt ([2e70a6e](https://github.com/directus/rstore/commit/2e70a6e))
+- Use ??= ([025ad34](https://github.com/directus/rstore/commit/025ad34))
+
+### ✅ Tests
+
+- **ci:** Run ci on all PRs ([571f7cd](https://github.com/directus/rstore/commit/571f7cd))
+- **ci:** Run on all branches ([8061cc6](https://github.com/directus/rstore/commit/8061cc6))
+- More gc tests ([df93feb](https://github.com/directus/rstore/commit/df93feb))
+
+### 🤖 CI
+
+- Fix build ([d38bb9d](https://github.com/directus/rstore/commit/d38bb9d))
+- Don't use catalog: in deps ([f9ff9d5](https://github.com/directus/rstore/commit/f9ff9d5))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+- ナイトウコウスケ ([@naitokosuke](http://github.com/naitokosuke))
+
 ## v0.6.18
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.17...v0.6.18)
