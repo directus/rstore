@@ -282,6 +282,26 @@ hook('deleteItem', async (payload) => {
 ```
 :::
 
+### Aborting
+
+If you have multiple plugins that can handle the same collections, you can abort the remaining callbacks for a *Data handling* hook by calling `abort()` on the payload.
+
+```ts
+hook('createItem', (payload) => {
+  if (payload.collection.name === 'MyCollection') {
+    // Handle the creation of the item
+    payload.setResult(createdItem)
+
+    // Abort the remaining callbacks for this hook
+    payload.abort()
+  }
+})
+```
+
+::: info
+For `fetchFirst` and `fetchMany`, the remaining callbacks are automatically aborted when a non-null result is set with `setResult`. You can override this behavior by passing `{ abort: false }` as the second argument to `setResult`.
+:::
+
 ## Fetching relations
 
 Learn more about setting up relations [here](../schema/relations.md) and how to query them [here](../data/query.md#fetching-relations).

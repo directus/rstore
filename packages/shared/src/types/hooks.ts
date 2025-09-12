@@ -72,6 +72,10 @@ export interface HookDefinitions<
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
       setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined, options?: AbortableOptions) => void
       setMarker: (marker: string) => void
+      /**
+       * Don't call the remaining hooks in the queue.
+       */
+      abort: () => void
     }
   ) => Awaitable<void>
 
@@ -120,6 +124,10 @@ export interface HookDefinitions<
       getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>, options?: AbortableOptions) => void
       setMarker: (marker: string) => void
+      /**
+       * Don't call the remaining hooks in the queue.
+       */
+      abort: () => void
     }
   ) => Awaitable<void>
 
@@ -237,6 +245,10 @@ export interface HookDefinitions<
       item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
       setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => void
+      /**
+       * Don't call the remaining hooks in the queue.
+       */
+      abort: () => void
     }
   ) => Awaitable<void>
 
@@ -254,6 +266,10 @@ export interface HookDefinitions<
       item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
       setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => void
+      /**
+       * Don't call the remaining hooks in the queue.
+       */
+      abort: () => void
     }
   ) => Awaitable<void>
 
@@ -268,6 +284,10 @@ export interface HookDefinitions<
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key: string | number
+      /**
+       * Don't call the remaining hooks in the queue.
+       */
+      abort: () => void
     }
   ) => Awaitable<void>
 

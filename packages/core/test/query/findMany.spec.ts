@@ -370,5 +370,26 @@ describe('findMany', () => {
       expect(fetchManyHook1).toHaveBeenCalled()
       expect(fetchManyHook2).toHaveBeenCalled()
     })
+
+    it('should abort when calling abort()', async () => {
+      const fetchManyHook1 = vi.fn((payload) => {
+        payload.abort()
+      })
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).not.toHaveBeenCalled()
+    })
   })
 })

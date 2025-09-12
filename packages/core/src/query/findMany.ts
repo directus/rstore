@@ -107,6 +107,7 @@ async function _findMany<
       setMarker: (value) => {
         marker = value
       },
+      abort,
     })
 
     await store.$hooks.callHook('afterFetch', {

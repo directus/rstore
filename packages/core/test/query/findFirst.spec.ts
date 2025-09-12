@@ -403,5 +403,26 @@ describe('findFirst', () => {
       expect(fetchFirstHook1).toHaveBeenCalled()
       expect(fetchFirstHook2).toHaveBeenCalled()
     })
+
+    it('should abort when calling abort()', async () => {
+      const fetchFirstHook1 = vi.fn((payload) => {
+        payload.abort()
+      })
+      const fetchFirstHook2 = vi.fn((payload) => {
+        payload.setResult({ id: '43' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook1)
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook2)
+
+      const result = await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: '42',
+      })
+
+      expect(result.result).toBeNull()
+      expect(fetchFirstHook1).toHaveBeenCalled()
+      expect(fetchFirstHook2).not.toHaveBeenCalled()
+    })
   })
 })

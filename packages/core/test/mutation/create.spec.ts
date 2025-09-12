@@ -112,4 +112,24 @@ describe('createItem', () => {
     expect(processItemSerializationPayloadItem).toEqual({ text: 'test' })
     expect(payloadItem).toEqual({ text: 'test', serialized: true })
   })
+
+  it('should abort when calling abort()', async () => {
+    const resultItem = { id: '1' } as unknown as ResolvedCollectionItem<Collection, CollectionDefaults, StoreSchema>
+    const hook1 = vi.fn(({ setResult, abort }) => {
+      setResult(resultItem)
+      abort()
+    })
+    const hook2 = vi.fn(({ setResult }) => {
+      setResult({ id: '2' } as any)
+    })
+    mockStore.$hooks.hook('createItem', hook1)
+    mockStore.$hooks.hook('createItem', hook2)
+    mockCollection.getKey = vi.fn(() => '1')
+
+    const result = await createItem(options)
+
+    expect(result).toEqual(resultItem)
+    expect(hook1).toHaveBeenCalled()
+    expect(hook2).not.toHaveBeenCalled()
+  })
 })

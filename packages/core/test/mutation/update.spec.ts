@@ -141,4 +141,20 @@ describe('updateItem', () => {
     expect(processItemSerializationPayloadItem).toEqual({ text: 'test' })
     expect(payloadItem).toEqual({ text: 'test', serialized: true })
   })
+
+  it('should abort when calling abort()', async () => {
+    const hook1 = vi.fn(({ abort, setResult }) => {
+      setResult({})
+      abort()
+    })
+    const hook2 = vi.fn()
+    mockStore.$hooks.hook('updateItem', hook1)
+    mockStore.$hooks.hook('updateItem', hook2)
+    mockCollection.getKey = vi.fn(() => '1')
+
+    await updateItem(options)
+
+    expect(hook1).toHaveBeenCalled()
+    expect(hook2).not.toHaveBeenCalled()
+  })
 })

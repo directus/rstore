@@ -79,4 +79,22 @@ describe('deleteItem', () => {
       key: mockKey,
     })
   })
+
+  it('should abort when calling abort()', async () => {
+    const hook1 = vi.fn(({ abort }) => {
+      abort()
+    })
+    const hook2 = vi.fn()
+    mockStore.$hooks.hook('deleteItem', hook1)
+    mockStore.$hooks.hook('deleteItem', hook2)
+
+    await deleteItem({
+      store: mockStore,
+      collection: mockCollection,
+      key: mockKey,
+    })
+
+    expect(hook1).toHaveBeenCalled()
+    expect(hook2).not.toHaveBeenCalled()
+  })
 })

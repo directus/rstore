@@ -101,6 +101,7 @@ export async function updateItem<
   }
 
   try {
+    const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('updateItem', {
       store,
       meta,
@@ -111,6 +112,7 @@ export async function updateItem<
       setResult: (newResult) => {
         result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
       },
+      abort,
     })
 
     await store.$hooks.callHook('afterMutation', {

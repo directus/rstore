@@ -113,6 +113,7 @@ async function _findFirst<
       setMarker: (value) => {
         marker = value
       },
+      abort,
     })
 
     await store.$hooks.callHook('afterFetch', {

@@ -59,11 +59,13 @@ export async function deleteItem<
   }
 
   try {
+    const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('deleteItem', {
       store,
       meta,
       collection,
       key,
+      abort,
     })
 
     await store.$hooks.callHook('afterMutation', {
