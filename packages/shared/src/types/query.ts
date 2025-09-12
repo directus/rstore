@@ -1,30 +1,30 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { Model, ModelDefaults, ModelList, ResolvedModelItem } from './model'
+import type { Collection, CollectionByName, CollectionDefaults, CollectionRelation, RelationsByName, ResolvedCollectionItem, StoreSchema } from './collection'
 
 export interface CustomParams<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 > {}
 
 export interface CustomFilterOption<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 > {}
 
 export interface CustomSortOption<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 > {}
 
 export interface FindOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> extends FindOptionsBase<TModel, TModelDefaults, TModelList> {}
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> extends FindOptionsBase<TCollection, TCollectionDefaults, TSchema> {}
 
 /**
  * Fetch policy for the query.
@@ -42,29 +42,61 @@ export interface FindOptions<
  */
 export type FetchPolicy = 'cache-first' | 'cache-and-fetch' | 'fetch-only' | 'cache-only' | 'no-cache'
 
+export type FindOptionsInclude<
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> = {
+  [K in keyof TCollection['relations']]?:
+  K extends string
+    ? TCollection['relations'] extends Record<string, infer TRelation extends CollectionRelation>
+      ? TRelation['to'] extends Record<infer TTargetCollectionName extends string, any>
+        ? CollectionByName<TSchema, TTargetCollectionName> extends infer TTargetCollection extends Collection
+          ? FindOptionsIncludeItem<TTargetCollection, TCollectionDefaults, TSchema>
+          : never
+        : never
+      : never
+    : never
+} & {
+  [K in keyof NonNullable<RelationsByName<TSchema, TCollection['name']>>]?:
+  K extends string
+    ? NonNullable<RelationsByName<TSchema, TCollection['name']>>[K] extends infer TRelation extends CollectionRelation
+      ? TRelation['to'] extends Record<string, infer TTargetCollectionData extends {
+        '~collection': Collection
+      }>
+        ? FindOptionsIncludeItem<TTargetCollectionData['~collection'], TCollectionDefaults, TSchema>
+        : never
+      : never
+    : never
+}
+
+export type FindOptionsIncludeItem<
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> = boolean | FindOptionsInclude<TCollection, TCollectionDefaults, TSchema>
+
 export interface FindOptionsBase<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 > {
   /**
    * Parameters sent to the adapter plugins. Usually used for filtering and sorting the data in the backend.
    */
-  params?: CustomParams<TModel, TModelDefaults, TModelList>
+  params?: CustomParams<TCollection, TCollectionDefaults, TSchema>
   /**
    * Filter the item.
    */
-  filter?: ((item: ResolvedModelItem<TModel, TModelDefaults, TModelList>) => boolean) | CustomFilterOption<TModel, TModelDefaults, TModelList>
+  filter?: ((item: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>) => boolean) | CustomFilterOption<TCollection, TCollectionDefaults, TSchema>
   /**
    * Sort the items.
    */
-  sort?: ((a: ResolvedModelItem<TModel, TModelDefaults, TModelList>, b: ResolvedModelItem<TModel, TModelDefaults, TModelList>) => number) | CustomSortOption<TModel, TModelDefaults, TModelList>
+  sort?: ((a: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>, b: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>) => number) | CustomSortOption<TCollection, TCollectionDefaults, TSchema>
   /**
    * Include the related items.
    */
-  include?: {
-    [TKey in keyof TModel['relations']]?: boolean
-  }
+  include?: FindOptionsInclude<TCollection, TCollectionDefaults, TSchema>
   /**
    * Fetch policy for the query.
    *
@@ -94,13 +126,25 @@ export interface FindOptionsBase<
    * Enable or disable the query.
    */
   enabled?: boolean
+
+  /**
+   * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
+   */
+  experimentalGarbageCollection?: boolean
+
+  /**
+   * Experimental: Filter out dirty items from the results.
+   *
+   * Items are marked as dirty when they are not returned by a query.
+   */
+  experimentalFilterDirty?: boolean
 }
 
 export type FindFirstOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = FindOptions<TModel, TModelDefaults, TModelList> & {
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> = FindOptions<TCollection, TCollectionDefaults, TSchema> & {
   /**
    * Key of the item. Usually used for fetching the item by its key (e.g. ID).
    */
@@ -108,10 +152,10 @@ export type FindFirstOptions<
 }
 
 export type FindManyOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = FindOptions<TModel, TModelDefaults, TModelList>
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> = FindOptions<TCollection, TCollectionDefaults, TSchema>
 
 export interface QueryResult<TResult> {
   result: TResult

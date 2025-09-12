@@ -14,12 +14,13 @@ export {
 
 export {
   install as RstorePlugin,
+  useStore,
 } from './plugin'
 
 export {
-  addModel,
+  addCollection,
   createStore,
-  removeModel,
+  removeCollection,
 } from './store'
 
 export type {
@@ -27,23 +28,26 @@ export type {
 } from './store'
 
 export {
-  createModule,
-  defineDataModel,
-  defineItemType,
+  addCollectionRelations,
+  defineCollection,
   definePlugin,
+  defineRelations,
+  withItemType,
 } from '@rstore/core'
 
 export type {
+  Collection,
+  CollectionDefaults,
   CustomCacheState,
+  CustomCollectionMeta,
   CustomFilterOption,
   CustomHookMeta,
-  CustomModelMeta,
   CustomParams,
   CustomPluginMeta,
   CustomSortOption,
+  FindFirstOptions,
+  FindManyOptions,
   FindOptions,
-  Model,
-  ModelDefaults,
-  ModelList,
   Module,
+  StoreSchema,
 } from '@rstore/shared'

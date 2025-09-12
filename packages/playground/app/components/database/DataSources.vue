@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 const store = useStore()
-const { data: sources } = await store.DataSource.queryMany()
+const { data: sources } = await store.DataSource.query(q => q.many())
 </script>
 
 <template>

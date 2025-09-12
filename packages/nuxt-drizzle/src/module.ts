@@ -1,11 +1,11 @@
-import type { CustomModelMeta, Model, ModelRelation } from '@rstore/shared'
+import type { Collection, CollectionRelation, CustomCollectionMeta } from '@rstore/shared'
 import type { Config as DrizzleKitConfig } from 'drizzle-kit'
 import type { getTableConfig as mysqlGetTableConfig } from 'drizzle-orm/mysql-core'
 import type { getTableConfig as pgGetTableConfig } from 'drizzle-orm/pg-core'
 import type { getTableConfig as singleStoreGetTableConfig } from 'drizzle-orm/singlestore-core'
 import type { getTableConfig as sqliteGetTableConfig } from 'drizzle-orm/sqlite-core'
 import fs from 'node:fs'
-import { addImportsDir, addServerHandler, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule, updateTemplates, useLogger } from '@nuxt/kit'
+import { addImportsDir, addServerHandler, addServerImports, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule, updateTemplates, useLogger } from '@nuxt/kit'
 import { createTableRelationsHelpers, getTableName, is, isTable, Many, One, Relations, type Table, type TableConfig } from 'drizzle-orm'
 import { createJiti } from 'jiti'
 import path from 'pathe'
@@ -26,11 +26,6 @@ export interface ModuleOptions {
   drizzleImport?: {
     name: string
     from: string
-
-    /**
-     * @deprecated
-     */
-    default: { name: string, from: string }
   }
 
   /**
@@ -74,30 +69,35 @@ export default defineNuxtModule<ModuleOptions>({
     // Add files to nuxt app
     addServerHandler({
       handler: resolve('./runtime/server/api/index.get'),
-      route: `${apiPath}/:model`,
+      route: `${apiPath}/:collection`,
       method: 'get',
     })
     addServerHandler({
       handler: resolve('./runtime/server/api/index.post'),
-      route: `${apiPath}/:model`,
+      route: `${apiPath}/:collection`,
       method: 'post',
     })
     addServerHandler({
       handler: resolve('./runtime/server/api/[key]/index.get'),
-      route: `${apiPath}/:model/:key`,
+      route: `${apiPath}/:collection/:key`,
       method: 'get',
     })
     addServerHandler({
       handler: resolve('./runtime/server/api/[key]/index.patch'),
-      route: `${apiPath}/:model/:key`,
+      route: `${apiPath}/:collection/:key`,
       method: 'patch',
     })
     addServerHandler({
       handler: resolve('./runtime/server/api/[key]/index.delete'),
-      route: `${apiPath}/:model/:key`,
+      route: `${apiPath}/:collection/:key`,
       method: 'delete',
     })
     addImportsDir(resolve('./runtime/utils'))
+    addServerImports([
+      'rstoreDrizzleHooks',
+      'hooksForTable',
+      'allowTables',
+    ].map(name => ({ from: resolve('./runtime/server/utils/hooks'), name })))
 
     const jiti = createJiti(import.meta.url, {
       moduleCache: false,
@@ -134,11 +134,11 @@ export default defineNuxtModule<ModuleOptions>({
       }
     }
 
-    const getModelsFromDrizzleSchema = useDedupePromise(async () => {
+    const getCollectionsFromDrizzleSchema = useDedupePromise(async () => {
       const schema = { ...(await jiti.import(drizzleSchemaPath)) as any }
 
-      const models: Model[] = []
-      const modelsByTable = new WeakMap<Table, Model>()
+      const collections: Collection[] = []
+      const collectionsByTable = new WeakMap<Table, Collection>()
 
       const tables: Array<{ key: string, table: Table, tableName: string, config: AllTableConfig | undefined }> = []
       const relationsList: Array<Relations> = []
@@ -194,37 +194,39 @@ export default defineNuxtModule<ModuleOptions>({
       }
 
       for (const { key, table, tableName, config } of tables) {
-        const model: Model = {
-          name: key,
-          scopeId: 'rstore-drizzle',
-          meta: {
+        const collection: Collection = {
+          '~type': 'collection',
+          'name': key,
+          'scopeId': 'rstore-drizzle',
+          'meta': {
             table: tableName,
             primaryKeys: config?.primaryKeys?.length ? config.primaryKeys[0]!.columns.map(col => getColumnKey(table, col)) : config?.columns?.filter(col => col.primary).map(col => getColumnKey(table, col)) ?? [],
           },
         }
-        models.push(model)
-        modelsByTable.set(table, model)
+        collections.push(collection)
+        collectionsByTable.set(table, collection)
       }
 
       const explicitOneRelations: Array<One> = []
-      const implicitOneRelations: Array<{ model: Model, key: string, relation: One }> = []
-      const implicitManyRelations: Array<{ model: Model, key: string, relation: Many<string> }> = []
+      const implicitOneRelations: Array<{ collection: Collection, key: string, relation: One }> = []
+      const implicitManyRelations: Array<{ collection: Collection, key: string, relation: Many<string> }> = []
 
       for (const relations of relationsList) {
-        const model = modelsByTable.get(relations.table)
-        if (!model) {
-          throw new Error(`Model not found for table ${relations.table}`)
+        const collection = collectionsByTable.get(relations.table)
+        if (!collection) {
+          throw new Error(`Collection not found for table ${relations.table}`)
         }
 
         const config = relations.config(createTableRelationsHelpers(relations.table))
 
+        // Explicit "to one" relations
         for (const key in config) {
           const relation = config[key]
           if (is(relation, One)) {
             if (relation.config) {
               const fields = relation.config.fields
               if (!fields[0]) {
-                implicitOneRelations.push({ model, key, relation })
+                implicitOneRelations.push({ collection, key, relation })
                 continue
               }
               if (fields.length > 1) {
@@ -232,76 +234,83 @@ export default defineNuxtModule<ModuleOptions>({
               }
               const references = relation.config.references
               if (!references[0]) {
-                implicitOneRelations.push({ model, key, relation })
+                implicitOneRelations.push({ collection, key, relation })
                 continue
               }
               if (references.length > 1) {
                 throw new Error(`Relations with multiple references are not supported yet, see https://github.com/Akryum/rstore/issues/7`)
               }
 
-              const targetModel = modelsByTable.get(relation.referencedTable)
-              if (!targetModel) {
-                throw new Error(`Target model not found for table ${relation.referencedTableName}`)
+              const targetCollection = collectionsByTable.get(relation.referencedTable)
+              if (!targetCollection) {
+                throw new Error(`Target collection not found for table ${relation.referencedTableName}`)
               }
 
-              model.relations ??= {}
-              model.relations[key] = {
+              collection.relations ??= {}
+              collection.relations[key] = {
                 to: {
-                  [targetModel.name]: {
-                    on: getColumnKey(relation.referencedTable, references[0]),
-                    eq: getColumnKey(relation.sourceTable, fields[0]),
+                  [targetCollection.name]: {
+                    on: {
+                      [getColumnKey(relation.referencedTable, references[0])]: getColumnKey(relation.sourceTable, fields[0]),
+                    },
                   },
                 },
               }
               explicitOneRelations.push(relation)
             }
             else {
-              implicitOneRelations.push({ model, key, relation })
+              implicitOneRelations.push({ collection, key, relation })
             }
           }
           else if (is(relation, Many)) {
-            implicitManyRelations.push({ model, key, relation })
+            implicitManyRelations.push({ collection, key, relation })
           }
         }
       }
 
-      for (const { model, key, relation } of implicitOneRelations) {
+      // Implicit "to one" relations
+      for (const { collection, key, relation } of implicitOneRelations) {
+        // Explicit relation name
         if (relation.relationName) {
           const targetRelation = explicitOneRelations.find(r => r.relationName === relation.relationName)
           if (!targetRelation) {
             throw new Error(`Explicit relation not found for ${relation.relationName}`)
           }
-          const targetModel = modelsByTable.get(targetRelation.referencedTable)
-          if (!targetModel) {
-            throw new Error(`Target model not found for table ${targetRelation.referencedTableName}`)
+          const targetCollection = collectionsByTable.get(targetRelation.referencedTable)
+          if (!targetCollection) {
+            throw new Error(`Target collection not found for table ${targetRelation.referencedTableName}`)
           }
-          model.relations ??= {}
-          model.relations[key] = {
+          collection.relations ??= {}
+          collection.relations[key] = {
             to: {
-              [targetModel.name]: {
-                on: getColumnKey(relation.referencedTable, targetRelation.config!.fields[0]),
-                eq: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]),
+              [targetCollection.name]: {
+                on: {
+                  [getColumnKey(relation.referencedTable, targetRelation.config!.fields[0]!)]: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]!),
+                },
               },
             },
           }
         }
         else {
-          const targetModel = modelsByTable.get(relation.referencedTable)
-          if (!targetModel) {
-            throw new Error(`Target model not found for table ${relation.referencedTableName}`)
+          // Find the relation in the target collection
+          const targetCollection = collectionsByTable.get(relation.referencedTable)
+          if (!targetCollection) {
+            throw new Error(`Target collection not found for table ${relation.referencedTableName}`)
           }
-          if (!targetModel.relations) {
-            throw new Error(`Target model ${targetModel.name} has no relations`)
+          if (!targetCollection.relations) {
+            throw new Error(`Target collection ${targetCollection.name} has no relations`)
           }
-          let newRelation: ModelRelation | undefined
-          for (const relationKey in targetModel.relations) {
-            for (const modelName in targetModel.relations[relationKey]!.to) {
-              if (modelName === model.name) {
+          let newRelation: CollectionRelation | undefined
+          for (const relationKey in targetCollection.relations) {
+            for (const collectionName in targetCollection.relations[relationKey]!.to) {
+              if (collectionName === collection.name) {
+                const targetTo = targetCollection.relations[relationKey]!.to[collectionName]!
+                const invertedFields = Object.fromEntries(Object.entries(targetTo.on).map(([key, value]) => [value, key]))
+
                 newRelation = {
                   to: {
-                    [targetModel.name]: {
-                      on: targetModel.relations[relationKey]!.to[modelName]!.eq,
-                      eq: targetModel.relations[relationKey]!.to[modelName]!.on,
+                    [targetCollection.name]: {
+                      on: invertedFields,
                     },
                   },
                 }
@@ -310,51 +319,57 @@ export default defineNuxtModule<ModuleOptions>({
             }
           }
           if (!newRelation) {
-            throw new Error(`Reference relation not found for ${model.name}.${key}`)
+            throw new Error(`Reference relation not found for ${collection.name}.${key}`)
           }
-          model.relations ??= {}
-          model.relations[key] = newRelation
+          collection.relations ??= {}
+          collection.relations[key] = newRelation
         }
       }
 
-      for (const { model, key, relation } of implicitManyRelations) {
+      // Implicit "to many" relations
+      for (const { collection, key, relation } of implicitManyRelations) {
+        // Explicit relation name
         if (relation.relationName) {
           const targetRelation = explicitOneRelations.find(r => r.relationName === relation.relationName)
           if (!targetRelation) {
             throw new Error(`Explicit relation not found for ${relation.relationName}`)
           }
-          const targetModel = modelsByTable.get(targetRelation.referencedTable)
-          if (!targetModel) {
-            throw new Error(`Target model not found for table ${targetRelation.referencedTableName}`)
+          const targetCollection = collectionsByTable.get(targetRelation.referencedTable)
+          if (!targetCollection) {
+            throw new Error(`Target collection not found for table ${targetRelation.referencedTableName}`)
           }
-          model.relations ??= {}
-          model.relations[key] = {
+          collection.relations ??= {}
+          collection.relations[key] = {
             to: {
-              [targetModel.name]: {
-                on: getColumnKey(relation.referencedTable, targetRelation.config!.fields[0]),
-                eq: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]),
+              [targetCollection.name]: {
+                on: {
+                  [getColumnKey(relation.referencedTable, targetRelation.config!.fields[0]!)]: getColumnKey(relation.sourceTable, targetRelation.config!.references[0]!),
+                },
               },
             },
             many: true,
           }
         }
         else {
-          const targetModel = modelsByTable.get(relation.referencedTable)
-          if (!targetModel) {
-            throw new Error(`Target model not found for table ${relation.referencedTableName}`)
+          // Find the relation in the target collection
+          const targetCollection = collectionsByTable.get(relation.referencedTable)
+          if (!targetCollection) {
+            throw new Error(`Target collection not found for table ${relation.referencedTableName}`)
           }
-          if (!targetModel.relations) {
-            throw new Error(`Target model ${targetModel.name} has no relations`)
+          if (!targetCollection.relations) {
+            throw new Error(`Target collection ${targetCollection.name} has no relations`)
           }
-          let newRelation: ModelRelation | undefined
-          for (const relationKey in targetModel.relations) {
-            for (const modelName in targetModel.relations[relationKey]!.to) {
-              if (modelName === model.name) {
+          let newRelation: CollectionRelation | undefined
+          for (const relationKey in targetCollection.relations) {
+            for (const collectionName in targetCollection.relations[relationKey]!.to) {
+              if (collectionName === collection.name) {
+                const targetTo = targetCollection.relations[relationKey]!.to[collectionName]!
+                const invertedFields = Object.fromEntries(Object.entries(targetTo.on).map(([key, value]) => [value, key]))
+
                 newRelation = {
                   to: {
-                    [targetModel.name]: {
-                      on: targetModel.relations[relationKey]!.to[modelName]!.eq,
-                      eq: targetModel.relations[relationKey]!.to[modelName]!.on,
+                    [targetCollection.name]: {
+                      on: invertedFields,
                     },
                   },
                   many: true,
@@ -364,31 +379,31 @@ export default defineNuxtModule<ModuleOptions>({
             }
           }
           if (!newRelation) {
-            throw new Error(`Reference relation not found for ${model.name}.${key}`)
+            throw new Error(`Reference relation not found for ${collection.name}.${key}`)
           }
-          model.relations ??= {}
-          model.relations[key] = newRelation
+          collection.relations ??= {}
+          collection.relations[key] = newRelation
         }
       }
 
-      return models
+      return collections
     })
 
     addServerTemplate({
       filename: '$rstore-drizzle-server-utils.js',
       getContents: async () => {
         jiti.cache = {}
-        const models = await getModelsFromDrizzleSchema()
-        const modelMetas: Record<string, CustomModelMeta | undefined> = {}
-        for (const model of models) {
-          modelMetas[model.name] = model.meta
+        const collections = await getCollectionsFromDrizzleSchema()
+        const collectionMetas: Record<string, CustomCollectionMeta | undefined> = {}
+        for (const collection of collections) {
+          collectionMetas[collection.name] = collection.meta
         }
 
         return `import * as schema from '${drizzleSchemaPath}'
-import { ${options.drizzleImport?.name ?? options.drizzleImport?.default?.name ?? 'useDrizzle'} as _drizzleDefault } from '${options.drizzleImport?.from ?? options.drizzleImport?.default?.from ?? '~~/server/utils/drizzle'}'
+import { ${options.drizzleImport?.name ?? 'useDrizzle'} as _drizzleDefault } from '${options.drizzleImport?.from ?? '~~/server/utils/drizzle'}'
 
 export const tables = schema
-export const modelMetas = ${JSON.stringify(modelMetas, null, 2)}
+export const collectionMetas = ${JSON.stringify(collectionMetas, null, 2)}
 export const dialect = '${drizzleConfig.dialect}'
 export const useDrizzles = {
   default: _drizzleDefault,
@@ -397,55 +412,51 @@ export const useDrizzles = {
     })
 
     addTemplate({
-      filename: '$rstore-drizzle-models.js',
+      filename: '$rstore-drizzle-collections.js',
       getContents: async () => {
-        const models = await getModelsFromDrizzleSchema()
-        return `export default [${
-          models.map((model) => {
-            let code = `{`
-            code += `name: '${model.name}',`
-            code += `scopeId: '${model.scopeId}',`
-            code += `meta: ${JSON.stringify(model.meta)},`
-            if (model.relations) {
-              code += `relations: ${JSON.stringify(model.relations)},`
-            }
-            code += `getKey: (item) => ${model.meta?.primaryKeys?.length ? `(${model.meta.primaryKeys.map(key => `item.${key}`).join(' + ')})` : 'item.id'},`
-            code += `}`
-            return code
-          }).join(',\n')
-        }]`
+        const collections = await getCollectionsFromDrizzleSchema()
+        return collections.map((collection, index) => {
+          let code = `export const collection${index} = {`
+          code += `name: '${collection.name}',`
+          code += `scopeId: '${collection.scopeId}',`
+          code += `meta: ${JSON.stringify(collection.meta)},`
+          if (collection.relations) {
+            code += `relations: ${JSON.stringify(collection.relations)},`
+          }
+          code += `getKey: (item) => ${collection.meta?.primaryKeys?.length ? `(${collection.meta.primaryKeys.map(key => `item.${key}`).join(' + ')})` : 'item.id'},`
+          code += `}`
+          return code
+        }).join('\n')
       },
     })
 
     addTypeTemplate({
-      filename: '$rstore-drizzle-models.d.ts',
+      filename: '$rstore-drizzle-collections.d.ts',
       getContents: async () => {
-        const models = await getModelsFromDrizzleSchema()
-        return `import { defineItemType } from '@rstore/vue'
+        const collections = await getCollectionsFromDrizzleSchema()
+        return `import { withItemType } from '@rstore/vue'
 import * as schema from '${drizzleSchemaPath}'
 
-export default [
-  ${models.map((model) => {
-    let code = `defineItemType<typeof schema.${model.name}.$inferSelect>().model({`
-    code += `name: '${model.name}',`
-    code += `meta: ${JSON.stringify(model.meta)},`
-    if (model.relations) {
-      code += `relations: ${JSON.stringify(model.relations)},`
-    }
-    code += `}),`
-    return code
-  }).join('\n')}
-]
+${collections.map((collection, index) => {
+  let code = `export const collection${index} = withItemType<typeof schema.${collection.name}.$inferSelect>().defineCollection({`
+  code += `name: '${collection.name}',`
+  code += `meta: ${JSON.stringify(collection.meta)},`
+  if (collection.relations) {
+    code += `relations: ${JSON.stringify(collection.relations)},`
+  }
+  code += `})`
+  return code
+}).join('\n')}
 `
       },
     })
 
-    // Refresh models
+    // Refresh collections
     if (nuxt.options.dev) {
       nuxt.hook('nitro:init', (nitro) => {
         nitro.hooks.hook('dev:reload', () => {
           updateTemplates({
-            filter: template => template.filename === '$rstore-drizzle-models.js' || template.filename === '$rstore-drizzle-models.d.ts',
+            filter: template => template.filename === '$rstore-drizzle-collections.js' || template.filename === '$rstore-drizzle-collections.d.ts',
           })
         })
       })
@@ -457,9 +468,9 @@ export default [
       getContents: () => `export const apiPath = ${JSON.stringify(apiPath)}\n`,
     })
 
-    const { addModelImport, addPluginImport } = await import('@rstore/nuxt/api')
+    const { addCollectionImport, addPluginImport } = await import('@rstore/nuxt/api')
 
-    addModelImport(nuxt, '#build/$rstore-drizzle-models.js')
+    addCollectionImport(nuxt, '#build/$rstore-drizzle-collections.js')
 
     addPluginImport(nuxt, resolve('./runtime/plugin'))
   },

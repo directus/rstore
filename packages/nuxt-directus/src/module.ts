@@ -1,5 +1,5 @@
 import type { DirectusCollection, DirectusField } from '@directus/sdk'
-import type { Model } from '@rstore/shared'
+import type { Collection } from '@rstore/shared'
 import { authentication, createDirectus, readCollections, readFieldsByCollection, rest } from '@directus/sdk'
 import { addImportsDir, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule } from '@nuxt/kit'
 
@@ -10,7 +10,7 @@ export interface ModuleOptions {
   url?: string
 
   /**
-   * Admin token for Directus API to introspect the model
+   * Admin token for Directus API to introspect the collection
    */
   adminToken?: string
 }
@@ -50,92 +50,94 @@ export default defineNuxtModule<ModuleOptions>({
     await directus.setToken(options.adminToken)
 
     // Introspect the collections
-    let collections = await directus.request(readCollections()) as Array<DirectusCollection>
-    collections = collections.filter(collection => !collection.meta.hidden && !collection.meta.singleton)
+    let directusCollections = await directus.request(readCollections()) as Array<DirectusCollection>
+    directusCollections = directusCollections.filter(collection => !collection.meta.hidden && !collection.meta.singleton)
 
     // TODO support singleton collections
 
     const fieldsPerCollection = new Map<string, Array<DirectusField>>()
 
-    await Promise.all(collections.map(async (collection) => {
+    await Promise.all(directusCollections.map(async (collection) => {
       const fields = await directus.request(readFieldsByCollection(collection.collection)) as Array<DirectusField>
       fieldsPerCollection.set(collection.collection, fields)
     }))
 
-    const models: Array<Model> = collections.map((collection) => {
+    const collections: Array<Collection> = directusCollections.map((collection) => {
       return {
-        name: collection.collection,
-        scopeId: 'rstore-directus',
-        meta: {
+        '~type': 'collection',
+        'name': collection.collection,
+        'scopeId': 'rstore-directus',
+        'meta': {
         },
-        relations: {}, // TODO
+        'relations': {}, // TODO
       }
     })
 
     addTemplate({
-      filename: '$rstore-directus-models.js',
+      filename: '$rstore-directus-collections.js',
       getContents: async () => {
-        return `export default [${
-          models.map((model) => {
-            let code = `{`
-            code += `name: '${model.name}',`
-            code += `scopeId: '${model.scopeId}',`
-            code += `meta: ${JSON.stringify(model.meta)},`
-            if (model.relations) {
-              code += `relations: ${JSON.stringify(model.relations)},`
+        return `${
+          collections.map((collection, index) => {
+            let code = `export const collection${index} = {`
+            code += `name: '${collection.name}',`
+            code += `scopeId: '${collection.scopeId}',`
+            code += `meta: ${JSON.stringify(collection.meta)},`
+            if (collection.relations) {
+              code += `relations: ${JSON.stringify(collection.relations)},`
             }
             code += `}`
             return code
-          }).join(',\n')
-        }]`
+          }).join('\n')
+        }`
       },
     })
 
     addTypeTemplate({
-      filename: '$rstore-directus-models.d.ts',
+      filename: '$rstore-directus-items.d.ts',
       getContents: async () => {
-        return `import { defineItemType } from '@rstore/vue'
+        return `${collections.map((collection) => {
+          let code = `export interface ${collection.name} {`
+          const fields = fieldsPerCollection.get(collection.name) ?? []
+          for (const field of fields) {
+            let type = 'any'
+            switch (field.type) {
+              case 'string':
+              case 'uuid':
+                type = 'string'
+                break
+              case 'integer':
+                type = 'number'
+                break
+              case 'boolean':
+                type = 'boolean'
+                break
+            }
 
-${models.map((model) => {
-  let code = `export interface ${model.name} {`
-  const fields = fieldsPerCollection.get(model.name) ?? []
-  for (const field of fields) {
-    if (field.meta.hidden) {
-      continue
-    }
+            code += `\n  ${field.field}: ${type}`
+          }
+          code += '}'
+          return code
+        }).join('\n')}`
+      },
+    })
 
-    let type = 'any'
-    switch (field.type) {
-      case 'string':
-      case 'uuid':
-        type = 'string'
-        break
-      case 'integer':
-        type = 'number'
-        break
-      case 'boolean':
-        type = 'boolean'
-        break
-    }
+    addTypeTemplate({
+      filename: '$rstore-directus-collections.d.ts',
+      getContents: async () => {
+        return `import { withItemType } from '@rstore/vue'
 
-    code += `\n  ${field.field}: ${type}`
+import {${collections.map(collection => collection.name).join(',\n')}} from '#build/$rstore-directus-items'
+
+${collections.map((collection, index) => {
+  let code = `export const collection${index} = withItemType<${collection.name}>().defineCollection({`
+  code += `name: '${collection.name}',`
+  code += `meta: ${JSON.stringify(collection.meta)},`
+  if (collection.relations) {
+    code += `relations: ${JSON.stringify(collection.relations)},`
   }
-  code += '}'
+  code += `}),`
   return code
 }).join('\n')}
-
-export default [
-  ${models.map((model) => {
-    let code = `defineItemType<${model.name}>().model({`
-    code += `name: '${model.name}',`
-    code += `meta: ${JSON.stringify(model.meta)},`
-    if (model.relations) {
-      code += `relations: ${JSON.stringify(model.relations)},`
-    }
-    code += `}),`
-    return code
-  }).join('\n')}
-]
 `
       },
     })
@@ -149,9 +151,9 @@ export default [
       getContents: () => `export const url = ${JSON.stringify(options.url)}\n`,
     })
 
-    const { addModelImport, addPluginImport } = await import('@rstore/nuxt/api')
+    const { addCollectionImport, addPluginImport } = await import('@rstore/nuxt/api')
 
-    addModelImport(nuxt, '#build/$rstore-directus-models.js')
+    addCollectionImport(nuxt, '#build/$rstore-directus-collections.js')
 
     addPluginImport(nuxt, resolve('./runtime/plugin'))
   },

@@ -8,6 +8,8 @@ import { filterItem } from './filter'
 export default definePlugin({
   name: 'rstore-directus',
 
+  category: 'remote',
+
   // @TODO multi directus instances
   scopeId: 'rstore-directus',
 
@@ -24,10 +26,10 @@ export default definePlugin({
 
     hook('fetchFirst', async (payload) => {
       if (payload.key) {
-        payload.setResult(await directus.request(readItem(payload.model.name, payload.key)))
+        payload.setResult(await directus.request(readItem(payload.collection.name, payload.key)))
       }
       else {
-        const result = await directus.request(readItems(payload.model.name, {
+        const result = await directus.request(readItems(payload.collection.name, {
           ...payload.findOptions?.filter ? { filter: payload.findOptions.filter } : {},
           limit: 1,
         }))
@@ -38,7 +40,7 @@ export default definePlugin({
     })
 
     hook('fetchMany', async (payload) => {
-      payload.setResult(await directus.request(readItems(payload.model.name, {
+      payload.setResult(await directus.request(readItems(payload.collection.name, {
         ...payload.findOptions?.filter ? { filter: payload.findOptions.filter } : {},
       })))
     })
@@ -53,7 +55,7 @@ export default definePlugin({
       const filter = payload.findOptions?.filter
       if (filter && typeof filter === 'object') {
         const items = payload.readItemsFromCache()
-        const result = items.find(item => filterItem(payload.store as VueStore, payload.model, item, filter))
+        const result = items.find(item => filterItem(payload.store as VueStore, payload.collection, item, filter))
         payload.setResult(result)
       }
     })
@@ -61,7 +63,7 @@ export default definePlugin({
     hook('cacheFilterMany', (payload) => {
       const filter = payload.findOptions?.filter
       if (filter && typeof filter === 'object') {
-        const items = payload.getResult().filter(item => filterItem(payload.store as VueStore, payload.model, item, filter))
+        const items = payload.getResult().filter(item => filterItem(payload.store as VueStore, payload.collection, item, filter))
         payload.setResult(items)
       }
     })
@@ -69,15 +71,15 @@ export default definePlugin({
     /* Mutations */
 
     hook('createItem', async (payload) => {
-      payload.setResult(await directus.request(createItem(payload.model.name, payload.item)))
+      payload.setResult(await directus.request(createItem(payload.collection.name, payload.item)))
     })
 
     hook('updateItem', async (payload) => {
-      payload.setResult(await directus.request(updateItem(payload.model.name, payload.key, payload.item)))
+      payload.setResult(await directus.request(updateItem(payload.collection.name, payload.key, payload.item)))
     })
 
     hook('deleteItem', async (payload) => {
-      await directus.request(deleteItem(payload.model.name, payload.key))
+      await directus.request(deleteItem(payload.collection.name, payload.key))
     })
   },
 })

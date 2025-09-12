@@ -1,41 +1,37 @@
 import type { Hooks } from '../utils/hooks'
 import type { Cache } from './cache'
-import type { Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelList } from './model'
-import type { CreateModuleApi, Module, ResolvedModule } from './module'
+import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionList, StoreSchema } from './collection'
+import type { ResolvedModule } from './module'
 import type { MutationOperation, MutationSpecialProps } from './mutation'
 import type { RegisteredPlugin } from './plugin'
 import type { FetchPolicy, FindOptions } from './query'
 
 export interface StoreCore<
-  TModelList extends Array<Model>,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
+  TSchema extends StoreSchema,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > {
-  $cache: Cache<TModelList, TModelDefaults>
-  $models: ResolvedModelList<TModelList, TModelDefaults>
-  $modelDefaults: TModelDefaults
+  $cache: Cache<TSchema, TCollectionDefaults>
+  $collections: ResolvedCollectionList<TSchema, TCollectionDefaults>
+  $collectionDefaults: TCollectionDefaults
   $plugins: Array<RegisteredPlugin>
-  $hooks: Hooks<TModelList, TModelDefaults>
+  $hooks: Hooks<TSchema, TCollectionDefaults>
   $findDefaults: Partial<FindOptions<any, any, any>>
   $getFetchPolicy: (value: FetchPolicy | null | undefined) => FetchPolicy
   /**
    * @private
    */
-  $processItemParsing: <TModel extends Model> (model: ResolvedModel<TModel, TModelDefaults, TModelList>, item: any) => void
+  $processItemParsing: <TCollection extends Collection> (collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>, item: any) => void
   /**
    * @private
    */
-  $processItemSerialization: <TModel extends Model> (model: ResolvedModel<TModel, TModelDefaults, TModelList>, item: any) => void
-  $getModel: (item: any, modelNames?: string[]) => ResolvedModel<Model, ModelDefaults, ModelList> | null
-  $mutationHistory: Array<MutationOperation<any, TModelDefaults, TModelList>>
+  $processItemSerialization: <TCollection extends Collection> (collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>, item: any) => void
+  $getCollection: (item: any, collectionNames?: string[]) => ResolvedCollection<Collection, CollectionDefaults, StoreSchema> | null
+  $mutationHistory: Array<MutationOperation<any, TCollectionDefaults, TSchema>>
   $isServer: boolean
   /**
    * @private
    */
   $dedupePromises: Map<string, Promise<any>>
-  /**
-   * @deprecated Use `createModule` import instead.
-   */
-  $createModule: <TModule extends Module> (module: TModule) => CreateModuleApi<TModule>
   /**
    * @private
    */

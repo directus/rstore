@@ -1,20 +1,20 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
+import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from './collection'
 import type { FormObjectBase } from './form'
-import type { Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem } from './model'
 
 export interface MutationOperation<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 > {
   operation: 'create' | 'update' | 'delete' | 'module-mutation'
-  model?: ResolvedModel<TModel, TModelDefaults, TModelList>
+  collection?: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
   module?: string
   /**
-   * Either the key of the item in the model or the key of the exposed mutation in the module.
+   * Either the key of the item in the collection or the key of the exposed mutation in the module.
    */
   key?: string | number
-  payload?: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  payload?: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 }
 
 export interface MutationSpecialProps {
@@ -22,29 +22,29 @@ export interface MutationSpecialProps {
 }
 
 export type CreateFormObjectBase<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = FormObjectBase<ResolvedModelItem<TModel, TModelDefaults, TModelList>, NonNullable<NonNullable<TModel['formSchema']>['create']>>
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> = FormObjectBase<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>, NonNullable<NonNullable<TCollection['formSchema']>['create']>>
 
 export type CreateFormObject<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['create']>>
-  & CreateFormObjectBase<TModel, TModelDefaults, TModelList>
-  & Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TCollection['formSchema']>['create']>>
+  & CreateFormObjectBase<TCollection, TCollectionDefaults, TSchema>
+  & Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
 export type UpdateFormObjectBase<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = FormObjectBase<ResolvedModelItem<TModel, TModelDefaults, TModelList>, NonNullable<NonNullable<TModel['formSchema']>['update']>>
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> = FormObjectBase<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>, NonNullable<NonNullable<TCollection['formSchema']>['update']>>
 
 export type UpdateFormObject<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TModel['formSchema']>['update']>>
-  & UpdateFormObjectBase<TModel, TModelDefaults, TModelList>
-  & Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> = StandardSchemaV1.InferInput<NonNullable<NonNullable<TCollection['formSchema']>['update']>>
+  & UpdateFormObjectBase<TCollection, TCollectionDefaults, TSchema>
+  & Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>

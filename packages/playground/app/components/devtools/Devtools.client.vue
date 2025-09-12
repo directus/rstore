@@ -16,8 +16,8 @@ const tabs: Array<TabsItem> = [
     icon: 'lucide:history',
   },
   {
-    label: 'Model',
-    slot: 'model',
+    label: 'Collection',
+    slot: 'collection',
     icon: 'lucide:boxes',
   },
 ]
@@ -67,8 +67,8 @@ const cacheHtml = asyncComputed(() => codeToHtml(JSON.stringify(cache.value, nul
         </div>
       </template>
 
-      <template v-if="currentTab.slot === 'model'">
-        <DevtoolsModel />
+      <template v-if="currentTab.slot === 'collection'">
+        <DevtoolsCollections />
       </template>
     </div>
   </div>

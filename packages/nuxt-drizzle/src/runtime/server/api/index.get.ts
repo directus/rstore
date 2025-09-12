@@ -1,7 +1,8 @@
 import type { RelationalQueryBuilder } from 'drizzle-orm/pg-core/query-builders/query'
-import { asc, desc } from 'drizzle-orm'
+import { and, asc, desc } from 'drizzle-orm'
 import { createError, eventHandler, getQuery, getRouterParams } from 'h3'
-import { getDrizzleCondition, getDrizzleTableFromModel, type RstoreDrizzleQueryParams, rstoreUseDrizzle } from '../utils'
+import { getDrizzleCondition, getDrizzleTableFromCollection, type RstoreDrizzleQueryParams, rstoreUseDrizzle } from '../utils'
+import { rstoreDrizzleHooks, type RstoreDrizzleMeta, type RstoreDrizzleTransformQuery } from '../utils/hooks'
 
 const orderByOperators = {
   asc,
@@ -9,21 +10,36 @@ const orderByOperators = {
 }
 
 export default eventHandler(async (event) => {
-  const { model: modelName } = getRouterParams(event) as { model: string }
-  const { table } = getDrizzleTableFromModel(modelName)
+  const meta: RstoreDrizzleMeta = {}
+  const transforms: Array<RstoreDrizzleTransformQuery> = []
 
+  const params = getRouterParams(event) as { collection: string }
+  const { collection: collectionName } = params
   const query = getQuery(event) as RstoreDrizzleQueryParams
+
+  await rstoreDrizzleHooks.callHook('index.get.before', {
+    event,
+    collection: collectionName,
+    meta,
+    params,
+    query: query as Record<string, string | string[]>,
+    transformQuery: (transform) => { transforms.push(transform) },
+  })
+
+  const { table } = getDrizzleTableFromCollection(collectionName)
 
   const dbQuery = rstoreUseDrizzle().query as unknown as Record<string, RelationalQueryBuilder<any, any>>
 
-  const q = {} as NonNullable<Parameters<typeof dbQuery[typeof modelName]['findMany']>[0]>
+  const q = {} as NonNullable<Parameters<typeof dbQuery[typeof collectionName]['findMany']>[0]>
+
+  const whereConditions: any[] = []
 
   if (query.where) {
     try {
       const where = JSON.parse(query.where as string) as any
       if (where) {
         const condition = getDrizzleCondition(table, where)
-        q.where = condition
+        whereConditions.push(condition)
       }
     }
     catch (e) {
@@ -34,6 +50,14 @@ export default eventHandler(async (event) => {
       })
     }
   }
+
+  for (const transform of transforms) {
+    transform({
+      where: (condition) => { whereConditions.push(condition) },
+    })
+  }
+
+  q.where = whereConditions.length ? and(...whereConditions) : undefined
 
   if (query.limit != null) {
     q.limit = Number.parseInt(query.limit)
@@ -64,11 +88,23 @@ export default eventHandler(async (event) => {
       }
       const [columnName, order] = parts
       const operator = orderByOperators[order as 'asc' | 'desc']
-      orderBy.push(operator((table as any)[columnName]))
+      orderBy.push(operator((table as any)[columnName!]))
     }
     q.orderBy = orderBy
   }
 
-  const result = await dbQuery[modelName].findMany(q)
-  return result ?? []
+  let result = await dbQuery[collectionName]!.findMany(q)
+  result ??= []
+
+  await rstoreDrizzleHooks.callHook('index.get.after', {
+    event,
+    collection: collectionName,
+    meta,
+    params,
+    query: query as Record<string, string | string[]>,
+    result,
+    setResult: (r) => { result = r },
+  })
+
+  return result
 })

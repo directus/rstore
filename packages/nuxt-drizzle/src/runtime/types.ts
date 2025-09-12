@@ -1,26 +1,26 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { Model, ModelDefaults, ModelList } from '@rstore/vue'
+import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/vue'
 import type { RstoreDrizzleCondition } from './utils/types'
 
 declare module '@rstore/vue' {
-  export interface CustomModelMeta {
+  export interface CustomCollectionMeta {
     table?: string
     primaryKeys?: string[]
   }
 
   export interface FindOptions<
-    TModel extends Model,
-    TModelDefaults extends ModelDefaults,
-    TModelList extends ModelList,
+    TCollection extends Collection,
+    TCollectionDefaults extends CollectionDefaults,
+    TSchema extends StoreSchema,
   > {
     where?: RstoreDrizzleCondition
   }
 
   export interface CustomParams<
-    TModel extends Model,
-    TModelDefaults extends ModelDefaults,
-    TModelList extends ModelList,
+    TCollection extends Collection,
+    TCollectionDefaults extends CollectionDefaults,
+    TSchema extends StoreSchema,
   > {
     /**
      * @deprecated Use \`findOptions.where\` instead

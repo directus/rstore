@@ -37,16 +37,16 @@ store.$onCacheReset(() => {
 Writing items to the cache is useful when you want to update the store with data that is not coming from a query. This can be used for example to add items from a websocket connection.
 
 ```ts
-const model = store.$getModel(item)
-const key = model.getKey(item)
+const collection = store.$getCollection(item)
+const key = collection.getKey(item)
 store.$cache.writeItem({
-  model,
+  collection,
   key,
   item,
 })
 ```
 
-You can also use the `store.<modelName>.writeItem` method:
+You can also use the `store.<collectionName>.writeItem` method:
 
 ```ts
 store.User.writeItem({
@@ -59,13 +59,13 @@ store.User.writeItem({
 To write multiple items at once, you can use the `writeItems` method:
 
 ```ts
-const model = store.$getModel(items[0])
+const collection = store.$getCollection(items[0])
 const writes = items.map(item => ({
-  key: model.getKey(item),
+  key: collection.getKey(item),
   value: item,
 }))
 store.$cache.writeItems({
-  model,
+  collection,
   items: writes,
 })
 ```
@@ -75,16 +75,79 @@ store.$cache.writeItems({
 Deleting items from the cache is useful when you want to remove items that are no longer needed. This can be used for example to remove items that are no longer in the store.
 
 ```ts
-const model = store.$getModel(item)
-const key = model.getKey(item)
+const collection = store.$getCollection(item)
+const key = collection.getKey(item)
 store.$cache.deleteItem({
-  model,
+  collection,
   key,
 })
 ```
 
-You can also use the `store.<modelName>.clearItem` method:
+You can also use the `store.<collectionName>.clearItem` method:
 
 ```ts
 store.User.clearItem('abc')
 ```
+
+## Layers
+
+A cache layer is a way to create a temporary state modification that can be easily reverted. This is how [optimistic updates](./mutation.md#optimistic-updates) are implemented.
+
+To create a new layer, use the `addLayer` method:
+
+```ts
+store.$cache.addLayer({
+  id: 'some-layer-id',
+  state: {
+    Messages: {
+      'some-message-id': {
+        $overrideKey: 'some-message-id',
+        text: 'This is an optimistic message',
+      },
+    },
+  },
+  deleteItems: {},
+  optimistic: true, // Optional
+  prevent: { // Optional
+    update: false,
+    delete: false,
+  },
+  skip: false, // Optional
+})
+```
+
+In this example, the layer will override the `text` property of the `Messages` item with id `some-message-id`.
+
+::: tip
+If the layer contains records that do not exist in the cache, it will act as if those records were created.
+:::
+
+```ts
+store.$cache.addLayer({
+  id: 'some-layer-id',
+  state: {},
+  deleteItems: {
+    Messages: new Set(['some-message-id']),
+  },
+})
+```
+
+In this second example, the layer will delete the `Messages` item with id `some-message-id`.
+
+::: tip
+If multiple layers, they are applied in the order they were added.
+:::
+
+To get a layer, use the `getLayer` method:
+
+```ts
+const layer = store.$cache.getLayer('some-layer-id')
+```
+
+To remove a layer, use the `removeLayer` method:
+
+```ts
+store.$cache.removeLayer('some-layer-id')
+```
+
+It will effectively rollback all the changes applied by the layer.

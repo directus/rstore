@@ -1,99 +1,150 @@
-import type { CustomHookMeta, Model, ModelDefaults, ModelList, ResolvedModel, ResolvedModelItem, StoreCore } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 
 export interface CreateOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  item: Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  store: StoreCore<TSchema, TCollectionDefaults>
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   skipCache?: boolean
+  optimistic?: boolean | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 }
 
 export async function createItem<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 >({
   store,
-  model,
+  collection,
   item,
   skipCache,
-}: CreateOptions<TModel, TModelDefaults, TModelList>): Promise<ResolvedModelItem<TModel, TModelDefaults, TModelList>> {
+  optimistic = true,
+}: CreateOptions<TCollection, TCollectionDefaults, TSchema>): Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> {
   const meta: CustomHookMeta = {}
 
-  item = pickNonSpecialProps(item) as Partial<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  const originalItem = item
 
-  store.$processItemSerialization(model, item)
+  item = pickNonSpecialProps(item, true) as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
-  let result: ResolvedModelItem<TModel, TModelDefaults, TModelList> | undefined
+  store.$processItemSerialization(collection, item)
+
+  let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | undefined
 
   await store.$hooks.callHook('beforeMutation', {
     store,
     meta,
-    model,
+    collection,
     mutation: 'create',
     item,
     modifyItem: (path: any, value: any) => {
       set(item, path, value)
     },
     setItem: (newItem) => {
-      item = newItem
+      item = newItem as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
     },
   })
 
-  await store.$hooks.callHook('createItem', {
-    store,
-    meta,
-    model,
-    item,
-    getResult: () => result,
-    setResult: (newResult) => {
-      result = newResult
-    },
-  })
+  let layer: CacheLayer | undefined
 
-  await store.$hooks.callHook('afterMutation', {
-    store,
-    meta,
-    model,
-    mutation: 'create',
-    item,
-    getResult: () => result,
-    setResult: (newResult) => {
-      result = newResult
-    },
-  })
+  if (!skipCache && optimistic) {
+    let key = collection.getKey(item)
+    if (!key) {
+      key = crypto.randomUUID()
+    }
+    layer = {
+      id: crypto.randomUUID(),
+      state: {
+        [collection.name]: {
+          [key]: {
+            ...originalItem,
+            ...typeof optimistic === 'object' ? optimistic : {},
+            $overrideKey: key,
+          },
+        },
+      },
+      deletedItems: {},
+      optimistic: true,
+      prevent: {
+        // @TODO queue mutations and reconcile the optimistic object with the actual result
+        update: true,
+        delete: true,
+      },
+    }
+    store.$cache.addLayer(layer)
+  }
 
-  if (result) {
-    store.$processItemParsing(model, result)
+  try {
+    const abort = store.$hooks.withAbort()
+    await store.$hooks.callHook('createItem', {
+      store,
+      meta,
+      collection,
+      item,
+      getResult: () => result,
+      setResult: (newResult, options) => {
+        result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+        if (result && options?.abort !== false) {
+          abort()
+        }
+      },
+      abort,
+    })
 
-    if (!skipCache) {
-      const key = model.getKey(result)
+    await store.$hooks.callHook('afterMutation', {
+      store,
+      meta,
+      collection,
+      mutation: 'create',
+      item,
+      getResult: () => result,
+      setResult: (newResult) => {
+        result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+      },
+    })
 
-      if (key) {
-        store.$cache.writeItem({
-          model,
-          key,
-          item: result,
-        })
-      }
-      else {
-        throw new Error('Item creation failed: key is not defined')
+    if (result) {
+      store.$processItemParsing(collection, result)
+
+      if (!skipCache) {
+        if (layer) {
+          store.$cache.removeLayer(layer.id)
+        }
+
+        const key = collection.getKey(result)
+
+        if (key) {
+          store.$cache.writeItem({
+            collection,
+            key,
+            item: result,
+          })
+        }
+        else {
+          throw new Error('Item creation failed: key is not defined')
+        }
       }
     }
-  }
-  else {
-    throw new Error('Item creation failed: result is nullish')
-  }
+    else {
+      throw new Error('Item creation failed: result is nullish')
+    }
 
-  store.$mutationHistory.push({
-    operation: 'create',
-    model,
-    payload: item,
-  })
+    store.$mutationHistory.push({
+      operation: 'create',
+      collection,
+      payload: item,
+    })
+  }
+  catch (error) {
+    // Rollback optimistic layer in case of error
+    if (layer) {
+      store.$cache.removeLayer(layer.id)
+    }
+    throw error
+  }
 
   return result
 }

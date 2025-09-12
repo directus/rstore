@@ -1,10 +1,10 @@
-import type { FindOptions, Model, ModelDefaults, ModelList, StoreCore } from '@rstore/shared'
+import type { Collection, CollectionDefaults, FindOptions, StoreCore, StoreSchema } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 
 export interface VueLiveQueryReturn<
-  _TModel extends Model,
-  _TModelDefaults extends ModelDefaults,
-  _TModelList extends ModelList,
+  _TCollection extends Collection,
+  _TCollectionDefaults extends CollectionDefaults,
+  _TCollectionList extends StoreSchema,
   TResult,
 > {
   data: Ref<TResult>
@@ -13,13 +13,13 @@ export interface VueLiveQueryReturn<
 }
 
 export interface VueCreateQueryOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-  TOptions extends FindOptions<TModel, TModelDefaults, TModelList>,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+  TOptions extends FindOptions<TCollection, TCollectionDefaults, TSchema>,
   TResult,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
+  store: StoreCore<TSchema, TCollectionDefaults>
   fetchMethod: (options?: TOptions) => Promise<TResult>
   cacheMethod: (options?: TOptions) => TResult
   defaultValue: TResult

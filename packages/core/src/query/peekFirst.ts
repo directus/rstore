@@ -1,16 +1,16 @@
-import type { CustomHookMeta, FindFirstOptions, Model, ModelDefaults, ModelList, QueryResult, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
 export interface PeekFirstOptions<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
+  store: StoreCore<TSchema, TCollectionDefaults>
   meta?: CustomHookMeta
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  findOptions: string | number | FindFirstOptions<TModel, TModelDefaults, TModelList>
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  findOptions: string | number | FindFirstOptions<TCollection, TCollectionDefaults, TSchema>
   force?: boolean
 }
 
@@ -18,19 +18,19 @@ export interface PeekFirstOptions<
  * Find the first item that matches the query in the cache without fetching the data from the adapter plugins.
  */
 export function peekFirst<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 >({
   store,
   meta,
-  model,
+  collection,
   findOptions: keyOrOptions,
   force,
-}: PeekFirstOptions<TModel, TModelDefaults, TModelList>): QueryResult<WrappedItem<TModel, TModelDefaults, TModelList> | null> {
+}: PeekFirstOptions<TCollection, TCollectionDefaults, TSchema>): QueryResult<WrappedItem<TCollection, TCollectionDefaults, TSchema> | null> {
   meta ??= {}
 
-  const findOptions: FindFirstOptions<TModel, TModelDefaults, TModelList> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
+  const findOptions: FindFirstOptions<TCollection, TCollectionDefaults, TSchema> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
     ? {
         key: keyOrOptions,
       }
@@ -40,12 +40,12 @@ export function peekFirst<
 
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let result: any
-    let marker = defaultMarker(model, findOptions)
+    let marker = defaultMarker(collection, findOptions)
 
     store.$hooks.callHookSync('beforeCacheReadFirst', {
       store,
       meta,
-      model,
+      collection,
       findOptions,
       setMarker: (value) => {
         marker = value
@@ -53,48 +53,61 @@ export function peekFirst<
     })
 
     if (key) {
-      result = store.$cache.readItem({ model, key })
+      result = store.$cache.readItem({ collection, key })
     }
     else if (typeof findOptions?.filter === 'function') {
-      const filterFn = findOptions.filter
+      const filterFn = findOptions.filter as (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean
 
       // Try with first marker first
       result = store.$cache.readItems({
-        model,
+        collection,
         marker: force ? undefined : getMarker('first', marker),
-      }).filter(item => filterFn(item))?.[0] ?? null
+        filter: filterFn,
+      })?.[0] ?? null
 
       // Fallback to many marker
       if (!result) {
         result = store.$cache.readItems({
-          model,
+          collection,
           marker: getMarker('many', marker),
-        }).filter(item => filterFn(item))?.[0] ?? null
+          filter: filterFn,
+        })?.[0] ?? null
       }
     }
 
     store.$hooks.callHookSync('cacheFilterFirst', {
       store,
       meta,
-      model,
+      collection,
       getResult: () => result,
       setResult: (value) => {
         result = value
       },
       key,
       findOptions,
-      readItemsFromCache: () => {
+      readItemsFromCache: (options) => {
+        function getFilter() {
+          if (options?.applyFilter === true) {
+            return findOptions?.filter as (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean
+          }
+          else if (typeof options?.applyFilter === 'function') {
+            return options.applyFilter
+          }
+        }
+
         // Try with first marker first
         let items = store.$cache.readItems({
-          model,
+          collection,
           marker: force ? undefined : getMarker('first', marker),
+          filter: getFilter(),
         }) ?? []
 
         // Fallback to many marker
         if (!items.length) {
           items = store.$cache.readItems({
-            model,
+            collection,
             marker: getMarker('many', marker),
+            filter: getFilter(),
           }) ?? []
         }
         return items

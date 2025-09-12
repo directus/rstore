@@ -1,4 +1,4 @@
-import type { Cache, FetchPolicy, ModelDefaults, ModelList, Plugin } from '@rstore/shared'
+import type { Cache, CollectionDefaults, FetchPolicy, Plugin, StoreSchema } from '@rstore/shared'
 import type { CreateStoreCoreOptions } from '../src/store'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -11,9 +11,9 @@ describe('createStoreCore', () => {
   beforeEach(() => {
     options = {
       cache: {} as Cache,
-      models: [] as ModelList,
-      modelDefaults: {} as ModelDefaults,
-      plugins: [],
+      schema: [] as StoreSchema,
+      collectionDefaults: {} as CollectionDefaults,
+      plugins: []!,
       hooks: {
         callHookSync: vi.fn(),
         callHook: vi.fn(),
@@ -27,9 +27,9 @@ describe('createStoreCore', () => {
     const store = await createStoreCore(options)
     expect(store).toBeDefined()
     expect(store.$cache).toBe(options.cache)
-    expect(store.$models).toBeDefined()
-    expect(store.$modelDefaults).toEqual({})
-    expect(store.$plugins).toEqual([])
+    expect(store.$collections).toBeDefined()
+    expect(store.$collectionDefaults).toEqual({})
+    expect(store.$plugins.filter(p => !p.meta?.builtin)).toEqual([])
     expect(store.$hooks).toBe(options.hooks)
     expect(store.$findDefaults).toEqual({})
   })
@@ -58,7 +58,7 @@ describe('createStoreCore', () => {
 
   describe('field parsing', () => {
     it('calls custom field parse', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Test',
           fields: {
@@ -68,27 +68,28 @@ describe('createStoreCore', () => {
           },
         },
       ]
-      options.models = models
+      options.schema = schema
       options.hooks = createHooks()
 
       const store = await createStoreCore(options)
       const item = { name: 'test' }
 
-      store.$processItemParsing(store.$models[0], item)
+      store.$processItemParsing(store.$collections[0]!, item)
 
       expect(item.name).toBe('TEST')
     })
 
     it('handle nested relations in result', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Message',
           relations: {
             author: {
               to: {
                 User: {
-                  on: 'id',
-                  eq: 'authorId',
+                  on: {
+                    id: 'authorId',
+                  },
                 },
               },
             },
@@ -103,7 +104,7 @@ describe('createStoreCore', () => {
           },
         },
       ]
-      options.models = models
+      options.schema = schema
       options.hooks = createHooks()
 
       const store = await createStoreCore(options)
@@ -118,7 +119,7 @@ describe('createStoreCore', () => {
         },
       }
 
-      store.$processItemParsing(store.$models[0], message)
+      store.$processItemParsing(store.$collections[0]!, message)
 
       expect(message.author.createdAt).toBeInstanceOf(Date)
       expect(message.author.createdAt.toISOString()).toBe('2023-01-01T00:00:00.000Z')
@@ -127,7 +128,7 @@ describe('createStoreCore', () => {
 
   describe('field serialization', () => {
     it('calls custom field serialize', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Test',
           fields: {
@@ -137,20 +138,20 @@ describe('createStoreCore', () => {
           },
         },
       ]
-      options.models = models
+      options.schema = schema
       options.hooks = createHooks()
 
       const store = await createStoreCore(options)
       const item = { date: new Date('2023-01-01T00:00:00Z') }
 
-      store.$processItemSerialization(store.$models[0], item)
+      store.$processItemSerialization(store.$collections[0]!, item)
 
       expect(item.date).toBe('2023-01-01T00:00:00.000Z')
     })
 
     it('skips serialization if value is null', async () => {
       const serializeMock = vi.fn()
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Test',
           fields: {
@@ -160,19 +161,19 @@ describe('createStoreCore', () => {
           },
         },
       ]
-      options.models = models
+      options.schema = schema
       options.hooks = createHooks()
 
       const store = await createStoreCore(options)
       const item = { optionalField: null }
 
-      store.$processItemSerialization(store.$models[0], item)
+      store.$processItemSerialization(store.$collections[0]!, item)
 
       expect(serializeMock).not.toHaveBeenCalled()
     })
 
     it('handles nested fields with dot notation', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'Test',
           fields: {
@@ -182,7 +183,7 @@ describe('createStoreCore', () => {
           },
         },
       ]
-      options.models = models
+      options.schema = schema
       options.hooks = createHooks()
 
       const store = await createStoreCore(options)
@@ -192,7 +193,7 @@ describe('createStoreCore', () => {
         },
       }
 
-      store.$processItemSerialization(store.$models[0], item)
+      store.$processItemSerialization(store.$collections[0]!, item)
 
       expect(item.metadata.createdAt).toBe('2023-01-01T00:00:00.000Z')
     })
@@ -221,9 +222,9 @@ describe('createStoreCore', () => {
     })
   })
 
-  describe('getModel', () => {
-    it('should return the correct model for an item', async () => {
-      const models: ModelList = [
+  describe('getCollection', () => {
+    it('should return the correct collection for an item', async () => {
+      const schema: StoreSchema = [
         {
           name: 'Test',
           isInstanceOf: (item: any) => item.__typename === 'Test',
@@ -233,18 +234,18 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => item.__typename === 'AnotherTest',
         },
       ]
-      options.models = models
+      options.schema = schema
       const store = await createStoreCore(options)
 
       const testItem = { __typename: 'Test' }
       const anotherTestItem = { __typename: 'AnotherTest' }
 
-      expect(store.$getModel(testItem)).toBe(store.$models[0])
-      expect(store.$getModel(anotherTestItem)).toBe(store.$models[1])
+      expect(store.$getCollection(testItem)).toBe(store.$collections[0])
+      expect(store.$getCollection(anotherTestItem)).toBe(store.$collections[1])
     })
 
-    it('should return the correct model for an item with no typename', async () => {
-      const models: ModelList = [
+    it('should return the correct collection for an item with no typename', async () => {
+      const schema: StoreSchema = [
         {
           name: 'User',
           isInstanceOf: (item: any) => 'username' in item,
@@ -254,33 +255,33 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => 'botname' in item,
         },
       ]
-      options.models = models
+      options.schema = schema
       const store = await createStoreCore(options)
 
       const testItem = { username: 'toto' }
       const anotherTestItem = { botname: 'bender' }
 
-      expect(store.$getModel(testItem)).toBe(store.$models[0])
-      expect(store.$getModel(anotherTestItem)).toBe(store.$models[1])
+      expect(store.$getCollection(testItem)).toBe(store.$collections[0])
+      expect(store.$getCollection(anotherTestItem)).toBe(store.$collections[1])
     })
 
-    it('should return null if no model matches the item', async () => {
-      const models: ModelList = [
+    it('should return null if no collection matches the item', async () => {
+      const schema: StoreSchema = [
         {
           name: 'Test',
           isInstanceOf: (item: any) => item.__typename === 'Test',
         },
       ]
-      options.models = models
+      options.schema = schema
       const store = await createStoreCore(options)
 
       const unknownItem = { __typename: 'Unknown' }
 
-      expect(store.$getModel(unknownItem)).toBeNull()
+      expect(store.$getCollection(unknownItem)).toBeNull()
     })
 
     it('should search in only specified types', async () => {
-      const models: ModelList = [
+      const schema: StoreSchema = [
         {
           name: 'User',
           isInstanceOf: (item: any) => 'username' in item,
@@ -294,17 +295,17 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => 'botname' in item,
         },
       ]
-      options.models = models
+      options.schema = schema
       const store = await createStoreCore(options)
 
       const testItem = { username: 'toto' }
 
-      expect(store.$getModel(testItem)).toBe(store.$models[0])
-      expect(store.$getModel(testItem, ['User2', 'Bot'])).toBe(store.$models[1])
+      expect(store.$getCollection(testItem)).toBe(store.$collections[0])
+      expect(store.$getCollection(testItem, ['User2', 'Bot'])).toBe(store.$collections[1])
     })
 
-    it('should return if only one specified model', async () => {
-      const models: ModelList = [
+    it('should return if only one specified collection', async () => {
+      const schema: StoreSchema = [
         {
           name: 'User',
           isInstanceOf: (item: any) => 'username' in item,
@@ -318,12 +319,12 @@ describe('createStoreCore', () => {
           isInstanceOf: (item: any) => 'fooname' in item,
         },
       ]
-      options.models = models
+      options.schema = schema
       const store = await createStoreCore(options)
 
       const testItem = { username: 'toto' }
 
-      expect(store.$getModel(testItem, ['Foo'])).toBe(store.$models[2])
+      expect(store.$getCollection(testItem, ['Foo'])).toBe(store.$collections[2])
     })
   })
 })

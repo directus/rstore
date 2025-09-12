@@ -2,32 +2,32 @@
 
 In most application, there are cases where some specific logic or state is needed. For example, you may want to handle the current user with a specific key and also have special mutations for login or logout.
 
-For this, you can create an rstore module, which is a shared composable that calls `createModule` and returns some exposed properties.
+For this, you can create an rstore module, which is a shared composable that calls `defineModule` with a module name and a setup function.
 
 ```ts
 // src/composables/auth.ts
 
-import { createModule, defineModule } from '@rstore/vue'
+import { defineModule } from '@rstore/vue'
 
-export const useAuth = defineModule(() => {
-  const store = useStore()
-
-  const { state, resolve, onResolve, defineMutation } = createModule(store, {
-    name: 'auth',
-    state: {
-      // Create some state here
-      currentUserKey: null as string | null,
-    },
+export const useAuth = defineModule('auth', ({
+  store,
+  defineState,
+  defineMutation,
+  onResolve,
+}) => {
+  const state = defineState({
+    // Create some state here
+    currentUserKey: null as string | null,
   })
 
-  return resolve({
+  return {
     // Expose things here
-  })
+  }
 })
 ```
 
 ::: tip
-With the `@rstore/nuxt` module, you can directly use the auto-imported `defineRstoreModule` function instead of `defineModule` and `createRstoreModule` instead of `createModule`.
+With the `@rstore/nuxt` module, you can directly use the auto-imported `defineRstoreModule` function instead of `defineModule`.
 :::
 
 ## Benefits of using modules
@@ -35,6 +35,7 @@ With the `@rstore/nuxt` module, you can directly use the auto-imported `defineRs
 - **Encapsulation**: Modules allow you to encapsulate related state, queries and mutations, making your code more organized and easier to maintain.
 - **Reusability**: You can create reusable modules that can be shared across different parts of your application or even across different applications.
 - **Shared**: rstore modules are automatically shared across all components that use them, so they are only created once.
+- **Code-splitting**: You can lazy-load modules when needed, reducing the initial bundle size of your application.
 - **SSR**: Modules are automatically SSR compatible, so you don't have to worry about the state being lost during server-side rendering.
 - **Async**: You can use async code (see `onResolve` below) to initialize the module.
 - **Hybrid promise**: Awaiting a module is optional, all exposed properties are also available directly.
@@ -42,54 +43,70 @@ With the `@rstore/nuxt` module, you can directly use the auto-imported `defineRs
 
 ![Modules tab in the rstore devtools](./img/devtools-modules.png)
 
+## Comparison with `pinia`
+
+[Pinia](https://pinia.vuejs.org/) is an amazing state management library for Vue.js applications. While both rstore modules and Pinia stores serve the purpose of managing state in a Vue application, there are some key differences between the two:
+
+- **Integration with rstore**: rstore modules are designed to work seamlessly with rstore's data collections and devtools, while Pinia is an external state management library.
+- **Private state**: rstore modules allow you to define private state that is not exposed outside the module, while still retaining compatibility with SSR.
+- **Hybrid promise**: rstore modules can be awaited for async initialization, but can also be used directly without awaiting, while Pinia stores are synchronous.
+
 ## State
 
-Define the state of the module using the `state` option of `createModule`. The state is reactive and stored in the rstore cache (which also means it is transferred to the client in SSR).
+Define the state of the module using the `defineState` function from the module setup function. The state is reactive and stored in the rstore cache (which also means it is transferred to the client in SSR).
 
-```ts{3-5}
-const { state } = createModule(store, {
-  name: 'auth',
-  state: {
+```ts{4-6}
+export const useAuth = defineModule('auth', ({
+  defineState,
+}) => {
+  const state = defineState({
     currentUserKey: null as string | null,
-  },
+  })
 })
 ```
 
+::: tip
+You don't have to expose the state if you want to keep it private to the module. It will be still hydrated in SSR and shared across all components using the module.
+:::
+
 ## Expose
 
-You must return the result of the `resolve` function to expose the module properties. The `resolve` function takes an object with the properties you want to expose.
+You must return an object from the module setup function to expose the module properties.
 
 ```ts{6-8}
-const { state, resolve } = createModule(store, {
-  name: 'auth',
-  state: {},
-})
+export const useAuth = defineModule('auth', ({
+  defineState,
+}) => {
+  const state = defineState({})
 
-return resolve({
-  // Expose things here
+  return {
+    // Expose things here
+  }
 })
 ```
 
 You can for example expose a query:
 
 ```ts
-const { state, resolve } = createModule(store, {
-  name: 'auth',
-  state: {
+export const useAuth = defineModule('auth', ({
+  store,
+  defineState,
+}) => {
+  const state = defineState({
     currentUserKey: null as string | null,
-  },
-})
+  })
 
-const currentUser = store.User.queryFirst(() => state.currentUserKey
-  ? {
-      key: state.currentUserKey,
-    }
-  : {
-      enabled: false,
-    })
+  const currentUser = store.User.query(q => q.first(state.currentUserKey
+    ? {
+        key: state.currentUserKey,
+      }
+    : {
+        enabled: false,
+      }))
 
-return resolve({
-  currentUser,
+  return {
+    currentUser,
+  }
 })
 ```
 
@@ -102,51 +119,52 @@ const { data: currentUser } = auth.currentUser
 
 ## onResolve
 
-You can use the `onResolve` function to run some code when the module is resolved. This is useful for initializing the module or running some async code.
+You can use the `onResolve` function from the module setup function to run some code when the module is resolved. This is useful for initializing the module or running some async code.
 
-```ts
-const { state, resolve, onResolve, defineMutation } = createModule(store, {
-  name: 'auth',
-  state: {
+```ts{33-37}
+export const useAuth = defineModule('auth', ({
+  store,
+  defineState,
+  onResolve,
+}) => {
+  const state = defineState({
     currentUserKey: null as string | null,
-  },
-})
+  })
 
-const currentUser = store.User.queryFirst(() => { /* ... */ })
+  const currentUser = store.User.query(q => q.first({ /* ... */ }))
 
-const requestFetch = useRequestFetch()
+  const requestFetch = useRequestFetch()
 
-async function initCurrentUser() {
-  try {
-    const user = await requestFetch('/api/auth/me')
-    if (user) {
-      state.currentUserKey = user.id
-      store.User.writeItem({
-        ...user,
-        createdAt: new Date(user.createdAt),
-      })
+  async function initCurrentUser() {
+    try {
+      const user = await requestFetch('/api/auth/me')
+      if (user) {
+        state.currentUserKey = user.id
+        store.User.writeItem({
+          ...user,
+          createdAt: new Date(user.createdAt),
+        })
+      }
+      else {
+        state.currentUserKey = null
+      }
     }
-    else {
-      state.currentUserKey = null
+    catch (e) {
+      console.error('Failed to init current user', e)
     }
   }
-  catch (e) {
-    console.error('Failed to init current user', e)
+
+  onResolve(async () => {
+    // Wait for async code to run before
+    // the module is considered resolved
+    await initCurrentUser()
+  })
+
+  return {
+    currentUser,
   }
-}
-
-onResolve(async () => {
-  await initCurrentUser()
-})
-
-return resolve({
-  currentUser,
 })
 ```
-
-::: warning
-The `store.<model>.writeItem` function does not currently apply parsing as defined in the model configuration. This is a known issue and will be fixed in a future release.
-:::
 
 You can then await the module in your component:
 
@@ -164,44 +182,48 @@ Awaiting a module is always optional. You can use the module without awaiting it
 
 ## Mutations
 
-You can define mutations using the `defineMutation` function. This is useful for defining actions that modify the state of the module or the store in general.
+You can define mutations using the `defineMutation` function from the module setup function. This is useful for defining actions that modify the state of the module or the store in general.
 
 ```ts
-const { state, resolve, defineMutation } = createModule(store, {
-  name: 'auth',
-  state: {
+export const useAuth = defineModule('auth', ({
+  store,
+  defineState,
+  defineMutation,
+  onResolve,
+}) => {
+  const state = defineState({
     currentUserKey: null as string | null,
-  },
-})
-
-// ...
-
-const login = defineMutation(async (email: string, password: string) => {
-  const result = await $fetch('/api/auth/login', {
-    method: 'POST',
-    body: {
-      email,
-      password,
-    },
   })
-  state.currentUserKey = result.userId
-})
 
-const logout = defineMutation(async () => {
-  await $fetch('/api/auth/logout', {
-    method: 'POST',
+  // ...
+
+  const login = defineMutation(async (email: string, password: string) => {
+    const result = await $fetch('/api/auth/login', {
+      method: 'POST',
+      body: {
+        email,
+        password,
+      },
+    })
+    state.currentUserKey = result.userId
   })
-  state.currentUserKey = null
-})
 
-onResolve(async () => {
-  await initCurrentUser()
-})
+  const logout = defineMutation(async () => {
+    await $fetch('/api/auth/logout', {
+      method: 'POST',
+    })
+    state.currentUserKey = null
+  })
 
-return resolve({
-  currentUser,
-  login,
-  logout,
+  onResolve(async () => {
+    await initCurrentUser()
+  })
+
+  return {
+    currentUser,
+    login,
+    logout,
+  }
 })
 ```
 
@@ -220,9 +242,9 @@ const password = ref('')
   <UForm @submit="auth.login(email, password)">
     <UInput v-model="email" label="Email" />
     <UInput v-model="password" label="Password" type="password" />
-    <UButton :loading="auth.login.$loading.value">Login</UButton>
-    <UAlert v-if="auth.login.$error.value" color="error">
-      {{ auth.login.$error.value.message }}
+    <UButton :loading="auth.login.$loading">Login</UButton>
+    <UAlert v-if="auth.login.$error" color="error">
+      {{ auth.login.$error.message }}
     </UAlert>
   </UForm>
 </template>

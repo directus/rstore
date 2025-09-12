@@ -1,14 +1,14 @@
 <script lang="ts" setup>
 const store = useStore()
 
-// const { data: messages } = store.ChatMessage.queryMany({
+// const { data: messages } = store.ChatMessage.query(q => q.many({
 //   fetchPolicy: 'cache-only',
-// })
+// }))
 // store.ChatMessage.subscribe()
 
-const { data: messages } = store.ChatMessage.liveQueryMany({
+const { data: messages } = store.ChatMessage.liveQuery(q => q.many({
   fetchPolicy: 'cache-only',
-})
+}))
 
 type CreateChat = StoreCreateFormObject<'ChatMessage'>
 

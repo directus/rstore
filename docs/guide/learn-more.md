@@ -4,7 +4,7 @@
 
 rstore is a powerful data store that allows you to manage all the data in your application efficiently.
 
-With rstore, you can define a data model and then run queries or execute mutations (create, update, and delete) on your data seamlessly.
+With rstore, you can define a data collection and then run queries or execute mutations (create, update, and delete) on your data seamlessly.
 
 Its main features include:
 
@@ -25,7 +25,7 @@ Here are some use cases for which rstore can be a great data management solution
 
 ### Small apps and prototypes
 
-rstore is perfect for small applications and prototypes due to its simplicity and progressiveness. You can quickly set up a data model and start managing your data with a simple plugin to handle all REST calls. You can then take advantage of the powerful API provided by the store and quickly add more Models to your app as it grows. The reactive cache ensures that your UI components are always in sync with the latest data, making development simpler and less bug-prone.
+rstore is perfect for small applications and prototypes due to its simplicity and progressiveness. You can quickly set up a data collection and start managing your data with a simple plugin to handle all REST calls. You can then take advantage of the powerful API provided by the store and quickly add more Collections to your app as it grows. The reactive cache ensures that your UI components are always in sync with the latest data, making development simpler and less bug-prone.
 
 ### Enterprise
 
@@ -47,13 +47,13 @@ rstore design makes it easy to add support for real-time updates and collaborati
 
 The reactive normalized cache in rstore is a key feature that ensures your application's data is always consistent and up-to-date. This cache automatically normalizes the data, meaning it stores data in a structured format that eliminates redundancy and allows maintaining relationships between different items.
 
-The cache is also reactive, meaning reading from the cache in a `computed` will always keep the components updated. In fact, each time you use `store.Todo.queryMany()` you get a computed ref that reads from the cache.
+The cache is also reactive, meaning reading from the cache in a `computed` will always keep the components updated. In fact, each time you use `store.Todo.query()` you get a computed ref that reads from the cache.
 
 The reactive normalized cache in rstore offers several benefits.
 - Consistency is maintained by normalizing the data, ensuring a single source of truth for each item, which prevents duplication and inconsistencies.
 - Reactivity is another advantage, as the cache automatically updates any part of your application that depends on the data whenever changes occur, keeping your UI in sync with the latest state.
 - Efficiency is achieved through the structured format of normalized data, allowing for quicker and less overhead-intensive queries and updates.
-- Co-locating the data requirements with the components that use them is a powerful pattern. By using the `queryMany` and `queryFirst` composables, you can easily fetch and display data in your components without worrying about deduplicating or synchronizing with other components.
+- Co-locating the data requirements with the components that use them is a powerful pattern. By using the `query` composable, you can easily fetch and display data in your components without worrying about deduplicating or synchronizing with other components.
 
 ![schema of rstore cache](./img/rstore-cache-dark.svg){.dark-only}{.small}
 ![schema of rstore cache](./img/rstore-cache.svg){.light-only}{.small}
@@ -119,18 +119,18 @@ export default definePlugin({
   setup({ hook }) {
     hook('fetchFirst', async (payload) => {
       if (payload.key) {
-        const result = await $fetch(`/api/${payload.model.name}/${payload.key}`)
+        const result = await $fetch(`/api/${payload.collection.name}/${payload.key}`)
         payload.setResult(result)
       }
     })
 
     hook('fetchMany', async (payload) => {
-      const result = await $fetch(`/api/${payload.model.name}`)
+      const result = await $fetch(`/api/${payload.collection.name}`)
       payload.setResult(result)
     })
 
     hook('createItem', async (payload) => {
-      const result = await $fetch(`/api/${payload.model.name}`, {
+      const result = await $fetch(`/api/${payload.collection.name}`, {
         method: 'POST',
         body: payload.item,
       })
@@ -138,7 +138,7 @@ export default definePlugin({
     })
 
     hook('updateItem', async (payload) => {
-      const result = await $fetch(`/api/${payload.model.name}/${payload.key}`, {
+      const result = await $fetch(`/api/${payload.collection.name}/${payload.key}`, {
         method: 'PATCH',
         body: payload.item,
       })
@@ -146,7 +146,7 @@ export default definePlugin({
     })
 
     hook('deleteItem', async (payload) => {
-      await $fetch(`/api/${payload.model.name}/${payload.key}`, {
+      await $fetch(`/api/${payload.collection.name}/${payload.key}`, {
         method: 'DELETE',
       })
     })
@@ -182,7 +182,7 @@ Another important difference is that rstore is based on a normalized cache and i
 |--------|--------------|
 | Local-first (compute client-side) | Server-first with caching |
 | Normalized cache | Query-based cache |
-| Data structured with models | No mandatory structure |
+| Data structured with collections | No mandatory structure |
 | Fetching through plugins | Fetching in queries themselves |
 
 ### Tanstack Query

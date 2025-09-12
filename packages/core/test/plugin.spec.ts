@@ -1,11 +1,11 @@
-import { createHooks, type ModelDefaults, type ModelList, type RegisteredPlugin, type StoreCore } from '@rstore/shared'
+import { type CollectionDefaults, createHooks, type RegisteredPlugin, type StoreCore, type StoreSchema } from '@rstore/shared'
 import { describe, expect, it, vi } from 'vitest'
-import { setupPlugin } from '../src/plugin'
+import { setupPlugin, sortPlugins } from '../src/plugin'
 
 describe('setupPlugin', () => {
   it('should call plugin.setup', async () => {
     const mockHook = vi.fn()
-    const mockStore: StoreCore<ModelList, ModelDefaults> = {
+    const mockStore: StoreCore<StoreSchema, CollectionDefaults> = {
       $hooks: {
         hook: mockHook,
       },
@@ -21,13 +21,13 @@ describe('setupPlugin', () => {
 
     expect(mockPlugin.setup).toHaveBeenCalledWith({
       hook: expect.any(Function),
-      addModelDefaults: expect.any(Function),
+      addCollectionDefaults: expect.any(Function),
     })
   })
 
   it('should handle async plugin setup', async () => {
     const mockHook = vi.fn()
-    const mockStore: StoreCore<ModelList, ModelDefaults> = {
+    const mockStore: StoreCore<StoreSchema, CollectionDefaults> = {
       $hooks: {
         hook: mockHook,
       },
@@ -46,7 +46,7 @@ describe('setupPlugin', () => {
 
   it('should throw if plugin setup fails', async () => {
     const mockHook = vi.fn()
-    const mockStore: StoreCore<ModelList, ModelDefaults> = {
+    const mockStore: StoreCore<StoreSchema, CollectionDefaults> = {
       $hooks: {
         hook: mockHook,
       },
@@ -64,7 +64,7 @@ describe('setupPlugin', () => {
   describe('hook', () => {
     it('should register hook', async () => {
       const mockHook = vi.fn()
-      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+      const mockStore: StoreCore<StoreSchema, CollectionDefaults> = {
         $hooks: {
           hook: mockHook,
         },
@@ -84,7 +84,7 @@ describe('setupPlugin', () => {
     })
 
     it('should filter hook with scopeId', async () => {
-      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+      const mockStore: StoreCore<StoreSchema, CollectionDefaults> = {
         $hooks: createHooks(),
       } as any
 
@@ -102,25 +102,25 @@ describe('setupPlugin', () => {
       await setupPlugin(mockStore, mockPlugin)
 
       await mockStore.$hooks.callHook('fetchMany', {
-        model: {
+        collection: {
           name: 'Todo',
           scopeId: 'my-scope',
         } as any,
       } as any)
 
       await mockStore.$hooks.callHook('fetchMany', {
-        model: {
+        collection: {
           name: 'Message',
           scopeId: 'other-scope',
         } as any,
       } as any)
 
       expect(hookCallback).toHaveBeenCalledOnce()
-      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
+      expect(hookCallback.mock.calls[0]![0].collection.name).toBe('Todo')
     })
 
     it('should not filter hook with scopeId with ignoreScope', async () => {
-      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+      const mockStore: StoreCore<StoreSchema, CollectionDefaults> = {
         $hooks: createHooks(),
       } as any
 
@@ -140,26 +140,26 @@ describe('setupPlugin', () => {
       await setupPlugin(mockStore, mockPlugin)
 
       await mockStore.$hooks.callHook('fetchMany', {
-        model: {
+        collection: {
           name: 'Todo',
           scopeId: 'my-scope',
         } as any,
       } as any)
 
       await mockStore.$hooks.callHook('fetchMany', {
-        model: {
+        collection: {
           name: 'Message',
           scopeId: 'other-scope',
         } as any,
       } as any)
 
       expect(hookCallback).toHaveBeenCalledTimes(2)
-      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
-      expect(hookCallback.mock.calls[1][0].model.name).toBe('Message')
+      expect(hookCallback.mock.calls[0]![0].collection.name).toBe('Todo')
+      expect(hookCallback.mock.calls[1]![0].collection.name).toBe('Message')
     })
 
-    it('should not filter hook with model without scope', async () => {
-      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+    it('should not filter hook with collection without scope', async () => {
+      const mockStore: StoreCore<StoreSchema, CollectionDefaults> = {
         $hooks: createHooks(),
       } as any
 
@@ -177,24 +177,24 @@ describe('setupPlugin', () => {
       await setupPlugin(mockStore, mockPlugin)
 
       await mockStore.$hooks.callHook('fetchMany', {
-        model: {
+        collection: {
           name: 'Todo',
         } as any,
       } as any)
 
       await mockStore.$hooks.callHook('fetchMany', {
-        model: {
+        collection: {
           name: 'Message',
         } as any,
       } as any)
 
       expect(hookCallback).toHaveBeenCalledTimes(2)
-      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
-      expect(hookCallback.mock.calls[1][0].model.name).toBe('Message')
+      expect(hookCallback.mock.calls[0]![0].collection.name).toBe('Todo')
+      expect(hookCallback.mock.calls[1]![0].collection.name).toBe('Message')
     })
 
     it('should not filter hook with plugin without scope', async () => {
-      const mockStore: StoreCore<ModelList, ModelDefaults> = {
+      const mockStore: StoreCore<StoreSchema, CollectionDefaults> = {
         $hooks: createHooks(),
       } as any
 
@@ -211,41 +211,41 @@ describe('setupPlugin', () => {
       await setupPlugin(mockStore, mockPlugin)
 
       await mockStore.$hooks.callHook('fetchMany', {
-        model: {
+        collection: {
           name: 'Todo',
           scopeId: 'my-scope',
         } as any,
       } as any)
 
       await mockStore.$hooks.callHook('fetchMany', {
-        model: {
+        collection: {
           name: 'Message',
           scopeId: 'other-scope',
         } as any,
       } as any)
 
       expect(hookCallback).toHaveBeenCalledTimes(2)
-      expect(hookCallback.mock.calls[0][0].model.name).toBe('Todo')
-      expect(hookCallback.mock.calls[1][0].model.name).toBe('Message')
+      expect(hookCallback.mock.calls[0]![0].collection.name).toBe('Todo')
+      expect(hookCallback.mock.calls[1]![0].collection.name).toBe('Message')
     })
   })
 
-  describe('addModelDefaults', () => {
-    describe('addModelDefaults', () => {
-      it('should add model defaults to the store', async () => {
+  describe('addCollectionDefaults', () => {
+    describe('addCollectionDefaults', () => {
+      it('should add collection defaults to the store', async () => {
         const mockHook = vi.fn()
-        const mockStore: StoreCore<ModelList, ModelDefaults> = {
+        const mockStore: StoreCore<StoreSchema, CollectionDefaults> = {
           $hooks: {
             hook: mockHook,
           },
-          $modelDefaults: {},
+          $collectionDefaults: {},
         } as any
 
         const mockPlugin: RegisteredPlugin = {
           name: 'test',
           hooks: {},
-          setup: async ({ addModelDefaults }) => {
-            addModelDefaults({
+          setup: async ({ addCollectionDefaults }) => {
+            addCollectionDefaults({
               computed: {
                 test: () => 'test',
               },
@@ -255,18 +255,18 @@ describe('setupPlugin', () => {
 
         await setupPlugin(mockStore, mockPlugin)
 
-        expect(mockStore.$modelDefaults.computed).toEqual({
+        expect(mockStore.$collectionDefaults.computed).toEqual({
           test: expect.any(Function),
         })
       })
 
-      it('should merge model defaults with existing defaults', async () => {
+      it('should merge collection defaults with existing defaults', async () => {
         const mockHook = vi.fn()
-        const mockStore: StoreCore<ModelList, ModelDefaults> = {
+        const mockStore: StoreCore<StoreSchema, CollectionDefaults> = {
           $hooks: {
             hook: mockHook,
           },
-          $modelDefaults: {
+          $collectionDefaults: {
             computed: {
               existing: () => 'existing',
             },
@@ -276,8 +276,8 @@ describe('setupPlugin', () => {
         const mockPlugin: RegisteredPlugin = {
           name: 'test',
           hooks: {},
-          setup: async ({ addModelDefaults }) => {
-            addModelDefaults({
+          setup: async ({ addCollectionDefaults }) => {
+            addCollectionDefaults({
               computed: {
                 test: () => 'test',
               },
@@ -287,19 +287,19 @@ describe('setupPlugin', () => {
 
         await setupPlugin(mockStore, mockPlugin)
 
-        expect(mockStore.$modelDefaults.computed).toEqual({
+        expect(mockStore.$collectionDefaults.computed).toEqual({
           existing: expect.any(Function),
           test: expect.any(Function),
         })
       })
 
-      it('should overwrite existing model defaults if specified', async () => {
+      it('should overwrite existing collection defaults if specified', async () => {
         const mockHook = vi.fn()
-        const mockStore: StoreCore<ModelList, ModelDefaults> = {
+        const mockStore: StoreCore<StoreSchema, CollectionDefaults> = {
           $hooks: {
             hook: mockHook,
           },
-          $modelDefaults: {
+          $collectionDefaults: {
             computed: {
               test: () => 'old',
             },
@@ -309,8 +309,8 @@ describe('setupPlugin', () => {
         const mockPlugin: RegisteredPlugin = {
           name: 'test',
           hooks: {},
-          setup: async ({ addModelDefaults }) => {
-            addModelDefaults({
+          setup: async ({ addCollectionDefaults }) => {
+            addCollectionDefaults({
               computed: {
                 test: () => 'new',
               },
@@ -320,11 +320,273 @@ describe('setupPlugin', () => {
 
         await setupPlugin(mockStore, mockPlugin)
 
-        expect(mockStore.$modelDefaults.computed).toEqual({
+        expect(mockStore.$collectionDefaults.computed).toEqual({
           test: expect.any(Function),
         })
-        expect(mockStore.$modelDefaults.computed?.test({})).toBe('new')
+        expect(mockStore.$collectionDefaults.computed!.test!({})).toBe('new')
       })
+    })
+  })
+
+  describe('plugin sorting', () => {
+    it('should sort plugins based on order in the options', () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-a', 'plugin-b', 'plugin-c'])
+    })
+
+    it('should sort plugins based on after property', () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          after: { plugins: ['plugin-b'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          after: { plugins: ['plugin-b'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-b', 'plugin-a', 'plugin-c'])
+    })
+
+    it('should sort plugins based on before/after property', () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          after: { plugins: ['plugin-b'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          after: { plugins: ['plugin-b'] },
+          before: { plugins: ['plugin-a'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-b', 'plugin-c', 'plugin-a'])
+    })
+
+    it('should sort plugins based on before property', () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          before: { plugins: ['plugin-a'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-c', 'plugin-a', 'plugin-b'])
+    })
+
+    it('should sort plugins based on before and after properties', () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          after: { plugins: ['plugin-b'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          before: { plugins: ['plugin-a'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-b', 'plugin-c', 'plugin-a'])
+    })
+
+    it('should handle circular dependencies gracefully', () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          after: { plugins: ['plugin-b'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          after: { plugins: ['plugin-c'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          after: { plugins: ['plugin-a'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name).sort()).toEqual(['plugin-a', 'plugin-b', 'plugin-c'])
+    })
+
+    it('should sort plugins based on category', () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          category: 'remote',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          category: 'local',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          category: 'processing',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-d',
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-b', 'plugin-a', 'plugin-c', 'plugin-d'])
+    })
+
+    it('should sort plugins based on category and before/after properties', () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          category: 'remote',
+          after: { plugins: ['plugin-b'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          category: 'local',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          category: 'processing',
+          before: { plugins: ['plugin-a'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-d',
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-b', 'plugin-c', 'plugin-a', 'plugin-d'])
+    })
+
+    it('should sort based on before/after categories', () => {
+      const plugins: RegisteredPlugin[] = [
+        {
+          name: 'plugin-a',
+          after: { categories: ['local'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-b',
+          category: 'local',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-c',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-d',
+          category: 'remote',
+          hooks: {},
+          setup: vi.fn(),
+        },
+        {
+          name: 'plugin-e',
+          category: 'processing',
+          before: { categories: ['remote'] },
+          hooks: {},
+          setup: vi.fn(),
+        },
+      ]
+
+      const result = sortPlugins(plugins)
+
+      expect(result.map(p => p.name)).toEqual(['plugin-b', 'plugin-a', 'plugin-c', 'plugin-e', 'plugin-d'])
     })
   })
 })

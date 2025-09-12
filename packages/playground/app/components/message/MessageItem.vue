@@ -6,7 +6,7 @@ const props = defineProps<{
 
 const store = useStore()
 
-const { data: message } = await store.Message.queryFirst(props.id)
+const { data: message } = await store.Message.query(q => q.first(props.id))
 
 async function updateText() {
   const { faker } = await import('@faker-js/faker')
@@ -25,7 +25,7 @@ async function updateText() {
     <UAvatar
       :src="message.author && 'avatar' in message.author ? message.author.avatar : undefined"
       :alt="message.author?.name"
-      :icon="message.author?.$model === 'Bot' ? 'lucide:bot' : undefined"
+      :icon="message.author?.$collection === 'Bot' ? 'lucide:bot' : undefined"
     />
     <div class="flex-1 min-w-0 flex flex-col gap-1">
       <div
@@ -37,7 +37,7 @@ async function updateText() {
         </span>
 
         <UBadge
-          v-if="message.author.$model === 'Bot'"
+          v-if="message.author.$collection === 'Bot'"
           icon="lucide:bot"
           color="secondary"
           variant="soft"

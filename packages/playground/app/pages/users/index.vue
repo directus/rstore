@@ -1,6 +1,6 @@
 <script lang="ts" setup>
 const store = useStore()
-const { data: users } = await store.User.queryMany()
+const { data: users } = await store.User.query(q => q.many())
 </script>
 
 <template>

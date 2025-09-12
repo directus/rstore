@@ -1,20 +1,15 @@
-export const useAuth = defineRstoreModule(() => {
-  const store = useStore()
-
-  const { state, resolve, onResolve, defineMutation } = createRstoreModule(store, {
-    name: 'auth',
-    state: {
-      currentUserKey: null as string | null,
-    },
+export const useAuth = defineRstoreModule('auth', ({ store, defineState, defineMutation, onResolve }) => {
+  const state = defineState({
+    currentUserKey: null as string | null,
   })
 
-  const currentUser = store.User.queryFirst(() => state.currentUserKey
+  const currentUser = store.User.query(q => q.first(state.currentUserKey
     ? {
         key: state.currentUserKey,
       }
     : {
         enabled: false,
-      })
+      }))
 
   const requestFetch = useRequestFetch()
 
@@ -59,10 +54,10 @@ export const useAuth = defineRstoreModule(() => {
     await initCurrentUser()
   })
 
-  return resolve({
+  return {
     currentUser,
     login,
     logout,
     loggedIn: computed(() => !!state.currentUserKey),
-  })
+  }
 })

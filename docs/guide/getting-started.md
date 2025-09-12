@@ -2,7 +2,7 @@
 
 rstore is a data store allowing you to handle all data in your application.
 
-Define a data model and then run queries or execute mutations (create, update and delete) on your data.
+Define a data collection and then run queries or execute mutations (create, update and delete) on your data.
 
 **FEATURES**
 
@@ -39,21 +39,29 @@ pnpm i @rstore/vue
 
 :::
 
-2. Create some Models:
+2. Create some Collections:
 
 ::: code-group
 
-```js [src/rstore/model.js]
-import { defineDataModel } from '@rstore/vue'
+```js [src/rstore/collection.js]
+import { defineCollection } from '@rstore/vue'
 
-export const todoModel = defineDataModel({
+export const todoCollection = defineCollection({
   name: 'todos',
+  // Interact with a REST/GraphQL/etc. API
+  hooks: {
+    fetchFirst: ({ key }) => fetch(`/api/todos/${key}`).then(r => r.json()),
+    fetchMany: ({ params }) => fetch('/api/todos').then(r => r.json()),
+    create: ({ item }) => { /* ... */ },
+    update: ({ key, item }) => { /* ... */ },
+    delete: ({ key }) => { /* ... */ },
+  },
 })
 ```
 
-```ts [src/rstore/model.ts]
-import type { ModelList } from '@rstore/vue'
-import { defineItemType } from '@rstore/vue'
+```ts [src/rstore/collection.ts]
+import type { StoreSchema } from '@rstore/vue'
+import { withItemType } from '@rstore/vue'
 
 // Item type
 export interface Todo {
@@ -64,17 +72,23 @@ export interface Todo {
   updatedAt?: Date
 }
 
-// Model
-const todoModel = defineItemType<Todo>().model({
+// Collection
+const todoCollection = withItemType<Todo>().defineCollection({
   name: 'todos',
 })
 
-export const models = [
-  todoModel,
-] satisfies ModelList
+export const schema = [
+  todoCollection,
+] satisfies StoreSchema
 ```
 
 :::
+
+::: info
+Instead of defining the hooks in the collection, you can also create a plugin to handle the fetching logic for many collections at once (see [Plugins](./plugin/setup.md)).
+:::
+
+<!--
 
 3. Create a plugin to interact with an API:
 
@@ -107,20 +121,20 @@ export default definePlugin({
   setup({ hook }) {
     hook('fetchFirst', async (payload) => {
       if (payload.key) {
-        const result = await fetch(`/api/${payload.model.name}/${payload.key}`)
+        const result = await fetch(`/api/${payload.collection.name}/${payload.key}`)
           .then(r => r.json())
         payload.setResult(result)
       }
     })
 
     hook('fetchMany', async (payload) => {
-      const result = await fetch(`/api/${payload.model.name}`)
+      const result = await fetch(`/api/${payload.collection.name}`)
         .then(r => r.json())
       payload.setResult(result)
     })
 
     hook('createItem', async (payload) => {
-      const result = await fetch(`/api/${payload.model.name}`, {
+      const result = await fetch(`/api/${payload.collection.name}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -131,7 +145,7 @@ export default definePlugin({
     })
 
     hook('updateItem', async (payload) => {
-      const result = await fetch(`/api/${payload.model.name}/${payload.key}`, {
+      const result = await fetch(`/api/${payload.collection.name}/${payload.key}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
@@ -142,7 +156,7 @@ export default definePlugin({
     })
 
     hook('deleteItem', async (payload) => {
-      await fetch(`/api/${payload.model.name}/${payload.key}`, {
+      await fetch(`/api/${payload.collection.name}/${payload.key}`, {
         method: 'DELETE',
       })
     })
@@ -154,19 +168,21 @@ export default definePlugin({
 In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and other popular standards. Feel free to also share your own plugins with the community! 😸
 :::
 
-4. Create the store:
+-->
+
+3. Create the store:
 
 ::: code-group
 
 ```js [src/rstore/index.js]
 import { createStore } from '@rstore/vue'
-import { todoModel } from './model'
+import { todoCollection } from './collection'
 import myPlugin from './plugin'
 
-export async function rstore(app) {
+export async function setupRstore(app) {
   const store = await createStore({
-    models: [
-      todoModel,
+    schema: [
+      todoCollection,
     ],
     plugins: [
       myPlugin,
@@ -178,12 +194,12 @@ export async function rstore(app) {
 ```ts [src/rstore/index.ts]
 import type { App } from 'vue'
 import { createStore } from '@rstore/vue'
-import { models } from './model'
+import { schema } from './collection'
 import myPlugin from './plugin'
 
-export async function rstore(app: App) {
+export async function setupRstore(app: App) {
   const store = await createStore({
-    models,
+    schema,
     plugins: [
       myPlugin,
     ],
@@ -193,72 +209,58 @@ export async function rstore(app: App) {
 
 :::
 
-5. Expose the store to your components with a composable:
+4. Install the store into the app:
 
 ::: code-group
 
 ```js{1,8,11-17} [src/rstore/index.js]
-const injectStoreKey = Symbol('rstore')
+import { RstorePlugin } from '@rstore/vue'
 
-export async function rstore(app) {
+export async function setupRstore(app) {
   const store = await createStore({
     // ...
   })
 
-  app.provide(injectStoreKey, store)
-}
-
-export function useStore () {
-  const store = inject(injectStoreKey, null)
-  if (store == null) {
-    throw new Error('No rstore provided.')
-  }
-  return store
+  app.use(RstorePlugin, { store })
 }
 ```
 
 ```ts{1,2,4,11,14-20} [src/rstore/index.ts]
-import type { VueStore } from '@rstore/vue'
-import type { InjectionKey } from 'vue'
+import { RstorePlugin, type VueStore } from '@rstore/vue'
 
-const injectStoreKey = Symbol('rstore') as InjectionKey<VueStore<typeof models>>
-
-export async function rstore(app: App) {
+export async function setupRstore(app: App) {
   const store = await createStore({
     // ...
   })
 
-  app.provide(injectStoreKey, store)
+  app.use(RstorePlugin, { store })
 }
 
-export function useStore () {
-  const store = inject(injectStoreKey, null)
-  if (store == null) {
-    throw new Error('No rstore provided.')
-  }
-  return store
+// Augment the `useStore` type
+declare module '@rstore/vue' {
+  export function useStore(): VueStore<typeof schema>
 }
 ```
 
 :::
 
-6. Add the store to your app:
+5. Add the store to your app:
 
 ```js
-import { rstore } from './rstore'
+import { setupRstore } from './rstore'
 
-app.use(rstore)
+app.use(setupRstore)
 ```
 
-7. Use the store in a component:
+6. Use the store in a component:
 
 ```vue
 <script setup>
-import { useStore } from '@/rstore'
+import { useStore } from '@rstore/vue'
 
 const store = useStore()
 
-const { data: todos } = store.todos.queryMany()
+const { data: todos } = store.todos.query(q => q.many())
 </script>
 
 <template>
@@ -269,11 +271,11 @@ const { data: todos } = store.todos.queryMany()
 ## Nuxt
 
 The Nuxt module will automatically:
-- scan the `rstore` folder in your Nuxt app for models,
+- scan the `rstore` folder in your Nuxt app for collections,
 - scan the `rstore/plugins` folder and register plugins (using `export default`),
 - create the store
 - handle SSR payload
-- expose the `useStore` composable typed according to the model (from the `rstore` folder).
+- expose the `useStore` composable typed according to the collection (from the `rstore` folder).
 
 <br>
 
@@ -299,31 +301,53 @@ export default defineNuxtConfig({
 
 :::
 
-2. Create some Models in the `rstore` (or `app/rstore`) folder of your Nuxt app:
+2. Create some Collections in the `app/rstore` folder of your Nuxt app:
 
 ::: code-group
 
 ```ts [app/rstore/todo.ts]
-// One Model
-export default defineItemType<Todo>().model({
+// One Collection
+export default withItemType<Todo>().defineCollection({
   name: 'todos',
+  // Interact with a REST/GraphQL/etc. API
+  hooks: {
+    fetchFirst: ({ key }) => $fetch(`/api/todos/${key}`),
+    fetchMany: ({ params }) => $fetch('/api/todos', { query: params }),
+    create: ({ item }) => { /* ... */ },
+    update: ({ key, item }) => { /* ... */ },
+    delete: ({ key }) => { /* ... */ },
+  },
 })
 ```
 
 ```ts [app/rstore/multiple.ts]
-// Multiple Models
-export default [
-  defineItemType<User>().model({
-    name: 'users',
-  }),
+// Multiple Collections
+const users = withItemType<User>().defineCollection({
+  name: 'users',
+  // Interact with a REST/GraphQL/etc. API
+  hooks: {
+    fetchFirst: ({ key }) => $fetch(`/api/users/${key}`),
+    fetchMany: ({ params }) => $fetch('/api/users', { query: params }),
+    create: ({ item }) => { /* ... */ },
+    update: ({ key, item }) => { /* ... */ },
+    delete: ({ key }) => { /* ... */ },
+  },
+})
 
-  defineItemType<Bot>().model({
-    name: 'bots',
-  }),
-]
+const bots = withItemType<Bot>().defineCollection({
+  name: 'bots',
+  // Interact with a REST/GraphQL/etc. API
+  hooks: {
+    fetchFirst: ({ key }) => $fetch(`/api/bots/${key}`),
+    fetchMany: ({ params }) => $fetch('/api/bots', { query: params }),
+    create: ({ item }) => { /* ... */ },
+    update: ({ key, item }) => { /* ... */ },
+    delete: ({ key }) => { /* ... */ },
+  },
+})
 ```
 
-```ts [shared/types/model.ts]
+```ts [shared/types/collection.ts]
 // Item types
 
 export interface Todo {
@@ -349,8 +373,18 @@ export interface Bot {
 :::
 
 ::: warning FILE SCANNING
-The rstore module will only scan exported defaults in files in the `rstore` folder and not in nested folders. If you want to split the models in multiple folders, you need to re-export each variables (currently the module is looking for `export default` expressions) or use Nuxt layers (recommended).
+The rstore module will only scan exports in files in the `rstore` folder and not in nested folders. If you want to split the collections in multiple folders, you need to re-export each variables or use Nuxt layers (recommended).
 :::
+
+::: info
+Instead of defining the hooks in the collection, you can also create a plugin to handle the fetching logic for many collections at once (see [Plugins](./plugin/setup.md)).
+:::
+
+::: tip Nuxt Layers
+You can also add an `app/rstore` folder in Nuxt layers! rstore will automatically add those files too.
+:::
+
+<!--
 
 3. Create a plugin to interact with an API in the `rstore/plugins` folder:
 
@@ -381,18 +415,18 @@ export default defineRstorePlugin({
   setup({ hook }) {
     hook('fetchFirst', async (payload) => {
       if (payload.key) {
-        const result = await $fetch(`/api/${payload.model.name}/${payload.key}`)
+        const result = await $fetch(`/api/${payload.collection.name}/${payload.key}`)
         payload.setResult(result)
       }
     })
 
     hook('fetchMany', async (payload) => {
-      const result = await $fetch(`/api/${payload.model.name}`)
+      const result = await $fetch(`/api/${payload.collection.name}`)
       payload.setResult(result)
     })
 
     hook('createItem', async (payload) => {
-      const result = await $fetch(`/api/${payload.model.name}`, {
+      const result = await $fetch(`/api/${payload.collection.name}`, {
         method: 'POST',
         body: payload.item,
       })
@@ -400,7 +434,7 @@ export default defineRstorePlugin({
     })
 
     hook('updateItem', async (payload) => {
-      const result = await $fetch(`/api/${payload.model.name}/${payload.key}`, {
+      const result = await $fetch(`/api/${payload.collection.name}/${payload.key}`, {
         method: 'PATCH',
         body: payload.item,
       })
@@ -408,7 +442,7 @@ export default defineRstorePlugin({
     })
 
     hook('deleteItem', async (payload) => {
-      await $fetch(`/api/${payload.model.name}/${payload.key}`, {
+      await $fetch(`/api/${payload.collection.name}/${payload.key}`, {
         method: 'DELETE',
       })
     })
@@ -420,13 +454,15 @@ export default defineRstorePlugin({
 In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and other popular standards. Feel free to also share your own plugins with the community! 😸
 :::
 
-4. Use the store in a component:
+-->
+
+3. Use the store in a component:
 
 ```vue
 <script setup>
 const store = useStore()
 
-const { data: todos } = await store.todos.queryMany()
+const { data: todos } = await store.todos.query(q => q.many())
 </script>
 
 <template>
@@ -436,7 +472,7 @@ const { data: todos } = await store.todos.queryMany()
 
 Open the Nuxt devtools and check the `rstore` tab:
 
-![Devtools screenshot of the models tab](./img/nuxt-devtools1.png)
+![Devtools screenshot of the collections tab](./img/nuxt-devtools1.png)
 
 ![Devtools screenshot of the history tab](./img/nuxt-devtools2.png)
 
@@ -444,7 +480,7 @@ Open the Nuxt devtools and check the `rstore` tab:
 
 [Online Demo](https://codesandbox.io/p/devbox/wonderful-sun-s4cgl6)
 
-In case you are using [Drizzle](https://orm.drizzle.team), you can install the `@rstore/nuxt-drizzle` module instead of `@rstore/nuxt` to automatically generate the models and plugins from your drizzle schema.
+In case you are using [Drizzle](https://orm.drizzle.team), you can install the `@rstore/nuxt-drizzle` module instead of `@rstore/nuxt` to automatically generate the collections and plugins from your drizzle schema.
 
 1. Install `@rstore/nuxt-drizzle` and add it to the Nuxt config:
 
@@ -480,10 +516,10 @@ export function useDrizzle() {
 
 The module will automatically:
 - load the drizzle schema from the `drizzle.config.ts` file (configurable with the `rstoreDrizzle.drizzleConfigPath` option in the Nuxt config),
-- generate the models from the schema for each table with the relations,
+- generate the collections from the schema for each table with the relations,
 - generate a REST API under the `/api/rstore` path to handle the CRUD operations,
 - generate a plugin to handle the queries and mutations,
-- generate all the necessary types for the models and the API.
+- generate all the necessary types for the collections and the API.
 
 You can already use the store in your components without any additional configuration:
 
@@ -491,7 +527,7 @@ You can already use the store in your components without any additional configur
 <script setup>
 const store = useStore()
 
-const { data: todos } = await store.todos.queryMany()
+const { data: todos } = await store.todos.query(q => q.many())
 </script>
 
 <template>
@@ -503,7 +539,7 @@ const { data: todos } = await store.todos.queryMany()
 
 ## Nuxt + Directus
 
-You can use the `@rstore/nuxt-directus` module to automatically generate the models and plugins from your [Directus](https://directus.io) backend.
+You can use the `@rstore/nuxt-directus` module to automatically generate the collections and plugins from your [Directus](https://directus.io) backend.
 
 ```bash
 npm install @rstore/nuxt-directus

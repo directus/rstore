@@ -5,7 +5,7 @@ const props = defineProps<{
 
 const store = useStore()
 
-const { data: message } = await store.ChatMessage.queryFirst(props.id)
+const { data: message } = await store.ChatMessage.query(q => q.first(props.id))
 
 const timeAgo = useTimeAgo(() => message.value?.createdAt ?? 0)
 </script>

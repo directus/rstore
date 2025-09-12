@@ -15,6 +15,7 @@ export class Hookable<
   HookNameT extends HookKeys<HooksT> = HookKeys<HooksT>,
 > {
   public _hooks: { [key: string]: StoredHookCallback<any, any>[] } = {}
+  private _nextAbortSignal: AbortSignal | null = null
 
   constructor() {
     this.hook = this.hook.bind(this)
@@ -32,19 +33,43 @@ export class Hookable<
       plugin,
     })
     return () => {
-      this._hooks[name] = this._hooks[name].filter(cb => cb.callback !== callback)
+      if (this._hooks[name]) {
+        this._hooks[name] = this._hooks[name].filter(cb => cb.callback !== callback)
+      }
     }
   }
 
-  async callHook<const HookName extends HookNameT>(name: HookName, ...args: Parameters<HooksT[HookName]>): Promise<ReturnType<Awaited<HooksT[HookName]>> | undefined> {
-    let returned: any
-    for (const { callback } of this._hooks[name] ?? []) {
-      const result = await callback(...args as any[])
-      if (result != null) {
-        returned = result
-      }
+  withAbort(): () => void {
+    const controller = new AbortController()
+    this._nextAbortSignal = controller.signal
+    return () => {
+      controller.abort()
     }
-    return returned
+  }
+
+  callHook<const HookName extends HookNameT>(name: HookName, ...args: Parameters<HooksT[HookName]>): Promise<ReturnType<Awaited<HooksT[HookName]>> | undefined> {
+    const abortSignal = this._nextAbortSignal
+    this._nextAbortSignal = null
+    // eslint-disable-next-line no-async-promise-executor
+    const promise = new Promise<ReturnType<Awaited<HooksT[HookName]>> | undefined>(async (resolve, reject) => {
+      try {
+        let returned: any
+        for (const { callback } of this._hooks[name] ?? []) {
+          if (abortSignal?.aborted) {
+            break
+          }
+          const result = await callback(...args as any[])
+          if (result != null) {
+            returned = result
+          }
+        }
+        resolve(returned)
+      }
+      catch (error) {
+        reject(error)
+      }
+    }) as Promise<ReturnType<Awaited<HooksT[HookName]>> | undefined> & { abort: () => void }
+    return promise
   }
 
   callHookSync<HookName extends HookNameT>(name: HookName, ...args: Parameters<HooksT[HookName]>): ReturnType<HooksT[HookName]> | undefined {

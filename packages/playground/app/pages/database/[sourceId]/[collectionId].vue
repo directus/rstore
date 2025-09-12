@@ -1,8 +1,9 @@
 <script lang="ts" setup>
 const route = useRoute()
 const store = useStore()
-const { data: collection } = await store.DataCollection.queryFirst(() => ({
-  filter: c => c.id === route.params.collectionId,
+const { data: collection } = await store.DataCollection.query(q => q.first({
+  key: String(route.params.collectionId),
+  fetchPolicy: 'cache-and-fetch',
 }))
 </script>
 
@@ -38,9 +39,9 @@ const { data: collection } = await store.DataCollection.queryFirst(() => ({
     >
       <template #nullable-cell="{ row }">
         <USwitch
-          :model-value="row.original.nullable"
+          :collection-value="row.original.nullable"
           :label="row.original.nullable ? 'Yes' : 'No'"
-          @update:model-value="value => row.original.$update({ nullable: value })"
+          @update:collection-value="value => row.original.$update({ nullable: value })"
         />
       </template>
     </UTable>

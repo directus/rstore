@@ -1,10 +1,12 @@
 <script lang="ts" setup>
+import { useStore } from '@rstore/vue'
+
 const props = defineProps<{
   id: string
 }>()
 
 const store = useStore()
-const { data: todo } = await store.Todo.queryFirst(props.id)
+const { data: todo } = await store.Todo.query(q => q.first(props.id))
 
 async function toggle() {
   if (!todo.value) {
@@ -46,6 +48,14 @@ const editOpen = ref(false)
     >
       {{ todo.text }}
     </span>
+
+    <UBadge
+      v-if="todo.$isOptimistic"
+      label="Optimistic"
+      color="info"
+      icon="lucide:hourglass"
+      size="sm"
+    />
 
     <span class="opacity-50">{{ timeAgo }}</span>
 

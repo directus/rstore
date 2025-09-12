@@ -1,13 +1,13 @@
-import type { Model, ModelDefaults, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollection, StoreCore, WrappedItem } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { findFirst } from '../../src/query/findFirst'
 
-interface TestModelDefaults extends ModelDefaults {
+interface TestCollectionDefaults extends CollectionDefaults {
   name: string
 }
 
-interface TestModelType extends Model {
+interface TestCollectionType extends Collection {
   id: string
 }
 
@@ -25,7 +25,7 @@ vi.mock('../../src/query/peekFirst', () => ({
 
 describe('findFirst', () => {
   let mockStore: StoreCore<any, any>
-  let model: ResolvedModel<any, any, any>
+  let collection: ResolvedCollection
 
   beforeEach(() => {
     mockStore = {
@@ -33,6 +33,19 @@ describe('findFirst', () => {
         readItem: ({ key }: any) => ({ id: key, name: 'Test Item' }),
         readItems: () => [{ id: '1', name: 'Test Item 1' }, { id: '2', name: 'Test Item 2' }],
         writeItem: vi.fn(),
+        wrapItem: ({ item }: any) => {
+          return new Proxy(item, {
+            get: (target, key) => {
+              if (key === '$meta') {
+                return {
+                  queries: new Set(),
+                  dirtyQueries: new Set(),
+                }
+              }
+              return Reflect.get(target, key)
+            },
+          })
+        },
       },
       $hooks: createHooks(),
       $getFetchPolicy: () => 'cache-first',
@@ -40,7 +53,7 @@ describe('findFirst', () => {
       $dedupePromises: new Map(),
     } as any
 
-    model = {
+    collection = {
       getKey: (item: any) => item.id,
     } as any
   })
@@ -48,7 +61,7 @@ describe('findFirst', () => {
   it('should return the first item from the cache by key', async () => {
     const result = await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: '1',
     })
 
@@ -58,9 +71,9 @@ describe('findFirst', () => {
   it('should return the first item from the cache by filter', async () => {
     const result = await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
-        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '2',
+        filter: (item: WrappedItem<TestCollectionType, TestCollectionDefaults, any>) => item.id === '2',
       },
     })
 
@@ -70,9 +83,9 @@ describe('findFirst', () => {
   it('should return null if no item matches the filter', async () => {
     const result = await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
-        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '3',
+        filter: (item: WrappedItem<TestCollectionType, TestCollectionDefaults, any>) => item.id === '3',
       },
     })
 
@@ -84,7 +97,7 @@ describe('findFirst', () => {
 
     await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: '42',
     })
 
@@ -99,12 +112,12 @@ describe('findFirst', () => {
 
     const result = await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: '42',
     })
 
     expect(mockStore.$cache.writeItem).toHaveBeenCalledWith(expect.objectContaining({
-      model,
+      collection,
       key: '42',
       item: result.result,
     }))
@@ -114,7 +127,7 @@ describe('findFirst', () => {
     mockStore.$getFetchPolicy = () => 'no-cache'
     await findFirst({
       store: mockStore,
-      model,
+      collection,
       findOptions: '1',
     })
 
@@ -131,12 +144,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: '42',
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: '42',
         }),
       ])
@@ -148,7 +161,7 @@ describe('findFirst', () => {
       ])
     })
 
-    it('should not dedupe findFirst on different model', async () => {
+    it('should not dedupe findFirst on different collection', async () => {
       const fn = vi.fn((payload) => {
         payload.setResult({ foo: payload.findOptions.key })
       })
@@ -157,13 +170,13 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: '42',
         }),
         findFirst({
           store: mockStore,
-          model: {
-            ...model,
+          collection: {
+            ...collection,
             name: 'Other',
           },
           findOptions: '42',
@@ -186,12 +199,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: '42',
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: '43',
         }),
       ])
@@ -212,12 +225,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
       ])
@@ -238,12 +251,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '43' } } },
         }),
       ])
@@ -264,12 +277,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
         }),
       ])
@@ -290,12 +303,12 @@ describe('findFirst', () => {
       const result = await Promise.all([
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
         }),
         findFirst({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
         }),
       ])
@@ -305,6 +318,111 @@ describe('findFirst', () => {
         { foo: '42' },
         { foo: '42' },
       ])
+    })
+  })
+
+  describe('abort fetchFirst', () => {
+    it('should abort fetchFirst if setResult is called', async () => {
+      const fetchFirstHook1 = vi.fn((payload) => {
+        payload.setResult({ id: '42' })
+      })
+      const fetchFirstHook2 = vi.fn((payload) => {
+        payload.setResult({ id: '43' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook1)
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook2)
+
+      const result = await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: '42',
+      })
+
+      expect(result.result).toEqual({ id: '42' })
+      expect(fetchFirstHook1).toHaveBeenCalled()
+      expect(fetchFirstHook2).not.toHaveBeenCalled()
+    })
+
+    it('should not abort if setResult is not called', async () => {
+      const fetchFirstHook1 = vi.fn()
+      const fetchFirstHook2 = vi.fn((payload) => {
+        payload.setResult({ id: '43' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook1)
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook2)
+
+      const result = await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: '42',
+      })
+
+      expect(result.result).toEqual({ id: '43' })
+      expect(fetchFirstHook1).toHaveBeenCalled()
+      expect(fetchFirstHook2).toHaveBeenCalled()
+    })
+
+    it('should not abort if setResult is called with abort: false', async () => {
+      const fetchFirstHook1 = vi.fn((payload) => {
+        payload.setResult({ id: '42' }, { abort: false })
+      })
+      const fetchFirstHook2 = vi.fn((payload) => {
+        payload.setResult({ id: '43' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook1)
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook2)
+
+      const result = await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: '42',
+      })
+
+      expect(result.result).toEqual({ id: '43' })
+      expect(fetchFirstHook1).toHaveBeenCalled()
+      expect(fetchFirstHook2).toHaveBeenCalled()
+    })
+
+    it('should not abort if result is nil', async () => {
+      const fetchFirstHook1 = vi.fn((payload) => {
+        payload.setResult(null)
+      })
+      const fetchFirstHook2 = vi.fn((payload) => {
+        payload.setResult({ id: '43' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook1)
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook2)
+
+      const result = await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: '42',
+      })
+
+      expect(result.result).toEqual({ id: '43' })
+      expect(fetchFirstHook1).toHaveBeenCalled()
+      expect(fetchFirstHook2).toHaveBeenCalled()
+    })
+
+    it('should abort when calling abort()', async () => {
+      const fetchFirstHook1 = vi.fn((payload) => {
+        payload.abort()
+      })
+      const fetchFirstHook2 = vi.fn((payload) => {
+        payload.setResult({ id: '43' })
+      })
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook1)
+      mockStore.$hooks.hook('fetchFirst', fetchFirstHook2)
+
+      const result = await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: '42',
+      })
+
+      expect(result.result).toBeNull()
+      expect(fetchFirstHook1).toHaveBeenCalled()
+      expect(fetchFirstHook2).not.toHaveBeenCalled()
     })
   })
 })

@@ -5,7 +5,7 @@ const search = useLocalStorage('rstore-search-plugins', '')
 const filteredPlugins = computed(() => {
   return plugins.value.filter((plugin) => {
     return plugin.name.toLowerCase().includes(search.value.toLowerCase())
-  }).sort((a, b) => a.name.localeCompare(b.name))
+  })
 })
 </script>
 
@@ -24,7 +24,6 @@ const filteredPlugins = computed(() => {
         icon="lucide:search"
         placeholder="Search"
         size="xs"
-        variant="soft"
         autofocus
         class="w-full"
       />
@@ -35,6 +34,7 @@ const filteredPlugins = computed(() => {
         v-for="plugin in filteredPlugins"
         :key="plugin.name"
         :plugin
+        :index="plugins.indexOf(plugin)"
       />
 
       <div class="flex-none h-1" />

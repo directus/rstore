@@ -1,50 +1,58 @@
-import type { FindOptions, Model, ModelDefaults, ModelList, Plugin, StoreCore, WrappedItem } from '@rstore/shared'
-import { createStoreCore, resolveModel } from '@rstore/core'
+import type { Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOptions, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import { createStoreCore, normalizeCollectionRelations, resolveCollection } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook } from '@vueuse/core'
-import { ref, type Ref } from 'vue'
-import { createModelApi, type VueModelApi } from './api'
+import { ref } from 'vue'
+import { createCollectionApi, type VueCollectionApi } from './api'
 import { createCache } from './cache'
 
 export interface CreateStoreOptions<
-  TModelList extends ModelList = ModelList,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
+  TSchema extends StoreSchema = StoreSchema,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > {
-  models: TModelList
-  modelDefaults?: TModelDefaults
+  schema: TSchema
+  collectionDefaults?: TCollectionDefaults
   plugins: Array<Plugin>
   findDefaults?: Partial<FindOptions<any, any, any>>
   isServer?: boolean
+  /**
+   * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
+   */
+  experimentalGarbageCollection?: boolean
 }
 
-export type VueStoreModelApiProxy<
-  TModelList extends ModelList,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
+export type VueStoreCollectionApiProxy<
+  TSchema extends StoreSchema,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > = {
-  [M in TModelList[number] as M['name']]: VueModelApi<M, TModelDefaults, TModelList, WrappedItem<M, TModelDefaults, TModelList>>
+  [M in CollectionsFromStoreSchema<TSchema> as M['name']]: VueCollectionApi<M, TCollectionDefaults, TSchema, WrappedItem<M, TCollectionDefaults, TSchema>>
 }
 
 export type VueStore<
-  TModelList extends ModelList = ModelList,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
-> = StoreCore<TModelList, TModelDefaults> & VueStoreModelApiProxy<TModelList, TModelDefaults> & {
-  $model: (modelName: string) => VueModelApi<any, TModelDefaults, TModelList, WrappedItem<any, TModelDefaults, TModelList>>
+  TSchema extends StoreSchema = StoreSchema,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
+> = StoreCore<TSchema, TCollectionDefaults> & VueStoreCollectionApiProxy<TSchema, TCollectionDefaults> & {
+  $collection: (collectionName: string) => VueCollectionApi<any, TCollectionDefaults, TSchema, WrappedItem<any, TCollectionDefaults, TSchema>>
   $onCacheReset: (callback: () => void) => () => void
+  $experimentalGarbageCollection?: boolean
+  $modulesCache: WeakMap<(...args: any[]) => ResolvedModule<any, any>, ResolvedModule<any, any>>
 }
 
 interface PrivateVueStore {
-  $_modelNames: Set<string>
+  $_collectionNames: Set<string>
 }
 
 export async function createStore<
-  const TModelList extends ModelList,
-  const TModelDefaults extends ModelDefaults,
->(options: CreateStoreOptions<TModelList, TModelDefaults>): Promise<VueStore<TModelList, TModelDefaults>> {
-  let storeProxy = undefined as unknown as VueStore<TModelList, TModelDefaults>
+  const TSchema extends StoreSchema,
+  const TCollectionDefaults extends CollectionDefaults,
+>(options: CreateStoreOptions<TSchema, TCollectionDefaults>): Promise<VueStore<TSchema, TCollectionDefaults>> {
+  let storeProxy = undefined as unknown as VueStore<TSchema, TCollectionDefaults>
 
-  return createStoreCore<TModelList, TModelDefaults>({
-    models: options.models,
-    modelDefaults: options.modelDefaults,
+  const modulesCache = new WeakMap<(...args: any[]) => ResolvedModule<any, any>, ResolvedModule<any, any>>()
+
+  return createStoreCore<TSchema, TCollectionDefaults>({
+    schema: options.schema,
+    collectionDefaults: options.collectionDefaults,
     plugins: options.plugins,
     cache: createCache({
       getStore: () => storeProxy,
@@ -55,20 +63,20 @@ export async function createStore<
     transformStore: (store) => {
       const privateStore = store as unknown as PrivateVueStore
 
-      const queryCache: Map<string, VueModelApi<Model, TModelDefaults, TModelList, WrappedItem<Model, TModelDefaults, TModelList>>> = new Map()
+      const queryCache: Map<string, VueCollectionApi<Collection, TCollectionDefaults, TSchema, WrappedItem<Collection, TCollectionDefaults, TSchema>>> = new Map()
 
       function getApi(key: string) {
         if (!queryCache.has(key)) {
-          const model = storeProxy.$models.find(m => m.name === key)
-          if (!model) {
-            throw new Error(`Model ${key} not found`)
+          const collection = storeProxy.$collections.find(m => m.name === key)
+          if (!collection) {
+            throw new Error(`Collection ${key} not found`)
           }
-          queryCache.set(key, createModelApi(storeProxy, model))
+          queryCache.set(key, createCollectionApi(storeProxy, collection))
         }
         return queryCache.get(key)
       }
 
-      privateStore.$_modelNames = new Set(store.$models.map(m => m.name))
+      privateStore.$_collectionNames = new Set(store.$collections.map(m => m.name))
 
       const cacheResetEvent = createEventHook()
 
@@ -78,16 +86,20 @@ export async function createStore<
 
       storeProxy = new Proxy(store, {
         get(_, key) {
-          if (typeof key === 'string' && privateStore.$_modelNames.has(key)) {
+          if (typeof key === 'string' && privateStore.$_collectionNames.has(key)) {
             return getApi(key)
           }
 
-          if (key === '$model') {
-            return (modelName: string) => getApi(modelName)
+          if (key === '$collection') {
+            return (collectionName: string) => getApi(collectionName)
           }
 
           if (key === '$onCacheReset') {
             return cacheResetEvent.on
+          }
+
+          if (typeof key === 'string' && key.startsWith('$experimental') && Reflect.has(options, key.substring(1))) {
+            return Reflect.get(options, key.substring(1))
           }
 
           if (key === '$wrapMutation') {
@@ -111,52 +123,92 @@ export async function createStore<
                   $time.value = performance.now() - start
                 }
               }
-              wrappedMutation.$loading = $loading
-              wrappedMutation.$error = $error
-              wrappedMutation.$time = $time
-              return wrappedMutation
+              return new Proxy(wrappedMutation, {
+                get(target, prop) {
+                  if (prop === '$loading') {
+                    return $loading.value
+                  }
+                  else if (prop === '$error') {
+                    return $error.value
+                  }
+                  else if (prop === '$time') {
+                    return $time.value
+                  }
+                  return Reflect.get(target, prop)
+                },
+                set(target, prop, value) {
+                  if (prop === '$error') {
+                    $error.value = value
+                    return true
+                  }
+                  return Reflect.set(target, prop, value)
+                },
+              })
             }
+          }
+
+          if (key === '$modulesCache') {
+            return modulesCache
           }
 
           return Reflect.get(store, key)
         },
-      }) as VueStore<TModelList, TModelDefaults>
+      }) as VueStore<TSchema, TCollectionDefaults>
 
       return storeProxy
     },
-  }) as Promise<VueStore<TModelList, TModelDefaults>>
+  }) as Promise<VueStore<TSchema, TCollectionDefaults>>
 }
 
-export function addModel(store: VueStore, model: Model) {
+export function addCollection(store: VueStore, collection: Collection) {
   const privateStore = store as unknown as PrivateVueStore
 
-  if (privateStore.$_modelNames.has(model.name)) {
-    throw new Error(`Model ${model.name} already exists`)
+  if (privateStore.$_collectionNames.has(collection.name)) {
+    throw new Error(`Collection ${collection.name} already exists`)
   }
 
-  store.$models.push(resolveModel(model, store.$modelDefaults))
-  privateStore.$_modelNames.add(model.name)
+  const resolvedCollection = resolveCollection(collection, store.$collectionDefaults)
+  store.$collections.push(resolvedCollection)
+  privateStore.$_collectionNames.add(collection.name)
+
+  normalizeCollectionRelations([resolvedCollection])
 }
 
-export function removeModel(store: VueStore, modelName: string) {
+export function removeCollection(store: VueStore, collectionName: string) {
   const privateStore = store as unknown as PrivateVueStore
 
-  const index = store.$models.findIndex(m => m.name === modelName)
+  const index = store.$collections.findIndex(m => m.name === collectionName)
   if (index === -1) {
-    throw new Error(`Model ${modelName} not found`)
+    throw new Error(`Collection ${collectionName} not found`)
   }
 
-  const model = store.$models[index]
-  store.$cache.clearModel({ model })
+  const collection = store.$collections[index]!
+  store.$cache.clearCollection({ collection })
 
-  store.$models.splice(index, 1)
-  privateStore.$_modelNames.delete(modelName)
+  store.$collections.splice(index, 1)
+  privateStore.$_collectionNames.delete(collectionName)
 }
 
 declare module '@rstore/shared' {
   export interface MutationSpecialProps {
-    $loading: Ref<boolean>
-    $error: Ref<Error | null>
-    $time: Ref<number>
+    $loading: boolean
+    $error: Error | null
+    $time: number
   }
+}
+
+let activeStore: VueStore | null = null
+
+/**
+ * Set the active store for testing modules or code outside of Vue components that need to access the store.
+ */
+export function setActiveStore(store: VueStore | null) {
+  activeStore = store
+}
+
+/**
+ * Get the active store. This is useful for testing modules or code outside of Vue components that need to access the store.
+ */
+export function getActiveStore(): VueStore | null {
+  return activeStore
 }

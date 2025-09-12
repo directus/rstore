@@ -1,7 +1,7 @@
 <script lang="ts" setup>
 const store = useStore()
 
-const { data: todos, refresh } = await store.Todo.queryMany()
+const { data: todos, refresh } = await store.Todo.query(q => q.many())
 
 const createTodo = store.Todo.createForm()
 const createInput = useTemplateRef('input')
@@ -52,10 +52,14 @@ createTodo.$onSuccess(() => {
     </UForm>
 
     <TodoItem
-      v-for="{ id } in todos"
-      :id
-      :key="id"
+      v-for="todo in todos"
+      :id="todo.$getKey()"
+      :key="todo.$getKey()"
     />
+
+    <div class="mt-2 opacity-50 text-center">
+      {{ todos.length }} item{{ todos.length !== 1 ? 's' : '' }}
+    </div>
 
     <div v-if="!todos.length" class="text-center text-gray-500 p-12">
       Nothing here yet

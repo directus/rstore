@@ -7,9 +7,9 @@ const [
   { data: users, refresh: refreshUsers },
   { data: bots, refresh: refreshBots },
 ] = await Promise.all([
-  store.Message.queryMany(),
-  store.User.queryMany(),
-  store.Bot.queryMany(),
+  store.Message.query(q => q.many()),
+  store.User.query(q => q.many()),
+  store.Bot.query(q => q.many()),
 ])
 
 async function refresh() {

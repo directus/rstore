@@ -3,12 +3,13 @@ const store = useStore()
 
 const email = ref('user1@acme.com')
 
-const { data: users } = await store.User.queryMany(() => ({
+const { data: users } = await store.User.query(q => q.many({
   filter: item => item.email === email.value,
   params: {
     filter: `email:${email.value}`,
   },
 }))
+users.value?.map(user => user)
 </script>
 
 <template>

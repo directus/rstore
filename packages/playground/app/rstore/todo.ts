@@ -1,5 +1,5 @@
-// Single model
-export default defineItemType<Todo>().model({
+// Single collection
+export default withItemType<Todo>().defineCollection({
   name: 'Todo',
   scopeId: 'main-backend',
   formSchema: {

@@ -1,26 +1,26 @@
-# Model
+# Collection
 
-The structure of your data is presented in rstore with Models:
+The structure of your data is presented in rstore with Collections:
 
 ```ts
-import type { ModelList } from '@rstore/vue'
+import type { StoreSchema } from '@rstore/vue'
 
-const models: ModelList = [
+const schema: StoreSchema = [
   { name: 'todos' },
   { name: 'users' },
-  // more models...
+  // more collections...
 ]
 ```
 
-Each Model defines information about the related item type. The only mandatory property is `name`, which can be different from the key in the model map (see the above example).
+Each Collection defines information about the related item type. The only mandatory property is `name`, which can be different from the key in the collection map (see the above example).
 
-Various applications can have different models based on their specific requirements. For instance, a blogging platform might include a `Post` model to denote a blog entry and a `Comment` model for user feedback. Conversely, a project management tool might feature models such as `Task`, `Project`, or `Milestone`.
+Various applications can have different collections based on their specific requirements. For instance, a blogging platform might include a `Post` collection to denote a blog entry and a `Comment` collection for user feedback. Conversely, a project management tool might feature collections such as `Task`, `Project`, or `Milestone`.
 
 ::: code-group
 
 ```js{2-5} [rstore.js]
 const store = await createStore({
-  models: [
+  schema: [
     { name: 'todos' },
     { name: 'users' },
   ],
@@ -30,9 +30,9 @@ const store = await createStore({
 
 ```ts{2-5} [rstore.ts]
 const store = await createStore({
-  models: [
-    defineItemType<Todo>().model({ name: 'todos' }),
-    defineItemType<User>().model({ name: 'users' }),
+  schema: [
+    withItemType<Todo>().defineCollection({ name: 'todos' }),
+    withItemType<User>().defineCollection({ name: 'users' }),
   ],
   plugins: [],
 })
@@ -40,30 +40,30 @@ const store = await createStore({
 
 :::
 
-## Defining a Model
+## Defining a Collection
 
-For JavaScript, you can use the `defineDataModel` utility function to define a model with auto-completion in your IDE:
+For JavaScript, you can use the `defineCollection` utility function to define a collection with auto-completion in your IDE:
 
 ```js
-import { createStore, defineDataModel } from '@rstore/vue'
+import { createStore, defineCollection } from '@rstore/vue'
 
-const todoModel = defineDataModel({
+const todoCollection = defineCollection({
   name: 'todos',
   // other properties...
 })
 
 const store = await createStore({
-  models: [
-    todoModel
+  schema: [
+    todoCollection
   ],
   plugins: [],
 })
 ```
 
-For TypeScript, you should use the `defineItemType` utility function instead to specify the type of the item, then call `model` on it:
+For TypeScript, you should use the `withItemType` utility function instead to specify the type of the item, then call `collection` on it:
 
 ```ts
-import { createStore, defineItemType } from '@rstore/vue'
+import { createStore, withItemType } from '@rstore/vue'
 
 interface TodoType {
   id: string
@@ -71,21 +71,21 @@ interface TodoType {
   completed: boolean
 }
 
-const todoModel = defineItemType<TodoType>().model({
+const todoCollection = withItemType<TodoType>().defineCollection({
   name: 'todos',
   // other properties...
 })
 
 const store = await createStore({
-  models: [
-    todoModel
+  schema: [
+    todoCollection
   ],
   plugins: [],
 })
 ```
 
 ::: info
-The [currying](https://en.wikipedia.org/wiki/Currying) is necessary to specify the type of the item while still letting TypeScript infer the type of the model. This is a limitation of TypeScript, and [it might improve in the future](https://github.com/microsoft/TypeScript/issues/26242).
+The [currying](https://en.wikipedia.org/wiki/Currying) is necessary to specify the type of the item while still letting TypeScript infer the type of the collection. This is a limitation of TypeScript, and [it might improve in the future](https://github.com/microsoft/TypeScript/issues/26242).
 :::
 
 ## Item Key
@@ -96,10 +96,10 @@ The key is a unique identifier for the item. It can be a string, number, or any 
 
 By default, rstore will try to use the `id` or `_id` property of the item as the key.
 
-You can override this behavior by specifying the `getKey` method on the model:
+You can override this behavior by specifying the `getKey` method on the collection:
 
 ```ts
-const todoModel = defineDataModel({
+const todoCollection = defineCollection({
   name: 'todos',
   getKey: item => item.customId,
 })
@@ -107,32 +107,32 @@ const todoModel = defineDataModel({
 
 ## Scope ID
 
-The scope ID allows filtering which plugins will handle the model. For example, if a model has a scope A, only plugins with the scope A will be able to handle it by default. This is very useful to handle multiple data sources.
+The scope ID allows filtering which plugins will handle the collection. For example, if a collection has a scope A, only plugins with the scope A will be able to handle it by default. This is very useful to handle multiple data sources.
 
 ```ts
-const todoModel = defineDataModel({
+const todoCollection = defineCollection({
   name: 'todos',
   scopeId: 'main-backend',
   // Only plugins with the scopeId 'main-backend'
-  // will be able to handle this model by default
+  // will be able to handle this collection by default
 })
 ```
 
 ::: warning
-If the scope ID is not defined, the model will be handled by all plugins.
+If the scope ID is not defined, the collection will be handled by all plugins.
 :::
 
 Learn more about federation and multi-source [here](./federation.md).
 
-## Model metadata
+## Collection metadata
 
-The model can have metadata that can be used to customize the behavior of the model.
+The collection can have metadata that can be used to customize the behavior of the collection.
 
-If you are using TypeScript, you can augment the type of `CustomModelMeta` to add your own properties:
+If you are using TypeScript, you can augment the type of `CustomCollectionMeta` to add your own properties:
 
 ```ts
 declare module '@rstore/vue' {
-  export interface CustomModelMeta {
+  export interface CustomCollectionMeta {
     path: string
   }
 }
@@ -140,10 +140,10 @@ declare module '@rstore/vue' {
 export {}
 ```
 
-In the model, you can add the metadata to the `meta` property:
+In the collection, you can add the metadata to the `meta` property:
 
 ```ts
-const todoModel = defineDataModel({
+const todoCollection = defineCollection({
   name: 'Todo',
   meta: {
     path: '/todos',
@@ -164,7 +164,7 @@ The field configuration can have the following properties:
 Example:
 
 ```ts
-const todoModel = defineDataModel({
+const todoCollection = defineCollection({
   name: 'todos',
   fields: {
     createdAt: {
@@ -181,12 +181,12 @@ const todoModel = defineDataModel({
 
 ## Computed fields
 
-You can define computed fields in the model. Computed fields are not stored in the cache, but they can be used to derive values from other fields.
+You can define computed fields in the collection. Computed fields are not stored in the cache, but they can be used to derive values from other fields.
 
 For example, you can define a `fullName` computed field that concatenates the `firstName` and `lastName` fields:
 
 ```ts
-const userModel = defineDataModel({
+const userCollection = defineCollection({
   name: 'users',
   computed: {
     fullName: item => `${item.firstName} ${item.lastName}`,
@@ -199,7 +199,7 @@ You can then use the computed field in your application just like any other fiel
 ```ts
 const store = useStore()
 
-const { data: user } = store.users.queryFirst('some-id')
+const { data: user } = store.users.query(q => q.first('some-id'))
 
 watchEffect(() => {
   console.log(user.value?.fullName) // This is a computed field
@@ -209,14 +209,14 @@ watchEffect(() => {
 
 ## Schema validation
 
-You can define some default schema validation for your model using the `schema` property. This is useful for validating the data for a create or update operation.
+You can define some default schema validation for your collection using the `schema` property. This is useful for validating the data for a create or update operation.
 
 You can specify the schema for the `create` and `update` operations. The schema can be defined using any validation library that implements [Standard Schema](https://standardschema.dev/).
 
 ```ts
 import { z } from 'zod'
 
-const todoModel = defineDataModel({
+const todoCollection = defineCollection({
   name: 'todos',
   formSchema: {
     create: z.object({

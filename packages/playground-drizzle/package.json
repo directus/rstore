@@ -18,8 +18,8 @@
   "devDependencies": {
     "@iconify-json/lucide": "^1.2.22",
     "@iconify-json/simple-icons": "^1.2.19",
-    "@nuxt/ui": "^3.0.0",
+    "@nuxt/ui": "catalog:",
     "drizzle-kit": "^0.30.5",
-    "nuxt": "^3.16.0"
+    "nuxt": "catalog:"
   }
 }

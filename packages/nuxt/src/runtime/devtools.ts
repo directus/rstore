@@ -33,6 +33,8 @@ function convertFunctionsToString(obj: Record<string, any> | undefined) {
 export const devtoolsPlugin = definePlugin({
   name: 'rstore-devtools',
 
+  category: 'processing',
+
   meta: {
     builtin: true,
     description: 'Integrate with Nuxt Devtools',
@@ -76,7 +78,7 @@ export const devtoolsPlugin = definePlugin({
       if (payload.meta.storeHistoryItem) {
         storeStats.value.history.push({
           operation: payload.many ? 'fetchMany' : 'fetchFirst',
-          model: payload.model.name,
+          collection: payload.collection.name,
           started: payload.meta.storeHistoryItem.started,
           ended: new Date(),
           result: payload.getResult(),
@@ -98,7 +100,7 @@ export const devtoolsPlugin = definePlugin({
       if (payload.meta.storeHistoryItem) {
         storeStats.value.history.push({
           operation: payload.mutation,
-          model: payload.model.name,
+          collection: payload.collection.name,
           started: payload.meta.storeHistoryItem.started,
           ended: new Date(),
           result: payload.getResult(),
@@ -113,11 +115,40 @@ export const devtoolsPlugin = definePlugin({
     hook('afterCacheWrite', (payload) => {
       storeStats.value.history.push({
         operation: 'cacheWrite',
-        model: payload.model.name,
+        collection: payload.collection.name,
         ended: new Date(),
         result: payload.result,
         key: payload.key,
         server: import.meta.server,
+      })
+      historyUpdated.trigger()
+    })
+
+    hook('itemGarbageCollect', (payload) => {
+      storeStats.value.history.push({
+        operation: 'itemGarbageCollect',
+        collection: payload.collection.name,
+        ended: new Date(),
+        key: payload.key,
+        result: payload.item,
+      })
+      historyUpdated.trigger()
+    })
+
+    hook('cacheLayerAdd', (payload) => {
+      storeStats.value.history.push({
+        operation: 'cacheLayerAdd',
+        result: payload.layer,
+        ended: new Date(),
+      })
+      historyUpdated.trigger()
+    })
+
+    hook('cacheLayerRemove', (payload) => {
+      storeStats.value.history.push({
+        operation: 'cacheLayerRemove',
+        result: payload.layer,
+        ended: new Date(),
       })
       historyUpdated.trigger()
     })
@@ -129,7 +160,7 @@ export const devtoolsPlugin = definePlugin({
     hook('subscribe', (payload) => {
       storeStats.value.subscriptions.push({
         id: payload.subscriptionId,
-        model: payload.model.name,
+        collection: payload.collection.name,
         key: payload.key,
         findOptions: convertFunctionsToString(payload.findOptions),
         started: new Date(),
@@ -169,8 +200,8 @@ export const devtoolsPlugin = definePlugin({
               // Register reactivity dependencies on mutation refs
               if (value?.__brand === 'rstore-module-mutation') {
                 m[key] = {
-                  $loading: value.$loading.value,
-                  $error: value.$error.value,
+                  $loading: value.$loading,
+                  $error: value.$error,
                 }
               }
               else if (value?.data && isRef(value.data) && value?.loading && isRef(value.loading) && value?.error && isRef(value.error)) {

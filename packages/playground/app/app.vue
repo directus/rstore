@@ -23,7 +23,17 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
               {
                 label: 'Todo',
                 icon: 'lucide:check-check',
-                to: '/todo',
+                active: $route.path.startsWith('/todo'),
+                children: [
+                  {
+                    label: 'List',
+                    to: '/todo',
+                  },
+                  {
+                    label: 'Layers',
+                    to: '/todo/layers',
+                  },
+                ],
               },
               {
                 label: 'Users',

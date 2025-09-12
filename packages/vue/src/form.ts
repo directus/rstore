@@ -1,5 +1,5 @@
 import { emptySchema } from '@rstore/core'
-import { type Awaitable, type CreateFormObject, type FormObjectBase, type Model, type ModelDefaults, type ModelList, pickNonSpecialProps, type ResolvedModelItem, type StandardSchemaV1, type UpdateFormObject } from '@rstore/shared'
+import { type Awaitable, type Collection, type CollectionDefaults, type CreateFormObject, type FormObjectBase, pickNonSpecialProps, type ResolvedCollectionItem, type StandardSchemaV1, type StoreSchema, type UpdateFormObject } from '@rstore/shared'
 import { createEventHook, type EventHookOn } from '@vueuse/core'
 import { markRaw, nextTick, reactive } from 'vue'
 
@@ -7,12 +7,13 @@ export interface CreateFormObjectOptions<
   TData extends Record<string, any>,
   TSchema extends StandardSchemaV1,
   TAdditionalProps,
+  TResult = TData,
 > {
   defaultValues?: (() => Partial<TData>) | undefined
   resetDefaultValues?: (() => Awaitable<Partial<TData>>) | undefined
   schema?: TSchema
   transformData?: (data: Partial<TData>) => Partial<TData>
-  submit: (data: Partial<TData>) => Promise<TData>
+  submit: (data: Partial<TData>) => Promise<TResult>
   additionalProps?: TAdditionalProps
 }
 
@@ -44,29 +45,29 @@ type VueFormObject<
 > = FormObjectBase<TData, TSchema> & FormObjectAdditionalProps<TData> & TAdditionalProps & Partial<TData> & (() => Promise<TData>)
 
 /**
- * Object returned by `store.<Model>.createForm()`
+ * Object returned by `store.<Collection>.createForm()`
  */
 export type VueCreateFormObject<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = CreateFormObject<TModel, TModelDefaults, TModelList> & VueFormObject<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> = CreateFormObject<TCollection, TCollectionDefaults, TSchema> & VueFormObject<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
 /**
- * Object returned by `store.<Model>.updateForm()`
+ * Object returned by `store.<Collection>.updateForm()`
  */
 export type VueUpdateFormObject<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
-> = UpdateFormObject<TModel, TModelDefaults, TModelList> & VueFormObject<ResolvedModelItem<TModel, TModelDefaults, TModelList>>
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> = UpdateFormObject<TCollection, TCollectionDefaults, TSchema> & VueFormObject<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
 export function createFormObject<
   TData extends Record<string, any> = Record<string, any>,
   TSchema extends StandardSchemaV1 = StandardSchemaV1,
   const TAdditionalProps = Record<string, never>,
 >(options: CreateFormObjectOptions<TData, TSchema, TAdditionalProps>) {
-  let initialData = pickNonSpecialProps(options.defaultValues?.() ?? {}) as Partial<TData>
+  let initialData = pickNonSpecialProps(options.defaultValues?.() ?? {}, true) as Partial<TData>
 
   const onSuccess = createEventHook()
   const onError = createEventHook<Error>()
@@ -87,10 +88,10 @@ export function createFormObject<
       }
       if (options.resetDefaultValues) {
         const values = await options.resetDefaultValues()
-        initialData = pickNonSpecialProps(values) as Partial<TData>
+        initialData = pickNonSpecialProps(values, true) as Partial<TData>
       }
       else if (options.defaultValues) {
-        initialData = pickNonSpecialProps(options.defaultValues()) as Partial<TData>
+        initialData = pickNonSpecialProps(options.defaultValues(), true) as Partial<TData>
       }
       Object.assign(form, initialData)
     },
@@ -98,7 +99,7 @@ export function createFormObject<
       form.$loading = true
       form.$error = null
       try {
-        const data = options?.transformData ? options.transformData(form as unknown as Partial<TData>) : pickNonSpecialProps(form) as Partial<TData>
+        const data = options?.transformData ? options.transformData(form as unknown as Partial<TData>) : pickNonSpecialProps(form, true) as Partial<TData>
         const { issues } = await this.$schema['~standard'].validate(data)
         if (issues) {
           const error = new Error(issues.map(i => i.message).join(', '))

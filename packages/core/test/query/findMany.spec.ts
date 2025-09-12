@@ -1,13 +1,13 @@
-import type { Model, ModelDefaults, ResolvedModel, StoreCore, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollection, StoreCore, WrappedItem } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { findMany } from '../../src/query/findMany'
 
-interface TestModelDefaults extends ModelDefaults {
+interface TestCollectionDefaults extends CollectionDefaults {
   name: string
 }
 
-interface TestModelType extends Model {
+interface TestCollectionType extends Collection {
   id: string
 }
 
@@ -22,13 +22,26 @@ vi.mock('../../src/query/peekMany', () => ({
 
 describe('findMany', () => {
   let mockStore: StoreCore<any, any>
-  let model: ResolvedModel<any, any, any>
+  let collection: ResolvedCollection
 
   beforeEach(() => {
     mockStore = {
       $cache: {
         readItems: () => [{ id: '1', name: 'Test Item 1' }, { id: '2', name: 'Test Item 2' }],
         writeItems: vi.fn(),
+        wrapItem: ({ item }: any) => {
+          return new Proxy(item, {
+            get: (target, key) => {
+              if (key === '$meta') {
+                return {
+                  queries: new Set(),
+                  dirtyQueries: new Set(),
+                }
+              }
+              return Reflect.get(target, key)
+            },
+          })
+        },
       },
       $hooks: createHooks(),
       $getFetchPolicy: () => 'cache-first',
@@ -36,7 +49,7 @@ describe('findMany', () => {
       $dedupePromises: new Map(),
     } as any
 
-    model = {
+    collection = {
       getKey: (item: any) => item.id,
     } as any
   })
@@ -44,9 +57,9 @@ describe('findMany', () => {
   it('should return items from the cache by filter', async () => {
     const result = await findMany({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
-        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '2',
+        filter: (item: WrappedItem<TestCollectionType, TestCollectionDefaults, any>) => item.id === '2',
       },
     })
 
@@ -56,9 +69,9 @@ describe('findMany', () => {
   it('should return an empty array if no items match the filter', async () => {
     const result = await findMany({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
-        filter: (item: WrappedItem<TestModelType, TestModelDefaults, any>) => item.id === '3',
+        filter: (item: WrappedItem<TestCollectionType, TestCollectionDefaults, any>) => item.id === '3',
       },
     })
 
@@ -70,7 +83,7 @@ describe('findMany', () => {
 
     await findMany({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
         params: {
           email: '42',
@@ -89,7 +102,7 @@ describe('findMany', () => {
 
     const result = await findMany({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
         params: {
           email: '42',
@@ -98,7 +111,7 @@ describe('findMany', () => {
     })
 
     expect(mockStore.$cache.writeItems).toHaveBeenCalledWith(expect.objectContaining({
-      model,
+      collection,
       items: [{ key: '42', value: result.result[0] }],
       marker: expect.any(String),
     }))
@@ -108,7 +121,7 @@ describe('findMany', () => {
     mockStore.$getFetchPolicy = () => 'no-cache'
     await findMany({
       store: mockStore,
-      model,
+      collection,
       findOptions: {
         params: {
           email: '42',
@@ -129,12 +142,12 @@ describe('findMany', () => {
       const result = await Promise.all([
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
       ])
@@ -146,7 +159,7 @@ describe('findMany', () => {
       ])
     })
 
-    it('should not dedupe findMany on different model', async () => {
+    it('should not dedupe findMany on different collection', async () => {
       const fn = vi.fn((payload) => {
         payload.setResult([{ foo: 'bar' }])
       })
@@ -155,13 +168,13 @@ describe('findMany', () => {
       const result = await Promise.all([
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
         findMany({
           store: mockStore,
-          model: {
-            ...model,
+          collection: {
+            ...collection,
             name: 'Other',
           },
           findOptions: { filter: { id: { eq: '42' } } },
@@ -184,12 +197,12 @@ describe('findMany', () => {
       const result = await Promise.all([
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '42' } } },
         }),
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: { id: { eq: '43' } } },
         }),
       ])
@@ -210,12 +223,12 @@ describe('findMany', () => {
       const result = await Promise.all([
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
         }),
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
         }),
       ])
@@ -236,12 +249,12 @@ describe('findMany', () => {
       const result = await Promise.all([
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
         }),
         findMany({
           store: mockStore,
-          model,
+          collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } }, dedupe: false },
         }),
       ])
@@ -251,6 +264,132 @@ describe('findMany', () => {
         [{ foo: '42' }],
         [{ foo: '42' }],
       ])
+    })
+  })
+
+  describe('abort fetchMany', () => {
+    it('should abort fetchMany if setResult is called', async () => {
+      const fetchManyHook1 = vi.fn((payload) => {
+        payload.setResult([{ id: '42' }])
+      })
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([{ id: '42' }])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).not.toHaveBeenCalled()
+    })
+
+    it('should not abort if setResult is not called', async () => {
+      const fetchManyHook1 = vi.fn()
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([{ id: '43' }])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).toHaveBeenCalled()
+    })
+
+    it('should not abort if setResult is called with abort: false', async () => {
+      const fetchManyHook1 = vi.fn((payload) => {
+        payload.setResult([{ id: '42' }], { abort: false })
+      })
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([{ id: '43' }])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).toHaveBeenCalled()
+    })
+
+    it('should not abort if result is nil', async () => {
+      const fetchManyHook1 = vi.fn((payload) => {
+        payload.setResult(null)
+      })
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([{ id: '43' }])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).toHaveBeenCalled()
+    })
+
+    it('should not abort if result is empty array', async () => {
+      const fetchManyHook1 = vi.fn((payload) => {
+        payload.setResult([])
+      })
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([{ id: '43' }])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).toHaveBeenCalled()
+    })
+
+    it('should abort when calling abort()', async () => {
+      const fetchManyHook1 = vi.fn((payload) => {
+        payload.abort()
+      })
+      const fetchManyHook2 = vi.fn((payload) => {
+        payload.setResult([{ id: '43' }])
+      })
+      mockStore.$hooks.hook('fetchMany', fetchManyHook1)
+      mockStore.$hooks.hook('fetchMany', fetchManyHook2)
+
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: { params: { teamId: '42' } },
+      })
+
+      expect(result.result).toEqual([])
+      expect(fetchManyHook1).toHaveBeenCalled()
+      expect(fetchManyHook2).not.toHaveBeenCalled()
     })
   })
 })

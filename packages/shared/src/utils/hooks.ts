@@ -1,15 +1,15 @@
+import type { CollectionDefaults, StoreSchema } from '../types/collection.js'
 import type { HookDefinitions } from '../types/hooks.js'
-import type { ModelDefaults, ModelList } from '../types/model.js'
 import { createHooks as _createHooks } from './hookable.js'
 
 export function createHooks<
-  TModelList extends ModelList,
-  TModelDefaults extends ModelDefaults,
+  TSchema extends StoreSchema,
+  TCollectionDefaults extends CollectionDefaults,
 >() {
-  return _createHooks<HookDefinitions<TModelList, TModelDefaults>>()
+  return _createHooks<HookDefinitions<TSchema, TCollectionDefaults>>()
 }
 
 export type Hooks<
-  TModelList extends ModelList,
-  TModelDefaults extends ModelDefaults,
-> = ReturnType<typeof createHooks<TModelList, TModelDefaults>>
+  TSchema extends StoreSchema,
+  TCollectionDefaults extends CollectionDefaults,
+> = ReturnType<typeof createHooks<TSchema, TCollectionDefaults>>

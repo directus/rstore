@@ -4,7 +4,7 @@ const props = defineProps<{
 }>()
 
 const store = useStore()
-const { data: todo } = await store.todos.queryFirst(props.id)
+const { data: todo } = await store.todos.query(q => q.first(props.id))
 
 async function toggle() {
   if (!todo.value) {

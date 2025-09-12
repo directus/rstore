@@ -1,8 +1,40 @@
+<script setup lang="ts">
+import { VPFeatures } from 'vitepress/theme'
+</script>
+
 # Nuxt + Drizzle
+
+<div class="py-12">
+  <VPFeatures
+    :features="[
+      {
+        icon: '🪄',
+        title: 'Auto-generated Collections',
+        details: `Collections are automatically generated from your Drizzle schema (including relations), alongside the necessary API and plugin.`,
+      },
+      {
+        icon: '📚',
+        title: 'Type Safety',
+        details: 'All collections are fully typed using your Drizzle schema.',
+      },
+      {
+        icon: '🔒',
+        title: 'Security',
+        details: 'Easily restrict the tables exposed through the API with the `allowTables` function.',
+      },
+      {
+        icon: '🔌',
+        title: 'Hooks',
+        details: 'Run code server-side before or after certain actions on the tables using hooks.',
+      },
+    ]"
+    class="px-0! [&_h2]:m-0! [&_.item]:w-1/2!"
+  />
+</div>
 
 [Online Demo](https://codesandbox.io/p/devbox/wonderful-sun-s4cgl6)
 
-In case you are using [Drizzle](https://orm.drizzle.team), you can install the `@rstore/nuxt-drizzle` module instead of `@rstore/nuxt` to automatically generate the models and plugins from your drizzle schema.
+In case you are using [Drizzle](https://orm.drizzle.team), you can install the `@rstore/nuxt-drizzle` module instead of `@rstore/nuxt` to automatically generate the collections and plugins from your drizzle schema.
 
 ```sh
 npm i @rstore/nuxt-drizzle
@@ -58,10 +90,10 @@ export default defineNuxtConfig({
 
 The module will automatically:
 - load the drizzle schema from the `drizzle.config.ts` file (configurable with the `rstoreDrizzle.drizzleConfigPath` option in the Nuxt config),
-- generate the models from the schema for each table with the relations,
+- generate the collections from the schema for each table with the relations,
 - generate a REST API under the `/api/rstore` path to handle the CRUD operations,
 - generate a plugin to handle the queries and mutations,
-- generate all the necessary types for the models and the API.
+- generate all the necessary types for the collections and the API.
 
 Example drizzle schema:
 
@@ -96,7 +128,7 @@ You can already use the store in your components without any additional configur
 <script setup>
 const store = useStore()
 
-const { data: todos } = await store.todos.queryMany()
+const { data: todos } = await store.todos.query(q => q.many())
 </script>
 
 <template>
@@ -104,8 +136,8 @@ const { data: todos } = await store.todos.queryMany()
 </template>
 ```
 
-::: tip Model Names
-The model names are infered from the exported variable names in the drizzle schema, **not** the table names.
+::: tip Collection Names
+The collection names are infered from the exported variable names in the drizzle schema, **not** the table names.
 :::
 
 ::: tip
@@ -124,7 +156,7 @@ const store = useStore()
 
 const email = ref('')
 
-const { data: users } = await store.users.queryMany(() => ({
+const { data: users } = await store.users.query(q => q.many({
   where: email.value ? eq('email', email.value) : undefined,
 }))
 </script>
@@ -136,18 +168,199 @@ Please note that only simple filters are supported - you can't do joins or subqu
 
 ## Relations
 
-You can use the `include` option to include related models in the query. [Learn more here](../guide/model/relations.md).
+You can use the `include` option to include related collections in the query. [Learn more here](../guide/schema/relations.md).
 
 ```vue
 <script lang="ts" setup>
 const store = useStore()
 
-const { data: users } = await store.users.queryMany(() => ({
+const { data: users } = await store.users.query(q => q.many({
   include: {
     posts: true,
   },
 }))
 </script>
+```
+
+## Allowing tables
+
+By default, all tables in your Drizzle schema are exposed through the API. You can restrict the tables that are exposed by using the `allowTables` function.
+
+::: tip
+Put this code in a Nitro plugin in `server/plugins` so it's executed once when the server starts.
+:::
+
+```ts
+import * as tables from 'path-to-your-drizzle-schema'
+
+export default defineNitroPlugin(() => {
+  allowTables([
+    tables.todos,
+  ])
+})
+```
+
+Any table that is not explicitly listed will throw on all API endpoints. `allowTables` can be called multiple times, and the allowed tables will be merged.
+
+## Hooks
+
+You can use hooks to run code before or after certain actions on the collections. You can register global hooks for all collections using the `rstoreDrizzleHooks` import, or specific hooks for a given table using the `hooksForTable` function (recommended).
+
+::: tip
+Put this code in a Nitro plugin in `server/plugins` so it's executed once when the server starts.
+:::
+
+You can use the following hooks:
+
+- `index.get.before` - before fetching a list of items
+- `index.get.after` - after fetching a list of items
+- `index.post.before` - before creating a new item
+- `index.post.after` - after creating a new item
+- `item.get.before` - before fetching a single item
+- `item.get.after` - after fetching a single item
+- `item.patch.before` - before updating a single item
+- `item.patch.after` - after updating a single item
+- `item.delete.before` - before deleting a single item
+- `item.delete.after` - after deleting a single item
+
+If you throw an error in a `before` hook, the action will be aborted and the error will be returned to the client.
+
+```ts
+import * as tables from 'path-to-your-drizzle-schema'
+
+export default defineNitroPlugin(() => {
+  hooksForTable(tables.todos, {
+    'index.get.before': async (payload) => {
+      console.log('Specific hook for todos - index.get.before', payload.collection, payload.query, payload.params)
+    },
+    'index.get.after': async (payload) => {
+      console.log('Specific hook for todos - index.get.after', payload.collection, payload.result.map(r => r.id))
+    },
+    'item.patch.after': async (payload) => {
+      console.log('Specific hook for todos - item.patch.after', payload.collection, payload.result.id)
+    },
+  })
+})
+```
+
+<details>
+
+<summary>You can also register global hooks for all tables.</summary>
+
+```ts
+export default defineNitroPlugin(() => {
+  rstoreDrizzleHooks.hook('index.get.before', async (payload) => {
+    console.log('index.get.before', payload.collection, payload.query, payload.params)
+  })
+  rstoreDrizzleHooks.hook('index.get.after', async (payload) => {
+    console.log('index.get.after', payload.collection)
+  })
+  rstoreDrizzleHooks.hook('index.post.before', async (payload) => {
+    console.log('index.post.before', payload.collection, payload.body)
+  })
+  rstoreDrizzleHooks.hook('index.post.after', async (payload) => {
+    console.log('index.post.after', payload.collection)
+  })
+  rstoreDrizzleHooks.hook('item.get.before', async (payload) => {
+    console.log('item.get.before', payload.collection, payload.params)
+  })
+  rstoreDrizzleHooks.hook('item.get.after', async (payload) => {
+    console.log('item.get.after', payload.collection)
+  })
+  rstoreDrizzleHooks.hook('item.patch.before', async (payload) => {
+    console.log('item.patch.before', payload.collection, payload.params, payload.body)
+  })
+  rstoreDrizzleHooks.hook('item.patch.after', async (payload) => {
+    console.log('item.patch.after', payload.collection)
+  })
+  rstoreDrizzleHooks.hook('item.delete.before', async (payload) => {
+    console.log('item.delete.before', payload.collection, payload.params)
+  })
+  rstoreDrizzleHooks.hook('item.delete.after', async (payload) => {
+    console.log('item.delete.after', payload.collection)
+  })
+})
+```
+
+</details>
+
+## Recipes
+
+### Permission check with a query
+
+Throwing an error in a `before` hook to prevent the action:
+
+```ts
+export default defineNitroPlugin(() => {
+  hooksForTable(tables.projects, {
+    'index.post.before': async ({ body }) => {
+      const session = await requireUserSession(event)
+      // Check that the user is a member of the team
+      // they are trying to create the project for
+      const teamId = body.teamId
+
+      // Check that the user is a member of the team
+      const membership = await useDrizzle()
+        .select()
+        .from(tables.teamsToUsers)
+        .where(and(
+          eq(tables.teamsToUsers.teamId, teamId),
+          eq(tables.teamsToUsers.userId, session.user.id),
+        ))
+        .limit(1)
+        .get()
+
+      if (!membership) {
+        throw createError({
+          statusCode: 403,
+          statusMessage: 'You are not a member of this team'
+        })
+      }
+    },
+  })
+})
+```
+
+### Implicit permission check
+
+By adding a SQL condition to the `where` clause of a query:
+
+```ts
+export default defineNitroPlugin(() => {
+  hooksForTable(tables.projects, {
+    'index.get.before': async ({ event, transformQuery }) => {
+      const session = await requireUserSession(event)
+      // Create a subquery to restrict the projects
+      // to those that belong to teams the user is a member of
+      const sq = useDrizzle()
+        .select({ id: tables.projects.id })
+        .from(tables.teamsToUsers)
+        .innerJoin(tables.projects, eq(tables.projects.teamId, tables.teamsToUsers.teamId))
+        .where(eq(tables.teamsToUsers.userId, session.user.id))
+      // Use the subquery in the main query
+      transformQuery(q => q.where(inArray(tables.projects.id, sq)))
+    },
+  })
+})
+```
+
+### Automatic query
+
+Automatically execute a query after a specific action:
+
+```ts
+export default defineNitroPlugin(() => {
+  hooksForTable(tables.teams, {
+    'index.post.after': async ({ event, result }) => {
+      const session = await requireUserSession(event)
+      // Add the user as a member of the newly created team
+      await useDrizzle().insert(tables.teamsToUsers).values({
+        teamId: result.id,
+        userId: session.user.id,
+      })
+    },
+  })
+})
 ```
 
 ## Configuration

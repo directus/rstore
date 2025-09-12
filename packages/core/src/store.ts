@@ -1,72 +1,81 @@
-import type { Cache, CustomHookMeta, FindOptions, Hooks, Model, ModelDefaults, ModelList, MutationSpecialProps, Plugin, StoreCore } from '@rstore/shared'
+import type { Cache, CollectionDefaults, CustomHookMeta, FindOptions, Hooks, MutationSpecialProps, Plugin, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { get, set } from '@rstore/shared'
+import { builtinCollectionHooksPlugin } from './builtin/collectionHooks'
+import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollections } from './collection'
 import { defaultFetchPolicy } from './fetchPolicy'
-import { resolveModels } from './model'
-import { createModule } from './module'
-import { setupPlugin } from './plugin'
+import { setupPlugin, sortPlugins } from './plugin'
 
 export interface CreateStoreCoreOptions<
-  TModelList extends ModelList = ModelList,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
+  TSchema extends StoreSchema = StoreSchema,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > {
   cache: Cache
-  models: TModelList
-  modelDefaults?: TModelDefaults
+  schema: TSchema
+  collectionDefaults?: TCollectionDefaults
   plugins?: Array<Plugin>
-  hooks: Hooks<TModelList, TModelDefaults>
+  hooks: Hooks<TSchema, TCollectionDefaults>
   findDefaults?: Partial<FindOptions<any, any, any>>
   isServer?: boolean
-  transformStore?: (store: StoreCore<TModelList, TModelDefaults>) => StoreCore<TModelList, TModelDefaults>
+  transformStore?: (store: StoreCore<TSchema, TCollectionDefaults>) => StoreCore<TSchema, TCollectionDefaults>
 }
 
 export async function createStoreCore<
-  TModelList extends ModelList = ModelList,
-  TModelDefaults extends ModelDefaults = ModelDefaults,
->(options: CreateStoreCoreOptions<TModelList, TModelDefaults>): Promise<StoreCore<TModelList, TModelDefaults>> {
+  TSchema extends StoreSchema = StoreSchema,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
+>(options: CreateStoreCoreOptions<TSchema, TCollectionDefaults>): Promise<StoreCore<TSchema, TCollectionDefaults>> {
   // Create store
 
-  const models = resolveModels(options.models, options.modelDefaults)
+  const collections = resolveCollections(options.schema, options.collectionDefaults)
 
-  let store: StoreCore<TModelList, TModelDefaults> = {
+  const optionPlugins = options.plugins ?? []
+  optionPlugins.unshift(builtinCollectionHooksPlugin)
+
+  let store: StoreCore<TSchema, TCollectionDefaults> = {
     $cache: options.cache,
-    $models: models,
-    $modelDefaults: options.modelDefaults ?? {} as TModelDefaults,
-    $plugins: options.plugins?.map(p => ({ ...p, hooks: {} })) ?? [],
+    $collections: collections,
+    $collectionDefaults: options.collectionDefaults ?? {} as TCollectionDefaults,
+    $plugins: sortPlugins(optionPlugins.map(p => ({ ...p, hooks: {} }))),
     $hooks: options.hooks,
     $findDefaults: options.findDefaults ?? {},
     $getFetchPolicy(value) {
       return value ?? store.$findDefaults.fetchPolicy ?? defaultFetchPolicy
     },
-    $processItemParsing(model, item) {
+    $processItemParsing(collection, item) {
       store.$hooks.callHookSync('parseItem', {
         store,
         meta: {},
-        model,
+        collection,
         item,
         modifyItem: (path, value) => {
           set(item, path, value as any)
         },
       })
     },
-    $processItemSerialization(model, item) {
+    $processItemSerialization(collection, item) {
       store.$hooks.callHookSync('serializeItem', {
         store,
         meta: {},
-        model,
+        collection,
         item,
         modifyItem: (path, value) => {
           set(item, path, value as any)
         },
       })
     },
-    $getModel(item, modelNames?) {
-      if (modelNames?.length === 1) {
-        return store.$models.find(m => m.name === modelNames[0]) ?? null
+    $getCollection(item, collectionNames?) {
+      if (collectionNames?.length === 1) {
+        return store.$collections.find(m => m.name === collectionNames[0]) ?? null
       }
-      const models = modelNames ? store.$models.filter(m => modelNames?.includes(m.name)) : store.$models
-      for (const model of models) {
-        if (model.isInstanceOf(item)) {
-          return model
+      if (typeof item?.$collection === 'string') {
+        const result = store.$collections.find(m => m.name === item.$collection)
+        if (result) {
+          return result
+        }
+      }
+      const collections = collectionNames ? store.$collections.filter(m => collectionNames?.includes(m.name)) : store.$collections
+      for (const collection of collections) {
+        if (collection.isInstanceOf(item)) {
+          return collection
         }
       }
       return null
@@ -74,12 +83,17 @@ export async function createStoreCore<
     $mutationHistory: [],
     $isServer: options.isServer ?? false,
     $dedupePromises: new Map(),
-    $createModule(module) {
-      return createModule(store, module)
-    },
     $registeredModules: new Map(),
     $wrapMutation: mutation => mutation as typeof mutation & MutationSpecialProps,
   }
+
+  for (const item of options.schema) {
+    if (isCollectionRelations(item)) {
+      addCollectionRelations(store, item)
+    }
+  }
+
+  normalizeCollectionRelations(store.$collections)
 
   if (options.transformStore) {
     store = options.transformStore(store)
@@ -100,12 +114,12 @@ export async function createStoreCore<
     meta,
   })
 
-  // Model hooks
+  // Collection hooks
 
   store.$hooks.hook('parseItem', (payload) => {
-    if (payload.model.fields) {
-      for (const path in payload.model.fields) {
-        const fieldConfig = payload.model.fields[path]!
+    if (payload.collection.fields) {
+      for (const path in payload.collection.fields) {
+        const fieldConfig = payload.collection.fields[path]!
         if (fieldConfig.parse) {
           const value = get(payload.item, path as any)
           if (value != null) {
@@ -116,36 +130,36 @@ export async function createStoreCore<
     }
 
     for (const key in payload.item) {
-      if (key in payload.model.relations) {
+      if (key in payload.collection.relations) {
         const value = payload.item[key]
         if (value) {
           if (Array.isArray(value)) {
             for (const child of value as any[]) {
-              parseNestedItem(payload.model, key, child)
+              parseNestedItem(payload.collection, key, child)
             }
           }
           else {
-            parseNestedItem(payload.model, key, value)
+            parseNestedItem(payload.collection, key, value)
           }
         }
       }
     }
   })
 
-  function parseNestedItem(parentModel: Model, key: string, child: any) {
-    const relation = parentModel.relations![key]!
-    const possibleModels = Object.keys(relation.to)
-    const childModel = store.$getModel(child, possibleModels)
-    if (!childModel) {
-      throw new Error(`Could not determine for relation ${parentModel.name}.${String(key)}`)
+  function parseNestedItem(parentCollection: ResolvedCollection, key: string, child: any) {
+    const relation = parentCollection.relations![key]!
+    const possibleCollections = Object.keys(relation.to)
+    const childCollection = store.$getCollection(child, possibleCollections)
+    if (!childCollection) {
+      throw new Error(`Could not determine for relation ${parentCollection.name}.${String(key)}`)
     }
-    store.$processItemParsing(childModel, child)
+    store.$processItemParsing(childCollection, child)
   }
 
   store.$hooks.hook('serializeItem', (payload) => {
-    if (payload.model.fields) {
-      for (const path in payload.model.fields) {
-        const fieldConfig = payload.model.fields[path]!
+    if (payload.collection.fields) {
+      for (const path in payload.collection.fields) {
+        const fieldConfig = payload.collection.fields[path]!
         if (fieldConfig.serialize) {
           const value = get(payload.item, path as any)
           if (value != null) {

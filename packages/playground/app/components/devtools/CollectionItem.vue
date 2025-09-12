@@ -1,9 +1,9 @@
 <script lang="ts" setup>
-import type { ModelRelation, ResolvedModel } from '@rstore/shared'
+import type { CollectionRelation, ResolvedCollection } from '@rstore/shared'
 import { codeToHtml } from 'shiki'
 
 const props = defineProps<{
-  item: ResolvedModel<any, any, any>
+  item: ResolvedCollection
 }>()
 
 const cache = useCache()
@@ -53,7 +53,7 @@ const cacheHtml = asyncComputed(() => codeToHtml(JSON.stringify((cache.value as 
         Relations
       </div>
       <div
-        v-for="(relation, key) in item.relations as Record<string, ModelRelation>"
+        v-for="(relation, key) in item.relations as Record<string, CollectionRelation>"
         :key
         class="flex gap-1 items-start"
       >
@@ -63,12 +63,12 @@ const cacheHtml = asyncComputed(() => codeToHtml(JSON.stringify((cache.value as 
         </div>
         <div>
           <div
-            v-for="(info, model) in relation.to"
-            :key="model"
+            v-for="(info, collection) in relation.to"
+            :key="collection"
             class="flex items-center"
           >
             <div class="relative bottom-px">
-              <div v-if="Object.keys(relation.to)[0]! === model" class="h-px w-3.5 border-b -mr-2" />
+              <div v-if="Object.keys(relation.to)[0]! === collection" class="h-px w-3.5 border-b -mr-2" />
               <div v-else class="h-4 w-1.5 relative">
                 <div class="h-px w-2.25 border-b absolute top-2 -right-2" />
                 <div class="w-px h-4 border-r absolute -top-1.75 left-1.25" />
@@ -79,7 +79,7 @@ const cacheHtml = asyncComputed(() => codeToHtml(JSON.stringify((cache.value as 
               class="size-[13px] relative bottom-px"
             />
             <span class="text-purple-500">
-              {{ model }}
+              {{ collection }}
             </span>
             <span class="opacity-50">.</span>
             <span class="text-purple-500">

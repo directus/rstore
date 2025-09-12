@@ -1,3 +1,3 @@
-export default defineDataModel({
+export default defineCollection({
   name: 'MyLayerTest',
 })

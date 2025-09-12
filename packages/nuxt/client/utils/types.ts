@@ -1,9 +1,9 @@
 import type { FindOptions } from '@rstore/shared'
 
 export interface StoreHistoryItem {
-  operation: 'fetchFirst' | 'fetchMany' | 'create' | 'update' | 'delete' | 'cacheWrite'
-  model: string
-  key?: string
+  operation: 'fetchFirst' | 'fetchMany' | 'create' | 'update' | 'delete' | 'cacheWrite' | 'itemGarbageCollect' | 'cacheLayerAdd' | 'cacheLayerRemove'
+  collection?: string
+  key?: string | number
   findOptions?: FindOptions<any, any, any>
   item?: any
   result: any
@@ -14,8 +14,8 @@ export interface StoreHistoryItem {
 
 export interface StoreSubscriptionItem {
   id: string
-  model: string
-  key?: string
+  collection: string
+  key?: string | number
   findOptions?: FindOptions<any, any, any>
   started: Date
 }

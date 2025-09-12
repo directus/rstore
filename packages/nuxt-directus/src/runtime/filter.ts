@@ -1,7 +1,7 @@
 /* eslint-disable eqeqeq */
 
 import type { QueryFilter } from '@directus/sdk'
-import type { ResolvedModel } from '@rstore/shared'
+import type { ResolvedCollection } from '@rstore/shared'
 import type { VueStore } from '@rstore/vue'
 
 const DYNAMIC_VARIABLES = {
@@ -40,7 +40,7 @@ const FUNCTION_PARAMETERS = {
   },
 }
 
-export function filterItem(store: VueStore, model: ResolvedModel<any, any, any>, item: any, filter: QueryFilter<any, any>): boolean {
+export function filterItem(store: VueStore, collection: ResolvedCollection, item: any, filter: QueryFilter<any, any>): boolean {
   // TODO relation filter
   // TODO user-related dynamic variables
   // TODO $FOLLOW
@@ -48,16 +48,16 @@ export function filterItem(store: VueStore, model: ResolvedModel<any, any, any>,
   for (const key in filter) {
     const filterValue = (filter as any)[key]
     if (key === '_and') {
-      if ((filterValue as any[]).every(f => filterItem(store, model, item, f))) {
+      if ((filterValue as any[]).every(f => filterItem(store, collection, item, f))) {
         return true
       }
     }
     else if (key === '_or') {
-      if ((filterValue as any[]).some(f => filterItem(store, model, item, f))) {
+      if ((filterValue as any[]).some(f => filterItem(store, collection, item, f))) {
         return true
       }
     }
-    else if (key in model.relations) {
+    else if (key in collection.relations) {
       throw new Error('Relation filter not implemented yet')
     }
 

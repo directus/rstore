@@ -1,73 +1,74 @@
-import { type CustomHookMeta, dedupePromise, type FindManyOptions, type Model, type ModelDefaults, type ModelList, type QueryResult, type ResolvedModel, type StoreCore, type WrappedItem, type WriteItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindManyOptions, FindOptions, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem, WriteItem } from '@rstore/shared'
+import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { peekMany } from './peekMany'
 
 export interface FindManyParams<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 > {
-  store: StoreCore<TModelList, TModelDefaults>
+  store: StoreCore<TSchema, TCollectionDefaults>
   meta?: CustomHookMeta
-  model: ResolvedModel<TModel, TModelDefaults, TModelList>
-  findOptions?: FindManyOptions<TModel, TModelDefaults, TModelList>
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  findOptions?: FindManyOptions<TCollection, TCollectionDefaults, TSchema>
 }
 
 /**
  * Find all items that match the query.
  */
 export async function findMany<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 >({
   store,
   meta,
-  model,
+  collection,
   findOptions,
-}: FindManyParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelList>>>> {
+}: FindManyParams<TCollection, TCollectionDefaults, TSchema>): Promise<QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>>> {
   if (findOptions?.dedupe === false) {
     return _findMany({
       store,
       meta,
-      model,
+      collection,
       findOptions,
     })
   }
 
   const dedupeKey = JSON.stringify(findOptions)
-  return dedupePromise(store.$dedupePromises, `findMany:${model.name}:${dedupeKey}`, () => _findMany({
+  return dedupePromise(store.$dedupePromises, `findMany:${collection.name}:${dedupeKey}`, () => _findMany({
     store,
     meta,
-    model,
+    collection,
     findOptions,
   }))
 }
 
 async function _findMany<
-  TModel extends Model,
-  TModelDefaults extends ModelDefaults,
-  TModelList extends ModelList,
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
 >({
   store,
   meta,
-  model,
+  collection,
   findOptions,
-}: FindManyParams<TModel, TModelDefaults, TModelList>): Promise<QueryResult<Array<WrappedItem<TModel, TModelDefaults, TModelList>>>> {
+}: FindManyParams<TCollection, TCollectionDefaults, TSchema>): Promise<QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>>> {
   meta ??= {}
+  findOptions ??= {}
 
-  findOptions = findOptions ?? {}
   const fetchPolicy = store.$getFetchPolicy(findOptions.fetchPolicy)
 
-  let result: any
+  let result: any[] | undefined
   let marker: string | undefined
 
   if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     const peekManyResult = peekMany({
       store,
       meta,
-      model,
+      collection,
       findOptions,
     })
     result = peekManyResult.result
@@ -76,13 +77,13 @@ async function _findMany<
 
   if (!result?.length && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
     if (!marker) {
-      marker = defaultMarker(model, findOptions)
+      marker = defaultMarker(collection, findOptions)
     }
 
     await store.$hooks.callHook('beforeFetch', {
       store,
       meta,
-      model,
+      collection,
       findOptions,
       many: true,
       updateFindOptions: (value) => {
@@ -90,24 +91,29 @@ async function _findMany<
       },
     })
 
+    const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('fetchMany', {
       store,
       meta,
-      model,
+      collection,
       findOptions,
-      getResult: () => result,
-      setResult: (value) => {
+      getResult: () => result ?? [],
+      setResult: (value, options) => {
         result = value
+        if (result?.length && options?.abort !== false) {
+          abort()
+        }
       },
       setMarker: (value) => {
         marker = value
       },
+      abort,
     })
 
     await store.$hooks.callHook('afterFetch', {
       store,
       meta,
-      model,
+      collection,
       findOptions,
       many: true,
       getResult: () => result,
@@ -118,44 +124,50 @@ async function _findMany<
 
     if (result) {
       for (const item of result) {
-        store.$processItemParsing(model, item)
+        store.$processItemParsing(collection, item)
       }
-    }
 
-    if (fetchPolicy !== 'no-cache') {
-      const items = result
-      const writes: Array<WriteItem<TModel, TModelDefaults, TModelList>> = []
-      for (const item of items) {
-        const key = model.getKey(item)
-        if (!key) {
-          console.warn(`Key is undefined for ${model.name}. Item was not written to cache.`)
-          continue
+      if (fetchPolicy !== 'no-cache') {
+        const items = result
+        const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
+        for (const item of items) {
+          const key = collection.getKey(item)
+          if (!key) {
+            console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
+            continue
+          }
+          writes.push({ key, value: item })
         }
-        writes.push({ key, value: item })
-      }
-      if (writes.length) {
-        store.$cache.writeItems<TModel>({
-          model,
-          items: writes,
-          marker: getMarker('many', marker),
-        })
+        if (writes.length) {
+          store.$cache.writeItems<TCollection>({
+            collection,
+            items: writes,
+            marker: getMarker('many', marker),
+          })
+        }
       }
     }
   }
 
   if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
+    const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('fetchRelations', {
       store,
       meta,
-      model,
-      findOptions,
+      collection,
+      findOptions: findOptions as FindOptions<TCollection, TCollectionDefaults, TSchema> & { include: NonNullable<FindOptions<TCollection, TCollectionDefaults, TSchema>['include']> },
       many: true,
       getResult: () => result,
+      abort,
     })
   }
 
+  if (result?.length) {
+    result = result.map((item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => store.$cache.wrapItem({ collection, item }))
+  }
+
   return {
-    result,
+    result: result ?? [],
     marker,
   }
 }

@@ -1,23 +1,23 @@
 <script lang="ts" setup>
-import type { Model, ModelDefaults, ModelList, ResolvedModel } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollection, StoreSchema } from '@rstore/shared'
 
 const store = useNonNullRstore()
 
-const search = useLocalStorage('rstore-search-models', '')
+const search = useLocalStorage('rstore-search-collections', '')
 
 const filteredTypes = computed(() => {
-  return store.value.$models.filter((model) => {
-    return model.name.toLowerCase().includes(search.value.toLowerCase())
-  }).sort((a, b) => a.name.localeCompare(b.name)) as ResolvedModel<Model, ModelDefaults, ModelList>[]
+  return store.value.$collections.filter((collection) => {
+    return collection.name.toLowerCase().includes(search.value.toLowerCase())
+  }).sort((a, b) => a.name.localeCompare(b.name)) as ResolvedCollection<Collection, CollectionDefaults, StoreSchema>[]
 })
 </script>
 
 <template>
   <div class="flex flex-col h-full">
     <Empty
-      v-if="!store.$models.length"
+      v-if="!store.$collections.length"
       icon="lucide:boxes"
-      title="No models found"
+      title="No collections found"
       class="h-full"
     />
 
@@ -28,14 +28,13 @@ const filteredTypes = computed(() => {
           icon="lucide:search"
           placeholder="Search"
           size="xs"
-          variant="soft"
           autofocus
           class="w-full"
         />
       </div>
 
       <div class="flex-1 overflow-auto min-h-0 flex flex-col p-1 gap-1">
-        <DevtoolsModelItem
+        <DevtoolsCollectionItem
           v-for="item in filteredTypes"
           :key="item.name"
           :item

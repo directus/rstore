@@ -36,7 +36,7 @@
   },
   "dependencies": {
     "@directus/sdk": "^19.0.1",
-    "@nuxt/kit": "^3.16.0",
+    "@nuxt/kit": "^4.0.0",
     "@rstore/nuxt": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^"
@@ -44,12 +44,12 @@
   "devDependencies": {
     "@nuxt/devtools": "^2.3.0",
     "@nuxt/module-builder": "^0.8.4",
-    "@nuxt/schema": "^3.16.0",
+    "@nuxt/schema": "catalog:",
     "@nuxt/test-utils": "^3.17.2",
-    "@types/node": "latest",
-    "nuxt": "^3.16.0",
-    "typescript": "~5.8.2",
-    "vitest": "^3.0.9",
-    "vue-tsc": "^2.2.8"
+    "@types/node": "catalog:",
+    "nuxt": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vue-tsc": "catalog:"
   }
 }

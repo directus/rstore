@@ -49,4 +49,11 @@ export default defineNuxtConfig({
   hub: {
     database: true,
   },
+
+  rstoreDrizzle: {
+    drizzleImport: {
+      name: 'useDrizzle',
+      from: 'server/utils/db',
+    },
+  },
 })

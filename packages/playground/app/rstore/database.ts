@@ -1,60 +1,106 @@
-export default [
-  defineItemType<DataSource>().model({
-    name: 'DataSource',
-    relations: {
-      collections: {
-        many: true,
-        to: {
-          DataCollection: {
-            on: 'dataSourceId',
-            eq: 'id',
-          },
+import { z } from 'zod'
+
+export const DataSourceCollection = RStoreSchema.withItemType<DataSource>().defineCollection({
+  name: 'DataSource',
+  meta: {
+    path: 'dataSources',
+  },
+})
+
+export const DataCollectionCollection = RStoreSchema.withItemType<DataCollection>().defineCollection({
+  name: 'DataCollection',
+  hooks: {
+    fetchFirst: async ({ key, params }) => {
+      // eslint-disable-next-line no-console
+      console.log('[collection hook] Fetching DataCollection with key', key, params)
+      const result = await $fetch(`/api/rest/dataCollections/${key ?? ''}`, {
+        query: params,
+      })
+      return Array.isArray(result) ? result[0] : result
+    },
+  },
+  meta: {
+    path: 'dataCollections',
+  },
+})
+
+export const DataFieldCollection = RStoreSchema.withItemType<DataField>().defineCollection({
+  name: 'DataField',
+  meta: {
+    path: 'dataFields',
+    // meow: true,
+  },
+  // meow: true,
+  getKey: item => item.id,
+  // isInstanceOf: _item => true,
+  computed: {
+    foo: item => `Field: ${item.name}`,
+  },
+  fields: {
+    name: {
+      parse: (value: any) => String(value).toUpperCase(),
+      serialize: (value: string) => value.toLowerCase(),
+    },
+    // meow: 'meow',
+  },
+  formSchema: {
+    create: z.object({}),
+    update: z.object({}),
+  },
+  // scopeId: 'datasource-1',
+  // relations: {
+  //   collection: {
+  //     to: {
+  //       DataCollection: {
+  //         on: {
+  //           id: 'dataCollectionId',
+  //         },
+  //         filter: (item, relationItem) => item.id === relationItem.dataCollectionId,
+  //       }
+  //     },
+  //   },
+  // }
+})
+
+export const DataSourceRelations = RStoreSchema.defineRelations(DataSourceCollection, ({ collection }) => ({
+  collections: {
+    many: true,
+    to: {
+      ...collection(DataCollectionCollection, {
+        on: {
+          'DataCollection.dataSourceId': 'DataSource.id',
+          // 'DataCollection.id': 'DataSource.id',
         },
+        filter: (item, relationItem) => !!item.id && !!relationItem.id,
+      }),
+    },
+  },
+}))
+
+export const DataCollectionRelations = RStoreSchema.defineRelations(DataCollectionCollection, ({ collection }) => ({
+  source: {
+    to: collection(DataSourceCollection, {
+      on: {
+        'DataSource.id': 'DataCollection.dataSourceId',
       },
-    },
-    meta: {
-      path: 'dataSources',
-    },
-  }),
-  defineItemType<DataCollection>().model({
-    name: 'DataCollection',
-    relations: {
-      source: {
-        to: {
-          DataSource: {
-            on: 'id',
-            eq: 'dataSourceId',
-          },
-        },
+    }),
+  },
+  fields: {
+    many: true,
+    to: collection(DataFieldCollection, {
+      on: {
+        'DataField.dataCollectionId': 'DataCollection.id',
       },
-      fields: {
-        many: true,
-        to: {
-          DataField: {
-            on: 'dataCollectionId',
-            eq: 'id',
-          },
-        },
+    }),
+  },
+}))
+
+export const DataFieldRelations = RStoreSchema.defineRelations(DataFieldCollection, ({ collection }) => ({
+  collection: {
+    to: collection(DataCollectionCollection, {
+      on: {
+        id: 'dataCollectionId',
       },
-    },
-    meta: {
-      path: 'dataCollections',
-    },
-  }),
-  defineItemType<DataField>().model({
-    name: 'DataField',
-    relations: {
-      collection: {
-        to: {
-          DataCollection: {
-            on: 'id',
-            eq: 'dataCollectionId',
-          },
-        },
-      },
-    },
-    meta: {
-      path: 'dataFields',
-    },
-  }),
-]
+    }),
+  },
+}))

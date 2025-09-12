@@ -1,4 +1,6 @@
+import type { StoreSchema } from './collection'
 import type { MutationSpecialProps } from './mutation'
+import type { StoreCore } from './store'
 import type { Awaitable, Brand } from './utils'
 
 export interface Module {
@@ -9,7 +11,7 @@ export interface Module {
   /**
    * State of the module. This is a plain object that can be used to store any data related to the module. It should be serializable to JSON to ensure compatibility with SSR and other future sync features.
    */
-  state: Record<string, any>
+  state: Record<string, Record<string, any>>
 }
 
 export type ResolvedModuleState<TModule extends Module> = TModule['state']
@@ -30,11 +32,20 @@ export type ResolvedModule<
 
 export type ModuleMutation<TMutation extends (...args: any[]) => unknown> = Brand<TMutation, 'rstore-module-mutation'> & MutationSpecialProps
 
-export type CreateModuleApi<TModule extends Module> = TModule & {
+export interface CreateModuleApi<
+  TStore extends StoreCore<StoreSchema>,
+> {
   /**
-   * The result of this function should be returned in `defineModule`. It resolves the module and exposes the passed properties to be used elsewhere in the application.
+   * The store instance that the module is registered to.
    */
-  resolve: <const TModuleExposed extends Record<string, any>> (exposed: TModuleExposed) => ResolvedModule<TModule, TModuleExposed>
+  store: TStore
+
+  /**
+   * Create a reactive state for the module. The state should be a plain object that can be used to store any data related to the module. It should be serializable to JSON to ensure compatibility with SSR and other future sync features. By default, the state will be key by the order of calls to `defineState`. You can also provide a custom key as the second argument to make sure the state is correctly hydrated from SSR.
+   *
+   * @returns The same state object, but reactive.
+   */
+  defineState: <TState extends Record<string, any>> (state: TState, key?: string) => TState
 
   /**
    * A module mutation is an augmented (possibly async) function that can be used to perform any action. It exposes additional properties and also integrates with various rstore systems such as the devtools.

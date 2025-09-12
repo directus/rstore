@@ -19,6 +19,9 @@ const icons = {
   update: 'lucide:pen',
   delete: 'lucide:trash',
   cacheWrite: 'lucide:database',
+  itemGarbageCollect: 'lucide:trash-2',
+  cacheLayerAdd: 'lucide:layers',
+  cacheLayerRemove: 'lucide:rotate-ccw',
 }
 </script>
 
@@ -32,7 +35,7 @@ const icons = {
             'text-blue-500': ['fetchFirst', 'fetchMany'].includes(item.operation),
             'text-orange-500': ['create', 'update'].includes(item.operation),
             'text-red-500': ['delete'].includes(item.operation),
-            'text-gray-500': ['cacheWrite'].includes(item.operation),
+            'text-gray-500': ['cacheWrite', 'itemGarbageCollect', 'cacheLayerAdd', 'cacheLayerRemove'].includes(item.operation),
           }"
         >
           <UIcon
@@ -41,7 +44,7 @@ const icons = {
           />
           <span>{{ item.operation }}</span>
         </span>
-        <span class="font-bold">{{ item.model }}</span>
+        <span class="font-bold">{{ item.collection }}</span>
         <span>(</span>
         <span v-if="item.key" class="text-emerald-500">{{ item.key }}</span>
         <span v-else-if="item.findOptions" class="whitespace-pre-wrap text-emerald-500">{{ JSON.stringify(item.findOptions, null, 2) }}</span>

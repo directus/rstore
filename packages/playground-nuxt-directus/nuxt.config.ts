@@ -6,10 +6,7 @@ export default defineNuxtConfig({
     '@vueuse/nuxt',
   ],
   devtools: { enabled: true },
-  compatibilityDate: '2024-12-19',
-  future: {
-    compatibilityVersion: 4,
-  },
+  compatibilityDate: '2025-09-01',
   css: ['~/assets/style.css'],
   rstoreDirectus: {
     url: import.meta.env.DIRECTUS_URL,

@@ -1,5 +1,5 @@
+import type { CollectionDefaults, StoreSchema } from './collection.js'
 import type { HookDefinitions } from './hooks.js'
-import type { ModelDefaults, ModelList } from './model.js'
 import type { Awaitable } from './utils.js'
 
 export interface CustomPluginMeta {
@@ -7,11 +7,18 @@ export interface CustomPluginMeta {
   builtin?: boolean
 }
 
+export type PluginCategory = 'virtual' | 'local' | 'remote' | 'processing'
+
 export interface Plugin {
   /**
    * Helps to identify the adapter.
    */
   name: string
+
+  /**
+   * Category of the plugin.
+   */
+  category?: PluginCategory
 
   /**
    * Setups the adapter
@@ -21,11 +28,40 @@ export interface Plugin {
   setup: (api: PluginSetupApi) => Awaitable<void>
 
   /**
-   * Allows scoping the plugin to specific models with the same scopeId.
+   * Allows scoping the plugin to specific collections with the same scopeId.
    *
    * This is useful when you have multiple data sources.
    */
   scopeId?: string
+
+  /**
+   * Sort the plugin after other plugins.
+   */
+  after?: {
+    /**
+     * List of plugin names that this plugin depends on.
+     * The dependent plugins will be sorted before this plugin.
+     */
+    plugins?: string[]
+    /**
+     * Categories of plugins that should be sorted before this plugin.
+     */
+    categories?: Array<PluginCategory>
+  }
+
+  /**
+   * Sort the plugin before other plugins.
+   */
+  before?: {
+    /**
+     * List of plugin names that should be sorted after this plugin.
+     */
+    plugins?: string[]
+    /**
+     * Categories of plugins that should be sorted after this plugin.
+     */
+    categories?: Array<PluginCategory>
+  }
 
   meta?: CustomPluginMeta
 }
@@ -37,21 +73,21 @@ export interface RegisteredPlugin extends Plugin {
 
 export interface HookPluginOptions {
   /**
-   * Allows the hook to be called with any model, even with different scopeId.
+   * Allows the hook to be called with any collection, even with different scopeId.
    */
   ignoreScope?: boolean
 }
 
 export interface PluginSetupApi {
   /**
-   * Add options to the model defaults.
+   * Add options to the collection defaults.
    */
-  addModelDefaults: (modelDefaults: ModelDefaults) => void
+  addCollectionDefaults: (collectionDefaults: CollectionDefaults) => void
 
   hook: <
-    TName extends keyof HookDefinitions<ModelList, ModelDefaults>,
+    TName extends keyof HookDefinitions<StoreSchema, CollectionDefaults>,
   > (name: TName,
-    callback: HookDefinitions<ModelList, ModelDefaults>[TName],
+    callback: HookDefinitions<StoreSchema, CollectionDefaults>[TName],
     options?: HookPluginOptions
   ) => () => void
 }
