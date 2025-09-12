@@ -109,8 +109,8 @@ export function wrapItem<
             const values: Record<string, any> = {}
             const on = targetCollectionConfig.on as Record<string, string>
             for (const key in on) {
-              const foreignKey = key.replace(`${targetCollection.name}.`, '')
-              const currentKey = on[key]!.replace(`${collection.name}.`, '')
+              const foreignKey = key
+              const currentKey = on[key]!
               values[foreignKey] = Reflect.get(proxy, currentKey)
             }
             const cacheResultForTarget = (relation.many ? peekMany : peekFirst)({

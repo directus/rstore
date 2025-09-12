@@ -144,3 +144,24 @@ export function addCollectionRelations<
   collection.relations ??= {}
   Object.assign(collection.relations, relations.relations)
 }
+
+export function normalizeCollectionRelations(collections: ResolvedCollection[]): void {
+  for (const collection of collections) {
+    if (!collection.relations) {
+      continue
+    }
+    for (const relationKey in collection.relations) {
+      const relation = collection.relations[relationKey]!
+      for (const toCollectionName in relation.to) {
+        const newOn = {} as Record<string, string>
+        const on = relation.to[toCollectionName]!.on as Record<string, string>
+        for (const key in on) {
+          const oppositeKey = key.replace(`${toCollectionName}.`, '')
+          const currentKey = on[key]!.replace(`${collection.name}.`, '')
+          newOn[oppositeKey] = currentKey
+        }
+        relation.to[toCollectionName]!.on = newOn
+      }
+    }
+  }
+}

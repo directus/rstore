@@ -1,6 +1,6 @@
-import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollection, StoreSchema } from '@rstore/shared'
 import { describe, expect, it } from 'vitest'
-import { defaultGetKey, defaultIsInstanceOf, resolveCollections } from '../src/collection'
+import { defaultGetKey, defaultIsInstanceOf, normalizeCollectionRelations, resolveCollections } from '../src/collection'
 
 describe('default get key', () => {
   it('should return id if present', () => {
@@ -172,6 +172,41 @@ describe('collection', () => {
     expect(resolved[0]!.formSchema.update['~standard']!.vendor).toBe('rstore')
     expect(resolved[0]!.meta).toEqual({
       test: 'meow',
+    })
+  })
+})
+
+describe('normalizeCollectionRelations', () => {
+  it('should normalize relations defined with collection function', () => {
+    const collections = [
+      {
+        name: 'TestCollection',
+        relations: {
+          test: {
+            to: {
+              Test2: {
+                on: {
+                  'Test2.id': 'TestCollection.testId',
+                },
+              },
+            },
+          },
+        },
+      },
+    ] as unknown as ResolvedCollection[]
+
+    const result = collections.slice()
+    normalizeCollectionRelations(result)
+    expect(result[0]!.relations).toEqual({
+      test: {
+        to: {
+          Test2: {
+            on: {
+              id: 'testId',
+            },
+          },
+        },
+      },
     })
   })
 })

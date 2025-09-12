@@ -1,6 +1,6 @@
 import type { Cache, CollectionDefaults, CustomHookMeta, FindOptions, Hooks, MutationSpecialProps, Plugin, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { get, set } from '@rstore/shared'
-import { addCollectionRelations, isCollectionRelations, resolveCollections } from './collection'
+import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollections } from './collection'
 import { defaultFetchPolicy } from './fetchPolicy'
 import { setupPlugin, sortPlugins } from './plugin'
 
@@ -88,6 +88,8 @@ export async function createStoreCore<
       addCollectionRelations(store, item)
     }
   }
+
+  normalizeCollectionRelations(store.$collections)
 
   if (options.transformStore) {
     store = options.transformStore(store)

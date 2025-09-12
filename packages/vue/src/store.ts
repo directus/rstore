@@ -1,5 +1,5 @@
 import type { Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOptions, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
-import { createStoreCore, resolveCollection } from '@rstore/core'
+import { createStoreCore, normalizeCollectionRelations, resolveCollection } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook } from '@vueuse/core'
 import { ref, type Ref } from 'vue'
@@ -150,8 +150,11 @@ export function addCollection(store: VueStore, collection: Collection) {
     throw new Error(`Collection ${collection.name} already exists`)
   }
 
-  store.$collections.push(resolveCollection(collection, store.$collectionDefaults))
+  const resolvedCollection = resolveCollection(collection, store.$collectionDefaults)
+  store.$collections.push(resolvedCollection)
   privateStore.$_collectionNames.add(collection.name)
+
+  normalizeCollectionRelations([resolvedCollection])
 }
 
 export function removeCollection(store: VueStore, collectionName: string) {
