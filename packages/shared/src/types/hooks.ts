@@ -172,6 +172,10 @@ export interface HookDefinitions<
       findOptions: FindOptions<TCollection, TCollectionDefaults, TSchema> & { include: NonNullable<FindOptions<TCollection, TCollectionDefaults, TSchema>['include']> }
       many: boolean
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
+      /**
+       * Don't call the remaining hooks in the queue.
+       */
+      abort: () => void
     }
   ) => Awaitable<void>
 

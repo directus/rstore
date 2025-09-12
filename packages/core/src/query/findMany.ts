@@ -150,6 +150,7 @@ async function _findMany<
   }
 
   if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
+    const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('fetchRelations', {
       store,
       meta,
@@ -157,6 +158,7 @@ async function _findMany<
       findOptions: findOptions as FindOptions<TCollection, TCollectionDefaults, TSchema> & { include: NonNullable<FindOptions<TCollection, TCollectionDefaults, TSchema>['include']> },
       many: true,
       getResult: () => result,
+      abort,
     })
   }
 
