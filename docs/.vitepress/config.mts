@@ -1,6 +1,12 @@
+import type { ElementContent, Properties } from 'hast'
 import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig } from 'vitepress'
+
+const MARKERS: Record<string, 'add' | 'remove'> = {
+  '// [!code ++]': 'add',
+  '// [!code --]': 'remove',
+}
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
@@ -113,4 +119,46 @@ export default defineConfig({
       ],
     },
   },
+
+  markdown: {
+    codeTransformers: [
+      {
+        line(line) {
+          const lastThree = line.children.slice(-3)
+          if (lastThree.length !== 3)
+            return
+          if (!lastThree.every(isSingleTextElement))
+            return
+
+          const texts = lastThree.map(el => el.children[0])
+          const joined = texts
+            .map(t => t.value)
+            .join('')
+            .trim()
+
+          const kind = MARKERS[joined]
+          if (!kind)
+            return
+
+          texts.forEach(t => (t.value = ''))
+          this.addClassToHast(this.pre, 'has-diff')
+          this.addClassToHast(line, ['diff', kind])
+        },
+      },
+    ],
+  },
 })
+
+function isSingleTextElement(node: ElementContent): node is {
+  type: 'element'
+  tagName: string
+  properties: Properties
+  children: [{ type: 'text', value: string }]
+} {
+  return (
+    node.type === 'element'
+    && Array.isArray(node.children)
+    && node.children.length === 1
+    && node.children[0]!.type === 'text'
+  )
+}
