@@ -33,7 +33,7 @@ export async function updateItem<
 
   item = pickNonSpecialProps(item, true) as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
-  key = key ?? collection.getKey(item)
+  key ??= collection.getKey(item)
 
   if (!key) {
     throw new Error('Item update failed: key is not defined')

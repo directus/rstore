@@ -57,8 +57,8 @@ async function _findMany<
   findOptions,
 }: FindManyParams<TCollection, TCollectionDefaults, TSchema>): Promise<QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>>> {
   meta ??= {}
+  findOptions ??= {}
 
-  findOptions = findOptions ?? {}
   const fetchPolicy = store.$getFetchPolicy(findOptions.fetchPolicy)
 
   let result: any[] | undefined
