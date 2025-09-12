@@ -307,7 +307,7 @@ export default defineNuxtConfig({
 
 ```ts [app/rstore/todo.ts]
 // One Collection
-export default withItemType<Todo>().defineCollection({
+export default RStoreSchema.withItemType<Todo>().defineCollection({
   name: 'todos',
   // Interact with a REST/GraphQL/etc. API
   hooks: {
@@ -322,7 +322,7 @@ export default withItemType<Todo>().defineCollection({
 
 ```ts [app/rstore/multiple.ts]
 // Multiple Collections
-const users = withItemType<User>().defineCollection({
+export const users = RStoreSchema.withItemType<User>().defineCollection({
   name: 'users',
   // Interact with a REST/GraphQL/etc. API
   hooks: {
@@ -334,7 +334,7 @@ const users = withItemType<User>().defineCollection({
   },
 })
 
-const bots = withItemType<Bot>().defineCollection({
+export const bots = RStoreSchema.withItemType<Bot>().defineCollection({
   name: 'bots',
   // Interact with a REST/GraphQL/etc. API
   hooks: {
