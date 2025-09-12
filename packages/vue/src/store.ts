@@ -2,7 +2,7 @@ import type { Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOp
 import { createStoreCore, normalizeCollectionRelations, resolveCollection } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook } from '@vueuse/core'
-import { ref, type Ref } from 'vue'
+import { ref } from 'vue'
 import { createCollectionApi, type VueCollectionApi } from './api'
 import { createCache } from './cache'
 
@@ -123,10 +123,27 @@ export async function createStore<
                   $time.value = performance.now() - start
                 }
               }
-              wrappedMutation.$loading = $loading
-              wrappedMutation.$error = $error
-              wrappedMutation.$time = $time
-              return wrappedMutation
+              return new Proxy(wrappedMutation, {
+                get(target, prop) {
+                  if (prop === '$loading') {
+                    return $loading.value
+                  }
+                  else if (prop === '$error') {
+                    return $error.value
+                  }
+                  else if (prop === '$time') {
+                    return $time.value
+                  }
+                  return Reflect.get(target, prop)
+                },
+                set(target, prop, value) {
+                  if (prop === '$error') {
+                    $error.value = value
+                    return true
+                  }
+                  return Reflect.set(target, prop, value)
+                },
+              })
             }
           }
 
@@ -174,9 +191,9 @@ export function removeCollection(store: VueStore, collectionName: string) {
 
 declare module '@rstore/shared' {
   export interface MutationSpecialProps {
-    $loading: Ref<boolean>
-    $error: Ref<Error | null>
-    $time: Ref<number>
+    $loading: boolean
+    $error: Error | null
+    $time: number
   }
 }
 

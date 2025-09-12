@@ -242,9 +242,9 @@ const password = ref('')
   <UForm @submit="auth.login(email, password)">
     <UInput v-model="email" label="Email" />
     <UInput v-model="password" label="Password" type="password" />
-    <UButton :loading="auth.login.$loading.value">Login</UButton>
-    <UAlert v-if="auth.login.$error.value" color="error">
-      {{ auth.login.$error.value.message }}
+    <UButton :loading="auth.login.$loading">Login</UButton>
+    <UAlert v-if="auth.login.$error" color="error">
+      {{ auth.login.$error.message }}
     </UAlert>
   </UForm>
 </template>

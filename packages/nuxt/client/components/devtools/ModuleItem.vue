@@ -54,23 +54,23 @@ const exposed = computed(() => {
 
           <UBadge
             icon="lucide:refresh-cw"
-            :label="`Loading: ${value.$loading.value}`"
-            :color="value.$loading.value ? 'info' : 'neutral'"
+            :label="`Loading: ${value.$loading}`"
+            :color="value.$loading ? 'info' : 'neutral'"
             size="sm"
             variant="soft"
           />
 
           <UBadge
-            :icon="value.$error.value ? 'lucide:alert-triangle' : 'lucide:check-circle'"
-            :label="`Error: ${value.$error.value}`"
-            :color="value.$error.value ? 'error' : 'success'"
+            :icon="value.$error ? 'lucide:alert-triangle' : 'lucide:check-circle'"
+            :label="`Error: ${value.$error}`"
+            :color="value.$error ? 'error' : 'success'"
             size="sm"
             variant="soft"
           />
 
           <UBadge
             icon="lucide:hourglass"
-            :label="`Time: ${formatDuration(value.$time.value)}`"
+            :label="`Time: ${formatDuration(value.$time)}`"
             color="neutral"
             size="sm"
             variant="soft"

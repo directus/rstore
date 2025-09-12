@@ -200,8 +200,8 @@ export const devtoolsPlugin = definePlugin({
               // Register reactivity dependencies on mutation refs
               if (value?.__brand === 'rstore-module-mutation') {
                 m[key] = {
-                  $loading: value.$loading.value,
-                  $error: value.$error.value,
+                  $loading: value.$loading,
+                  $error: value.$error,
                 }
               }
               else if (value?.data && isRef(value.data) && value?.loading && isRef(value.loading) && value?.error && isRef(value.error)) {

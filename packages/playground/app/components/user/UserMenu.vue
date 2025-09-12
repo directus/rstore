@@ -59,12 +59,12 @@ const loginState = ref<z.infer<typeof loginSchema>>({
             type="submit"
             color="primary"
             block
-            :loading="auth.login.$loading.value"
+            :loading="auth.login.$loading"
           />
 
           <UAlert
-            v-if="auth.login.$error.value"
-            :description="(auth.login.$error.value as any).data?.message ?? auth.login.$error.value.message"
+            v-if="auth.login.$error && !auth.login.$loading"
+            :description="(auth.login.$error as any).data?.message ?? auth.login.$error.message"
             color="error"
             variant="soft"
             icon="lucide:triangle-alert"
@@ -94,7 +94,7 @@ const loginState = ref<z.infer<typeof loginSchema>>({
           variant="subtle"
           block
           icon="lucide:log-out"
-          :loading="auth.logout.$loading.value"
+          :loading="auth.logout.$loading"
           @click="auth.logout()"
         />
       </template>
