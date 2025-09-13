@@ -406,7 +406,8 @@ export default defineNuxtConfig({
   ],
   rstoreDrizzle: {
     drizzleImport: {
-      default: { name: 'useDb', from: '~~/server/useDb' },
+      name: 'useDb',
+      from: '~~/server/useDb',
     },
   },
 })
