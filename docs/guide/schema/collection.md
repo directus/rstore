@@ -88,6 +88,155 @@ const store = await createStore({
 The [currying](https://en.wikipedia.org/wiki/Currying) is necessary to specify the type of the item while still letting TypeScript infer the type of the collection. This is a limitation of TypeScript, and [it might improve in the future](https://github.com/microsoft/TypeScript/issues/26242).
 :::
 
+## Collection hooks
+
+You can define hooks on the collection that will be called at different stages of the item lifecycle in the `hooks` option. The available hooks are:
+
+- `fetchFirst`: fetch a single item by its key or by other parameters
+- `fetchMany`: fetch multiple items
+- `create`: create a new item
+- `update`: update an existing item
+- `delete`: delete an item
+
+::: tip
+Instead of defining the hooks in the collection, you can also create a plugin to handle the fetching logic for many collections at once and with a larger choice of hooks (see [Plugins](../plugin/setup.md)).
+:::
+
+Each hook receives a payload object with the following properties:
+- `fetchFirst`:
+  - `key` (optional): the key of the item to fetch
+  - `params` (optional): additional parameters for the fetch
+  - `include` (optional): dictionnary of related items to include (see [Relations](./relations.md))
+- `fetchMany`:
+  - `params` (optional): additional parameters for the fetch (if available)
+  - `include` (optional): dictionnary of related items to include (see [Relations](./relations.md))
+- `create`:
+  - `item`: the item to create
+- `update`:
+  - `key`: the key of the item to update
+  - `item`: the partial item to update
+- `delete`:
+  - `key`: the key of the item to delete
+
+::: code-group
+
+```js [todos.js]
+export const todoCollection = defineCollection({
+  name: 'todos',
+  hooks: {
+    async fetchFirst({ key, params, include }) {
+      // Fetch the item from the server
+      const response = await fetch(`/api/todos/${key}`)
+      const data = await response.json()
+      return data
+    },
+    async fetchMany({ params, include }) {
+      // Fetch the items from the server
+      const response = await fetch('/api/todos')
+      const data = await response.json()
+      return data
+    },
+    async create({ item }) {
+      // Create the item on the server
+      const response = await fetch('/api/todos', {
+        method: 'POST',
+        body: JSON.stringify(item),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await response.json()
+      return data
+    },
+    async update({ key, item }) {
+      // Update the item on the server
+      const response = await fetch(`/api/todos/${key}`, {
+        method: 'PUT',
+        body: JSON.stringify(item),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await response.json()
+      return data
+    },
+    async delete({ key }) {
+      // Delete the item on the server
+      await fetch(`/api/todos/${key}`, {
+        method: 'DELETE',
+      })
+    },
+  },
+})
+```
+
+```ts [todos.ts]
+export const todoCollection = withItemType<TodoType>().defineCollection({
+  name: 'todos',
+  hooks: {
+    async fetchFirst({ key, params, include }) {
+      // Fetch the item from the server
+      const response = await fetch(`/api/todos/${key}`)
+      const data = await response.json()
+      return data
+    },
+    async fetchMany({ params, include }) {
+      // Fetch the items from the server
+      const response = await fetch('/api/todos')
+      const data = await response.json()
+      return data
+    },
+    async create({ item }) {
+      // Create the item on the server
+      const response = await fetch('/api/todos', {
+        method: 'POST',
+        body: JSON.stringify(item),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await response.json()
+      return data
+    },
+    async update({ key, item }) {
+      // Update the item on the server
+      const response = await fetch(`/api/todos/${key}`, {
+        method: 'PUT',
+        body: JSON.stringify(item),
+        headers: { 'Content-Type': 'application/json' },
+      })
+      const data = await response.json()
+      return data
+    },
+    async delete({ key }) {
+      // Delete the item on the server
+      await fetch(`/api/todos/${key}`, {
+        method: 'DELETE',
+      })
+    },
+  },
+})
+```
+
+```ts [Nuxt]
+export const todoCollection = withItemType<TodoType>().defineCollection({
+  name: 'todos',
+  hooks: {
+    fetchFirst: async ({ key, params }) => key
+      ? $fetch(`/api/todos/${key}`, { query: params })
+      : (await $fetch('/api/todos', { query: params }))[0],
+    fetchMany: async ({ params }) => $fetch('/api/todos', { query: params }),
+    create: async ({ item }) => $fetch('/api/todos', {
+      method: 'POST',
+      body: item,
+    }),
+    update: async ({ key, item }) => $fetch(`/api/todos/${key}`, {
+      method: 'PATCH',
+      body: item,
+    }),
+    delete: async ({ key }) => $fetch(`/api/todos/${key}`, {
+      method: 'DELETE',
+    }),
+  },
+})
+```
+
+:::
+
 ## Item Key
 
 rstore uses a normalized cache to store the data. This means that each item is stored in a flat structure, and the key is used to identify the item in the cache.
