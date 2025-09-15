@@ -124,11 +124,18 @@ export function createCache<
   }
 
   function getStateForCollection(collectionName: string) {
-    const result = Object.assign({}, state.value[collectionName] ?? {})
+    let copied = false
+    let result = state.value[collectionName] ?? {}
 
     // Add & modify from layers
     for (const layer of layers.value) {
       if (!layer.skip && layer.state[collectionName]) {
+        // Lazy copy the state if needed
+        if (!copied) {
+          result = Object.assign({}, result)
+          copied = true
+        }
+
         const layerState: Record<string | number, any> = {}
         for (const [key, value] of Object.entries(layer.state[collectionName])) {
           const data = {
@@ -145,6 +152,12 @@ export function createCache<
     // Delete from layers
     for (const layer of layers.value) {
       if (!layer.skip && layer.deletedItems[collectionName]) {
+        // Lazy copy the state if needed
+        if (!copied) {
+          result = Object.assign({}, result)
+          copied = true
+        }
+
         for (const key of layer.deletedItems[collectionName]) {
           delete result[key]
         }
