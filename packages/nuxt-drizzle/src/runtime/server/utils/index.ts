@@ -75,7 +75,7 @@ export function getDrizzleDialect(): Dialect {
 }
 
 export function getDrizzleKeyWhere(key: string, primaryKeys: string[], table: Table) {
-  const keys = key.split(' + ')
+  const keys = key.split('::')
   if (primaryKeys.length > 1) {
     return drizzle.and(...primaryKeys.map((pk, i) => drizzle.eq(table[pk as keyof typeof table] as Column, keys[i])))
   }
