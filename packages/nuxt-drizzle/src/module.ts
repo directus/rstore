@@ -426,7 +426,7 @@ export const useDrizzles = {
           if (collection.relations) {
             code += `relations: ${JSON.stringify(collection.relations)},`
           }
-          code += `getKey: (item) => ${collection.meta?.primaryKeys?.length ? `(${collection.meta.primaryKeys.map(key => `item.${key}`).join(' + ')})` : 'item.id'},`
+          code += `getKey: (item) => ${collection.meta?.primaryKeys?.length ? `(${collection.meta.primaryKeys.map(key => `item.${key}`).join(` + ':' + `)})` : 'item.id'},`
           code += `}`
           return code
         }).join('\n')
