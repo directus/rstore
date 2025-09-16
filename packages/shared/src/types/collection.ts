@@ -7,7 +7,9 @@ import type { FilterArray, Full, KeysToUnion, Path, PathValue } from './utils'
 
 export type GetKey<TItem> = (item: TItem) => string | number | undefined | null
 
-export interface CustomCollectionMeta {}
+export interface CustomCollectionMeta<
+  TCollection extends Collection = Collection,
+> {}
 
 export interface CollectionSchemas<
   TCreateSchema extends StandardSchemaV1 = StandardSchemaV1,
@@ -94,7 +96,7 @@ export interface Collection<
    */
   'hooks'?: CollectionHooks<this>
 
-  'meta'?: CustomCollectionMeta
+  'meta'?: CustomCollectionMeta<this>
 
   /**
    * @private
