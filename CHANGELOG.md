@@ -1,6 +1,35 @@
 # Changelog
 
 
+## v0.7.1
+
+[compare changes](https://github.com/directus/rstore/compare/v0.7.0...v0.7.1)
+
+### 🚀 Enhancements
+
+- **nuxt-drizzle:** Expose filterWhere ([e79683d](https://github.com/directus/rstore/commit/e79683d))
+
+### 🔥 Performance
+
+- Fast path for getStateForCollection ([c7a8831](https://github.com/directus/rstore/commit/c7a8831))
+- Cache relations for one tick ([04ac3fa](https://github.com/directus/rstore/commit/04ac3fa))
+
+### 🩹 Fixes
+
+- **nuxt-drizzle:** Key from primary keys adding up numbers ([cffbef7](https://github.com/directus/rstore/commit/cffbef7))
+- **nuxt-drizzle:** Multi primary key update ([e91be9c](https://github.com/directus/rstore/commit/e91be9c))
+
+### 📖 Documentation
+
+- Fix nuxt setup ([bce3518](https://github.com/directus/rstore/commit/bce3518))
+- Update nuxt folders ([6c25b2a](https://github.com/directus/rstore/commit/6c25b2a))
+- **nuxt-drizzle:** Fix drizzleImport ([25de30b](https://github.com/directus/rstore/commit/25de30b))
+- Collection hooks ([be08544](https://github.com/directus/rstore/commit/be08544))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.7.0
 
 [compare changes](https://github.com/directus/rstore/compare/v0.6.18...v0.7.0)
