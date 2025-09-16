@@ -167,6 +167,27 @@ export function createCache<
     return result
   }
 
+  function removeLayer(layerId: string) {
+    const index = layers.value.findIndex(l => l.id === layerId)
+    if (index !== -1) {
+      const layer = layers.value[index]!
+      const keys = wrappedItemKeysPerLayer.get(layer.id)
+      if (keys) {
+        for (const key of keys) {
+          wrappedItems.delete(key)
+          wrappedItemsMetadata.delete(key)
+        }
+        wrappedItemKeysPerLayer.delete(layer.id)
+      }
+      layers.value.splice(index, 1)
+      const store = getStore()
+      store.$hooks.callHookSync('cacheLayerRemove', {
+        store,
+        layer,
+      })
+    }
+  }
+
   return {
     wrapItem({ collection, item }) {
       return getWrappedItem(collection, item)!
@@ -376,6 +397,7 @@ export function createCache<
       }
     },
     addLayer(layer) {
+      removeLayer(layer.id)
       layers.value.push(layer)
       const store = getStore()
       store.$hooks.callHookSync('cacheLayerAdd', {
@@ -386,26 +408,7 @@ export function createCache<
     getLayer(layerId) {
       return layers.value.find(l => l.id === layerId)
     },
-    removeLayer(layerId) {
-      const index = layers.value.findIndex(l => l.id === layerId)
-      if (index !== -1) {
-        const layer = layers.value[index]!
-        const keys = wrappedItemKeysPerLayer.get(layer.id)
-        if (keys) {
-          for (const key of keys) {
-            wrappedItems.delete(key)
-            wrappedItemsMetadata.delete(key)
-          }
-          wrappedItemKeysPerLayer.delete(layer.id)
-        }
-        layers.value.splice(index, 1)
-        const store = getStore()
-        store.$hooks.callHookSync('cacheLayerRemove', {
-          store,
-          layer,
-        })
-      }
-    },
+    removeLayer,
     _private: {
       state,
       wrappedItems,
