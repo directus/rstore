@@ -1,6 +1,23 @@
 # Changelog
 
 
+## v0.7.2
+
+[compare changes](https://github.com/directus/rstore/compare/v0.7.1...v0.7.2)
+
+### 🩹 Fixes
+
+- **cache:** Auto remove layer with same id ([3f94499](https://github.com/directus/rstore/commit/3f94499))
+- Always abort from collection hooks ([9810cc7](https://github.com/directus/rstore/commit/9810cc7))
+
+### 🌊 Types
+
+- Add TCollection generic to CustomCollectionMeta ([ab1e8ed](https://github.com/directus/rstore/commit/ab1e8ed))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.7.1
 
 [compare changes](https://github.com/directus/rstore/compare/v0.7.0...v0.7.1)
