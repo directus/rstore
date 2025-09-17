@@ -32,7 +32,7 @@ export function wrapItem<
   const relationCache = new Map<string, any>()
 
   const proxy = new Proxy({}, {
-    get: (target, key) => {
+    get: (_, key) => {
       switch (key) {
         case '$collection':
           return (collection.name) satisfies WrappedItemBase<TCollection, TCollectionDefaults, TSchema>['$collection']
@@ -100,9 +100,9 @@ export function wrapItem<
           return cached
         }
 
-        if (Reflect.has(target, key)) {
+        if (Reflect.has(item.value, key)) {
           // @TODO resolve references
-          return Reflect.get(target, key)
+          return Reflect.get(item.value, key)
         }
         else {
           const relation = collection.relations[key as string]!
