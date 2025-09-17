@@ -55,6 +55,14 @@ export const devtoolsPlugin = definePlugin({
       hook('afterCacheReset', () => {
         cacheUpdated.trigger()
       })
+      // Defer to next tick so `nuxtApp.$rstore` is available
+      setTimeout(() => {
+        watch(() => (nuxtApp.$rstore as any).$cache._private.layers.value, () => {
+          cacheUpdated.trigger()
+        }, {
+          deep: true,
+        })
+      })
     }
 
     // History

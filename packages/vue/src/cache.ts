@@ -414,6 +414,7 @@ export function createCache<
       wrappedItems,
       wrappedItemsMetadata,
       getWrappedItem,
+      layers,
     },
   } satisfies Cache & {
     _private: {
@@ -421,6 +422,7 @@ export function createCache<
       wrappedItems: typeof wrappedItems
       wrappedItemsMetadata: typeof wrappedItemsMetadata
       getWrappedItem: typeof getWrappedItem
+      layers: typeof layers
     }
   } as any
 }

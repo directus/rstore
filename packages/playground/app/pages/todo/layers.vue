@@ -67,13 +67,29 @@ function addDeleteItemLayer() {
     store.$cache.addLayer(deleteItemLayer)
   }
 }
+
+const skippedLayer = {
+  id: 'todo:skippedLayer',
+  state: {
+    Todo: {
+      'new-from-layer2': {
+        $overrideKey: 'new-from-layer2',
+        text: 'This will not be applyed',
+        completed: false,
+        createdAt: new Date(),
+      } satisfies Omit<StoreResolvedCollectionItem<'Todo'>, 'id'> & { $overrideKey: string },
+    },
+  },
+  deletedItems: {},
+  optimistic: false,
+  skip: true,
+} satisfies CacheLayer
 </script>
 
 <template>
-  <div class="m-4 p-4 border border-default rounded-xl flex flex-wrap gap-4">
+  <div class="m-4 p-4 border border-default rounded-xl flex flex-wrap gap-2">
     <UButton
       v-if="!store.$cache.getLayer(addedItemLayer.id)"
-      size="xl"
       variant="outline"
       icon="lucide:plus"
       @click="store.$cache.addLayer(addedItemLayer)"
@@ -83,7 +99,6 @@ function addDeleteItemLayer() {
 
     <UButton
       v-else
-      size="xl"
       variant="outline"
       color="error"
       icon="lucide:x"
@@ -94,7 +109,6 @@ function addDeleteItemLayer() {
 
     <UButton
       v-if="!store.$cache.getLayer(modifyItemLayer.id)"
-      size="xl"
       variant="outline"
       icon="lucide:edit-2"
       @click="addModifyItemLayer()"
@@ -104,7 +118,6 @@ function addDeleteItemLayer() {
 
     <UButton
       v-else
-      size="xl"
       variant="outline"
       color="error"
       icon="lucide:x"
@@ -115,7 +128,6 @@ function addDeleteItemLayer() {
 
     <UButton
       v-if="!store.$cache.getLayer(deleteItemLayer.id)"
-      size="xl"
       variant="outline"
       icon="lucide:trash"
       @click="addDeleteItemLayer()"
@@ -125,13 +137,31 @@ function addDeleteItemLayer() {
 
     <UButton
       v-else
-      size="xl"
       variant="outline"
       color="error"
       icon="lucide:x"
       @click="store.$cache.removeLayer(deleteItemLayer.id)"
     >
       Remove the layer that deletes the first todo
+    </UButton>
+
+    <UButton
+      v-if="!store.$cache.getLayer(skippedLayer.id)"
+      variant="outline"
+      icon="lucide:fast-forward"
+      @click="store.$cache.addLayer(skippedLayer)"
+    >
+      Add a skipped layer that adds a todo (will not be applied)
+    </UButton>
+
+    <UButton
+      v-else
+      variant="outline"
+      color="error"
+      icon="lucide:x"
+      @click="store.$cache.removeLayer(skippedLayer.id)"
+    >
+      Remove the skipped layer
     </UButton>
   </div>
 
@@ -150,7 +180,6 @@ function addDeleteItemLayer() {
           v-model="createTodo.text"
           placeholder="What needs to be done?"
           autofocus
-          size="xl"
           class="w-full"
           @keydown.enter.prevent="createTodo.$submit()"
         />
@@ -159,7 +188,6 @@ function addDeleteItemLayer() {
           type="submit"
           icon="lucide:plus"
           label="Add"
-          size="xl"
           :loading="createTodo.$loading"
           :disabled="!createTodo.$valid"
         />

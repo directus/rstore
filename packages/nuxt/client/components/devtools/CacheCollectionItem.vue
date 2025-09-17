@@ -1,20 +1,20 @@
 <script lang="ts" setup>
-import type { Collection } from '@rstore/shared'
+import type { CacheLayer, Collection } from '@rstore/shared'
 
 const props = defineProps<{
   collection: Collection
+  state: Record<string, Record<string, any>>
+  selectedLayer?: CacheLayer
   selected?: boolean
 }>()
 
-const cache = useStoreCache()
-
-const cacheCount = computed(() => Object.keys((cache.value as any)[props.collection.name] ?? {}).length)
+const cacheCount = computed(() => Object.keys(props.state[props.collection.name] ?? {}).length)
 </script>
 
 <template>
   <UButton
     v-bind="selected ? {
-      color: 'primary',
+      color: selectedLayer ? 'warning' : 'primary',
       variant: 'subtle',
     } : {
       color: 'neutral',
@@ -30,12 +30,21 @@ const cacheCount = computed(() => Object.keys((cache.value as any)[props.collect
     <UBadge
       v-if="cacheCount"
       :label="cacheCount || '0'"
-      :color="selected ? 'primary' : 'neutral'"
+      :color="selected ? selectedLayer ? 'warning' : 'primary' : 'neutral'"
       variant="soft"
       size="sm"
       :class="{
         'font-bold': cacheCount > 0,
       }"
+    />
+
+    <UBadge
+      v-if="selectedLayer?.deletedItems[props.collection.name]?.size"
+      :label="selectedLayer?.deletedItems[props.collection.name]?.size || '0'"
+      color="error"
+      variant="soft"
+      size="sm"
+      icon="lucide:trash"
     />
   </UButton>
 </template>

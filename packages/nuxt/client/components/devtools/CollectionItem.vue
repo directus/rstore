@@ -5,7 +5,7 @@ const props = defineProps<{
   item: ResolvedCollection
 }>()
 
-const cache = useStoreCache()
+const { cache } = useStoreCache()
 
 const cacheCount = computed(() => Object.keys((cache.value as any)[props.item.name] ?? {}).length)
 </script>
