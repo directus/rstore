@@ -15,32 +15,37 @@ export const builtinCollectionHooksPlugin = definePlugin({
   },
 
   setup({ hook }) {
-    hook('fetchFirst', async ({ collection, findOptions, setResult }) => {
+    hook('fetchFirst', async ({ collection, findOptions, setResult, abort }) => {
       if (collection.hooks?.fetchFirst) {
+        abort()
         setResult(await collection.hooks.fetchFirst(findOptions as any))
       }
     })
 
-    hook('fetchMany', async ({ collection, findOptions, setResult }) => {
+    hook('fetchMany', async ({ collection, findOptions, setResult, abort }) => {
       if (collection.hooks?.fetchMany) {
+        abort()
         setResult(await collection.hooks.fetchMany(findOptions as any))
       }
     })
 
-    hook('createItem', async ({ collection, item, setResult }) => {
+    hook('createItem', async ({ collection, item, setResult, abort }) => {
       if (collection.hooks?.create) {
+        abort()
         setResult(await collection.hooks.create({ item }))
       }
     })
 
-    hook('updateItem', async ({ collection, key, item, setResult }) => {
+    hook('updateItem', async ({ collection, key, item, setResult, abort }) => {
       if (collection.hooks?.update) {
+        abort()
         setResult(await collection.hooks.update({ key, item }))
       }
     })
 
-    hook('deleteItem', async ({ collection, key }) => {
+    hook('deleteItem', async ({ collection, key, abort }) => {
       if (collection.hooks?.delete) {
+        abort()
         await collection.hooks.delete({ key })
       }
     })
