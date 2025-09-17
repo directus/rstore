@@ -25,7 +25,7 @@ const meta = computed(() => {
 
 const categoryIcons = {
   virtual: 'lucide:cpu',
-  local: 'lucide:computer-desktop',
+  local: 'lucide:computer',
   remote: 'lucide:cloud',
   processing: 'lucide:settings',
 }
