@@ -31,7 +31,7 @@ export function wrapItem<
 
   const relationCache = new Map<string, any>()
 
-  const proxy = new Proxy({}, {
+  const proxy = new Proxy(item.value, {
     get: (_, key) => {
       switch (key) {
         case '$collection':
