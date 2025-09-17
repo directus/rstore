@@ -8,7 +8,7 @@ const props = defineProps<{
   selected?: boolean
 }>()
 
-const cacheCount = computed(() => Object.keys(props.state[props.collection.name] ?? {}).length)
+const cacheCount = computed(() => Object.keys(props.state?.[props.collection.name] ?? {}).length)
 </script>
 
 <template>

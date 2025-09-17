@@ -8,6 +8,14 @@ const props = defineProps<{
 const { cache } = useStoreCache()
 
 const cacheCount = computed(() => Object.keys((cache.value as any)[props.item.name] ?? {}).length)
+
+const tab = useLocalStorage('rstore-devtools-tab', '0')
+const selectedCollection = useLocalStorage<string | null>('rstore-devtools-selected-cache-collection', null)
+
+function goToCache() {
+  selectedCollection.value = props.item.name
+  tab.value = '1'
+}
 </script>
 
 <template>
@@ -21,29 +29,14 @@ const cacheCount = computed(() => Object.keys((cache.value as any)[props.item.na
         {{ item.name }}
       </div>
 
-      <UPopover
-        arrow
-      >
-        <template #default="{ open }">
-          <UBadge
-            :label="cacheCount || '0'"
-            variant="subtle"
-            :color="cacheCount ? 'primary' : 'neutral'"
-            icon="lucide:database"
-            :class="{
-              'ring ring-green-500': open,
-              'font-bold': cacheCount > 0,
-            }"
-          />
-        </template>
-
-        <template #content>
-          <CodeSnippet
-            :code="(cache as any)[props.item.name] ?? {}"
-            class="text-xs p-2 max-w-120 max-h-90 overflow-auto"
-          />
-        </template>
-      </UPopover>
+      <UButton
+        :label="String(cacheCount) || '0'"
+        variant="subtle"
+        :color="cacheCount ? 'primary' : 'neutral'"
+        size="xs"
+        icon="lucide:database"
+        @click="goToCache()"
+      />
     </div>
 
     <div class="text-xs font-mono border border-default rounded p-2 flex gap-4">
