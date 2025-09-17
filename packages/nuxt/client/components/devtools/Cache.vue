@@ -1,11 +1,11 @@
 <script lang="ts">
-</script>
-
-<script lang="ts" setup>
 import type { ResolvedCollection } from '@rstore/shared'
 
 const itemSearchContent = ref('')
+const itemSearchTempContent = ref('')
+</script>
 
+<script lang="ts" setup>
 const store = useNonNullRstore()
 const cache = useStoreCache()
 
@@ -82,6 +82,18 @@ const filteredCache = computed(() => {
 
 watch(cache, () => {
   forceUpdate.value++
+})
+
+const keySearchOptions = ref<string[]>([])
+
+function updateKeySearchOptions() {
+  keySearchOptions.value = Object.keys(selectedCache.value || {})
+}
+
+watch(selectedCollection, () => {
+  itemSearchKey.value = ''
+  itemSearchContent.value = ''
+  itemSearchTempContent.value = ''
 })
 </script>
 
@@ -174,31 +186,80 @@ watch(cache, () => {
       >
         <UButton
           icon="lucide:search"
+          label="Search items"
           size="xs"
           :variant="itemSearchKey || itemSearchContent ? 'solid' : 'soft'"
         />
 
         <template #content>
-          <div class="p-2 w-80 flex flex-col gap-2">
+          <div class="p-2 w-80 flex flex-col gap-4">
             <UFormField label="Search item by Key">
-              <UInput
-                v-model="itemSearchKey"
-                placeholder="Item Key"
-                icon="lucide:id-card"
-                autofocus
-                class="w-full"
-              />
+              <UButtonGroup class="w-full" :gap="2">
+                <UInputMenu
+                  v-model="itemSearchKey"
+                  :items="keySearchOptions"
+                  placeholder="Item Key"
+                  icon="lucide:search"
+                  autofocus
+                  :reset-search-term-on-blur="false"
+                  class="w-full"
+                  @update:open="$event ? updateKeySearchOptions() : null"
+                />
+                <UButton
+                  :disabled="!itemSearchKey"
+                  icon="lucide:x"
+                  variant="outline"
+                  color="neutral"
+                  @click="itemSearchKey = ''"
+                />
+              </UButtonGroup>
             </UFormField>
             <UFormField label="Filter items by data">
-              <UTextarea
-                v-model="itemSearchContent"
-                placeholder="item.isActive && item.age > 18"
-                class="w-full font-mono"
-                :rows="3"
-                :ui="{
-                  base: 'resize-none',
-                }"
-              />
+              <template #hint>
+                <div class="flex items-center gap-1">
+                  <UButton
+                    :disabled="!itemSearchTempContent || itemSearchTempContent === itemSearchContent"
+                    icon="lucide:undo-2"
+                    size="xs"
+                    variant="soft"
+                    @click="itemSearchTempContent = itemSearchContent"
+                  />
+                  <UButton
+                    :disabled="!itemSearchTempContent"
+                    icon="lucide:x"
+                    size="xs"
+                    variant="soft"
+                    @click="itemSearchTempContent = itemSearchContent = ''"
+                  />
+                </div>
+              </template>
+
+              <div class="flex flex-col gap-2">
+                <UTextarea
+                  v-model="itemSearchTempContent"
+                  placeholder="item.isActive && item.age > 18"
+                  class="w-full font-mono"
+                  :rows="3"
+                  :ui="{
+                    base: 'resize-none',
+                  }"
+                  @keyup.ctrl.enter="itemSearchContent = itemSearchTempContent"
+                  @keyup.meta.enter="itemSearchContent = itemSearchTempContent"
+                />
+                <UButton
+                  :disabled="!itemSearchTempContent || itemSearchTempContent === itemSearchContent"
+                  size="sm"
+                  icon="lucide:filter"
+                  block
+                  @click="itemSearchContent = itemSearchTempContent"
+                >
+                  Apply JavaScript filter
+                  <div class="flex-1 flex justify-end gap-0.5">
+                    <UKbd value="meta" />
+                    <UKbd value="enter" />
+                  </div>
+                </UButton>
+              </div>
             </UFormField>
           </div>
         </template>
