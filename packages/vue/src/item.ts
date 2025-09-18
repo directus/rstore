@@ -31,8 +31,10 @@ export function wrapItem<
 
   const relationCache = new Map<string, any>()
 
+  const isFrozen = Object.isFrozen(item.value)
+
   const proxy = new Proxy(item.value, {
-    get: (_, key) => {
+    get: (proxyTarget, key) => {
       switch (key) {
         case '$collection':
           return (collection.name) satisfies WrappedItemBase<TCollection, TCollectionDefaults, TSchema>['$collection']
@@ -94,7 +96,7 @@ export function wrapItem<
       }
 
       // Resolve related items in the cache
-      if (key in collection.relations) {
+      if (!isFrozen && key in collection.relations) {
         const cached = relationCache.get(key as string)
         if (cached) {
           return cached
@@ -161,7 +163,7 @@ export function wrapItem<
         }
       }
 
-      return Reflect.get(item.value, key)
+      return Reflect.get(isFrozen ? proxyTarget : item.value, key)
     },
 
     set: () => {

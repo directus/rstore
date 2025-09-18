@@ -223,46 +223,51 @@ export function createCache<
     writeItem({ collection, key, item, marker, fromWriteItems }) {
       state.value[collection.name] ??= {}
       const itemsForType = state.value[collection.name]
-      const rawData = pickNonSpecialProps(item, true)
+      const isFrozen = Object.isFrozen(item)
+      if (isFrozen) {
+        itemsForType[key] = item
+      }
+      else {
+        const rawData = pickNonSpecialProps(item, true)
 
-      // Handle relations
-      const data = {} as Record<string, any>
-      for (const field in rawData) {
-        if (field in collection.relations) {
-          const relation = collection.relations[field]
-          const rawItem = rawData[field]
+        // Handle relations
+        const data = {} as Record<string, any>
+        for (const field in rawData) {
+          if (field in collection.relations) {
+            const relation = collection.relations[field]
+            const rawItem = rawData[field]
 
-          // TODO: figure out deletions
-          if (!rawItem || !relation) {
-            continue
-          }
+            // TODO: figure out deletions
+            if (!rawItem || !relation) {
+              continue
+            }
 
-          if (relation.many && !Array.isArray(rawItem)) {
-            throw new Error(`Expected array for relation ${collection.name}.${field}`)
-          }
-          else if (!relation.many && Array.isArray(rawItem)) {
-            throw new Error(`Expected object for relation ${collection.name}.${field}`)
-          }
+            if (relation.many && !Array.isArray(rawItem)) {
+              throw new Error(`Expected array for relation ${collection.name}.${field}`)
+            }
+            else if (!relation.many && Array.isArray(rawItem)) {
+              throw new Error(`Expected object for relation ${collection.name}.${field}`)
+            }
 
-          if (Array.isArray(rawItem)) {
-            for (const nestedItem of rawItem as any[]) {
+            if (Array.isArray(rawItem)) {
+              for (const nestedItem of rawItem as any[]) {
+                this.writeItemForRelation({
+                  parentCollection: collection,
+                  relationKey: field,
+                  relation,
+                  childItem: nestedItem,
+                })
+              }
+            }
+            else if (rawItem) {
               this.writeItemForRelation({
                 parentCollection: collection,
                 relationKey: field,
                 relation,
-                childItem: nestedItem,
+                childItem: rawItem,
               })
             }
-          }
-          else if (rawItem) {
-            this.writeItemForRelation({
-              parentCollection: collection,
-              relationKey: field,
-              relation,
-              childItem: rawItem,
-            })
-          }
-          else {
+            else {
             // TODO: figure out deletions
             // // If to-one relation is null, we delete the existing item
             // const existingItem = this.readItem({ collection, key })
@@ -274,18 +279,19 @@ export function createCache<
             //     this.deleteItem({ collection: nestedItemCollection, key: nestedKey })
             //   }
             // }
+            }
+          }
+          else {
+            data[field] = rawData[field]
           }
         }
-        else {
-          data[field] = rawData[field]
-        }
-      }
 
-      if (!itemsForType[key]) {
-        itemsForType[key] = data
-      }
-      else {
-        Object.assign(itemsForType[key], data)
+        if (!itemsForType[key]) {
+          itemsForType[key] = data
+        }
+        else {
+          Object.assign(itemsForType[key], data)
+        }
       }
       if (marker) {
         mark(marker)
