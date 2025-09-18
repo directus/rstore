@@ -5,7 +5,7 @@ import type { StoreHistoryItem, StoreSubscriptionItem } from '../../client/utils
 import { useNuxtApp, useState } from '#app'
 import { definePlugin } from '@rstore/vue'
 import { createEventHook } from '@vueuse/core'
-import { isRef, shallowRef, triggerRef, watch } from 'vue'
+import { isRef, markRaw, shallowRef, triggerRef, watch } from 'vue'
 
 function useStoreStats() {
   return useState('$rstore-devtools-stats', () => ({
@@ -84,7 +84,7 @@ export const devtoolsPlugin = definePlugin({
 
     hook('afterFetch', (payload) => {
       if (payload.meta.storeHistoryItem) {
-        storeStats.value.history.push({
+        storeStats.value.history.push(markRaw({
           operation: payload.many ? 'fetchMany' : 'fetchFirst',
           collection: payload.collection.name,
           started: payload.meta.storeHistoryItem.started,
@@ -93,7 +93,7 @@ export const devtoolsPlugin = definePlugin({
           key: payload.key,
           findOptions: convertFunctionsToString(payload.findOptions),
           server: import.meta.server,
-        })
+        }))
         historyUpdated.trigger()
       }
     })
@@ -106,7 +106,7 @@ export const devtoolsPlugin = definePlugin({
 
     hook('afterMutation', (payload) => {
       if (payload.meta.storeHistoryItem) {
-        storeStats.value.history.push({
+        storeStats.value.history.push(markRaw({
           operation: payload.mutation,
           collection: payload.collection.name,
           started: payload.meta.storeHistoryItem.started,
@@ -115,49 +115,49 @@ export const devtoolsPlugin = definePlugin({
           key: payload.key,
           item: payload.item,
           server: import.meta.server,
-        })
+        }))
         historyUpdated.trigger()
       }
     })
 
     hook('afterCacheWrite', (payload) => {
-      storeStats.value.history.push({
+      storeStats.value.history.push(markRaw({
         operation: 'cacheWrite',
         collection: payload.collection.name,
         ended: new Date(),
         result: payload.result,
         key: payload.key,
         server: import.meta.server,
-      })
+      }))
       historyUpdated.trigger()
     })
 
     hook('itemGarbageCollect', (payload) => {
-      storeStats.value.history.push({
+      storeStats.value.history.push(markRaw({
         operation: 'itemGarbageCollect',
         collection: payload.collection.name,
         ended: new Date(),
         key: payload.key,
         result: payload.item,
-      })
+      }))
       historyUpdated.trigger()
     })
 
     hook('cacheLayerAdd', (payload) => {
-      storeStats.value.history.push({
+      storeStats.value.history.push(markRaw({
         operation: 'cacheLayerAdd',
         result: payload.layer,
         ended: new Date(),
-      })
+      }))
       historyUpdated.trigger()
     })
 
     hook('cacheLayerRemove', (payload) => {
-      storeStats.value.history.push({
+      storeStats.value.history.push(markRaw({
         operation: 'cacheLayerRemove',
         result: payload.layer,
         ended: new Date(),
-      })
+      }))
       historyUpdated.trigger()
     })
 
@@ -166,13 +166,13 @@ export const devtoolsPlugin = definePlugin({
     const subscriptionsUpdated = nuxtApp.$rstoreSubscriptionsUpdated = createEventHook()
 
     hook('subscribe', (payload) => {
-      storeStats.value.subscriptions.push({
+      storeStats.value.subscriptions.push(markRaw({
         id: payload.subscriptionId,
         collection: payload.collection.name,
         key: payload.key,
         findOptions: convertFunctionsToString(payload.findOptions),
         started: new Date(),
-      })
+      }))
       subscriptionsUpdated.trigger()
     })
 
