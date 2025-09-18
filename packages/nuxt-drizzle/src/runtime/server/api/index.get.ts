@@ -51,9 +51,12 @@ export default eventHandler(async (event) => {
     }
   }
 
+  const extras: Record<string, any> = {}
+
   for (const transform of transforms) {
     transform({
       where: (condition) => { whereConditions.push(condition) },
+      extras: e => Object.assign(extras, e),
     })
   }
 
@@ -74,6 +77,8 @@ export default eventHandler(async (event) => {
   if (query.columns) {
     q.columns = JSON.parse(query.columns)
   }
+
+  q.extras = extras
 
   if (query.orderBy) {
     const orderByData = typeof query.orderBy === 'string' ? [query.orderBy] : query.orderBy as Array<`${string}.${string}.${'asc' | 'desc'}`>

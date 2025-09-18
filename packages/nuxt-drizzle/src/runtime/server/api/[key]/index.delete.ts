@@ -29,6 +29,7 @@ export default defineEventHandler(async (event) => {
   for (const transform of transforms) {
     transform({
       where: (condition) => { whereConditions.push(condition) },
+      extras: () => {},
     })
   }
 

@@ -24,9 +24,13 @@ export default defineEventHandler(async (event) => {
   const { table, primaryKeys } = getDrizzleTableFromCollection(collectionName)
 
   const whereConditions: any[] = []
+
+  const extras: Record<string, any> = {}
+
   for (const transform of transforms) {
     transform({
       where: (condition) => { whereConditions.push(condition) },
+      extras: e => Object.assign(extras, e),
     })
   }
 
@@ -38,6 +42,7 @@ export default defineEventHandler(async (event) => {
     ),
     with: query.with ? JSON.parse(query.with) : undefined,
     columns: query.columns ? JSON.parse(query.columns) : undefined,
+    extras,
   })
 
   result ??= null

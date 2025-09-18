@@ -37,6 +37,7 @@ export interface RstoreDrizzleHookPayload {
 
 export interface RstoreDrizzleQueryBuilder {
   where: (condition: any) => void
+  extras: (extras: Record<string, any>) => void
 }
 
 export type RstoreDrizzleTransformQuery = (queryBuilder: RstoreDrizzleQueryBuilder) => void
