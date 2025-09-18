@@ -199,10 +199,11 @@ export function createCache<
       if (marker && !state.value._markers?.[marker]) {
         return []
       }
-      const data: Array<ResolvedCollectionItemBase<any, any, any>> = Object.values(getStateForCollection(collection.name))
+      const data: Record<string | number, ResolvedCollectionItemBase<any, any, any>> = getStateForCollection(collection.name)
       const result: Array<WrappedItem<any, any, any>> = []
       let count = 0
-      for (const item of data) {
+      for (const key in data) {
+        const item = data[key]
         if (item) {
           if (filter && !filter(item)) {
             continue
