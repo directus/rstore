@@ -52,14 +52,14 @@ export function getDrizzleCondition(table: Table, condition: RstoreDrizzleCondit
   if ('field' in condition) {
     if ('value' in condition) {
       if (condition.operator !== 'arrayContained' && condition.operator !== 'arrayContains' && condition.operator !== 'arrayOverlaps' && condition.operator !== 'inArray' && condition.operator !== 'notInArray') {
-        return drizzle[condition.operator](table[condition.field as keyof typeof table] as Column, condition.value)
+        return drizzle[condition.operator](table[condition.field as keyof typeof table] as Column ?? drizzle.sql`${condition.field}`.as(condition.field), condition.value)
       }
       else {
-        return drizzle[condition.operator]<typeof condition.value>(table[condition.field as keyof typeof table] as Column, condition.value)
+        return drizzle[condition.operator]<typeof condition.value>(table[condition.field as keyof typeof table] as Column ?? drizzle.sql`${condition.field}`.as(condition.field), condition.value)
       }
     }
     else if ('value1' in condition) {
-      return drizzle[condition.operator](table[condition.field as keyof typeof table] as Column, condition.value1, condition.value2)
+      return drizzle[condition.operator](table[condition.field as keyof typeof table] as Column ?? drizzle.sql`${condition.field}`.as(condition.field), condition.value1, condition.value2)
     }
   }
   else if ('condition' in condition) {
