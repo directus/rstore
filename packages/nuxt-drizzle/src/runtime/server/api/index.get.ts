@@ -1,5 +1,5 @@
 import type { RelationalQueryBuilder } from 'drizzle-orm/pg-core/query-builders/query'
-import { and, asc, desc } from 'drizzle-orm'
+import { and, asc, desc, sql } from 'drizzle-orm'
 import { createError, eventHandler, getQuery, getRouterParams } from 'h3'
 import { getDrizzleCondition, getDrizzleTableFromCollection, type RstoreDrizzleQueryParams, rstoreUseDrizzle } from '../utils'
 import { rstoreDrizzleHooks, type RstoreDrizzleMeta, type RstoreDrizzleTransformQuery } from '../utils/hooks'
@@ -93,7 +93,7 @@ export default eventHandler(async (event) => {
       }
       const [columnName, order] = parts
       const operator = orderByOperators[order as 'asc' | 'desc']
-      orderBy.push(operator((table as any)[columnName!]))
+      orderBy.push(operator((table as any)[columnName!] ?? sql`${columnName}`.as(columnName!)))
     }
     q.orderBy = orderBy
   }
