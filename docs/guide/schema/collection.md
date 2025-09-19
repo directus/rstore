@@ -40,7 +40,7 @@ const store = await createStore({
 
 :::
 
-## Defining a Collection
+## Defining a Collection <Badge text="Changed in v0.7" type="warning" />
 
 For JavaScript, you can use the `defineCollection` utility function to define a collection with auto-completion in your IDE:
 
@@ -88,7 +88,7 @@ const store = await createStore({
 The [currying](https://en.wikipedia.org/wiki/Currying) is necessary to specify the type of the item while still letting TypeScript infer the type of the collection. This is a limitation of TypeScript, and [it might improve in the future](https://github.com/microsoft/TypeScript/issues/26242).
 :::
 
-## Collection hooks
+## Collection hooks <Badge text="New in v0.7" />
 
 You can define hooks on the collection that will be called at different stages of the item lifecycle in the `hooks` option. The available hooks are:
 

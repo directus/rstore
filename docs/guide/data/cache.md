@@ -89,7 +89,7 @@ You can also use the `store.<collectionName>.clearItem` method:
 store.User.clearItem('abc')
 ```
 
-## Layers
+## Layers <Badge text="New in v0.7" />
 
 A cache layer is a way to create a temporary state modification that can be easily reverted. This is how [optimistic updates](./mutation.md#optimistic-updates) are implemented.
 

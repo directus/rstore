@@ -1,6 +1,6 @@
 # Form Objects
 
-## Create Form
+## Create
 
 Instead of creating a new item directly, you can create a *form object* that is very useful to handle the data of a form with the `createForm` method.
 

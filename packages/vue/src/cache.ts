@@ -321,7 +321,9 @@ export function createCache<
       for (const { key, value: item } of items) {
         this.writeItem({ collection, key, item, fromWriteItems: true })
       }
-      mark(marker)
+      if (marker) {
+        mark(marker)
+      }
       const store = getStore()
       store.$hooks.callHookSync('afterCacheWrite', {
         store,

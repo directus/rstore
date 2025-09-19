@@ -66,14 +66,16 @@ export async function updateItem<
     },
   })
 
-  let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null = peekFirst({
-    store,
-    meta,
-    collection,
-    findOptions: {
-      key,
-    },
-  }).result
+  let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null = skipCache
+    ? null
+    : peekFirst({
+      store,
+      meta,
+      collection,
+      findOptions: {
+        key,
+      },
+    }).result
 
   if (result) {
     result = pickNonSpecialProps(result) as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>

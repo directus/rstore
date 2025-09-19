@@ -11,6 +11,23 @@ const newTodo = await store.todos.create({
 })
 ```
 
+::: tip
+You can also use the `createForm` method to create a new record. This method returns a form object that you can use to manage the state of the form and submit it when you're ready. See [Forms](./form.md#create-form) for more details.
+:::
+
+## Create Many <Badge text="New in v0.7.3" />
+
+You can create many items at once by using the `createMany` method on the store. This method takes an array of objects with the properties of the records you want to create.
+
+```ts
+const newTodos = await store.todos.createMany([
+  { title: 'New Todo 1', completed: false },
+  { title: 'New Todo 2', completed: false },
+])
+```
+
+It can be useful to batch the create operations into a single fetch request to your backend. See `createMany` in the [plugin hooks](../plugin/hooks.md#createmany).
+
 ## Update
 
 To update an existing record, you can use the `update` method on the store. This method takes an object with the properties you want to update and the key of the record you want to update.
@@ -58,6 +75,23 @@ async function toggle() {
 }
 ```
 
+::: tip
+You can also use the `updateForm` method to update an existing record. This method returns a form object that you can use to manage the state of the form and submit it when you're ready. See [Forms](./form.md#update-form) for more details.
+:::
+
+## Update Many <Badge text="New in v0.7.3" />
+
+You can update many items at once by using the `updateMany` method on the store. This method takes an array of objects with the properties you want to update. Each object must contain the key (or the properties used to [compute the key](../schema/collection.md#item-key)) of the record you want to update.
+
+```ts
+const updatedTodos = await store.todos.updateMany([
+  { id: 'id-1', completed: true },
+  { id: 'id-2', completed: true },
+])
+```
+
+It can be useful to batch the update operations into a single fetch request to your backend. See `updateMany` in the [plugin hooks](../plugin/hooks.md#updatemany).
+
 ## Delete
 
 To delete a record, you can use the `delete` method on the store. This method takes the key of the record you want to delete.
@@ -94,7 +128,17 @@ if (todo) {
 }
 ```
 
-## Optimistic Updates
+## Delete Many <Badge text="New in v0.7.3" />
+
+You can delete many items at once by using the `deleteMany` method on the store. This method takes an array of keys or objects that contain the keys of the records you want to delete.
+
+```ts
+await store.todos.deleteMany(['id-1', 'id-2'])
+```
+
+It can be useful to batch the delete operations into a single fetch request to your backend. See `deleteMany` in the [plugin hooks](../plugin/hooks.md#deletemany).
+
+## Optimistic Updates <Badge text="New in v0.7" />
 
 By default, rstore will try to perform optimistic updates when you create, update or delete a record. This means that the record will be updated in the store immediately, without waiting for the server to confirm the change. If an error is thrown during the mutation, the change will be automatically reverted.
 

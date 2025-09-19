@@ -1,3 +1,6 @@
 export * from './create.js'
+export * from './createMany.js'
 export * from './delete.js'
+export * from './deleteMany.js'
 export * from './update.js'
+export * from './updateMany.js'

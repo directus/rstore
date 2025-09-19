@@ -4,6 +4,7 @@ export interface StoreHistoryItem {
   operation: 'fetchFirst' | 'fetchMany' | 'create' | 'update' | 'delete' | 'cacheWrite' | 'itemGarbageCollect' | 'cacheLayerAdd' | 'cacheLayerRemove'
   collection?: string
   key?: string | number
+  keys?: Array<string | number>
   findOptions?: FindOptions<any, any, any>
   item?: any
   result: any

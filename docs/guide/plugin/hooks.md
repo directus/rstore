@@ -210,6 +210,27 @@ hook('createItem', async (payload) => {
 
 :::
 
+### createMany <Badge text="New in v0.7.3" />
+
+This hook is called when rstore needs to create many new items at once when [`createMany()`](../data/mutation.md#create-many) is used.
+
+::: tip
+If no `createMany` hook is defined, rstore will fallback to calling the [`createItem`](#createitem) hook for each item in the array. If hooks for `createMany` are defined but none of them [aborts](#aborting), rstore will also fallback to calling the `createItem` hook for each item. Calling `abort()` or `setResult(value)` with a non-empty array in the `createMany` hook will prevent this behavior.
+:::
+
+```ts
+hook('createMany', async (payload) => {
+  const result = await fetch(`/api/${payload.collection.name}/batch`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload.items),
+  }).then(r => r.json())
+  payload.setResult(result)
+})
+```
+
 ### updateItem
 
 This hook is called when rstore needs to update an existing item.
@@ -266,6 +287,40 @@ hook('updateItem', async (payload) => {
 ```
 :::
 
+### updateMany <Badge text="New in v0.7.3" />
+
+This hook is called when rstore needs to update many existing items at once when [`updateMany()`](../data/mutation.md#update-many) is used.
+
+::: tip
+If no `updateMany` hook is defined, rstore will fallback to calling the [`updateItem`](#updateitem) hook for each item in the array. If hooks for `updateMany` are defined but none of them [aborts](#aborting), rstore will also fallback to calling the `updateItem` hook for each item. Calling `abort()` or `setResult(value)` with a non-empty array in the `updateMany` hook will prevent this behavior.
+:::
+
+::: danger
+
+Contrary to `createMany` hook, the `updateMany` hook receives an array of items that already contain their keys:
+
+```ts
+interface Payload {
+  items: Array<{ key: string | number, item: any }>
+  /// ...
+}
+```
+
+:::
+
+```ts
+hook('updateMany', async (payload) => {
+  const result = await fetch(`/api/${payload.collection.name}/batch`, {
+    method: 'PATCH',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload.items.map(i => i.item)),
+  }).then(r => r.json())
+  payload.setResult(result)
+})
+```
+
 ### deleteItem
 
 This hook is called when rstore needs to delete an existing item.
@@ -302,7 +357,25 @@ hook('deleteItem', async (payload) => {
 ```
 :::
 
-### Aborting
+### deleteMany <Badge text="New in v0.7.3" />
+
+This hook is called when rstore needs to delete many existing items at once when [`deleteMany()`](../data/mutation.md#delete-many) is used.
+
+It receives an array of keys to delete:
+
+```ts
+hook('deleteMany', async (payload) => {
+  await fetch(`/api/${payload.collection.name}/batch`, {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(payload.keys),
+  })
+})
+```
+
+### Aborting <Badge text="New in v0.7" />
 
 If you have multiple plugins that can handle the same collections, you can abort the remaining callbacks for a *Data handling* hook by calling `abort()` on the payload.
 
@@ -318,7 +391,25 @@ hook('deleteItem', (payload) => {
 ```
 
 ::: info
-For `fetchFirst`, `fetchMany`, `createItem` and `updateItem`, the remaining callbacks are automatically aborted when a non-null result is set with `setResult`. You can override this behavior by passing `{ abort: false }` as the second argument to `setResult`.
+For `fetchFirst`, `fetchMany`, `createItem` and `updateItem`, the remaining callbacks are automatically aborted when a non-null result is set with `setResult`.
+
+```ts
+pluginApi.hook('fetchFirst', async (payload) => {
+  // If the item is non-null,
+  // remaining `fetchFirst` hooks will not be called
+  payload.setResult(cache.get(payload.key))
+  // If `cache.get(payload.key)` is null,
+  // remaining `fetchFirst` hooks will be called
+})
+```
+
+Note that in the above example, adding a condition to call `setResult` is not necessary because it checks if the value is null or empty (for arrays) before aborting the remaining callbacks.
+
+You can prevent this behavior by setting `abort: false` to the second argument of `setResult()`.
+
+```ts
+payload.setResult(cache.get(payload.key), { abort: false })
+```
 :::
 
 ## Fetching relations

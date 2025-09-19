@@ -78,7 +78,7 @@ export interface Cache<
     /**
      * Marker to consider that the corresponding list was already fetched once.
      */
-    marker: string
+    marker?: string
   }) => void
 
   writeItemForRelation: <TCollection extends Collection = Collection>(params: {

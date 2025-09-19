@@ -46,9 +46,9 @@ const icons = {
         </span>
         <span class="font-bold">{{ item.collection }}</span>
         <span>(</span>
-        <span v-if="item.key" class="text-emerald-500">{{ item.key }}</span>
+        <span v-if="item.key || item.keys" class="text-emerald-500">{{ item.keys ? `[${item.keys?.join(', ')}]` : item.key }}</span>
         <span v-else-if="item.findOptions" class="whitespace-pre-wrap text-emerald-500">{{ JSON.stringify(item.findOptions, null, 2) }}</span>
-        <span v-if="(item.key || item.findOptions) && item.item">, </span>
+        <span v-if="(item.key || item.keys || item.findOptions) && item.item">, </span>
         <span v-if="item.item" class="whitespace-pre-wrap text-pink-500">{{ JSON.stringify(item.item, null, 2) }}</span>
         <span>)</span>
 

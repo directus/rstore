@@ -33,6 +33,10 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
                     label: 'Layers',
                     to: '/todo/layers',
                   },
+                  {
+                    label: 'Bulk',
+                    to: '/todo/bulk',
+                  },
                 ],
               },
               {

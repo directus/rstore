@@ -1,4 +1,4 @@
-# Module
+# Module <Badge text="Changed in v0.7" type="warning" />
 
 In most application, there are cases where some specific logic or state is needed. For example, you may want to handle the current user with a specific key and also have special mutations for login or logout.
 
@@ -180,7 +180,7 @@ const { data: currentUser } = auth.currentUser
 Awaiting a module is always optional. You can use the module without awaiting it, but all necessary code might not have run yet. This is a valid use case if you don't use async component setup for example.
 :::
 
-## Mutations
+## Mutations <Badge text="Changed in v0.7" type="warning" />
 
 You can define mutations using the `defineMutation` function from the module setup function. This is useful for defining actions that modify the state of the module or the store in general.
 

@@ -1,10 +1,10 @@
-import type { CreateOptions, DeleteOptions, UpdateOptions } from '@rstore/core'
+import type { CreateManyOptions, CreateOptions, DeleteManyOptions, DeleteOptions, UpdateManyOptions, UpdateOptions } from '@rstore/core'
 import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StandardSchemaV1, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueLiveQueryReturn } from './live'
 import type { VueQueryReturn } from './query'
 import type { VueStore } from './store'
-import { createItem, deleteItem, findFirst, findMany, peekFirst, peekMany, subscribe, unsubscribe, updateItem } from '@rstore/core'
+import { createItem, createMany, deleteItem, deleteMany, findFirst, findMany, peekFirst, peekMany, subscribe, unsubscribe, updateItem, updateMany } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { ref, toValue, watch } from 'vue'
@@ -176,6 +176,14 @@ export interface VueCollectionApi<
   ) => Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
   /**
+   * Create many items.
+   */
+  createMany: (
+    items: Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>,
+    createOptions?: Pick<CreateManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>
+  ) => Promise<Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>
+
+  /**
    * (Recommended) The form object helps you creating a new item.
    */
   createForm: (
@@ -201,6 +209,14 @@ export interface VueCollectionApi<
     item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
     updateOptions?: Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'key' | 'optimistic'>,
   ) => Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
+
+  /**
+   * Update many items.
+   */
+  updateMany: (
+    items: Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>,
+    updateOptions?: Pick<UpdateManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
+  ) => Promise<Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>
 
   /**
    * (Recommended) The form object helps you updating an existing item. If the item is not loaded yet, it will be fetched first to pre-fill the form.
@@ -230,6 +246,14 @@ export interface VueCollectionApi<
   delete: (
     keyOrItem: string | number | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
     DeleteOptions?: Pick<DeleteOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
+  ) => Promise<void>
+
+  /**
+   * Delete many items.
+   */
+  deleteMany: (
+    keysOrItems: Array<string | number | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>,
+    deleteOptions?: Pick<DeleteManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
   ) => Promise<void>
 
   getKey: (
@@ -444,6 +468,13 @@ export function createCollectionApi<
       item,
     }),
 
+    createMany: (items, options) => createMany({
+      ...options,
+      store,
+      collection,
+      items,
+    }),
+
     createForm: (formOptions) => {
       type TReturn = ReturnType<Api['createForm']>
       return createFormObject<
@@ -462,6 +493,13 @@ export function createCollectionApi<
       store,
       collection,
       item,
+    }),
+
+    updateMany: (items, options) => updateMany({
+      ...options,
+      store,
+      collection,
+      items,
     }),
 
     updateForm: async (options, formOptions) => {
@@ -520,6 +558,28 @@ export function createCollectionApi<
         store,
         collection,
         key,
+      })
+    },
+
+    deleteMany: (keysOrItems, options) => {
+      const keys = keysOrItems.map((keyOrItem) => {
+        if (typeof keyOrItem !== 'string' && typeof keyOrItem !== 'number') {
+          const result = collection.getKey(keyOrItem)
+          if (!result) {
+            throw new Error('Item delete failed: key is not defined')
+          }
+          return result
+        }
+        else {
+          return keyOrItem
+        }
+      })
+
+      return deleteMany({
+        ...options,
+        store,
+        collection,
+        keys,
       })
     },
 

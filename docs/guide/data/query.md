@@ -16,7 +16,7 @@ const { data: todos } = store.Todo.query(q => q.many())
 const { data: users } = store.users.query(q => q.many())
 ```
 
-## Query composables
+## Query composables <Badge text="Changed in v0.7" type="warning" />
 
 The query composables are the recommended way to fetch data from the server. They are designed to be used in a Vue component and return a reactive result to be used in the components.
 
@@ -379,7 +379,7 @@ The cache will automatically resolve the relations as soon as the data is availa
 
 Plugins hooked on the `fetchRelations` hook will also be called to potentially fetch the data of the relations. See [Plugin hooks](../plugin/hooks.md#fetching-relations) for more details.
 
-## Customizing Find Options Types
+## Customizing Find Options Types <Badge text="Changed in v0.7" type="warning" />
 
 You can customize the `FindOptions` type used in the `first` and `many` query builder methods and in the `peek*`/`find*` methods by declaring a module augmentation for `@rstore/vue` and extending the `FindOptions` interface.
 

@@ -14,7 +14,8 @@ export interface MutationOperation<
    * Either the key of the item in the collection or the key of the exposed mutation in the module.
    */
   key?: string | number
-  payload?: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
+  keys?: Array<string | number>
+  payload?: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> | Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>
 }
 
 export interface MutationSpecialProps {

@@ -236,6 +236,35 @@ export interface HookDefinitions<
     }
   ) => Awaitable<void>
 
+  beforeManyMutation: <
+    TCollection extends Collection,
+  > (
+    payload: {
+      store: StoreCore<TSchema, TCollectionDefaults>
+      meta: CustomHookMeta
+      collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+      keys?: Array<string | number>
+      items?: Array<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>>
+      setItems: (item: Array<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>>) => void
+      mutation: 'create' | 'update' | 'delete'
+    }
+  ) => Awaitable<void>
+
+  afterManyMutation: <
+    TCollection extends Collection,
+  > (
+    payload: {
+      store: StoreCore<TSchema, TCollectionDefaults>
+      meta: CustomHookMeta
+      collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+      keys?: Array<string | number>
+      items?: Array<{ key?: number | string, item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> }>
+      mutation: 'create' | 'update' | 'delete'
+      getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
+      setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>) => void
+    }
+  ) => Awaitable<void>
+
   /**
    * Called when an item is created.
    */
@@ -249,6 +278,26 @@ export interface HookDefinitions<
       item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
       setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>, options?: AbortableOptions) => void
+      /**
+       * Don't call the remaining hooks in the queue.
+       */
+      abort: () => void
+    }
+  ) => Awaitable<void>
+
+  /**
+   * Called when an item is created.
+   */
+  createMany: <
+    TCollection extends Collection,
+  > (
+    payload: {
+      store: StoreCore<TSchema, TCollectionDefaults>
+      meta: CustomHookMeta
+      collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+      items: Array<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>>
+      getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
+      setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>, options?: AbortableOptions) => void
       /**
        * Don't call the remaining hooks in the queue.
        */
@@ -278,6 +327,26 @@ export interface HookDefinitions<
   ) => Awaitable<void>
 
   /**
+   * Called when an item is updated.
+   */
+  updateMany: <
+    TCollection extends Collection,
+  > (
+    payload: {
+      store: StoreCore<TSchema, TCollectionDefaults>
+      meta: CustomHookMeta
+      collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+      items: Array<{ key: number | string, item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> }>
+      getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> | undefined
+      setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>, options?: AbortableOptions) => void
+      /**
+       * Don't call the remaining hooks in the queue.
+       */
+      abort: () => void
+    }
+  ) => Awaitable<void>
+
+  /**
    * Called when an item is deleted.
    */
   deleteItem: <
@@ -288,6 +357,24 @@ export interface HookDefinitions<
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key: string | number
+      /**
+       * Don't call the remaining hooks in the queue.
+       */
+      abort: () => void
+    }
+  ) => Awaitable<void>
+
+  /**
+   * Called when an item is deleted.
+   */
+  deleteMany: <
+    TCollection extends Collection,
+  > (
+    payload: {
+      store: StoreCore<TSchema, TCollectionDefaults>
+      meta: CustomHookMeta
+      collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+      keys: Array<string | number>
       /**
        * Don't call the remaining hooks in the queue.
        */

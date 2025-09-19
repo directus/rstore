@@ -2,7 +2,7 @@
 
 rstore supports relations between collections. This allows you to define relationships between different collections and automatically handle the loading and caching of related data.
 
-## Defining Relations
+## Defining Relations <Badge text="Changed in v0.7" type="warning" />
 
 Use the `defineRelations` function to define the relations between collections. It accepts an object where the keys are the names of the relations and the values are objects that define the relation.
 
@@ -166,7 +166,7 @@ const messageRelations = defineRelations(messageCollection, ({ collection }) => 
 }))
 ```
 
-## Polymorphic Relations
+## Polymorphic Relations <Badge text="Changed in v0.7" type="warning" />
 
 In a polymorphic relation, the target collection can be one of several collections. You can define a polymorphic relation by specifying multiple target collections in the `to` property.
 
@@ -218,7 +218,7 @@ const commentRelations = defineRelations(commentCollection, ({ collection }) => 
 }))
 ```
 
-## Multi-field Relations
+## Multi-field Relations <Badge text="New in v0.7" />
 
 You can define relations that use multiple fields to establish the relationship between collections.
 
@@ -236,7 +236,7 @@ const myCollectionRelations = defineRelations(myCollection, ({ collection }) => 
 }))
 ```
 
-## Custom Filter
+## Custom Filter <Badge text="New in v0.7" />
 
 You can also define a custom filter function to determine if two items are related. The `filter` function receives two parameters: the item from the source collection and the item from the target collection. It should return `true` if the items are related, and `false` otherwise.
 

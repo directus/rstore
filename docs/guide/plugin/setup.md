@@ -63,7 +63,7 @@ app/
 You can also add an `app/rstore` folder in Nuxt layers! rstore will automatically add those files too.
 :::
 
-## Category
+## Category <Badge text="New in v0.7" />
 
 Plugins can be categorized to define their role in the data flow. The available categories are:
 
@@ -129,6 +129,40 @@ export default definePlugin({
 
 Explore the [Plugin hooks](./hooks.md) for a complete list of available hooks.
 
+### Aborting hook <Badge text="New in v0.7" />
+
+You can abort most the hooks by calling either `setResult()` with a non-null/non-empty value, or `abort()`. This will prevent the remaining plugins from running the same hook. This is useful when you want to short-circuit the data flow, for example when you have a cache plugin that can return the data without needing to call a remote API.
+
+```ts
+pluginApi.hook('fetchFirst', async (payload) => {
+  // If the item is non-null,
+  // remaining `fetchFirst` hooks will not be called
+  payload.setResult(cachedmyCache.get(payload.key))
+})
+```
+
+::: tip
+You can prevent this behavior by setting `abort: false` to the second argument of `setResult()`.
+
+```ts
+payload.setResult(cachedmyCache.get(payload.key), { abort: false })
+```
+
+:::
+
+```ts
+pluginApi.hook('fetchFirst', async (payload) => {
+  if (payload.collection.name === 'SomeSpecialCollection') {
+    // Do something special here
+    await doSomethingSpecial()
+    // Remaining `fetchFirst` hooks will not be called
+    payload.abort()
+  }
+})
+```
+
+See also [Category](#category) and [Sorting plugins](#sorting-plugins). Learn more in [Hooks](./hooks.md#aborting).
+
 ## Scope ID
 
 The scope ID allows filtering which plugins will handle the collection. For example, if a collection has a scope A, only plugins with the scope A will be able to handle it by default. This is very useful to handle multiple data sources.
@@ -190,7 +224,7 @@ export default definePlugin({
 })
 ```
 
-## Sorting plugins
+## Sorting plugins <Badge text="New in v0.7" />
 
 Plugins are sorted based on their dependencies and category. You can specify that a plugin should be loaded before or after another plugin or category using the `before` and `after` options:
 
