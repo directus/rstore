@@ -1,6 +1,37 @@
 # Changelog
 
 
+## v0.7.3
+
+[compare changes](https://github.com/directus/rstore/compare/v0.7.2...v0.7.3)
+
+### 🚀 Enhancements
+
+- CreateMany, updateMany, deleteMany ([40aaa50](https://github.com/directus/rstore/commit/40aaa50))
+- **devtools:** Improved filters ([a3f59d3](https://github.com/directus/rstore/commit/a3f59d3))
+- **devtools:** Cache layers ([d7d1038](https://github.com/directus/rstore/commit/d7d1038))
+- **devtools:** Go to cache tab from collections ([dd18099](https://github.com/directus/rstore/commit/dd18099))
+- **cache:** Handle frozen items in writeItem ([6586aec](https://github.com/directus/rstore/commit/6586aec))
+- **nuxt-drizzle:** Extras in query transform ([803a569](https://github.com/directus/rstore/commit/803a569))
+
+### 🔥 Performance
+
+- **cache:** Iterate over state directly ([7016950](https://github.com/directus/rstore/commit/7016950))
+- **devtools:** Considerably reduce overhead of adding history records ([453f85a](https://github.com/directus/rstore/commit/453f85a))
+
+### 🩹 Fixes
+
+- Relations undefined if fetchPolicy is no-cache ([9845539](https://github.com/directus/rstore/commit/9845539))
+- Use item as proxy target to improve dx in browser devtools ([a11b218](https://github.com/directus/rstore/commit/a11b218))
+- **devtools:** Local icon ([35bcdc5](https://github.com/directus/rstore/commit/35bcdc5))
+- **nuxt-drizzle:** Allow any field in where clauses ([84301f1](https://github.com/directus/rstore/commit/84301f1))
+- **nuxt-drizzle:** OrderBy allow any column name ([b7d07b5](https://github.com/directus/rstore/commit/b7d07b5))
+- **cache:** Handle existing frozen items in cache ([f4bb64f](https://github.com/directus/rstore/commit/f4bb64f))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.7.2
 
 [compare changes](https://github.com/directus/rstore/compare/v0.7.1...v0.7.2)
