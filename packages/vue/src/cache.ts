@@ -286,11 +286,18 @@ export function createCache<
           }
         }
 
-        if (!itemsForType[key]) {
+        const existing = itemsForType[key]
+        if (!existing) {
           itemsForType[key] = data
         }
+        else if (Object.isFrozen(existing)) {
+          itemsForType[key] = {
+            ...existing,
+            ...data,
+          }
+        }
         else {
-          Object.assign(itemsForType[key], data)
+          Object.assign(existing, data)
         }
       }
       if (marker) {
