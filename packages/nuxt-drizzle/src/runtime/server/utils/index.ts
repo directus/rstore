@@ -61,6 +61,9 @@ export function getDrizzleCondition(table: Table, condition: RstoreDrizzleCondit
     else if ('value1' in condition) {
       return drizzle[condition.operator](table[condition.field as keyof typeof table] as Column ?? drizzle.sql`${condition.field}`.as(condition.field), condition.value1, condition.value2)
     }
+    else {
+      return drizzle[condition.operator](table[condition.field as keyof typeof table] as Column ?? drizzle.sql`${condition.field}`.as(condition.field))
+    }
   }
   else if ('condition' in condition) {
     return drizzle[condition.operator](getDrizzleCondition(table, condition.condition))
