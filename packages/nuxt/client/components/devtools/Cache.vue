@@ -40,7 +40,7 @@ const selectedLayer = computed(() => layers.value.find(layer => layer.id === sel
 
 const selectedCache = computed(() => {
   if (selectedLayer.value) {
-    return selectedLayer.value.state
+    return selectedLayer.value.state[selectedCollection.value as keyof typeof selectedLayer.value.state] as Record<string, any>
   }
   return cache.value[selectedCollection.value as keyof typeof cache.value] as Record<string, any>
 })
@@ -205,7 +205,7 @@ watch(selectedCollection, () => {
             :key="collection.name"
             :collection
             :selected="selectedCollection === collection.name"
-            :state="selectedCache"
+            :state="selectedLayer?.state ?? cache as any"
             :selected-layer
             @click="selectedCollection = collection.name"
           />
