@@ -13,7 +13,6 @@ const createTodo = createFormObject({
     const data = { text: values.text ?? '' }
     const texts = data.text.split(',').map(t => t.trim()).filter(t => t.length > 0)
     await store.Todo.createMany(texts.map(text => ({ text })))
-    return data
   },
 })
 const createInput = useTemplateRef('input')

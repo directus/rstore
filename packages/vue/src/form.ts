@@ -7,7 +7,7 @@ export interface CreateFormObjectOptions<
   TData extends Record<string, any>,
   TSchema extends StandardSchemaV1,
   TAdditionalProps,
-  TResult = TData,
+  TResult extends TData | void = TData,
 > {
   defaultValues?: (() => Partial<TData>) | undefined
   resetDefaultValues?: (() => Awaitable<Partial<TData>>) | undefined
@@ -26,14 +26,15 @@ export type FormObjectChanged<TData> = {
 
 export interface FormObjectAdditionalProps<
   TData extends Record<string, any>,
+  TResult extends TData | void = TData,
 > {
   $changedProps: FormObjectChanged<TData>
   $hasChanges: () => boolean
   /**
    * @deprecated Use `$onSuccess` instead
    */
-  $onSaved: EventHookOn<TData>
-  $onSuccess: EventHookOn<TData>
+  $onSaved: EventHookOn<TResult>
+  $onSuccess: EventHookOn<TResult>
   $onError: EventHookOn<Error>
   $onChange: EventHookOn<FormObjectChanged<TData>>
 }
@@ -42,7 +43,8 @@ type VueFormObject<
   TData extends Record<string, any>,
   TSchema extends StandardSchemaV1 = StandardSchemaV1,
   TAdditionalProps = Record<string, never>,
-> = FormObjectBase<TData, TSchema> & FormObjectAdditionalProps<TData> & TAdditionalProps & Partial<TData> & (() => Promise<TData>)
+  TResult extends TData | void = TData,
+> = FormObjectBase<TResult, TSchema> & FormObjectAdditionalProps<TData, TResult> & TAdditionalProps & Partial<TData> & (() => Promise<TData>)
 
 /**
  * Object returned by `store.<Collection>.createForm()`
@@ -66,7 +68,8 @@ export function createFormObject<
   TData extends Record<string, any> = Record<string, any>,
   TSchema extends StandardSchemaV1 = StandardSchemaV1,
   const TAdditionalProps = Record<string, never>,
->(options: CreateFormObjectOptions<TData, TSchema, TAdditionalProps>) {
+  TResult extends TData | void = TData,
+>(options: CreateFormObjectOptions<TData, TSchema, TAdditionalProps, TResult>) {
   let initialData = pickNonSpecialProps(options.defaultValues?.() ?? {}, true) as Partial<TData>
 
   const onSuccess = createEventHook()
@@ -135,7 +138,7 @@ export function createFormObject<
       return this.$onSaved(...args)
     },
     $onChange: onChange.on,
-  } satisfies FormObjectBase<TData, TSchema> & FormObjectAdditionalProps<TData>) as FormObjectBase<TData, TSchema> & FormObjectAdditionalProps<TData>
+  } satisfies FormObjectBase<TResult, TSchema> & FormObjectAdditionalProps<TData>) as FormObjectBase<TResult, TSchema> & FormObjectAdditionalProps<TData>
 
   // On change
 
@@ -185,7 +188,7 @@ export function createFormObject<
   // Validate initially (don't await for it)
   queueChange()
 
-  return proxy as VueFormObject<TData, TSchema, TAdditionalProps>
+  return proxy as VueFormObject<TData, TSchema, TAdditionalProps, TResult>
 }
 
 /**
