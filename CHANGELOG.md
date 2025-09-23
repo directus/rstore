@@ -1,6 +1,27 @@
 # Changelog
 
 
+## v0.7.4
+
+[compare changes](https://github.com/directus/rstore/compare/v0.7.3...v0.7.4)
+
+### 🚀 Enhancements
+
+- **form:** ResetOnSuccess: false ([787889d](https://github.com/directus/rstore/commit/787889d))
+- **form:** ValidateOnSubmit + pickOnlyChanged, closes #47 ([#47](https://github.com/directus/rstore/issues/47))
+
+### 🩹 Fixes
+
+- **nuxt-drizzle:** IsNull and similar where clause with no value not working ([c19fd47](https://github.com/directus/rstore/commit/c19fd47))
+
+### 🌊 Types
+
+- **form:** Allow void in `submit` ([3372faa](https://github.com/directus/rstore/commit/3372faa))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.7.3
 
 [compare changes](https://github.com/directus/rstore/compare/v0.7.2...v0.7.3)
