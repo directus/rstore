@@ -46,6 +46,11 @@ export interface CreateFormObjectOptions<
    * @default true
    */
   resetOnSuccess?: boolean
+  /**
+   * If `true`, the form will be validated using the `schema` when `$submit()` is called. If `false`, the form will not be validated automatically, and you will need to validate it manually if needed.
+   * @default true
+   */
+  validateOnSubmit?: boolean
 }
 
 export type FormObjectChanged<TData> = {
@@ -134,15 +139,17 @@ export function createFormObject<
       form.$error = null
       try {
         const data = options?.transformData ? options.transformData(form as unknown as Partial<TData>) : pickNonSpecialProps(form, true) as Partial<TData>
-        const { issues } = await this.$schema['~standard'].validate(data)
-        if (issues) {
-          const error = new Error(issues.map(i => i.message).join(', '))
-          ;(error as any).$issues = issues
-          throw error
+        if (options.validateOnSubmit ?? true) {
+          const { issues } = await this.$schema['~standard'].validate(data)
+          if (issues) {
+            const error = new Error(issues.map(i => i.message).join(', '))
+            ;(error as any).$issues = issues
+            throw error
+          }
         }
         const item = await options.submit(data)
         onSuccess.trigger(item)
-        if (options.resetOnSuccess || options.resetOnSuccess == null) {
+        if (options.resetOnSuccess ?? true) {
           await form.$reset()
         }
         return item

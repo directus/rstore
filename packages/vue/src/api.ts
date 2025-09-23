@@ -8,7 +8,7 @@ import { createItem, createMany, deleteItem, deleteMany, findFirst, findMany, pe
 import { pickNonSpecialProps } from '@rstore/shared'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { ref, toValue, watch } from 'vue'
-import { createFormObject, type VueCreateFormObject, type VueUpdateFormObject } from './form'
+import { createFormObject, type CreateFormObjectOptions, type VueCreateFormObject, type VueUpdateFormObject } from './form'
 import { createQuery } from './query'
 
 export type QueryType = 'first' | 'many'
@@ -199,7 +199,8 @@ export interface VueCollectionApi<
        * @default collection.schema.create
        */
       schema?: StandardSchemaV1
-    } & Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
+    } & Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>
+    & Pick<CreateFormObjectOptions<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>, StandardSchemaV1, never>, 'resetOnSuccess' | 'validateOnSubmit' | 'transformData'>,
   ) => VueCreateFormObject<TCollection, TCollectionDefaults, TSchema>
 
   /**
@@ -237,7 +238,14 @@ export interface VueCollectionApi<
        * @default collection.schema.update
        */
       schema?: StandardSchemaV1
-    } & Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
+
+      /**
+       * If `true`, only the changed properties will be sent to the `update` method. If `false`, all properties will be sent.
+       * @default true
+       */
+      pickOnlyChanged?: boolean
+    } & Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>
+    & Pick<CreateFormObjectOptions<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>, StandardSchemaV1, never>, 'resetOnSuccess' | 'validateOnSubmit' | 'transformData'>,
   ) => Promise<VueUpdateFormObject<TCollection, TCollectionDefaults, TSchema>>
 
   /**
@@ -485,6 +493,9 @@ export function createCollectionApi<
         submit: data => api.create(data, {
           optimistic: formOptions?.optimistic,
         }),
+        resetOnSuccess: formOptions?.resetOnSuccess,
+        validateOnSubmit: formOptions?.validateOnSubmit,
+        transformData: formOptions?.transformData,
       }) as TReturn
     },
 
@@ -526,9 +537,17 @@ export function createCollectionApi<
         resetDefaultValues: () => getFormData(),
         // Only use changed props
         transformData: (form) => {
-          const data = {} as any
-          for (const key in form.$changedProps) {
-            data[key] = form[key]
+          let data = {} as any
+          if (formOptions?.pickOnlyChanged ?? true) {
+            for (const key in form.$changedProps) {
+              data[key] = form[key]
+            }
+          }
+          else {
+            data = { ...form }
+          }
+          if (formOptions?.transformData) {
+            data = formOptions.transformData(data)
           }
           return data
         },
@@ -536,6 +555,8 @@ export function createCollectionApi<
           key: collection.getKey(initialData),
           optimistic: formOptions?.optimistic,
         }),
+        resetOnSuccess: formOptions?.resetOnSuccess,
+        validateOnSubmit: formOptions?.validateOnSubmit,
       })
       return form
     },

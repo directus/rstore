@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { createFormObject } from '../src'
 
 describe('createFormObject', () => {
@@ -46,5 +46,65 @@ describe('createFormObject', () => {
     await obj.$submit()
 
     expect(obj.name).toBe('Jane')
+  })
+
+  it('validates the form before submit', async () => {
+    const submit = vi.fn()
+    const obj = createFormObject({
+      defaultValues: () => ({ name: 'John' }),
+      schema: {
+        '~standard': {
+          version: 1,
+          vendor: 'test',
+          validate: async (data: any) => {
+            const issues = []
+            if (!data.name) {
+              issues.push({ message: 'Name is required' })
+            }
+            return { issues: issues.length ? issues : undefined, value: data }
+          },
+        },
+      },
+      submit,
+    })
+
+    obj.name = ''
+
+    await expect(() => obj.$submit()).rejects.toThrow('Name is required')
+    expect(submit).not.toHaveBeenCalled()
+
+    obj.name = 'Jane'
+
+    await obj.$submit()
+
+    expect(submit).toHaveBeenCalled()
+  })
+
+  it('does not validate the form before submit when `validateOnSubmit` is false', async () => {
+    const submit = vi.fn()
+    const obj = createFormObject({
+      defaultValues: () => ({ name: 'John' }),
+      schema: {
+        '~standard': {
+          version: 1,
+          vendor: 'test',
+          validate: async (data: any) => {
+            const issues = []
+            if (!data.name) {
+              issues.push({ message: 'Name is required' })
+            }
+            return { issues: issues.length ? issues : undefined, value: data }
+          },
+        },
+      },
+      submit,
+      validateOnSubmit: false,
+    })
+
+    obj.name = ''
+
+    await obj.$submit()
+
+    expect(submit).toHaveBeenCalledWith({ name: '' })
   })
 })
