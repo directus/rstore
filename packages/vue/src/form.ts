@@ -9,12 +9,43 @@ export interface CreateFormObjectOptions<
   TAdditionalProps,
   TResult extends TData | void = TData,
 > {
+  /**
+   * Function returning the default values for the form
+   *
+   * If not provided, the form will be initialized with an empty object
+   *
+   * If `resetDefaultValues` is provided, `defaultValues` will only be used for the initial values
+   */
   defaultValues?: (() => Partial<TData>) | undefined
+  /**
+   * Function returning the default values for the form when `$reset()` is called. `resetDefaultValues` is **not** called when initializing the form.
+   *
+   * If not provided, `defaultValues` will be used instead
+   *
+   * If neither `resetDefaultValues` nor `defaultValues` are provided, the form will be reset to an empty object
+   */
   resetDefaultValues?: (() => Awaitable<Partial<TData>>) | undefined
+  /**
+   * Schema to validate the form data against. It should be compatible with Standard Schema v1.
+   */
   schema?: TSchema
+  /**
+   * Function to transform the data before submission (e.g. to remove extra properties).
+   */
   transformData?: (data: Partial<TData>) => Partial<TData>
+  /**
+   * Function called when the form is submitted.
+   */
   submit: (data: Partial<TData>) => Promise<TResult>
+  /**
+   * Additional properties to add to the form object. Their name must start with `$` to avoid conflicts with form fields.
+   */
   additionalProps?: TAdditionalProps
+  /**
+   * Resets the form to default values after a successful submission
+   * @default true
+   */
+  resetOnSuccess?: boolean
 }
 
 export type FormObjectChanged<TData> = {
@@ -111,7 +142,9 @@ export function createFormObject<
         }
         const item = await options.submit(data)
         onSuccess.trigger(item)
-        await form.$reset()
+        if (options.resetOnSuccess || options.resetOnSuccess == null) {
+          await form.$reset()
+        }
         return item
       }
       catch (error: any) {
