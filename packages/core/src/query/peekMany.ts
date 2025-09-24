@@ -30,6 +30,10 @@ export function peekMany<
 }: PeekManyOptions<TCollection, TCollectionDefaults, TSchema>): QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>> {
   meta ??= {}
 
+  if (findOptions?.meta) {
+    Object.assign(meta, findOptions.meta)
+  }
+
   const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let marker = defaultMarker(collection, findOptions)

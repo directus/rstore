@@ -1,6 +1,7 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
 import type { Collection, CollectionByName, CollectionDefaults, CollectionRelation, RelationsByName, ResolvedCollectionItem, StoreSchema } from './collection'
+import type { CustomHookMeta } from './hooks'
 
 export interface CustomParams<
   TCollection extends Collection,
@@ -131,6 +132,8 @@ export interface FindOptionsBase<
    * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
    */
   experimentalGarbageCollection?: boolean
+
+  meta?: CustomHookMeta
 }
 
 export type FindFirstOptions<

@@ -333,10 +333,10 @@ export function createCollectionApi<
     return createQuery<TCollection, TCollectionDefaults, TSchema, any, WrappedItem<TCollection, TCollectionDefaults, TSchema> | null | Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>>({
       store,
       fetchMethod: (options, meta) => toValue(type) === 'first'
-        ? findFirst({ store, collection, findOptions: options!, meta }).then(r => r.result)
+        ? (options ? findFirst({ store, collection, findOptions: options, meta }).then(r => r.result) : Promise.resolve(null))
         : findMany({ store, collection, findOptions: options, meta }).then(r => r.result),
       cacheMethod: (options, meta) => toValue(type) === 'first'
-        ? peekFirst({ store, collection, findOptions: options!, meta, force: true }).result
+        ? (options ? peekFirst({ store, collection, findOptions: options, meta, force: true }).result : null)
         : peekMany({ store, collection, findOptions: options, meta, force: true }).result,
       defaultValue: () => toValue(type) === 'first' ? null : [],
       options: boundOptionsGetter,

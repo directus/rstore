@@ -35,7 +35,13 @@ export function peekFirst<
         key: keyOrOptions,
       }
     : keyOrOptions
+
   const key = findOptions?.key
+
+  if (findOptions.meta) {
+    Object.assign(meta, findOptions.meta)
+  }
+
   const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
 
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {

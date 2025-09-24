@@ -59,6 +59,10 @@ async function _findMany<
   meta ??= {}
   findOptions ??= {}
 
+  if (findOptions.meta) {
+    Object.assign(meta, findOptions.meta)
+  }
+
   const fetchPolicy = store.$getFetchPolicy(findOptions.fetchPolicy)
 
   let result: any[] | undefined

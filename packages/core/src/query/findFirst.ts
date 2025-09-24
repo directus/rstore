@@ -63,6 +63,11 @@ async function _findFirst<
         key: keyOrOptions,
       }
     : keyOrOptions
+
+  if (findOptions.meta) {
+    Object.assign(meta, findOptions.meta)
+  }
+
   const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
 
   let result: any
