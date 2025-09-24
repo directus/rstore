@@ -55,14 +55,11 @@ export function createQuery<
   collection,
   name,
 }: VueCreateQueryOptions<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>): HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TResult>> {
+  const trackingQueryId = `${collection.name}:${toValue(name)}:${crypto.randomUUID()}`
+
   function getOptions(): TOptions | undefined {
     const result = toValue(options)
     return typeof result === 'object' && 'enabled' in result && result.enabled === false ? undefined : result as TOptions
-  }
-
-  function getQueryId(): string {
-    const options = getOptions() ?? {}
-    return `${collection.name}:${toValue(name)}:${JSON.stringify(options)}`
   }
 
   function isDisabled() {
@@ -88,13 +85,12 @@ export function createQuery<
     if (fetchPolicy !== 'no-cache') {
       const options = getOptions()
       const result = cacheMethod(options, meta.value) ?? null
-      if (queryTrackingEnabled) {
-        const queryId = getQueryId()
+      if (result && queryTrackingEnabled) {
         if (Array.isArray(result)) {
-          return result.filter((item: WrappedItemBase<TCollection, TCollectionDefaults, TSchema>) => !item.$meta.dirtyQueries.has(queryId))
+          return result.filter((item: WrappedItemBase<TCollection, TCollectionDefaults, TSchema>) => !item.$meta.dirtyQueries.has(trackingQueryId))
         }
         else {
-          return (result && !(result as unknown as WrappedItemBase<TCollection, TCollectionDefaults, TSchema>).$meta.dirtyQueries.has(queryId)) ? result : null
+          return !(result as unknown as WrappedItemBase<TCollection, TCollectionDefaults, TSchema>).$meta.dirtyQueries.has(trackingQueryId) ? result : null
         }
       }
       return result
@@ -171,8 +167,6 @@ export function createQuery<
   }
 
   function handleQueryTracking(newQueryTracking: HookMetaQueryTracking) {
-    const queryId = getQueryId()
-
     const isResultEmpty = result.value == null || (Array.isArray(result.value) && result.value.length === 0)
 
     // Init the query tracking object if the result is not empty and there is no previous tracking
@@ -219,7 +213,7 @@ export function createQuery<
             }
           }
         }
-        item.$meta.queries.add(queryId)
+        item.$meta.queries.add(trackingQueryId)
       }
     }
 
@@ -233,8 +227,8 @@ export function createQuery<
           key,
         }) as WrappedItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
         if (item) {
-          item.$meta.queries.add(queryId)
-          item.$meta.dirtyQueries.delete(queryId)
+          item.$meta.queries.add(trackingQueryId)
+          item.$meta.dirtyQueries.delete(trackingQueryId)
           oldKeys?.delete(key)
         }
       }
@@ -250,8 +244,8 @@ export function createQuery<
           key,
         }) as WrappedItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
         if (item) {
-          item.$meta.queries.delete(queryId)
-          item.$meta.dirtyQueries.add(queryId)
+          item.$meta.queries.delete(trackingQueryId)
+          item.$meta.dirtyQueries.add(trackingQueryId)
 
           hasAddedDirty = true
 
@@ -279,7 +273,6 @@ export function createQuery<
   // Mark tracked items as dirty on unmount
   if (queryTrackingEnabled) {
     tryOnScopeDispose(() => {
-      const queryId = getQueryId()
       for (const collectionName in queryTracking) {
         const collection = store.$collections.find(c => c.name === collectionName)!
         for (const key of queryTracking[collectionName]!) {
@@ -288,8 +281,8 @@ export function createQuery<
             key,
           }) as WrappedItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
           if (item) {
-            item.$meta.queries.delete(queryId)
-            item.$meta.dirtyQueries.add(queryId)
+            item.$meta.queries.delete(trackingQueryId)
+            item.$meta.dirtyQueries.add(trackingQueryId)
 
             store.$cache.garbageCollectItem({
               collection,
