@@ -332,7 +332,6 @@ export function createCollectionApi<
   }) {
     return createQuery<TCollection, TCollectionDefaults, TSchema, any, WrappedItem<TCollection, TCollectionDefaults, TSchema> | null | Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>>({
       store,
-      collection,
       fetchMethod: (options, meta) => toValue(type) === 'first'
         ? findFirst({ store, collection, findOptions: options!, meta }).then(r => r.result)
         : findMany({ store, collection, findOptions: options, meta }).then(r => r.result),
@@ -341,7 +340,6 @@ export function createCollectionApi<
         : peekMany({ store, collection, findOptions: options, meta, force: true }).result,
       defaultValue: () => toValue(type) === 'first' ? null : [],
       options: boundOptionsGetter,
-      name: type,
     })
   }
 

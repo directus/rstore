@@ -77,8 +77,6 @@ describe('createQuery', () => {
       options: ref({
         fetchPolicy: 'no-cache',
       }),
-      collection: mockCollection,
-      name: 'query',
     })
 
     expect(query.data.value).toEqual(defaultValue)
@@ -95,8 +93,6 @@ describe('createQuery', () => {
       cacheMethod: mockCacheMethod,
       defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options: ref(undefined),
-      collection: mockCollection,
-      name: 'query',
     })
 
     const result = await query
@@ -115,8 +111,6 @@ describe('createQuery', () => {
       cacheMethod: mockCacheMethod,
       defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options: ref(undefined),
-      collection: mockCollection,
-      name: 'query',
     })
 
     const result = await query
@@ -137,8 +131,6 @@ describe('createQuery', () => {
       cacheMethod: mockCacheMethod,
       defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options,
-      collection: mockCollection,
-      name: 'query',
     })
 
     const result = await query
@@ -167,8 +159,6 @@ describe('createQuery', () => {
       cacheMethod: mockCacheMethod,
       defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options: ref(undefined),
-      collection: mockCollection,
-      name: 'query',
     })
 
     const result = await query
@@ -194,8 +184,6 @@ describe('createQuery', () => {
       cacheMethod: mockCacheMethod,
       defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options,
-      collection: mockCollection,
-      name: 'query',
     })
 
     const result = await query
@@ -218,8 +206,6 @@ describe('createQuery', () => {
       cacheMethod: mockCacheMethod,
       defaultValue: mockStore.$cache.wrapItem({ collection: mockCollection, item: defaultValue }),
       options,
-      collection: mockCollection,
-      name: 'query',
     })
 
     const result = await query
@@ -249,8 +235,6 @@ describe('createQuery', () => {
       cacheMethod: mockCacheMethod,
       defaultValue: [],
       options,
-      collection: mockCollection,
-      name: 'query',
     })
 
     const result = await query
@@ -297,8 +281,6 @@ describe('createQuery', () => {
       options: {
         experimentalGarbageCollection: true,
       },
-      collection: mockCollection,
-      name: 'query',
     })
 
     // init tracking

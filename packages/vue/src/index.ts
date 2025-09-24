@@ -28,6 +28,14 @@ export type {
 } from './store'
 
 export {
+  useQueryTracking,
+} from './tracking'
+
+export type {
+  UseQueryTrackingOptions,
+} from './tracking'
+
+export {
   addCollectionRelations,
   defineCollection,
   definePlugin,
