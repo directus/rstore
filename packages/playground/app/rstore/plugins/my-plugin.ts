@@ -38,7 +38,10 @@ export default defineRstorePlugin({
         else {
           const result: any = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
             method: 'GET',
-            query: payload.findOptions?.params,
+            query: {
+              ...payload.findOptions?.params,
+              include: payload.findOptions?.include ? JSON.stringify(payload.findOptions.include) : undefined,
+            },
           })
           payload.setResult(result?.[0])
         }
@@ -55,13 +58,19 @@ export default defineRstorePlugin({
       if (payload.collection.meta?.path) {
         const result = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
           method: 'GET',
-          query: payload.findOptions?.params,
+          query: {
+            ...payload.findOptions?.params,
+            include: payload.findOptions?.include ? JSON.stringify(payload.findOptions.include) : undefined,
+          },
         })
         payload.setResult(result)
       }
     })
 
     hook('fetchRelations', async (payload) => {
+      if (payload.collection.name === 'DataSource') {
+        return
+      }
       const store = useStore()
       const payloadResult = payload.getResult()
       const items: any[] = Array.isArray(payloadResult) ? payloadResult : [payloadResult]

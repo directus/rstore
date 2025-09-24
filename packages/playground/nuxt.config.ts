@@ -58,6 +58,10 @@ export default defineNuxtConfig({
     },
   },
 
+  experimental: {
+    asyncContext: true,
+  },
+
   rstore: {
     experimentalGarbageCollection: true,
   },

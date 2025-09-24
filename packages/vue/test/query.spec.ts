@@ -1,4 +1,4 @@
-import type { ResolvedCollection } from '@rstore/shared'
+import type { CustomHookMeta, ResolvedCollection } from '@rstore/shared'
 import type { VueStore } from '../src'
 import type { WrappedItemMetadata } from '../src/item'
 import { beforeEach, describe, expect, it, type MockedFunction, vi } from 'vitest'
@@ -20,6 +20,9 @@ describe('createQuery', () => {
     } as any
 
     mockStore = {
+      $collections: [
+        mockCollection,
+      ],
       $getFetchPolicy: vi.fn(value => value ?? 'cache-first'),
       $onCacheReset: vi.fn(),
       $cache: {
@@ -36,6 +39,18 @@ describe('createQuery', () => {
             get: (target, key) => {
               if (key === '$meta') {
                 return metadata
+              }
+              if (key === '$collection') {
+                return mockCollection.name
+              }
+              if (key === '$getKey') {
+                return () => {
+                  const k = mockCollection.getKey(target)
+                  if (!k) {
+                    throw new Error('Key is undefined on item')
+                  }
+                  return k
+                }
               }
               return Reflect.get(target, key)
             },
@@ -251,110 +266,49 @@ describe('createQuery', () => {
     expect(mockFetchMethod).toHaveBeenCalledOnce()
   })
 
-  it('should mark items as dirty', async () => {
+  it('should garbage collect items', async () => {
     mockWrappedCache = new Map()
 
     const cacheResult = [{ id: 1 }, { id: 2 }]
     const fetchResult = [{ id: 1 }]
     mockCacheMethod.mockReturnValue(cacheResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
-    mockFetchMethod.mockResolvedValue(fetchResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
+    mockFetchMethod.mockImplementation((_: any, meta: any) => {
+      const m = meta as CustomHookMeta
+      const qt = m.$queryTracking!
+      for (const item of fetchResult) {
+        qt[mockCollection.name] ??= new Set()
+        qt[mockCollection.name]!.add(mockCollection.getKey(item))
+      }
+      return fetchResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item }))
+    })
+
+    mockStore.$cache.readItem = vi.fn(({ key }) => {
+      const item = cacheResult.find(i => mockCollection.getKey(i) === key)
+      if (item) {
+        return mockStore.$cache.wrapItem({ collection: mockCollection, item })
+      }
+    })
 
     const query = createQuery({
       store: mockStore,
       fetchMethod: mockFetchMethod,
       cacheMethod: mockCacheMethod,
       defaultValue: [],
-      options: {},
+      options: {
+        experimentalGarbageCollection: true,
+      },
       collection: mockCollection,
       name: 'query',
     })
 
-    const result = await query
-    expect(query.data.value).toEqual(cacheResult)
+    // init tracking
+    await query
+
     expect(mockFetchMethod).toHaveBeenCalledTimes(1)
-    expect(result.data.value[0].$meta.dirtyQueries.size).toBe(0)
-    expect(result.data.value[1].$meta.dirtyQueries.size).toBe(1)
-    expect(result.data.value[1].$meta.dirtyQueries.has('testCollection:query:{}')).toBe(true)
-  })
 
-  it('should garbage collect dirty items', async () => {
-    mockWrappedCache = new Map()
-
-    const cacheResult = [{ id: 1 }, { id: 2 }]
-    const fetchResult = [{ id: 1 }]
-    mockCacheMethod.mockReturnValue(cacheResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
-    mockFetchMethod.mockResolvedValue(fetchResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
-
-    const currentCache = cacheResult.slice()
-    mockStore.$cache.garbageCollectItem = vi.fn(({ item }) => {
-      if (item.$meta.queries.size === 0) {
-        currentCache.splice(currentCache.findIndex(i => i.id === item.id), 1)
-        mockCacheMethod.mockReturnValue(currentCache.map(i => mockStore.$cache.wrapItem({ collection: mockCollection, item: i })))
-      }
-    })
-
-    const query = createQuery({
-      store: mockStore,
-      fetchMethod: mockFetchMethod,
-      cacheMethod: mockCacheMethod,
-      defaultValue: [],
-      options: {
-        experimentalGarbageCollection: true,
-      },
-      collection: mockCollection,
-      name: 'query',
-    })
-
-    expect(query.data.value).toEqual(cacheResult)
-    await query
-    expect(query.data.value).toEqual(fetchResult)
-  })
-
-  it('should not garbage collect if item is used in another query', async () => {
-    mockWrappedCache = new Map()
-
-    const cacheResult = [{ id: 1 }, { id: 2 }]
-    const fetchResult = [{ id: 1 }]
-    mockCacheMethod.mockReturnValue(cacheResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
-    mockFetchMethod.mockResolvedValue(fetchResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item })))
-
-    const currentCache = cacheResult.slice()
-    mockStore.$cache.garbageCollectItem = vi.fn(({ item }) => {
-      if (item.$meta.queries.size === 0) {
-        currentCache.splice(currentCache.findIndex(i => i.id === item.id), 1)
-        mockCacheMethod.mockReturnValue(currentCache.map(i => mockStore.$cache.wrapItem({ collection: mockCollection, item: i })))
-      }
-    })
-
-    const otherQuery = createQuery({
-      store: mockStore,
-      fetchMethod: mockCacheMethod,
-      cacheMethod: mockCacheMethod,
-      defaultValue: [],
-      options: {
-        experimentalGarbageCollection: true,
-      },
-      collection: mockCollection,
-      name: 'otherQuery',
-    })
-
-    await otherQuery
-
-    const query = createQuery({
-      store: mockStore,
-      fetchMethod: mockFetchMethod,
-      cacheMethod: mockCacheMethod,
-      defaultValue: [],
-      options: {
-        experimentalGarbageCollection: true,
-      },
-      collection: mockCollection,
-      name: 'query',
-    })
-
-    expect(query.data.value).toEqual(cacheResult)
-    await query
-    expect(query.data.value).toEqual(fetchResult)
-    expect(otherQuery.data.value).toEqual(cacheResult)
+    expect(mockStore.$cache.garbageCollectItem).toHaveBeenCalledTimes(1)
+    expect(mockStore.$cache.garbageCollectItem).toHaveBeenCalledWith(expect.objectContaining({
+      item: expect.objectContaining({ id: 2 }),
+    }))
   })
 })

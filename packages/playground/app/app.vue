@@ -85,7 +85,17 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
               {
                 label: 'Database',
                 icon: 'lucide:database',
-                to: '/database',
+                active: $route.path.startsWith('/gc') || $route.path.startsWith('/database'),
+                children: [
+                  {
+                    label: 'Overview',
+                    to: '/database',
+                  },
+                  {
+                    label: 'Garbage Collection',
+                    to: '/gc',
+                  },
+                ],
               },
             ]"
             content-orientation="vertical"

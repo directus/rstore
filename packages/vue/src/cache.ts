@@ -220,7 +220,7 @@ export function createCache<
       }
       return result
     },
-    writeItem({ collection, key, item, marker, fromWriteItems }) {
+    writeItem({ collection, key, item, marker, fromWriteItems, meta }) {
       state.value[collection.name] ??= {}
       const itemsForType = state.value[collection.name]
       const isFrozen = Object.isFrozen(item)
@@ -256,6 +256,7 @@ export function createCache<
                   relationKey: field,
                   relation,
                   childItem: nestedItem,
+                  meta,
                 })
               }
             }
@@ -265,6 +266,7 @@ export function createCache<
                 relationKey: field,
                 relation,
                 childItem: rawItem,
+                meta,
               })
             }
             else {
@@ -304,6 +306,11 @@ export function createCache<
         mark(marker)
       }
 
+      if (meta?.$queryTracking) {
+        meta.$queryTracking[collection.name] ??= new Set()
+        meta.$queryTracking[collection.name]!.add(key)
+      }
+
       if (!fromWriteItems) {
         const store = getStore()
         store.$hooks.callHookSync('afterCacheWrite', {
@@ -317,9 +324,9 @@ export function createCache<
         })
       }
     },
-    writeItems({ collection, items, marker }) {
+    writeItems({ collection, items, marker, meta }) {
       for (const { key, value: item } of items) {
-        this.writeItem({ collection, key, item, fromWriteItems: true })
+        this.writeItem({ collection, key, item, meta, fromWriteItems: true })
       }
       if (marker) {
         mark(marker)
@@ -334,7 +341,7 @@ export function createCache<
         operation: 'write',
       })
     },
-    writeItemForRelation({ parentCollection, relationKey, relation, childItem }) {
+    writeItemForRelation({ parentCollection, relationKey, relation, childItem, meta }) {
       const store = getStore()
       const possibleCollections = Object.keys(relation.to)
       const nestedItemCollection = store.$getCollection(childItem, possibleCollections)
@@ -350,6 +357,7 @@ export function createCache<
         collection: nestedItemCollection,
         key: nestedKey,
         item: childItem,
+        meta,
       })
     },
     deleteItem({ collection, key }) {

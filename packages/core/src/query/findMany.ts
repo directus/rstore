@@ -143,6 +143,7 @@ async function _findMany<
             collection,
             items: writes,
             marker: getMarker('many', marker),
+            meta,
           })
         }
       }

@@ -143,6 +143,7 @@ async function _findFirst<
             key,
             item: result,
             marker: getMarker('first', marker),
+            meta,
           })
         }
       }

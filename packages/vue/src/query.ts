@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, HybridPromise, ResolvedCollection, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, HookMetaQueryTracking, HybridPromise, ResolvedCollection, StoreSchema, WrappedItemBase } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueStore } from './store'
 import { tryOnScopeDispose } from '@vueuse/core'
@@ -72,6 +72,9 @@ export function createQuery<
 
   let fetchPolicy = store.$getFetchPolicy(getOptions()?.fetchPolicy)
 
+  let queryTracking: HookMetaQueryTracking | null = null
+  const queryTrackingEnabled = !store.$isServer && (getOptions()?.experimentalGarbageCollection ?? store.$experimentalGarbageCollection)
+
   const result: Ref<TResult> = shallowRef(toValue(defaultValue))
   const meta = ref<CustomHookMeta>({})
 
@@ -84,27 +87,17 @@ export function createQuery<
 
     if (fetchPolicy !== 'no-cache') {
       const options = getOptions()
-      const cacheResult = cacheMethod(options, meta.value) ?? null
-
-      // Exclude dirty items from cache result
-      if ((options?.experimentalGarbageCollection ?? store.$experimentalGarbageCollection) || (options?.experimentalFilterDirty)) {
+      const result = cacheMethod(options, meta.value) ?? null
+      if (queryTrackingEnabled) {
         const queryId = getQueryId()
-        if (Array.isArray(cacheResult)) {
-          return cacheResult.filter((item: WrappedItem<TCollection, TCollectionDefaults, TSchema>) => item.$layer || !item.$meta.dirtyQueries.has(queryId))
+        if (Array.isArray(result)) {
+          return result.filter((item: WrappedItemBase<TCollection, TCollectionDefaults, TSchema>) => !item.$meta.dirtyQueries.has(queryId))
         }
         else {
-          const item = cacheResult as unknown as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
-          if (item && (!item.$layer && item.$meta.dirtyQueries.has(queryId))) {
-            return undefined
-          }
-          else {
-            return cacheResult
-          }
+          return (result && !(result as unknown as WrappedItemBase<TCollection, TCollectionDefaults, TSchema>).$meta.dirtyQueries.has(queryId)) ? result : null
         }
       }
-      else {
-        return cacheResult
-      }
+      return result
     }
     return result.value
   }) as Ref<TResult>
@@ -122,15 +115,13 @@ export function createQuery<
     _result: result,
   }
 
-  /**
-   * Indicates if a fetch is in progress
-   */
-  let fetching = false
-
   async function load(force: boolean = false) {
     if (!isDisabled()) {
       loading.value = true
       error.value = null
+
+      const newQueryTracking: HookMetaQueryTracking = {}
+      let shouldHandleQueryTracking = true
 
       try {
         const finalOptions: TOptions = getOptions() ?? {} as TOptions
@@ -138,19 +129,34 @@ export function createQuery<
 
         // If fetchPolicy is `cache-and-fetch`, fetch in parallel
         if (!force && fetchPolicy === 'cache-and-fetch') {
+          shouldHandleQueryTracking = false
           fetchMethod({
             ...finalOptions,
             fetchPolicy: 'fetch-only',
-          } as FindOptions<TCollection, TCollectionDefaults, TSchema> as any, meta.value)
+          } as FindOptions<TCollection, TCollectionDefaults, TSchema> as any, {
+            ...meta.value,
+            $queryTracking: queryTrackingEnabled ? newQueryTracking : undefined,
+          }).then(() => {
+            if (queryTrackingEnabled) {
+              handleQueryTracking(newQueryTracking)
+            }
+          })
         }
 
         if (force) {
           finalOptions.fetchPolicy = 'fetch-only'
         }
 
-        fetching = true
+        result.value = await fetchMethod(finalOptions, shouldHandleQueryTracking
+          ? {
+              ...meta.value,
+              $queryTracking: queryTrackingEnabled ? newQueryTracking : undefined,
+            }
+          : meta.value)
 
-        result.value = await fetchMethod(finalOptions, meta.value)
+        if (queryTrackingEnabled && shouldHandleQueryTracking) {
+          handleQueryTracking(newQueryTracking)
+        }
       }
       catch (e: any) {
         error.value = e
@@ -162,6 +168,137 @@ export function createQuery<
     }
 
     return returnObject
+  }
+
+  function handleQueryTracking(newQueryTracking: HookMetaQueryTracking) {
+    const queryId = getQueryId()
+
+    const isResultEmpty = result.value == null || (Array.isArray(result.value) && result.value.length === 0)
+
+    // Init the query tracking object if the result is not empty and there is no previous tracking
+    if (!isResultEmpty && !queryTracking) {
+      const keys = Object.keys(newQueryTracking)
+      const isNewQueryTrackingEmpty = keys.length === 0 || keys.every(k => newQueryTracking[k]!.size === 0)
+
+      if (isNewQueryTrackingEmpty) {
+        const list = (Array.isArray(result.value) ? result.value : [result.value])
+        for (const item of list) {
+          if (item) {
+            addToQueryTracking(newQueryTracking, item)
+          }
+        }
+      }
+
+      {
+        queryTracking = {}
+        const list = Array.isArray(data.value) ? data.value : (data.value ? [data.value] : [])
+        for (const item of list) {
+          if (item) {
+            addToQueryTracking(queryTracking, item)
+          }
+        }
+      }
+
+      function addToQueryTracking(qt: HookMetaQueryTracking, item: WrappedItemBase<TCollection, TCollectionDefaults, TSchema>) {
+        const collection = store.$collections.find(c => c.name === item.$collection)
+        if (!collection) {
+          throw new Error(`Collection ${item.$collection} not found in the store`)
+        }
+        const set = qt![collection.name] ??= new Set()
+        if (set.has(item.$getKey())) {
+          return
+        }
+        set.add(item.$getKey())
+        for (const relationName in collection.relations) {
+          const value = item[relationName as keyof typeof item]
+          if (Array.isArray(value)) {
+            for (const relatedItem of value) {
+              if (relatedItem) {
+                addToQueryTracking(qt, relatedItem as WrappedItemBase<TCollection, TCollectionDefaults, TSchema>)
+              }
+            }
+          }
+        }
+        item.$meta.queries.add(queryId)
+      }
+    }
+
+    // Mark new tracked items as fresh
+    for (const collectionName in newQueryTracking) {
+      const collection = store.$collections.find(c => c.name === collectionName)!
+      const oldKeys = queryTracking?.[collectionName]
+      for (const key of newQueryTracking[collectionName]!) {
+        const item = store.$cache.readItem({
+          collection,
+          key,
+        }) as WrappedItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
+        if (item) {
+          item.$meta.queries.add(queryId)
+          item.$meta.dirtyQueries.delete(queryId)
+          oldKeys?.delete(key)
+        }
+      }
+    }
+
+    // Mark old tracked items as dirty if they are not tracked anymore
+    let hasAddedDirty = false
+    for (const collectionName in queryTracking) {
+      const collection = store.$collections.find(c => c.name === collectionName)!
+      for (const key of queryTracking[collectionName]!) {
+        const item = store.$cache.readItem({
+          collection,
+          key,
+        }) as WrappedItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
+        if (item) {
+          item.$meta.queries.delete(queryId)
+          item.$meta.dirtyQueries.add(queryId)
+
+          hasAddedDirty = true
+
+          // Clean garbage after the dirty items have a change to be removed from other queries
+          // (e.g. after `dataKey.value++` updates the `data` computed property)
+          nextTick(() => {
+            store.$cache.garbageCollectItem({
+              collection,
+              item: item as any,
+            })
+          })
+        }
+      }
+    }
+
+    // Filter out dirty items from the results
+    if (hasAddedDirty) {
+      // Force refresh of the data computed
+      dataKey.value++
+    }
+
+    queryTracking = newQueryTracking
+  }
+
+  // Mark tracked items as dirty on unmount
+  if (queryTrackingEnabled) {
+    tryOnScopeDispose(() => {
+      const queryId = getQueryId()
+      for (const collectionName in queryTracking) {
+        const collection = store.$collections.find(c => c.name === collectionName)!
+        for (const key of queryTracking[collectionName]!) {
+          const item = store.$cache.readItem({
+            collection,
+            key,
+          }) as WrappedItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
+          if (item) {
+            item.$meta.queries.delete(queryId)
+            item.$meta.dirtyQueries.add(queryId)
+
+            store.$cache.garbageCollectItem({
+              collection,
+              item: item as any,
+            })
+          }
+        }
+      }
+    })
   }
 
   // Auto load on options change
@@ -185,103 +322,6 @@ export function createQuery<
   store.$onCacheReset(() => {
     refresh()
   })
-
-  let previousData: TResult | undefined
-
-  if (!store.$isServer) {
-    // Mark items as used in this query or as dirty if they didn't appear in the new result
-    watch([data, result, () => getOptions()], ([_dataValue, resultValue], [oldDataValue, oldResultValue]) => {
-      previousData = oldDataValue
-
-      const queryId = getQueryId()
-
-      // Old result
-      if (Array.isArray(oldResultValue)) {
-        for (const item of oldResultValue as Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>) {
-          item.$meta.queries.delete(queryId)
-          if (fetching && !item.$layer) {
-            item.$meta.dirtyQueries.add(queryId)
-          }
-        }
-      }
-      else {
-        const item = oldResultValue as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
-        item?.$meta.queries.delete(queryId)
-        if (fetching && !item?.$layer) {
-          item?.$meta.dirtyQueries.add(queryId)
-        }
-      }
-
-      // Old cached result
-      if (Array.isArray(oldDataValue)) {
-        for (const item of oldDataValue as Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>) {
-          item.$meta.queries.delete(queryId)
-          if (fetching && !item.$layer) {
-            item.$meta.dirtyQueries.add(queryId)
-          }
-        }
-      }
-      else {
-        const item = oldDataValue as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
-        item?.$meta.queries.delete(queryId)
-        if (fetching && !item?.$layer) {
-          item?.$meta.dirtyQueries.add(queryId)
-        }
-      }
-
-      // New result
-      if (Array.isArray(resultValue)) {
-        for (const item of resultValue as Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>) {
-          item.$meta.queries.add(queryId)
-          item.$meta.dirtyQueries.delete(queryId)
-        }
-      }
-      else {
-        const item = resultValue as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
-        item?.$meta.queries.add(queryId)
-        item?.$meta.dirtyQueries.delete(queryId)
-      }
-
-      fetching = false
-    })
-
-    // Unmark items on unmount
-    tryOnScopeDispose(() => {
-      const queryId = getQueryId()
-      if (Array.isArray(result.value)) {
-        for (const item of result.value as Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>) {
-          item.$meta.queries.delete(queryId)
-        }
-      }
-      else {
-        const item = result.value as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
-        item?.$meta.queries.delete(queryId)
-      }
-    })
-
-    watch(result, () => {
-      // Force recompute of `data`
-      dataKey.value++
-
-      // Garbage collect items
-      if (getOptions()?.experimentalGarbageCollection ?? store.$experimentalGarbageCollection) {
-        // Defer to let other queries mark items as used if needed
-        nextTick(() => {
-          if (Array.isArray(previousData)) {
-            for (const item of previousData as Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>) {
-              store.$cache.garbageCollectItem({ collection, item })
-            }
-          }
-          else {
-            const item = previousData as WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
-            if (item) {
-              store.$cache.garbageCollectItem({ collection, item })
-            }
-          }
-        })
-      }
-    })
-  }
 
   return promise
 }

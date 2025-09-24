@@ -66,7 +66,7 @@ describe('subscribe', () => {
 
   it('should include meta in the context if provided', async () => {
     const callHookSpy = vi.spyOn(mockStore.$hooks, 'callHook')
-    const meta = { custom: 'meta-data' }
+    const meta = { custom: 'meta-data' } as any
 
     await subscribe({
       store: mockStore,

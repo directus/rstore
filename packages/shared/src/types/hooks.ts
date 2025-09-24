@@ -5,9 +5,12 @@ import type { FindOptions } from './query'
 import type { StoreCore } from './store'
 import type { Awaitable, Path, PathValue } from './utils'
 
-// @TODO type generics
+export type HookMetaQueryTracking = Record<string, Set<string | number>>
 
-export interface CustomHookMeta {}
+// @TODO type generics
+export interface CustomHookMeta {
+  $queryTracking?: HookMetaQueryTracking
+}
 
 export interface AbortableOptions {
   /**

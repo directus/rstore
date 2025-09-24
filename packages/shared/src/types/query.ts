@@ -131,13 +131,6 @@ export interface FindOptionsBase<
    * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
    */
   experimentalGarbageCollection?: boolean
-
-  /**
-   * Experimental: Filter out dirty items from the results.
-   *
-   * Items are marked as dirty when they are not returned by a query.
-   */
-  experimentalFilterDirty?: boolean
 }
 
 export type FindFirstOptions<

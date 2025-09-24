@@ -1,4 +1,5 @@
 import type { Collection, CollectionDefaults, CollectionRelation, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from './collection'
+import type { CustomHookMeta } from './hooks'
 import type { WrappedItem } from './item'
 import type { CacheLayer } from './layer'
 import type { Module, ResolvedModuleState } from './module'
@@ -49,6 +50,7 @@ export interface Cache<
     item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
     marker?: string
     fromWriteItems?: boolean
+    meta?: CustomHookMeta
   }) => void
 
   deleteItem: <TCollection extends Collection = Collection>(params: {
@@ -79,6 +81,7 @@ export interface Cache<
      * Marker to consider that the corresponding list was already fetched once.
      */
     marker?: string
+    meta?: CustomHookMeta
   }) => void
 
   writeItemForRelation: <TCollection extends Collection = Collection>(params: {
@@ -86,6 +89,7 @@ export interface Cache<
     relationKey: keyof ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>['relations']
     relation: CollectionRelation
     childItem: any
+    meta?: CustomHookMeta
   }) => void
 
   getModuleState: <TModule extends Module> (name: TModule['name'], key: string, initState: TModule['state']) => ResolvedModuleState<TModule>
