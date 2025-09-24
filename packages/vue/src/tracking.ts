@@ -62,29 +62,6 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
           }
         }
       }
-
-      function addToQueryTracking(qt: HookMetaQueryTracking, item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>) {
-        const collection = store.$collections.find(c => c.name === item.$collection)
-        if (!collection) {
-          throw new Error(`Collection ${item.$collection} not found in the store`)
-        }
-        const set = qt![collection.name] ??= new Set()
-        if (set.has(item.$getKey())) {
-          return
-        }
-        set.add(item.$getKey())
-        for (const relationName in collection.relations) {
-          const value = item[relationName as keyof typeof item]
-          if (Array.isArray(value)) {
-            for (const relatedItem of value) {
-              if (relatedItem) {
-                addToQueryTracking(qt, relatedItem as WrappedItemBase<Collection, CollectionDefaults, StoreSchema>)
-              }
-            }
-          }
-        }
-        item.$meta.queries.add(trackingQueryId)
-      }
     }
 
     // Mark new tracked items as fresh
@@ -167,9 +144,32 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     return obj
   }
 
+  function addToQueryTracking(qt: HookMetaQueryTracking, item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>) {
+    const collection = store.$collections.find(c => c.name === item.$collection)
+    if (!collection) {
+      throw new Error(`Collection ${item.$collection} not found in the store`)
+    }
+    const set = qt![collection.name] ??= new Set()
+    if (set.has(item.$getKey())) {
+      return
+    }
+    set.add(item.$getKey())
+    for (const relationName in collection.relations) {
+      const value = item[relationName as keyof typeof item]
+      if (Array.isArray(value)) {
+        for (const relatedItem of value) {
+          if (relatedItem) {
+            addToQueryTracking(qt, relatedItem as WrappedItemBase<Collection, CollectionDefaults, StoreSchema>)
+          }
+        }
+      }
+    }
+  }
+
   return {
     handleQueryTracking,
     filteredCached,
     createTrackingObject,
+    addToQueryTracking,
   }
 }
