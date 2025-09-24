@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, GlobalStoreType, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
@@ -43,7 +43,7 @@ export function peekFirst<
     let marker = defaultMarker(collection, findOptions)
 
     store.$hooks.callHookSync('beforeCacheReadFirst', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       findOptions,
@@ -76,7 +76,7 @@ export function peekFirst<
     }
 
     store.$hooks.callHookSync('cacheFilterFirst', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       getResult: () => result,

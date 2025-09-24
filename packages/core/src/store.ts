@@ -1,4 +1,4 @@
-import type { Cache, CollectionDefaults, CustomHookMeta, FindOptions, Hooks, MutationSpecialProps, Plugin, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import type { Cache, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, Hooks, MutationSpecialProps, Plugin, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { get, set } from '@rstore/shared'
 import { builtinCollectionHooksPlugin } from './builtin/collectionHooks'
 import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollections } from './collection'
@@ -42,7 +42,7 @@ export async function createStoreCore<
     },
     $processItemParsing(collection, item) {
       store.$hooks.callHookSync('parseItem', {
-        store,
+        store: store as unknown as GlobalStoreType,
         meta: {},
         collection,
         item,
@@ -53,7 +53,7 @@ export async function createStoreCore<
     },
     $processItemSerialization(collection, item) {
       store.$hooks.callHookSync('serializeItem', {
-        store,
+        store: store as unknown as GlobalStoreType,
         meta: {},
         collection,
         item,
@@ -110,7 +110,7 @@ export async function createStoreCore<
   const meta: CustomHookMeta = {}
 
   await store.$hooks.callHook('init', {
-    store,
+    store: store as unknown as GlobalStoreType,
     meta,
   })
 

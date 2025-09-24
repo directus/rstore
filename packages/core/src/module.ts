@@ -1,4 +1,4 @@
-import type { Awaitable, CreateModuleApi, Module, ModuleMutation, ResolvedModule, StoreCore, StoreSchema } from '@rstore/shared'
+import type { Awaitable, CreateModuleApi, GlobalStoreType, Module, ModuleMutation, ResolvedModule, StoreCore, StoreSchema } from '@rstore/shared'
 
 type ResolveCallbacks = Array<() => Awaitable<unknown>>
 
@@ -75,7 +75,7 @@ export function defineModule<
       }
       store.$registeredModules.set(name, resolved)
       onResolve(() => store.$hooks.callHook('moduleResolved', {
-        store,
+        store: store as unknown as GlobalStoreType,
         module: resolved,
       }))
       return resolved

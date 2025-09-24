@@ -1,4 +1,4 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 
 export interface CreateOptions<
@@ -35,7 +35,7 @@ export async function createItem<
   let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | undefined
 
   await store.$hooks.callHook('beforeMutation', {
-    store,
+    store: store as unknown as GlobalStoreType,
     meta,
     collection,
     mutation: 'create',
@@ -80,7 +80,7 @@ export async function createItem<
   try {
     const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('createItem', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       item,
@@ -95,7 +95,7 @@ export async function createItem<
     })
 
     await store.$hooks.callHook('afterMutation', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       mutation: 'create',

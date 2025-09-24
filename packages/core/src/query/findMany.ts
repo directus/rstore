@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FindManyOptions, FindOptions, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem, WriteItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindManyOptions, FindOptions, GlobalStoreType, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem, WriteItem } from '@rstore/shared'
 import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
@@ -81,7 +81,7 @@ async function _findMany<
     }
 
     await store.$hooks.callHook('beforeFetch', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       findOptions,
@@ -93,7 +93,7 @@ async function _findMany<
 
     const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('fetchMany', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       findOptions,
@@ -111,7 +111,7 @@ async function _findMany<
     })
 
     await store.$hooks.callHook('afterFetch', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       findOptions,
@@ -153,7 +153,7 @@ async function _findMany<
   if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
     const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('fetchRelations', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       findOptions: findOptions as FindOptions<TCollection, TCollectionDefaults, TSchema> & { include: NonNullable<FindOptions<TCollection, TCollectionDefaults, TSchema>['include']> },

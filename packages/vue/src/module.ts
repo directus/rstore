@@ -1,4 +1,5 @@
-import type { Awaitable, CreateModuleApi, Module, ResolvedModule } from '@rstore/shared'
+import type { Awaitable, CreateModuleApi, GlobalStoreType, Module, ResolvedModule } from '@rstore/shared'
+import type { VueStore } from './store'
 import { defineModule as _defineModule } from '@rstore/core'
 import { hasInjectionContext } from 'vue'
 import { useStore } from './plugin'
@@ -15,7 +16,7 @@ export function defineModule<
   return (_store) => {
     const hasContext = hasInjectionContext()
 
-    const store = hasContext ? useStore() : _store
+    const store = (hasContext ? useStore() : _store) as VueStore
 
     if (store) {
       // Reuse the module if it was already created
@@ -24,7 +25,7 @@ export function defineModule<
       }
 
       // Create a new module and add it to the global store
-      const module = _defineModule(store, name, cb)()
+      const module = _defineModule(store as unknown as GlobalStoreType, name, cb)()
       store.$modulesCache.set(cb, module)
       return module
     }

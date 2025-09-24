@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 
 export interface UnsubscribeOptions<
   TCollection extends Collection,
@@ -28,7 +28,7 @@ export async function unsubscribe<
   meta ??= {}
 
   await store.$hooks.callHook('unsubscribe', {
-    store,
+    store: store as unknown as GlobalStoreType,
     meta,
     collection,
     subscriptionId,

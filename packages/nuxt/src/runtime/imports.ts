@@ -61,3 +61,10 @@ export type StoreUpdateFormObject<
 export function useStore(): Store {
   return useNuxtApp().$rstore as any
 }
+
+declare module '@rstore/shared' {
+  export interface RstoreGlobal {
+    // eslint-disable-next-line ts/method-signature-style
+    store(): Store
+  }
+}

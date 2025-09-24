@@ -1,4 +1,4 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 
 export interface DeleteOptions<
   TCollection extends Collection,
@@ -35,7 +35,7 @@ export async function deleteItem<
   const meta: CustomHookMeta = {}
 
   await store.$hooks.callHook('beforeMutation', {
-    store,
+    store: store as unknown as GlobalStoreType,
     meta,
     collection,
     mutation: 'delete',
@@ -61,7 +61,7 @@ export async function deleteItem<
   try {
     const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('deleteItem', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       key,
@@ -69,7 +69,7 @@ export async function deleteItem<
     })
 
     await store.$hooks.callHook('afterMutation', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       mutation: 'delete',

@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FindManyOptions, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindManyOptions, GlobalStoreType, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 
@@ -36,7 +36,7 @@ export function peekMany<
     let overrideFilter: ((item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean) | undefined
 
     store.$hooks.callHookSync('beforeCacheReadMany', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       findOptions,
@@ -55,7 +55,7 @@ export function peekMany<
     })
 
     store.$hooks.callHookSync('cacheFilterMany', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       findOptions,

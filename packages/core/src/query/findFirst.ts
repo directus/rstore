@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, FindOptions, QueryResult, ResolvedCollection, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, FindOptions, GlobalStoreType, QueryResult, ResolvedCollection, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
@@ -85,7 +85,7 @@ async function _findFirst<
     }
 
     await store.$hooks.callHook('beforeFetch', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       key: findOptions.key,
@@ -98,7 +98,7 @@ async function _findFirst<
 
     const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('fetchFirst', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       key: findOptions.key,
@@ -117,7 +117,7 @@ async function _findFirst<
     })
 
     await store.$hooks.callHook('afterFetch', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       key: findOptions.key,
@@ -155,7 +155,7 @@ async function _findFirst<
   if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
     const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('fetchRelations', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       key: findOptions.key,

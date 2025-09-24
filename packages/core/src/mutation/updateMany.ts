@@ -1,4 +1,4 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WriteItem } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WriteItem } from '@rstore/shared'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { peekMany } from '../query'
 
@@ -60,7 +60,7 @@ export async function updateMany<
   let itemsWithKey = getItemsWithKey(items)
 
   await store.$hooks.callHook('beforeManyMutation', {
-    store,
+    store: store as unknown as GlobalStoreType,
     meta,
     collection,
     mutation: 'update',
@@ -73,7 +73,7 @@ export async function updateMany<
   let result: Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> = skipCache
     ? []
     : peekMany({
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       findOptions: {
@@ -122,7 +122,7 @@ export async function updateMany<
       aborted = true
     }
     await store.$hooks.callHook('updateMany', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       items: itemsWithKey,
@@ -143,7 +143,7 @@ export async function updateMany<
 
         const abort = store.$hooks.withAbort()
         await store.$hooks.callHook('updateItem', {
-          store,
+          store: store as unknown as GlobalStoreType,
           meta,
           collection,
           key,
@@ -159,7 +159,7 @@ export async function updateMany<
         })
 
         await store.$hooks.callHook('afterMutation', {
-          store,
+          store: store as unknown as GlobalStoreType,
           meta,
           collection,
           mutation: 'update',
@@ -187,7 +187,7 @@ export async function updateMany<
     }
 
     await store.$hooks.callHook('afterManyMutation', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       mutation: 'update',

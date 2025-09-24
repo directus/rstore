@@ -1,8 +1,8 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from './collection'
+import type { GlobalStoreType } from './global'
 import type { CacheLayer } from './layer'
 import type { ResolvedModule } from './module'
 import type { FindOptions } from './query'
-import type { StoreCore } from './store'
 import type { Awaitable, Path, PathValue } from './utils'
 
 export type HookMetaQueryTracking = Record<string, Set<string | number>>
@@ -26,7 +26,7 @@ export interface HookDefinitions<
 > {
   init: (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
     }
   ) => Awaitable<void>
@@ -35,7 +35,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
@@ -49,7 +49,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
@@ -67,7 +67,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
@@ -86,7 +86,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
@@ -102,7 +102,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
@@ -120,7 +120,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
@@ -138,7 +138,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
@@ -155,7 +155,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
@@ -168,7 +168,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
@@ -189,7 +189,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
@@ -201,7 +201,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
@@ -213,7 +213,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
@@ -228,7 +228,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
@@ -243,7 +243,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       keys?: Array<string | number>
@@ -257,7 +257,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       keys?: Array<string | number>
@@ -275,7 +275,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
@@ -295,7 +295,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       items: Array<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>>
@@ -315,7 +315,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key: string | number
@@ -336,7 +336,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       items: Array<{ key: number | string, item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> }>
@@ -356,7 +356,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key: string | number
@@ -374,7 +374,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       keys: Array<string | number>
@@ -389,7 +389,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
@@ -401,7 +401,7 @@ export interface HookDefinitions<
 
   afterCacheReset: (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
     }
   ) => void
@@ -410,7 +410,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       /**
@@ -426,7 +426,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       subscriptionId: string
@@ -437,7 +437,7 @@ export interface HookDefinitions<
 
   moduleResolved: (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       module: ResolvedModule<any, any>
     }
   ) => Awaitable<void>
@@ -446,7 +446,7 @@ export interface HookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key: string | number
       item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
@@ -455,14 +455,14 @@ export interface HookDefinitions<
 
   cacheLayerAdd: (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       layer: CacheLayer
     }
   ) => Awaitable<void>
 
   cacheLayerRemove: (
     payload: {
-      store: StoreCore<TSchema, TCollectionDefaults>
+      store: GlobalStoreType
       layer: CacheLayer
     }
   ) => Awaitable<void>

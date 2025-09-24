@@ -71,7 +71,7 @@ export default defineRstorePlugin({
       if (payload.collection.name === 'DataSource') {
         return
       }
-      const store = useStore()
+      const { store } = payload
       const payloadResult = payload.getResult()
       const items: any[] = Array.isArray(payloadResult) ? payloadResult : [payloadResult]
       await Promise.all(items.map(async (item) => {

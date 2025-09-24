@@ -1,4 +1,4 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WriteItem } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WriteItem } from '@rstore/shared'
 import { pickNonSpecialProps } from '@rstore/shared'
 
 export interface CreateManyOptions<
@@ -37,7 +37,7 @@ export async function createMany<
   let result: Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> = []
 
   await store.$hooks.callHook('beforeManyMutation', {
-    store,
+    store: store as unknown as GlobalStoreType,
     meta,
     collection,
     mutation: 'create',
@@ -87,7 +87,7 @@ export async function createMany<
       aborted = true
     }
     await store.$hooks.callHook('createMany', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       items,
@@ -107,7 +107,7 @@ export async function createMany<
         let singleResult: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | undefined
         const abort = store.$hooks.withAbort()
         await store.$hooks.callHook('createItem', {
-          store,
+          store: store as unknown as GlobalStoreType,
           meta,
           collection,
           item,
@@ -122,7 +122,7 @@ export async function createMany<
         })
 
         await store.$hooks.callHook('afterMutation', {
-          store,
+          store: store as unknown as GlobalStoreType,
           meta,
           collection,
           mutation: 'create',
@@ -140,7 +140,7 @@ export async function createMany<
     }
 
     await store.$hooks.callHook('afterManyMutation', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       mutation: 'create',

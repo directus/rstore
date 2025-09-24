@@ -1,4 +1,4 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 import { peekFirst } from '../query'
 
@@ -52,7 +52,7 @@ export async function updateItem<
   store.$processItemSerialization(collection, item)
 
   await store.$hooks.callHook('beforeMutation', {
-    store,
+    store: store as unknown as GlobalStoreType,
     meta,
     collection,
     mutation: 'update',
@@ -69,7 +69,7 @@ export async function updateItem<
   let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null = skipCache
     ? null
     : peekFirst({
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       findOptions: {
@@ -105,7 +105,7 @@ export async function updateItem<
   try {
     const abort = store.$hooks.withAbort()
     await store.$hooks.callHook('updateItem', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       key,
@@ -121,7 +121,7 @@ export async function updateItem<
     })
 
     await store.$hooks.callHook('afterMutation', {
-      store,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       mutation: 'update',
