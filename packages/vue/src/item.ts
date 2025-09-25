@@ -1,7 +1,7 @@
-import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions, WrappedItemUpdateOptions } from '@rstore/shared'
 import type { VueCollectionApi } from './api'
 import type { VueStore } from './store'
 import { peekFirst, peekMany, type UpdateOptions } from '@rstore/core'
+import { cloneInfo, type Collection, type CollectionDefaults, type ResolvedCollection, type ResolvedCollectionItem, type StandardSchemaV1, type StoreSchema, type WrappedItem, type WrappedItemBase, type WrappedItemUpdateFormOptions, type WrappedItemUpdateOptions } from '@rstore/shared'
 import { markRaw, nextTick, type Ref } from 'vue'
 
 export interface WrapItemOptions<
@@ -170,13 +170,37 @@ export function wrapItem<
       throw new Error('Items are read-only. Use `item.$updateForm()` to update the item.')
     },
 
-    ownKeys: () => Reflect.ownKeys(item.value),
+    ownKeys: () => cloneInfo.cloning
+      ? Reflect.ownKeys(item.value)
+      : [
+          ...Reflect.ownKeys(item.value),
+          ...Object.keys(collection.computed),
+          ...Object.keys(collection.relations),
+        ],
 
-    has: (_target, key) => Reflect.has(item.value, key),
+    has: (_target, key) => Reflect.has(item.value, key) || (
+      !cloneInfo.cloning && (
+        key in collection.computed
+        || key in collection.relations
+      )
+    ),
 
-    getOwnPropertyDescriptor: (_target, key) => Reflect.getOwnPropertyDescriptor(item.value, key),
+    getOwnPropertyDescriptor: (_target, key) => {
+      if (!cloneInfo.cloning && (key in collection.computed || key in collection.relations)) {
+        return {
+          enumerable: true,
+          configurable: true,
+        }
+      }
+      return Reflect.getOwnPropertyDescriptor(item.value, key)
+    },
 
-    defineProperty: (_target, property, attributes) => Reflect.defineProperty(item.value, property, attributes),
+    defineProperty: (_target, property, attributes) => {
+      if (property in collection.computed || property in collection.relations) {
+        throw new Error(`Cannot define property ${String(property)} because it is a computed property or a relation`)
+      }
+      return Reflect.defineProperty(item.value, property, attributes)
+    },
 
     deleteProperty: () => {
       throw new Error('Items are read-only. Use `item.$delete()` to delete the item.')
