@@ -21,6 +21,7 @@ export {
   addCollection,
   createStore,
   removeCollection,
+  setActiveStore,
 } from './store'
 
 export type {
