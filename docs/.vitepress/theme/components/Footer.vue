@@ -15,7 +15,6 @@ const { hasSidebar } = useSidebar()
       <a href="https://directus.io" target="_blank" class="flex items-center justify-center gap-2 mt-4 text-sm !no-underline hover:!underline">
         <img src="/directus-black.svg" alt="directus logo" class="dark:!hidden size-8">
         <img src="/directus.svg" alt="directus logo" class="not-dark:!hidden size-8">
-        <span>Backed by Directus</span>
       </a>
     </div>
   </footer>

@@ -61,7 +61,7 @@ const heroHover = ref(false)
 
     <!-- Logo -->
 
-    <div class="flex flex-col items-center py-12 gap-4 relative">
+    <div class="flex flex-col items-center py-2 gap-4 relative">
       <div class="p-12 rounded-full bg-radial from-(--vp-c-bg) via-(--vp-c-bg) via-30% to-transparent">
         <div class="block size-[400px]">
           <img src="/LogoTextHorizontalBlack.svg" alt="rstore logo" class="!size-full dark:!hidden">
@@ -71,46 +71,9 @@ const heroHover = ref(false)
     </div>
   </div>
 
-  <!-- Directus powered by rstore -->
-  <div class="flex flex-col items-center gap-4 -mt-24">
-    <div class="relative group">
-      <div class="absolute bottom-[calc(100%-2px)] h-32 w-1 bg-gradient-to-b from-transparent to-[#b175eb] left-11.5">
-        <div
-          v-for="i in 6"
-          :key="i"
-          class="absolute top-0 left-0 w-full h-full animate-pipe-down"
-          :style="{
-            animationDelay: `-${i * 0.5}s`,
-          }"
-        >
-          <div class="absolute top-0 size-1 bg-(--c-brand) dark:shadow-[0_0_12px_var(--vp-c-brand-1),0_0_4px_var(--vp-c-brand-1)]" />
-        </div>
-      </div>
-      <div
-        v-for="i in 3"
-        :key="i"
-        class="absolute border-5 border-[#b175eb] rounded-full blur-xs inset-0 animate-grow-fade transition-all duration-300 ease-in-out group-hover:scale-120"
-        :style="{
-          animationDelay: `-${i}s`,
-        }"
-      />
-      <a href="https://directus.io" target="_blank" class="block relative transition-all duration-300 ease-in-out group-hover:scale-150">
-        <img src="/directus-logo.svg" alt="directus logo" class="size-24 rounded-full">
-      </a>
-
-      <div class="pointer-events-none absolute -inset-8 opacity-0 scale-50 group-hover:opacity-100 group-hover:scale-100 transition-all duration-300 ease-in-out">
-        <div class="text-center bg-[#b175eb] size-full rounded-full flex flex-col items-center justify-center p-4 leading-none text-black tracking-tight">
-          <img src="/directus-black.svg" alt="directus logo" class="size-10 mb-2">
-          <div><b class="text-xl">Directus</b></div>
-          <div>powered by<br><b>rstore</b></div>
-        </div>
-      </div>
-    </div>
-  </div>
-
   <!-- Tag line -->
 
-  <div class="mt-24 mb-12 flex flex-col items-center gap-4">
+  <div class="mb-12 flex flex-col items-center gap-4">
     <h1 class="text-center">
       <span class="name clip text-6xl font-extrabold">
         The Reactive Data Store
