@@ -37,11 +37,3 @@ Define a data collection and then run queries or execute mutations (create, upda
 - **Nuxt module** with devtools
 
 ![Devtools screenshot](./docs/guide/img/nuxt-devtools2.png)
-
-<p align="center">
-  <span>Backed by</span>
-  <br>
-  <a href="https://directus.io">
-    <img src="https://github.com/Akryum/rstore/blob/main/img/directus-logo-stacked.png?raw=true" alt="Directus" width="100px" height="100px">
-  </a>
-</p>
