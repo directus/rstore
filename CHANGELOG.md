@@ -1,6 +1,39 @@
 # Changelog
 
 
+## v0.7.5
+
+[compare changes](https://github.com/directus/rstore/compare/v0.7.4...v0.7.5)
+
+### 🚀 Enhancements
+
+- New garbage collector ([2378647](https://github.com/directus/rstore/commit/2378647))
+- Expose useQueryTracking ([42865ff](https://github.com/directus/rstore/commit/42865ff))
+- Allow passing meta to find options ([ed8e3d0](https://github.com/directus/rstore/commit/ed8e3d0))
+- AddToQueryTracking ([cdfc3f8](https://github.com/directus/rstore/commit/cdfc3f8))
+
+### 🩹 Fixes
+
+- **devtools:** Cache count per collection not working if no layer is selected ([2a157a3](https://github.com/directus/rstore/commit/2a157a3))
+- More stable tracking query id ([b1d8ae1](https://github.com/directus/rstore/commit/b1d8ae1))
+- Enumerate relations and computed so watch deep works ([b737d9a](https://github.com/directus/rstore/commit/b737d9a))
+- Export setActiveStore ([3484a28](https://github.com/directus/rstore/commit/3484a28))
+
+### 📖 Documentation
+
+- Tweak branding ([5d9d988](https://github.com/directus/rstore/commit/5d9d988))
+- Update other readme as well ([b02bfdc](https://github.com/directus/rstore/commit/b02bfdc))
+- Fix typo in schema ([a9939e2](https://github.com/directus/rstore/commit/a9939e2))
+
+### 🌊 Types
+
+- New RstoreGlobal augmentable interface to apply custom store types to plugin hooks etc. ([0bc5706](https://github.com/directus/rstore/commit/0bc5706))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+- Rijk Van Zanten ([@rijkvanzanten](http://github.com/rijkvanzanten))
+
 ## v0.7.4
 
 [compare changes](https://github.com/directus/rstore/compare/v0.7.3...v0.7.4)
