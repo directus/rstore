@@ -155,9 +155,12 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
   }
 
   function addToQueryTracking(qt: HookMetaQueryTracking, item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>) {
+    if (!item.$collection) {
+      return
+    }
     const collection = store.$collections.find(c => c.name === item.$collection)
     if (!collection) {
-      throw new Error(`Collection ${item.$collection} not found in the store`)
+      return
     }
     const set = qt!.items[collection.name] ??= new Set()
     if (set.has(item.$getKey())) {
