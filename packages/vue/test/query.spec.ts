@@ -260,8 +260,8 @@ describe('createQuery', () => {
       const m = meta as CustomHookMeta
       const qt = m.$queryTracking!
       for (const item of fetchResult) {
-        qt[mockCollection.name] ??= new Set()
-        qt[mockCollection.name]!.add(mockCollection.getKey(item))
+        qt.items[mockCollection.name] ??= new Set()
+        qt.items[mockCollection.name]!.add(mockCollection.getKey(item))
       }
       return fetchResult.map(item => mockStore.$cache.wrapItem({ collection: mockCollection, item }))
     })

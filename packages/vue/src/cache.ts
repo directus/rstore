@@ -307,8 +307,8 @@ export function createCache<
       }
 
       if (meta?.$queryTracking) {
-        meta.$queryTracking[collection.name] ??= new Set()
-        meta.$queryTracking[collection.name]!.add(key)
+        meta.$queryTracking.items[collection.name] ??= new Set()
+        meta.$queryTracking.items[collection.name]!.add(key)
       }
 
       if (!fromWriteItems) {

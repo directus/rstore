@@ -153,6 +153,9 @@ async function _findMany<
       }
     }
   }
+  else if (meta.$queryTracking) {
+    meta.$queryTracking.skipped = true
+  }
 
   if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
     const abort = store.$hooks.withAbort()

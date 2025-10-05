@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, HookMetaQueryTracking, HybridPromise, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, HybridPromise, StoreSchema } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueStore } from './store'
 import { computed, ref, shallowRef, toValue, watch } from 'vue'
@@ -103,7 +103,7 @@ export function createQuery<
       loading.value = true
       error.value = null
 
-      const newQueryTracking: HookMetaQueryTracking = {}
+      const newQueryTracking = queryTracking?.createTrackingObject()
       let shouldHandleQueryTracking = true
 
       try {
@@ -113,14 +113,17 @@ export function createQuery<
         // If fetchPolicy is `cache-and-fetch`, fetch in parallel
         if (!force && fetchPolicy === 'cache-and-fetch') {
           shouldHandleQueryTracking = false
+          const newQueryTracking2 = queryTracking?.createTrackingObject()
           fetchMethod({
             ...finalOptions,
             fetchPolicy: 'fetch-only',
           } as FindOptions<TCollection, TCollectionDefaults, TSchema> as any, {
             ...meta.value,
-            $queryTracking: queryTrackingEnabled ? newQueryTracking : undefined,
+            $queryTracking: queryTrackingEnabled ? newQueryTracking2 : undefined,
           }).then(() => {
-            queryTracking?.handleQueryTracking(newQueryTracking)
+            if (queryTracking && newQueryTracking2) {
+              queryTracking.handleQueryTracking(newQueryTracking2)
+            }
           })
         }
 
@@ -135,8 +138,8 @@ export function createQuery<
             }
           : meta.value)
 
-        if (queryTrackingEnabled && shouldHandleQueryTracking) {
-          queryTracking?.handleQueryTracking(newQueryTracking)
+        if (queryTrackingEnabled && shouldHandleQueryTracking && queryTracking && newQueryTracking) {
+          queryTracking.handleQueryTracking(newQueryTracking)
         }
       }
       catch (e: any) {

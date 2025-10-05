@@ -5,7 +5,10 @@ import type { ResolvedModule } from './module'
 import type { FindOptions } from './query'
 import type { Awaitable, Path, PathValue } from './utils'
 
-export type HookMetaQueryTracking = Record<string, Set<string | number>>
+export interface HookMetaQueryTracking {
+  items: Record<string, Set<string | number>>
+  skipped?: boolean
+}
 
 // @TODO type generics
 export interface CustomHookMeta {

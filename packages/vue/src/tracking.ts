@@ -35,14 +35,18 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
   })
 
   function handleQueryTracking(newQueryTracking: HookMetaQueryTracking, result?: TResult) {
+    if (newQueryTracking.skipped) {
+      return
+    }
+
     const _result = result ?? toValue(options.result)
 
     const isResultEmpty = _result == null || (Array.isArray(_result) && _result.length === 0)
 
     // Init the query tracking object if the result is not empty and there is no previous tracking
     if (!isResultEmpty && !queryTracking) {
-      const keys = Object.keys(newQueryTracking)
-      const isNewQueryTrackingEmpty = keys.length === 0 || keys.every(k => newQueryTracking[k]!.size === 0)
+      const keys = Object.keys(newQueryTracking.items)
+      const isNewQueryTrackingEmpty = keys.length === 0 || keys.every(k => newQueryTracking.items[k]!.size === 0)
 
       if (isNewQueryTrackingEmpty) {
         const list = (Array.isArray(_result) ? _result : [_result])
@@ -54,7 +58,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
       }
 
       {
-        queryTracking = {}
+        queryTracking = createTrackingObject()
         const list = Array.isArray(filteredCached.value) ? filteredCached.value : (filteredCached.value ? [filteredCached.value] : [])
         for (const item of list) {
           if (item) {
@@ -65,10 +69,10 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     }
 
     // Mark new tracked items as fresh
-    for (const collectionName in newQueryTracking) {
+    for (const collectionName in newQueryTracking.items) {
       const collection = store.$collections.find(c => c.name === collectionName)!
-      const oldKeys = queryTracking?.[collectionName]
-      for (const key of newQueryTracking[collectionName]!) {
+      const oldKeys = queryTracking?.items[collectionName]
+      for (const key of newQueryTracking.items[collectionName]!) {
         const item = store.$cache.readItem({
           collection,
           key,
@@ -83,27 +87,29 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
 
     // Mark old tracked items as dirty if they are not tracked anymore
     let hasAddedDirty = false
-    for (const collectionName in queryTracking) {
-      const collection = store.$collections.find(c => c.name === collectionName)!
-      for (const key of queryTracking[collectionName]!) {
-        const item = store.$cache.readItem({
-          collection,
-          key,
-        }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
-        if (item) {
-          item.$meta.queries.delete(trackingQueryId)
-          item.$meta.dirtyQueries.add(trackingQueryId)
+    if (queryTracking) {
+      for (const collectionName in queryTracking.items) {
+        const collection = store.$collections.find(c => c.name === collectionName)!
+        for (const key of queryTracking.items[collectionName]!) {
+          const item = store.$cache.readItem({
+            collection,
+            key,
+          }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
+          if (item) {
+            item.$meta.queries.delete(trackingQueryId)
+            item.$meta.dirtyQueries.add(trackingQueryId)
 
-          hasAddedDirty = true
+            hasAddedDirty = true
 
-          // Clean garbage after the dirty items have a change to be removed from other queries
-          // (e.g. after `dataKey.value++` updates the `cached` computed property)
-          nextTick(() => {
-            store.$cache.garbageCollectItem({
-              collection,
-              item: item as any,
+            // Clean garbage after the dirty items have a change to be removed from other queries
+            // (e.g. after `dataKey.value++` updates the `cached` computed property)
+            nextTick(() => {
+              store.$cache.garbageCollectItem({
+                collection,
+                item: item as any,
+              })
             })
-          })
+          }
         }
       }
     }
@@ -119,28 +125,32 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
 
   // Mark tracked items as dirty on unmount
   tryOnScopeDispose(() => {
-    for (const collectionName in queryTracking) {
-      const collection = store.$collections.find(c => c.name === collectionName)!
-      for (const key of queryTracking[collectionName]!) {
-        const item = store.$cache.readItem({
-          collection,
-          key,
-        }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
-        if (item) {
-          item.$meta.queries.delete(trackingQueryId)
-          item.$meta.dirtyQueries.add(trackingQueryId)
-
-          store.$cache.garbageCollectItem({
+    if (queryTracking) {
+      for (const collectionName in queryTracking.items) {
+        const collection = store.$collections.find(c => c.name === collectionName)!
+        for (const key of queryTracking.items[collectionName]!) {
+          const item = store.$cache.readItem({
             collection,
-            item: item as any,
-          })
+            key,
+          }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
+          if (item) {
+            item.$meta.queries.delete(trackingQueryId)
+            item.$meta.dirtyQueries.add(trackingQueryId)
+
+            store.$cache.garbageCollectItem({
+              collection,
+              item: item as any,
+            })
+          }
         }
       }
     }
   })
 
   function createTrackingObject(): HookMetaQueryTracking {
-    const obj: HookMetaQueryTracking = {}
+    const obj: HookMetaQueryTracking = {
+      items: {},
+    }
     return obj
   }
 
@@ -149,7 +159,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     if (!collection) {
       throw new Error(`Collection ${item.$collection} not found in the store`)
     }
-    const set = qt![collection.name] ??= new Set()
+    const set = qt!.items[collection.name] ??= new Set()
     if (set.has(item.$getKey())) {
       return
     }
