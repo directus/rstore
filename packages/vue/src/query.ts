@@ -63,7 +63,11 @@ export function createQuery<
 
   let fetchPolicy = store.$getFetchPolicy(getOptions()?.fetchPolicy)
 
-  const queryTrackingEnabled = !store.$isServer && fetchPolicy !== 'no-cache' && (getOptions()?.experimentalGarbageCollection ?? store.$experimentalGarbageCollection)
+  const queryTrackingEnabled = !store.$isServer && fetchPolicy !== 'no-cache' && (
+    store.$experimentalGarbageCollection
+      ? getOptions()?.experimentalGarbageCollection !== false
+      : getOptions()?.experimentalGarbageCollection === true
+  )
 
   const result: Ref<TResult> = shallowRef(toValue(defaultValue))
   const meta = ref<CustomHookMeta>({})
