@@ -1,6 +1,20 @@
 # Changelog
 
 
+## v0.7.6
+
+[compare changes](https://github.com/directus/rstore/compare/v0.7.5...v0.7.6)
+
+### 🩹 Fixes
+
+- **gc:** Handle fetch skipped ([abd8609](https://github.com/directus/rstore/commit/abd8609))
+- Improve experimentalGarbageCollection query option ([c66df81](https://github.com/directus/rstore/commit/c66df81))
+- **gc:** Handle non wrapped items ([73dda4c](https://github.com/directus/rstore/commit/73dda4c))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.7.5
 
 [compare changes](https://github.com/directus/rstore/compare/v0.7.4...v0.7.5)
