@@ -1,6 +1,6 @@
 import type { VueStore } from './store'
 import { type Cache, type CacheLayer, type Collection, type CollectionDefaults, pickNonSpecialProps, type ResolvedCollection, type ResolvedCollectionItem, type ResolvedCollectionItemBase, type StoreSchema, type WrappedItem } from '@rstore/shared'
-import { computed, ref, toRaw } from 'vue'
+import { computed, ref, shallowRef, toRaw } from 'vue'
 import { wrapItem, type WrappedItemMetadata } from './item'
 
 export interface CreateCacheOptions<
@@ -53,10 +53,24 @@ export function createCache<
   function getWrappedItem<TCollection extends Collection>(
     collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>,
     item: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null | undefined,
+    noCache = false,
   ): WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined {
     if (!item) {
       return undefined
     }
+
+    if (noCache) {
+      return wrapItem({
+        store: getStore(),
+        collection,
+        item: shallowRef(item),
+        metadata: {
+          queries: new Set(),
+          dirtyQueries: new Set(),
+        },
+      })
+    }
+
     const key = getItemKey(collection, item)
     const layer = item.$layer as CacheLayer | undefined
     const wrapKey = getItemWrapKey(collection, key, layer)
@@ -189,8 +203,8 @@ export function createCache<
   }
 
   return {
-    wrapItem({ collection, item }) {
-      return getWrappedItem(collection, item)!
+    wrapItem({ collection, item, noCache }) {
+      return getWrappedItem(collection, item, noCache)!
     },
     readItem({ collection, key }) {
       return getWrappedItem(collection, getStateForCollection(collection.name)[key])

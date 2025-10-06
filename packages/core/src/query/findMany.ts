@@ -171,7 +171,11 @@ async function _findMany<
   }
 
   if (result?.length) {
-    result = result.map((item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => store.$cache.wrapItem({ collection, item }))
+    result = result.map((item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => store.$cache.wrapItem({
+      collection,
+      item,
+      noCache: fetchPolicy === 'no-cache',
+    }))
   }
 
   return {

@@ -174,6 +174,10 @@ async function _findFirst<
     })
   }
 
+  if (result) {
+    result = store.$cache.wrapItem({ collection, item: result, noCache: fetchPolicy === 'no-cache' })
+  }
+
   return {
     result,
     marker,

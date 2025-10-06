@@ -107,6 +107,7 @@ export interface Cache<
   wrapItem: <TCollection extends Collection = Collection>(params: {
     collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
     item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
+    noCache?: boolean
   }) => WrappedItem<TCollection, TCollectionDefaults, TSchema>
 
   garbageCollectItem: <TCollection extends Collection = Collection>(params: {
