@@ -1,3 +1,4 @@
+import type { RelationalQueryBuilder } from 'drizzle-orm/pg-core/query-builders/query'
 import { and } from 'drizzle-orm'
 import { defineEventHandler, getQuery, getRouterParams } from 'h3'
 import { getDrizzleKeyWhere, getDrizzleTableFromCollection, rstoreUseDrizzle } from '../../utils'
@@ -33,11 +34,18 @@ export default defineEventHandler(async (event) => {
     })
   }
 
-  await rstoreUseDrizzle().delete(table as any).where(and(
+  const db = rstoreUseDrizzle()
+
+  const dbQuery = db.query as unknown as Record<string, RelationalQueryBuilder<any, any>>
+  let result: any = await dbQuery[collectionName]!.findFirst({
+    where: and(
+      ...whereConditions,
+    ),
+  })
+
+  await db.delete(table as any).where(and(
     ...whereConditions,
   ))
-
-  let result: any = null
 
   await rstoreDrizzleHooks.callHook('item.delete.after', {
     event,
