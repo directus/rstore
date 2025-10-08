@@ -95,8 +95,11 @@ You can define hooks on the collection that will be called at different stages o
 - `fetchFirst`: fetch a single item by its key or by other parameters
 - `fetchMany`: fetch multiple items
 - `create`: create a new item
+- `createMany`: create multiple new items
 - `update`: update an existing item
+- `updateMany`: update multiple existing items
 - `delete`: delete an item
+- `deleteMany`: delete multiple items
 
 ::: tip
 Instead of defining the hooks in the collection, you can also create a plugin to handle the fetching logic for many collections at once and with a larger choice of hooks (see [Plugins](../plugin/setup.md)).
@@ -112,11 +115,17 @@ Each hook receives a payload object with the following properties:
   - `include` (optional): dictionnary of related items to include (see [Relations](./relations.md))
 - `create`:
   - `item`: the item to create
+- `createMany`:
+  - `items`: the items to create
 - `update`:
   - `key`: the key of the item to update
   - `item`: the partial item to update
+- `updateMany`:
+  - `items`: array of items to update
 - `delete`:
   - `key`: the key of the item to delete
+- `deleteMany`:
+  - `keys`: array of keys of the items to delete
 
 ::: code-group
 

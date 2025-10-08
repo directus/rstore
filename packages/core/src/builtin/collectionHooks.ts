@@ -36,6 +36,13 @@ export const builtinCollectionHooksPlugin = definePlugin({
       }
     })
 
+    hook('createMany', async ({ collection, items, setResult, abort }) => {
+      if (collection.hooks?.createMany) {
+        abort()
+        setResult(await collection.hooks.createMany({ items }))
+      }
+    })
+
     hook('updateItem', async ({ collection, key, item, setResult, abort }) => {
       if (collection.hooks?.update) {
         abort()
@@ -43,10 +50,24 @@ export const builtinCollectionHooksPlugin = definePlugin({
       }
     })
 
+    hook('updateMany', async ({ collection, items, setResult, abort }) => {
+      if (collection.hooks?.updateMany) {
+        abort()
+        setResult(await collection.hooks.updateMany({ items }))
+      }
+    })
+
     hook('deleteItem', async ({ collection, key, abort }) => {
       if (collection.hooks?.delete) {
         abort()
         await collection.hooks.delete({ key })
+      }
+    })
+
+    hook('deleteMany', async ({ collection, keys, abort }) => {
+      if (collection.hooks?.deleteMany) {
+        abort()
+        await collection.hooks.deleteMany({ keys })
       }
     })
   },
