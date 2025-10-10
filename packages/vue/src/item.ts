@@ -172,11 +172,11 @@ export function wrapItem<
 
     ownKeys: () => cloneInfo.cloning
       ? Reflect.ownKeys(item.value)
-      : [
+      : Array.from(new Set([
           ...Reflect.ownKeys(item.value),
           ...Object.keys(collection.computed),
           ...Object.keys(collection.relations),
-        ],
+        ])),
 
     has: (_target, key) => Reflect.has(item.value, key) || (
       !cloneInfo.cloning && (
