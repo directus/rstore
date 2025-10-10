@@ -1,6 +1,6 @@
 import type { VueStore } from './store'
 import { type Cache, type CacheLayer, type Collection, type CollectionDefaults, pickNonSpecialProps, type ResolvedCollection, type ResolvedCollectionItem, type ResolvedCollectionItemBase, type StoreSchema, type WrappedItem } from '@rstore/shared'
-import { computed, ref, shallowRef, toRaw } from 'vue'
+import { computed, ref, shallowRef, toValue } from 'vue'
 import { wrapItem, type WrappedItemMetadata } from './item'
 
 export interface CreateCacheOptions<
@@ -304,16 +304,14 @@ export function createCache<
 
         const existing = itemsForType[key]
         if (!existing) {
-          itemsForType[key] = data
+          // Disable deep reactivity tracking inside the `data` object
+          itemsForType[key] = shallowRef(data)
         }
-        else if (Object.isFrozen(existing)) {
+        else {
           itemsForType[key] = {
             ...existing,
             ...data,
           }
-        }
-        else {
-          Object.assign(existing, data)
         }
       }
       if (marker) {
@@ -383,10 +381,45 @@ export function createCache<
       return state.value[cacheKey]
     },
     getState() {
-      return toRaw(state.value)
+      const result: Record<string, any> = {}
+
+      for (const collectionName in state.value) {
+        if (collectionName.startsWith('_') || collectionName.startsWith('$')) {
+          result[collectionName] = state.value[collectionName]
+          continue
+        }
+        result[collectionName] = {}
+        const itemsForType = getStateForCollection(collectionName)
+        for (const key in itemsForType) {
+          const item = itemsForType[key]
+          if (item) {
+            result[collectionName][key] = toValue(item)
+          }
+        }
+      }
+
+      return result
     },
     setState(value) {
-      state.value = value
+      const newState = {} as Record<string, any>
+
+      // Process incoming state
+      for (const collectionName in value) {
+        if (collectionName.startsWith('_') || collectionName.startsWith('$')) {
+          newState[collectionName] = value[collectionName as keyof typeof value]
+          continue
+        }
+        const incomingCollectionState = value[collectionName as keyof typeof value] as Record<string | number, any>
+        const collectionState = newState[collectionName] = {} as Record<string | number, any>
+        for (const key in incomingCollectionState) {
+          const item = incomingCollectionState[key]
+          if (item) {
+            collectionState[key] = Object.isFrozen(item) ? item : shallowRef(item)
+          }
+        }
+      }
+
+      state.value = newState
       wrappedItems.clear()
       wrappedItemsMetadata.clear()
 
