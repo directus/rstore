@@ -88,6 +88,9 @@ export function wrapItem<
 
         case '$meta':
           return metadata
+
+        case 'toJSON':
+          return () => item.value
       }
 
       // Resolve computed properties
