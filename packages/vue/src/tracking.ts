@@ -136,11 +136,6 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
           if (item) {
             item.$meta.queries.delete(trackingQueryId)
             item.$meta.dirtyQueries.add(trackingQueryId)
-
-            store.$cache.garbageCollectItem({
-              collection,
-              item: item as any,
-            })
           }
         }
       }
