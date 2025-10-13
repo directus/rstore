@@ -51,7 +51,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Introspect the collections
     let directusCollections = await directus.request(readCollections()) as Array<DirectusCollection>
-    directusCollections = directusCollections.filter(collection => !collection.meta.hidden && !collection.meta.singleton)
+    directusCollections = directusCollections.filter(collection => !collection.meta.hidden && !collection.meta.singleton && !!collection.schema)
 
     // TODO support singleton collections
 
