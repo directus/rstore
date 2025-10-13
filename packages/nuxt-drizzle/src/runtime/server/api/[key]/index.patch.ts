@@ -42,16 +42,16 @@ export default defineEventHandler(async (event) => {
   let result: any
 
   const dialect = getDrizzleDialect()
-  if (dialect === 'pg' || dialect === 'sqlite') {
-    const _result = await q.returning()
-    result = _result[0]
-  }
-  else {
+  if (dialect === 'mysql' || dialect === 'singlestore') {
     await q
     const select = await rstoreUseDrizzle().select().from(table as any).where(and(
       ...whereConditions,
     )).limit(1)
     result = select[0]
+  }
+  else {
+    const _result = await q.returning()
+    result = _result[0]
   }
 
   await rstoreDrizzleHooks.callHook('item.patch.after', {

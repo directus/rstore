@@ -1,11 +1,13 @@
 import type { CustomCollectionMeta } from '@rstore/vue'
-import type { Column, Dialect, Table } from 'drizzle-orm'
+import type { Column, Table } from 'drizzle-orm'
 import type { PgDatabase } from 'drizzle-orm/pg-core'
 import type { RstoreDrizzleCondition } from '../../utils/types'
 // @ts-expect-error virtual file
 import { collectionMetas, dialect, tables, useDrizzles } from '$rstore-drizzle-server-utils.js'
 import * as drizzle from 'drizzle-orm'
 import { createError } from 'h3'
+
+export type Dialect = 'postgresql' | 'mysql' | 'singlestore' | 'sqlite' | 'gel' | 'turso'
 
 export interface RstoreDrizzleQueryParams {
   where?: string

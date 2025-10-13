@@ -29,11 +29,7 @@ export default defineEventHandler(async (event) => {
   let result: any
 
   const dialect = getDrizzleDialect()
-  if (dialect === 'pg' || dialect === 'sqlite') {
-    const _result = await q.returning()
-    result = _result[0]
-  }
-  else if (dialect === 'mysql' || dialect === 'singlestore') {
+  if (dialect === 'mysql' || dialect === 'singlestore') {
     // @ts-expect-error specific to mysql
     const _result = await q.$returningId()
     const primaryKey = _result[0]
@@ -43,6 +39,10 @@ export default defineEventHandler(async (event) => {
       }),
     )).limit(1)
     result = select[0]
+  }
+  else {
+    const _result = await q.returning()
+    result = _result[0]
   }
 
   await rstoreDrizzleHooks.callHook('index.post.after', {
