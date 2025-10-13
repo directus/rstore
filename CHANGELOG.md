@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.7.7
+
+[compare changes](https://github.com/directus/rstore/compare/v0.7.6...v0.7.7)
+
+### 🚀 Enhancements
+
+- Many mutations added to collection hooks ([9c229a1](https://github.com/directus/rstore/commit/9c229a1))
+- **drizzle:** Return deleted item ([95c0391](https://github.com/directus/rstore/commit/95c0391))
+
+### 🔥 Performance
+
+- Shallow items in the cache ([3c0b535](https://github.com/directus/rstore/commit/3c0b535))
+
+### 🩹 Fixes
+
+- Improve item wrapping for fetchPolicy 'no-cache' ([d0fbe6e](https://github.com/directus/rstore/commit/d0fbe6e))
+- Deduplicate wrapped items ownKeys ([4673a1f](https://github.com/directus/rstore/commit/4673a1f))
+- Handle JSON stringifying wrapped items ([d0158f3](https://github.com/directus/rstore/commit/d0158f3))
+- **gc:** Don't run a garbage collection on query unmount ([f180d31](https://github.com/directus/rstore/commit/f180d31))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.7.6
 
 [compare changes](https://github.com/directus/rstore/compare/v0.7.5...v0.7.6)
