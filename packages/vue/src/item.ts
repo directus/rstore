@@ -2,7 +2,7 @@ import type { VueCollectionApi } from './api'
 import type { VueStore } from './store'
 import { peekFirst, peekMany, type UpdateOptions } from '@rstore/core'
 import { cloneInfo, type Collection, type CollectionDefaults, type ResolvedCollection, type ResolvedCollectionItem, type StandardSchemaV1, type StoreSchema, type WrappedItem, type WrappedItemBase, type WrappedItemUpdateFormOptions, type WrappedItemUpdateOptions } from '@rstore/shared'
-import { markRaw, nextTick, type Ref } from 'vue'
+import { markRaw, type Ref } from 'vue'
 
 export interface WrapItemOptions<
   TCollection extends Collection,
@@ -28,8 +28,6 @@ export function wrapItem<
   function getApi(): VueCollectionApi<TCollection, TCollectionDefaults, TSchema, WrappedItem<TCollection, TCollectionDefaults, TSchema>> {
     return store[collection.name as keyof typeof store] as any
   }
-
-  const relationCache = new Map<string, any>()
 
   const isFrozen = Object.isFrozen(item.value)
 
@@ -100,11 +98,6 @@ export function wrapItem<
 
       // Resolve related items in the cache
       if (!isFrozen && key in collection.relations) {
-        const cached = relationCache.get(key as string)
-        if (cached) {
-          return cached
-        }
-
         if (Reflect.has(item.value, key)) {
           // @TODO resolve references
           return Reflect.get(item.value, key)
@@ -156,11 +149,6 @@ export function wrapItem<
           else {
             finalResult = result[0]
           }
-
-          relationCache.set(key as string, finalResult)
-          nextTick(() => {
-            relationCache.delete(key as string)
-          })
 
           return finalResult
         }
