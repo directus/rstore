@@ -9,6 +9,25 @@ createTodo.$onSuccess(() => {
   createInput.value?.inputRef?.focus()
   createInput.value?.inputRef?.select()
 })
+
+onMounted(async () => {
+  await store.User.findMany()
+})
+
+let unrelatedUSersUpdates = 0
+
+const unrelated = computed(() => {
+  unrelatedUSersUpdates++
+  return store.User.peekMany()
+})
+
+function updateUnrelatedUSersUpdates() {
+  document.querySelector('#unrelatedUSersUpdates')!.textContent = String(unrelatedUSersUpdates)
+}
+
+onUpdated(() => {
+  updateUnrelatedUSersUpdates()
+})
 </script>
 
 <template>
@@ -64,6 +83,11 @@ createTodo.$onSuccess(() => {
     <div v-if="!todos.length" class="text-center text-gray-500 p-12">
       Nothing here yet
     </div>
+  </div>
+
+  <pre>{{ unrelated.length }} users</pre>
+  <div>
+    <span id="unrelatedUSersUpdates">0</span> unrelated User updates
   </div>
 
   <Output :data="todos" title="todos" />

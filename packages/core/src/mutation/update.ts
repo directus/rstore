@@ -86,16 +86,15 @@ export async function updateItem<
   if (!skipCache && optimistic) {
     layer = {
       id: crypto.randomUUID(),
+      collectionName: collection.name,
       state: {
-        [collection.name]: {
-          [key]: {
-            ...originalItem,
-            ...typeof optimistic === 'object' ? optimistic : {},
-            $overrideKey: key,
-          },
+        [key]: {
+          ...originalItem,
+          ...typeof optimistic === 'object' ? optimistic : {},
+          $overrideKey: key,
         },
       },
-      deletedItems: {},
+      deletedItems: new Set(),
       optimistic: true,
     }
 

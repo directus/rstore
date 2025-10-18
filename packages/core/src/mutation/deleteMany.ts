@@ -50,10 +50,9 @@ export async function deleteMany<
   if (!skipCache && optimistic) {
     layer = {
       id: crypto.randomUUID(),
+      collectionName: collection.name,
       state: {},
-      deletedItems: {
-        [collection.name]: new Set(keys),
-      },
+      deletedItems: new Set(keys),
       optimistic: true,
     }
     store.$cache.addLayer(layer)

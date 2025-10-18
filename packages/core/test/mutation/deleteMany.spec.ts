@@ -140,10 +140,9 @@ describe('deleteMany', () => {
 
     expect(mockStore.$cache.addLayer).toHaveBeenCalledWith({
       id: 'mock-uuid',
+      collectionName: mockCollection.name,
       state: {},
-      deletedItems: {
-        [mockCollection.name]: new Set(mockKeys),
-      },
+      deletedItems: new Set(mockKeys),
       optimistic: true,
     })
     expect(mockStore.$cache.removeLayer).toHaveBeenCalledWith('mock-uuid')
@@ -190,9 +189,10 @@ describe('deleteMany', () => {
   it('should throw error when item deletion is prevented by layer', async () => {
     const mockLayer: CacheLayer = {
       id: 'prevent-layer',
+      collectionName: 'testCollection',
       prevent: { delete: true },
       state: {},
-      deletedItems: {},
+      deletedItems: new Set(),
     }
 
     mockReadItem.mockReturnValue({
@@ -216,9 +216,10 @@ describe('deleteMany', () => {
   it('should check all keys for layer prevention', async () => {
     const mockLayer: CacheLayer = {
       id: 'prevent-layer',
+      collectionName: 'testCollection',
       prevent: { delete: true },
       state: {},
-      deletedItems: {},
+      deletedItems: new Set(),
     }
 
     mockReadItem

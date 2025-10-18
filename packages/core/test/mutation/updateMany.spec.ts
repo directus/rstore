@@ -135,13 +135,12 @@ describe('updateMany', () => {
 
     expect(mockStore.$cache.addLayer).toHaveBeenCalledWith({
       id: 'mock-uuid-1',
+      collectionName: 'testCollection',
       state: {
-        testCollection: {
-          1: { ...mockItems[0], $overrideKey: '1' },
-          2: { ...mockItems[1], $overrideKey: '2' },
-        },
+        1: { ...mockItems[0], $overrideKey: '1' },
+        2: { ...mockItems[1], $overrideKey: '2' },
       },
-      deletedItems: {},
+      deletedItems: new Set(),
       optimistic: true,
     })
     expect(mockStore.$cache.removeLayer).toHaveBeenCalledWith('mock-uuid-1')
@@ -158,12 +157,11 @@ describe('updateMany', () => {
 
     expect(mockStore.$cache.addLayer).toHaveBeenCalledWith({
       id: 'mock-uuid-1',
+      collectionName: 'testCollection',
       state: {
-        testCollection: {
-          1: { ...mockItems[0], ...optimisticData[0], $overrideKey: '1' },
-        },
+        1: { ...mockItems[0], ...optimisticData[0], $overrideKey: '1' },
       },
-      deletedItems: {},
+      deletedItems: new Set(),
       optimistic: true,
     })
   })

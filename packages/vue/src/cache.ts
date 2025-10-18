@@ -1,7 +1,22 @@
+import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheState, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { VueStore } from './store'
-import { type Cache, type CacheLayer, type Collection, type CollectionDefaults, pickNonSpecialProps, type ResolvedCollection, type ResolvedCollectionItem, type ResolvedCollectionItemBase, type StoreSchema, type WrappedItem } from '@rstore/shared'
-import { computed, ref, shallowRef, toValue } from 'vue'
+import { pickNonSpecialProps } from '@rstore/shared'
+import { computed, ref, type Ref, shallowRef, toValue } from 'vue'
 import { wrapItem, type WrappedItemMetadata } from './item'
+
+declare module '@rstore/shared' {
+  export interface CustomCacheState {
+    markers: Record<string, boolean>
+    collections: Record<string, Record<string | number, any>>
+    modules: Record<string, any>
+  }
+}
+
+interface InternalCacheState {
+  markers: Record<string, boolean>
+  collections: Record<string, Ref<Record<string | number, any>>>
+  modules: Record<string, Ref<any>>
+}
 
 export interface CreateCacheOptions<
   TSchema extends StoreSchema,
@@ -16,11 +31,14 @@ export function createCache<
 >({
   getStore,
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): Cache {
-  const state = ref<Record<string, any>>({
-    _markers: {},
-  })
+  const state: InternalCacheState = {
+    markers: {},
+    collections: {},
+    modules: {},
+  }
 
-  const layers = ref<CacheLayer[]>([])
+  const layers: Record<string, Ref<CacheLayer[]>> = {}
+  const layerIdToCollectionName: Record<string, string> = {}
 
   const wrappedItems = new Map<string, WrappedItem<Collection, TCollectionDefaults, TSchema>>()
   const wrappedItemsMetadata = new Map<string, WrappedItemMetadata<Collection, TCollectionDefaults, TSchema>>()
@@ -48,6 +66,13 @@ export function createCache<
       wrappedItemKeysPerLayer.set(layer.id, keys)
     }
     keys.add(wrapKey)
+  }
+
+  function ensureCollectionRef(collectionName: string) {
+    if (!state.collections[collectionName]) {
+      state.collections[collectionName] = ref({})
+    }
+    return state.collections[collectionName]
   }
 
   function getWrappedItem<TCollection extends Collection>(
@@ -89,7 +114,7 @@ export function createCache<
         collection,
         item: computed(() => layer
           ? item
-          : state.value[collection.name]?.[key] ?? item),
+          : ensureCollectionRef(collection.name).value[key] ?? item),
         metadata,
       })
       wrappedItems.set(wrapKey, wrappedItem)
@@ -99,16 +124,14 @@ export function createCache<
   }
 
   function mark(marker: string) {
-    if (!state.value._markers) {
-      state.value._markers = {}
-    }
-    state.value._markers[marker] = true
+    state.markers[marker] = true
   }
 
   function deleteItem(collection: ResolvedCollection<any, any, any>, key: string | number) {
-    const item = state.value[collection.name]?.[key]
+    const collectionState = ensureCollectionRef(collection.name).value
+    const item = collectionState[key]
     if (item) {
-      delete state.value[collection.name]?.[key]
+      delete collectionState[key]
       const wrapKey = getItemWrapKey(collection, key, undefined)
       wrappedItems.delete(wrapKey)
       wrappedItemsMetadata.delete(wrapKey)
@@ -139,11 +162,13 @@ export function createCache<
 
   function getStateForCollection(collectionName: string) {
     let copied = false
-    let result = state.value[collectionName] ?? {}
+    let result = ensureCollectionRef(collectionName).value
 
     // Add & modify from layers
-    for (const layer of layers.value) {
-      if (!layer.skip && layer.state[collectionName]) {
+    const collectionLayersRef = layers[collectionName] ??= shallowRef([])
+    const collectionLayers = collectionLayersRef.value
+    for (const layer of collectionLayers) {
+      if (!layer.skip) {
         // Lazy copy the state if needed
         if (!copied) {
           result = Object.assign({}, result)
@@ -151,7 +176,7 @@ export function createCache<
         }
 
         const layerState: Record<string | number, any> = {}
-        for (const [key, value] of Object.entries(layer.state[collectionName])) {
+        for (const [key, value] of Object.entries(layer.state)) {
           const data = {
             ...result[key],
             ...value,
@@ -164,15 +189,15 @@ export function createCache<
     }
 
     // Delete from layers
-    for (const layer of layers.value) {
-      if (!layer.skip && layer.deletedItems[collectionName]) {
+    for (const layer of collectionLayers) {
+      if (!layer.skip && layer.deletedItems) {
         // Lazy copy the state if needed
         if (!copied) {
           result = Object.assign({}, result)
           copied = true
         }
 
-        for (const key of layer.deletedItems[collectionName]) {
+        for (const key of layer.deletedItems) {
           delete result[key]
         }
       }
@@ -182,9 +207,18 @@ export function createCache<
   }
 
   function removeLayer(layerId: string) {
-    const index = layers.value.findIndex(l => l.id === layerId)
+    const collectionName = layerIdToCollectionName[layerId]
+    if (!collectionName) {
+      return
+    }
+    const collectionLayersRef = layers[collectionName]
+    if (!collectionLayersRef) {
+      return
+    }
+    const collectionLayers = collectionLayersRef.value
+    const index = collectionLayers.findIndex(l => l.id === layerId)
     if (index !== -1) {
-      const layer = layers.value[index]!
+      const layer = collectionLayers[index]!
       const keys = wrappedItemKeysPerLayer.get(layer.id)
       if (keys) {
         for (const key of keys) {
@@ -193,7 +227,8 @@ export function createCache<
         }
         wrappedItemKeysPerLayer.delete(layer.id)
       }
-      layers.value.splice(index, 1)
+      collectionLayersRef.value = collectionLayers.filter(l => l.id !== layerId)
+      delete layerIdToCollectionName[layerId]
       const store = getStore()
       store.$hooks.callHookSync('cacheLayerRemove', {
         store,
@@ -210,7 +245,7 @@ export function createCache<
       return getWrappedItem(collection, getStateForCollection(collection.name)[key])
     },
     readItems({ collection, marker, filter, limit }) {
-      if (marker && !state.value._markers?.[marker]) {
+      if (marker && !state.markers[marker]) {
         return []
       }
       const data: Record<string | number, ResolvedCollectionItemBase<any, any, any>> = getStateForCollection(collection.name)
@@ -235,11 +270,10 @@ export function createCache<
       return result
     },
     writeItem({ collection, key, item, marker, fromWriteItems, meta }) {
-      state.value[collection.name] ??= {}
-      const itemsForType = state.value[collection.name]
+      const collectionState = ensureCollectionRef(collection.name).value
       const isFrozen = Object.isFrozen(item)
       if (isFrozen) {
-        itemsForType[key] = item
+        collectionState[key] = item
       }
       else {
         const rawData = pickNonSpecialProps(item, true)
@@ -302,13 +336,13 @@ export function createCache<
           }
         }
 
-        const existing = itemsForType[key]
+        const existing = collectionState[key]
         if (!existing) {
           // Disable deep reactivity tracking inside the `data` object
-          itemsForType[key] = shallowRef(data)
+          collectionState[key] = shallowRef(data)
         }
         else {
-          itemsForType[key] = {
+          collectionState[key] = {
             ...existing,
             ...data,
           }
@@ -376,50 +410,65 @@ export function createCache<
       deleteItem(collection, key)
     },
     getModuleState(name, key, initState) {
-      const cacheKey = `$${name}:${key}`
-      state.value[cacheKey] ??= initState
-      return state.value[cacheKey]
+      const cacheKey = `${name}:${key}`
+      if (!state.modules[cacheKey]) {
+        state.modules[cacheKey] = ref(initState)
+      }
+      return state.modules[cacheKey].value
     },
     getState() {
-      const result: Record<string, any> = {}
+      const result: CustomCacheState = {
+        collections: {},
+        markers: toValue(state.markers),
+        modules: {},
+      }
 
-      for (const collectionName in state.value) {
-        if (collectionName.startsWith('_') || collectionName.startsWith('$')) {
-          result[collectionName] = state.value[collectionName]
-          continue
-        }
-        result[collectionName] = {}
-        const itemsForType = getStateForCollection(collectionName)
+      for (const collectionName in state.collections) {
+        const targetState: Record<string | number, any> = result.collections[collectionName] = {}
+        const itemsForType = state.collections[collectionName]!.value
         for (const key in itemsForType) {
           const item = itemsForType[key]
           if (item) {
-            result[collectionName][key] = toValue(item)
+            targetState[key] = toValue(item)
           }
         }
+      }
+
+      for (const moduleKey in state.modules) {
+        result.modules[moduleKey] = toValue(state.modules[moduleKey]!)
       }
 
       return result
     },
     setState(value) {
-      const newState = {} as Record<string, any>
-
       // Process incoming state
-      for (const collectionName in value) {
-        if (collectionName.startsWith('_') || collectionName.startsWith('$')) {
-          newState[collectionName] = value[collectionName as keyof typeof value]
-          continue
-        }
-        const incomingCollectionState = value[collectionName as keyof typeof value] as Record<string | number, any>
-        const collectionState = newState[collectionName] = {} as Record<string | number, any>
+
+      // Markers
+      state.markers = value.markers || {}
+
+      // Collections
+
+      const newCollectionsState: Record<string, Ref<Record<string | number, any>>> = {}
+      for (const collectionName in value.collections) {
+        const incomingCollectionState = value.collections[collectionName as keyof typeof value.collections] as Record<string | number, any>
+        const collectionState = newCollectionsState[collectionName] = ref<Record<string | number, any>>({})
         for (const key in incomingCollectionState) {
           const item = incomingCollectionState[key]
           if (item) {
-            collectionState[key] = Object.isFrozen(item) ? item : shallowRef(item)
+            collectionState.value[key] = Object.isFrozen(item) ? item : shallowRef(item)
           }
         }
       }
+      state.collections = newCollectionsState
 
-      state.value = newState
+      // Modules
+
+      const newModulesState: Record<string, Ref<any>> = {}
+      for (const moduleKey in value.modules) {
+        newModulesState[moduleKey] = ref(value.modules[moduleKey])
+      }
+      state.modules = newModulesState
+
       wrappedItems.clear()
       wrappedItemsMetadata.clear()
 
@@ -430,7 +479,13 @@ export function createCache<
       })
     },
     clear() {
-      state.value = {}
+      state.markers = {}
+      for (const collectionName in state.collections) {
+        state.collections[collectionName]!.value = {}
+      }
+      for (const moduleKey in state.modules) {
+        state.modules[moduleKey]!.value = {}
+      }
       wrappedItems.clear()
       wrappedItemsMetadata.clear()
 
@@ -441,9 +496,9 @@ export function createCache<
       })
     },
     clearCollection({ collection }) {
-      const itemsForType = state.value[collection.name]
+      const itemsForType = state.collections[collection.name]
       if (itemsForType) {
-        for (const key in itemsForType) {
+        for (const key in itemsForType.value) {
           this.deleteItem({ collection, key })
         }
       }
@@ -452,24 +507,25 @@ export function createCache<
       garbageCollectItem(collection, item)
     },
     garbageCollect() {
-      for (const collectionName in state.value) {
-        if (collectionName === '_markers' || collectionName.startsWith('$')) {
-          continue
-        }
+      for (const collectionName in state.collections) {
         const collection = getStore().$collections.find(m => m.name === collectionName)
         if (!collection) {
           continue
         }
-        const itemsForType = state.value[collectionName]
-        for (const key in itemsForType) {
-          const wrappedItem = this.wrapItem({ collection, item: itemsForType[key] })
-          garbageCollectItem(collection, wrappedItem)
+        const itemsForType = state.collections[collectionName]?.value
+        if (itemsForType) {
+          for (const key in itemsForType) {
+            const wrappedItem = this.wrapItem({ collection, item: itemsForType[key] })
+            garbageCollectItem(collection, wrappedItem)
+          }
         }
       }
     },
     addLayer(layer) {
       removeLayer(layer.id)
-      layers.value.push(layer)
+      const collectionLayersRef = layers[layer.collectionName] ??= shallowRef([])
+      collectionLayersRef.value = [...collectionLayersRef.value, layer]
+      layerIdToCollectionName[layer.id] = layer.collectionName
       const store = getStore()
       store.$hooks.callHookSync('cacheLayerAdd', {
         store,
@@ -477,7 +533,15 @@ export function createCache<
       })
     },
     getLayer(layerId) {
-      return layers.value.find(l => l.id === layerId)
+      const collectionName = layerIdToCollectionName[layerId]
+      if (!collectionName) {
+        return undefined
+      }
+      const collectionLayers = layers[collectionName]
+      if (!collectionLayers) {
+        return undefined
+      }
+      return collectionLayers.value.find(l => l.id === layerId)
     },
     removeLayer,
     _private: {

@@ -104,10 +104,9 @@ export async function updateMany<
     }
     layer = {
       id: crypto.randomUUID(),
-      state: {
-        [collection.name]: optimisticState,
-      },
-      deletedItems: {},
+      collectionName: collection.name,
+      state: optimisticState,
+      deletedItems: new Set(),
       optimistic: true,
     }
 

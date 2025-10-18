@@ -14,7 +14,15 @@ export const useStoreCache = createSharedComposable(() => {
     const cache = store.value.$cache as Cache & {
       _private: any
     }
-    return toRaw(cache._private.layers.value)
+    const layerMap = toRaw(cache._private.layers) as Record<string, Ref<CacheLayer[]>>
+    const layers: CacheLayer[] = []
+    for (const collectionLayersRef of Object.values(layerMap)) {
+      const collectionLayers = collectionLayersRef.value
+      for (const layer of collectionLayers) {
+        layers.push(layer)
+      }
+    }
+    return layers
   }
 
   const layers = shallowRef(getLayers())

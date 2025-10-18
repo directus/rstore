@@ -49,10 +49,9 @@ export async function deleteItem<
   if (!skipCache && optimistic) {
     layer = {
       id: crypto.randomUUID(),
+      collectionName: collection.name,
       state: {},
-      deletedItems: {
-        [collection.name]: new Set([key]),
-      },
+      deletedItems: new Set([key]),
       optimistic: true,
     }
     store.$cache.addLayer(layer)

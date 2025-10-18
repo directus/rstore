@@ -98,15 +98,14 @@ To create a new layer, use the `addLayer` method:
 ```ts
 store.$cache.addLayer({
   id: 'some-layer-id',
+  collectionName: 'Messages',
   state: {
-    Messages: {
-      'some-message-id': {
-        $overrideKey: 'some-message-id',
-        text: 'This is an optimistic message',
-      },
+    'some-message-id': {
+      $overrideKey: 'some-message-id',
+      text: 'This is an optimistic message',
     },
   },
-  deleteItems: {},
+  deleteItems: new Set(),
   optimistic: true, // Optional
   prevent: { // Optional
     update: false,
@@ -125,10 +124,9 @@ If the layer contains records that do not exist in the cache, it will act as if 
 ```ts
 store.$cache.addLayer({
   id: 'some-layer-id',
+  collectionName: 'Messages',
   state: {},
-  deleteItems: {
-    Messages: new Set(['some-message-id']),
-  },
+  deleteItems: new Set(['some-message-id']),
 })
 ```
 
