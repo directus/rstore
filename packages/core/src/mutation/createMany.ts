@@ -65,10 +65,9 @@ export async function createMany<
     }
     layer = {
       id: crypto.randomUUID(),
-      state: {
-        [collection.name]: optimisticState,
-      },
-      deletedItems: {},
+      collectionName: collection.name,
+      state: optimisticState,
+      deletedItems: new Set(),
       optimistic: true,
       prevent: {
         // @TODO queue mutations and reconcile the optimistic object with the actual result

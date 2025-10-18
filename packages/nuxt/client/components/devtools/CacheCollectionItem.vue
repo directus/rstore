@@ -39,8 +39,8 @@ const cacheCount = computed(() => Object.keys(props.state?.[props.collection.nam
     />
 
     <UBadge
-      v-if="selectedLayer?.deletedItems[props.collection.name]?.size"
-      :label="selectedLayer?.deletedItems[props.collection.name]?.size || '0'"
+      v-if="selectedLayer?.deletedItems?.size"
+      :label="selectedLayer?.deletedItems?.size || '0'"
       color="error"
       variant="soft"
       size="sm"
