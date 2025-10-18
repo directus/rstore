@@ -57,16 +57,15 @@ export async function createItem<
     }
     layer = {
       id: crypto.randomUUID(),
+      collectionName: collection.name,
       state: {
-        [collection.name]: {
-          [key]: {
-            ...originalItem,
-            ...typeof optimistic === 'object' ? optimistic : {},
-            $overrideKey: key,
-          },
+        [key]: {
+          ...originalItem,
+          ...typeof optimistic === 'object' ? optimistic : {},
+          $overrideKey: key,
         },
       },
-      deletedItems: {},
+      deletedItems: new Set(),
       optimistic: true,
       prevent: {
         // @TODO queue mutations and reconcile the optimistic object with the actual result

@@ -40,13 +40,17 @@ const selectedLayer = computed(() => layers.value.find(layer => layer.id === sel
 
 const selectedCache = computed(() => {
   if (selectedLayer.value) {
-    return selectedLayer.value.state[selectedCollection.value as keyof typeof selectedLayer.value.state] as Record<string, any>
+    return selectedLayer.value.state as Record<string, any>
   }
-  return cache.value[selectedCollection.value as keyof typeof cache.value] as Record<string, any>
+  return cache.value.collections[selectedCollection.value as keyof typeof cache.value] as Record<string, any>
 })
 
 const deletedItemsFromLayer = computed(() => {
-  return selectedLayer.value?.deletedItems[selectedCollection.value as keyof typeof selectedLayer.value.deletedItems]
+  const layer = selectedLayer.value
+  if (layer?.collectionName === selectedCollection.value && layer.deletedItems.size) {
+    return layer.deletedItems
+  }
+  return null
 })
 
 const filteredCache = computed(() => {
@@ -205,8 +209,8 @@ watch(selectedCollection, () => {
             :key="collection.name"
             :collection
             :selected="selectedCollection === collection.name"
-            :state="selectedLayer?.state ?? cache as any"
-            :selected-layer
+            :state="selectedLayer?.collectionName === collection.name ? { [collection.name]: selectedLayer.state } : cache.collections"
+            :selected-layer="selectedLayer?.collectionName === collection.name ? selectedLayer : undefined"
             @click="selectedCollection = collection.name"
           />
 

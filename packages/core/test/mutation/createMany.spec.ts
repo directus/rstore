@@ -109,13 +109,12 @@ describe('createMany', () => {
 
     expect(mockStore.$cache.addLayer).toHaveBeenCalledWith({
       id: 'mock-uuid-1',
+      collectionName: 'testCollection',
       state: {
-        testCollection: {
-          1: { ...mockItems[0], $overrideKey: '1' },
-          2: { ...mockItems[1], $overrideKey: '2' },
-        },
+        1: { ...mockItems[0], $overrideKey: '1' },
+        2: { ...mockItems[1], $overrideKey: '2' },
       },
-      deletedItems: {},
+      deletedItems: new Set(),
       optimistic: true,
       prevent: {
         update: true,
@@ -136,12 +135,11 @@ describe('createMany', () => {
 
     expect(mockStore.$cache.addLayer).toHaveBeenCalledWith({
       id: 'mock-uuid-1',
+      collectionName: 'testCollection',
       state: {
-        testCollection: {
-          1: { ...mockItems[0], ...optimisticData, $overrideKey: '1' },
-        },
+        1: { ...mockItems[0], ...optimisticData, $overrideKey: '1' },
       },
-      deletedItems: {},
+      deletedItems: new Set(),
       optimistic: true,
       prevent: {
         update: true,
@@ -186,13 +184,12 @@ describe('createMany', () => {
     expect(mockRandomUUID).toHaveBeenCalled()
     expect(mockStore.$cache.addLayer).toHaveBeenCalledWith({
       id: 'mock-uuid-3',
+      collectionName: 'testCollection',
       state: {
-        testCollection: {
-          'mock-uuid-1': { ...mockItems[0], $overrideKey: 'mock-uuid-1' },
-          'mock-uuid-2': { ...mockItems[1], $overrideKey: 'mock-uuid-2' },
-        },
+        'mock-uuid-1': { ...mockItems[0], $overrideKey: 'mock-uuid-1' },
+        'mock-uuid-2': { ...mockItems[1], $overrideKey: 'mock-uuid-2' },
       },
-      deletedItems: {},
+      deletedItems: new Set(),
       optimistic: true,
       prevent: {
         update: true,

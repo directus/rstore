@@ -14,33 +14,31 @@ createTodo.$onSuccess(() => {
 
 const addedItemLayer = {
   id: 'todo:addedItems',
+  collectionName: 'Todo',
   state: {
-    Todo: {
-      'new-from-layer': {
-        $overrideKey: 'new-from-layer',
-        text: 'This todo was added from a layer',
-        completed: false,
-        createdAt: new Date(),
-      } satisfies Omit<StoreResolvedCollectionItem<'Todo'>, 'id'> & { $overrideKey: string },
-    },
+    'new-from-layer': {
+      $overrideKey: 'new-from-layer',
+      text: 'This todo was added from a layer',
+      completed: false,
+      createdAt: new Date(),
+    } satisfies Omit<StoreResolvedCollectionItem<'Todo'>, 'id'> & { $overrideKey: string },
   },
-  deletedItems: {},
+  deletedItems: new Set(),
   optimistic: true,
 } satisfies CacheLayer
 
 const modifyItemLayer = {
   id: 'todo:modifyItems',
-  state: {
-    Todo: {},
-  },
-  deletedItems: {},
+  collectionName: 'Todo',
+  state: {},
+  deletedItems: new Set(),
   optimistic: true,
 } satisfies CacheLayer
 
 function addModifyItemLayer() {
   const firstTodo = todos.value.find(t => !t.$isOptimistic)
   if (firstTodo) {
-    modifyItemLayer.state.Todo = {
+    modifyItemLayer.state = {
       [firstTodo.id]: {
         id: firstTodo.id,
         text: `${firstTodo.text} (modified by a layer)`,
@@ -53,34 +51,32 @@ function addModifyItemLayer() {
 
 const deleteItemLayer = {
   id: 'todo:deleteItems',
+  collectionName: 'Todo',
   state: {},
-  deletedItems: {
-    Todo: new Set<string | number>(),
-  },
+  deletedItems: new Set<string | number>(),
   optimistic: true,
 } satisfies CacheLayer
 
 function addDeleteItemLayer() {
   const firstTodo = todos.value.find(t => !t.$isOptimistic)
   if (firstTodo) {
-    deleteItemLayer.deletedItems.Todo = new Set([firstTodo.id])
+    deleteItemLayer.deletedItems = new Set([firstTodo.id])
     store.$cache.addLayer(deleteItemLayer)
   }
 }
 
 const skippedLayer = {
   id: 'todo:skippedLayer',
+  collectionName: 'Todo',
   state: {
-    Todo: {
-      'new-from-layer2': {
-        $overrideKey: 'new-from-layer2',
-        text: 'This will not be applyed',
-        completed: false,
-        createdAt: new Date(),
-      } satisfies Omit<StoreResolvedCollectionItem<'Todo'>, 'id'> & { $overrideKey: string },
-    },
+    'new-from-layer2': {
+      $overrideKey: 'new-from-layer2',
+      text: 'This will not be applyed',
+      completed: false,
+      createdAt: new Date(),
+    } satisfies Omit<StoreResolvedCollectionItem<'Todo'>, 'id'> & { $overrideKey: string },
   },
-  deletedItems: {},
+  deletedItems: new Set(),
   optimistic: false,
   skip: true,
 } satisfies CacheLayer

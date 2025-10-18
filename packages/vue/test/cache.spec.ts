@@ -30,7 +30,7 @@ describe('cache', () => {
     cache.writeItem({ collection: mockCollection, key: 1, item: mockItem })
 
     const state = cache.getState() as any
-    expect(state.TestCollection[1]).toEqual({ id: 1, name: 'Test Item' })
+    expect(state.collections.TestCollection[1]).toEqual({ id: 1, name: 'Test Item' })
   })
 
   it('should not write special keys', () => {
@@ -41,7 +41,7 @@ describe('cache', () => {
     } })
 
     const state = cache.getState() as any
-    expect(state.TestCollection[1]).toEqual({ id: 1, name: 'Test Item' })
+    expect(state.collections.TestCollection[1]).toEqual({ id: 1, name: 'Test Item' })
   })
 
   it('should read an item from the cache', () => {
@@ -67,7 +67,7 @@ describe('cache', () => {
     cache.deleteItem({ collection: mockCollection, key: 1 })
 
     const state = cache.getState() as any
-    expect(state.TestCollection).toEqual({})
+    expect(state.collections.TestCollection).toEqual({})
   })
 
   it('should clear the cache', () => {
@@ -76,7 +76,13 @@ describe('cache', () => {
     cache.clear()
 
     const state = cache.getState()
-    expect(state).toEqual({})
+    expect(state).toEqual({
+      collections: {
+        TestCollection: {},
+      },
+      markers: {},
+      modules: {},
+    })
   })
 
   it('should handle relations when writing items', () => {
@@ -104,8 +110,8 @@ describe('cache', () => {
     cache.writeItem({ collection: mockCollectionWithRelation, key: 1, item: itemWithRelation })
 
     const state = cache.getState() as any
-    expect(state.TestCollection[1]).toEqual({ id: 1, name: 'Test Item', relatedId: 2 })
-    expect(state.RelatedCollection[2]).toEqual({ id: 2, name: 'Related Item' })
+    expect(state.collections.TestCollection[1]).toEqual({ id: 1, name: 'Test Item', relatedId: 2 })
+    expect(state.collections.RelatedCollection[2]).toEqual({ id: 2, name: 'Related Item' })
   })
 
   it('should mark a marker when writing items', () => {
@@ -113,7 +119,7 @@ describe('cache', () => {
     cache.writeItem({ collection: mockCollection, key: 1, item: mockItem, marker: 'testMarker' })
 
     const state = cache.getState() as any
-    expect(state._markers.testMarker).toBe(true)
+    expect(state.markers.testMarker).toBe(true)
   })
 
   it('should read items by marker', () => {
@@ -212,16 +218,16 @@ describe('cache', () => {
     item2.$meta.queries.add('testQuery')
 
     let state = cache.getState() as any
-    expect(state.TestCollection[1]).toBeDefined()
-    expect(state.TestCollection[2]).toBeDefined()
-    expect(state.TestCollection[3]).toBeDefined()
+    expect(state.collections.TestCollection[1]).toBeDefined()
+    expect(state.collections.TestCollection[2]).toBeDefined()
+    expect(state.collections.TestCollection[3]).toBeDefined()
 
     cache.garbageCollect()
 
     state = cache.getState() as any
-    expect(state.TestCollection[1]).toBeUndefined()
-    expect(state.TestCollection[2]).toBeDefined()
-    expect(state.TestCollection[3]).toBeUndefined()
+    expect(state.collections.TestCollection[1]).toBeUndefined()
+    expect(state.collections.TestCollection[2]).toBeDefined()
+    expect(state.collections.TestCollection[3]).toBeUndefined()
   })
 
   describe('layers', () => {
@@ -233,12 +239,11 @@ describe('cache', () => {
 
       const layer: CacheLayer = {
         id: 'layer1',
+        collectionName: 'TestCollection',
         state: {
-          TestCollection: {
-            2: { id: 2, name: 'item2' },
-          },
+          2: { id: 2, name: 'item2' },
         },
-        deletedItems: {},
+        deletedItems: new Set(),
       }
       cache.addLayer(layer)
 
@@ -263,12 +268,11 @@ describe('cache', () => {
 
       const layer: CacheLayer = {
         id: 'layer1',
+        collectionName: 'TestCollection',
         state: {
-          TestCollection: {
-            1: { id: 1, name: 'modified item1' },
-          },
+          1: { id: 1, name: 'modified item1' },
         },
-        deletedItems: {},
+        deletedItems: new Set(),
       }
       cache.addLayer(layer)
 
@@ -288,10 +292,9 @@ describe('cache', () => {
 
       const layer: CacheLayer = {
         id: 'layer1',
+        collectionName: 'TestCollection',
         state: {},
-        deletedItems: {
-          TestCollection: new Set([2]),
-        },
+        deletedItems: new Set([2]),
       }
       cache.addLayer(layer)
 
