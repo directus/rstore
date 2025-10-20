@@ -1,6 +1,20 @@
 # Changelog
 
 
+## v0.7.8
+
+[compare changes](https://github.com/directus/rstore/compare/v0.7.7...v0.7.8)
+
+### 🩹 Fixes
+
+- **drizzle:** Dialect is wrong ([491b3c4](https://github.com/directus/rstore/commit/491b3c4))
+- **directus:** Skip folder 'collections', closes #51 ([#51](https://github.com/directus/rstore/issues/51))
+- Remove item relation cache ([aa34b9a](https://github.com/directus/rstore/commit/aa34b9a))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.7.7
 
 [compare changes](https://github.com/directus/rstore/compare/v0.7.6...v0.7.7)
