@@ -244,7 +244,7 @@
 }
 
 .VPFeature {
-  @apply !bg-transparent !border-2 !border-(--vp-c-brand-1)/20 outline-4 outline-(--vp-c-brand-1)/5;
+  @apply !bg-transparent !border-2 !border-(--vp-c-brand-1)/75;
 
   article {
     @apply items-center text-center;
@@ -305,6 +305,25 @@ footer.VPFooter {
   100% {
     transform: translateY(100%);
     opacity: 0;
+  }
+}
+
+.animate-spin-slow {
+  animation: spin 2s linear infinite;
+}
+
+@theme {
+  --animate-pulse-zoom: pulse-zoom 3s ease-in-out infinite both;
+
+  @keyframes pulse-zoom {
+    0%, 100% {
+      transform: scale(0);
+      opacity: 0;
+    }
+    50% {
+      transform: scale(1);
+      opacity: 1;
+    }
   }
 }
 
