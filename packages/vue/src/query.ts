@@ -1,7 +1,7 @@
 import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, HybridPromise, StoreSchema } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueStore } from './store'
-import { computed, ref, shallowRef, toValue, watch } from 'vue'
+import { computed, getCurrentInstance, onServerPrefetch, ref, shallowRef, toValue, watch } from 'vue'
 import { useQueryTracking } from './tracking'
 
 export interface VueQueryReturn<
@@ -179,6 +179,13 @@ export function createQuery<
   store.$onCacheReset(() => {
     refresh()
   })
+
+  // SSR
+  const vm = getCurrentInstance()
+
+  if (vm && store.$isServer) {
+    onServerPrefetch(() => promise)
+  }
 
   return promise
 }
