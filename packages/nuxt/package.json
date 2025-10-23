@@ -19,8 +19,8 @@
       "require": "./dist/module.cjs"
     },
     "./api": {
-      "types": "./dist/runtime/api.d.ts",
-      "import": "./dist/runtime/api.js"
+      "types": "./dist/api.d.ts",
+      "import": "./dist/api.mjs"
     }
   },
   "main": "./dist/module.cjs",
@@ -31,13 +31,10 @@
   "scripts": {
     "build": "nuxi prepare playground && nuxt-module-build build && npm run client:build",
     "dev": "pnpm run build",
-    "dev:playground": "nuxi prepare playground && nuxi dev ../playground",
-    "dev:build": "nuxi build ../playground",
-    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare playground && nuxi prepare ../playground",
+    "dev:prepare": "nuxt prepare && pnpm run client:prepare",
     "client:build": "nuxi generate client",
     "client:dev": "nuxi dev client --port 3300",
     "client:prepare": "nuxi prepare client",
-    "prepare:all": "nuxi prepare playground && pnpm run dev:prepare && pnpm run client:prepare",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:types": "vue-tsc --noEmit"

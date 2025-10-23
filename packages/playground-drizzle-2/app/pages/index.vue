@@ -19,5 +19,7 @@ const { data: users } = await store.users.query(q => q.many({
     label="Email"
     placeholder="Enter email to filter users"
   />
-  <pre>{{ users.map(user => ({ id: user.id, email: user.email, posts: user.posts })) }}</pre>
+  <pre>{{ users.map(user => ({ id: user.id,
+                               email: user.email,
+                               posts: user.posts })) }}</pre>
 </template>

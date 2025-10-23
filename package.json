@@ -12,6 +12,7 @@
   },
   "scripts": {
     "build": "pnpm run -r --filter \"@rstore/*\" build",
+    "dev:prepare": "pnpm run -r --filter \"@rstore/*\" dev:prepare",
     "dev": "pnpm run -r --filter \"@rstore/*\" dev",
     "lint": "eslint --cache .",
     "test": "vitest run",
@@ -23,7 +24,7 @@
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",
     "bb": "pnpm run build && pnpm run test:types",
-    "postinstall": "simple-git-hooks"
+    "postinstall": "simple-git-hooks && pnpm run dev:prepare"
   },
   "devDependencies": {
     "@akryum/sheep": "^0.5.2",

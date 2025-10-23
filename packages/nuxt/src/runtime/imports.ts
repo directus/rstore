@@ -1,6 +1,7 @@
+// @ts-expect-error virtual module
 import type { constCollections } from '#build/$rstore-collection-const'
 import type { CollectionByName, CollectionNameMap, ResolvedCollectionItem, WrappedItem } from '@rstore/shared'
-import { useNuxtApp } from '#app'
+import { useNuxtApp } from '#imports'
 import { type CreateFormObject, defineRelations, type UpdateFormObject, type VueStore, withItemType } from '@rstore/vue'
 
 export * from '@rstore/vue'

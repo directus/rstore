@@ -156,8 +156,14 @@ watch(selectedCollection, () => {
               v-model="selectedLayerId"
               icon="lucide:layers"
               :items="[
-                { id: undefined, label: 'Base cache state', icon: 'lucide:database' },
-                ...layers.map(layer => ({ id: layer.id, label: layer.id, icon: 'lucide:layers-2', class: layer.skip ? 'text-dimmed' : 'text-yellow-500', layer })),
+                { id: undefined,
+                  label: 'Base cache state',
+                  icon: 'lucide:database' },
+                ...layers.map(layer => ({ id: layer.id,
+                                          label: layer.id,
+                                          icon: 'lucide:layers-2',
+                                          class: layer.skip ? 'text-dimmed' : 'text-yellow-500',
+                                          layer })),
               ]"
               value-key="id"
               label-key="label"

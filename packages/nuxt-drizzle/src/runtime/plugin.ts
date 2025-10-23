@@ -1,6 +1,6 @@
-import { useRequestFetch } from '#app'
 // @ts-expect-error virtual module
 import { apiPath } from '#build/$rstore-drizzle-config.js'
+import { useRequestFetch } from '#imports'
 import { definePlugin, type VueStore } from '@rstore/vue'
 import { and, eq } from './utils/where'
 import { filterWhere } from './where'

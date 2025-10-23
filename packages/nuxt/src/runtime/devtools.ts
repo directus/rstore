@@ -2,7 +2,7 @@ import type { ResolvedModule } from '@rstore/shared'
 import type { ShallowRef } from 'vue'
 
 import type { StoreHistoryItem, StoreSubscriptionItem } from '../../client/utils/types'
-import { useNuxtApp, useState } from '#app'
+import { useNuxtApp, useState } from '#imports'
 import { definePlugin } from '@rstore/vue'
 import { createEventHook } from '@vueuse/core'
 import { isRef, markRaw, shallowRef, triggerRef, watch } from 'vue'

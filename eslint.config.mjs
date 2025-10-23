@@ -6,4 +6,9 @@ export default antfu({
     '**/.nitro',
     'docs/guide/migration/**',
   ],
+  rules: {
+    'vue/object-property-newline': ['error', {
+      allowAllPropertiesOnSameLine: false,
+    }],
+  },
 })

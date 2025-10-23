@@ -1,7 +1,14 @@
 import type { Nuxt } from 'nuxt/schema'
 
 declare module '@nuxt/schema' {
-  export interface NuxtOptions {
+  interface NuxtOptions {
+    _rstoreCollectionImports?: Set<string>
+    _rstorePluginImports?: Set<string>
+  }
+}
+
+declare module 'nuxt/schema' {
+  interface NuxtOptions {
     _rstoreCollectionImports?: Set<string>
     _rstorePluginImports?: Set<string>
   }

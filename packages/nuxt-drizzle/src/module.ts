@@ -5,7 +5,7 @@ import type { getTableConfig as pgGetTableConfig } from 'drizzle-orm/pg-core'
 import type { getTableConfig as singleStoreGetTableConfig } from 'drizzle-orm/singlestore-core'
 import type { getTableConfig as sqliteGetTableConfig } from 'drizzle-orm/sqlite-core'
 import fs from 'node:fs'
-import { addImports, addImportsDir, addServerHandler, addServerImports, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule, updateTemplates, useLogger } from '@nuxt/kit'
+import { addImports, addImportsDir, addServerHandler, addServerImports, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, updateTemplates, useLogger } from '@nuxt/kit'
 import { createTableRelationsHelpers, getTableName, is, isTable, Many, One, Relations, type Table, type TableConfig } from 'drizzle-orm'
 import { createJiti } from 'jiti'
 import path from 'pathe'
@@ -49,15 +49,17 @@ export default defineNuxtModule<ModuleOptions>({
   meta: {
     name: 'rstore-nuxt-drizzle',
     configKey: 'rstoreDrizzle',
+    compatibility: {
+      nuxt: '^3.19.2 || >=4.1.2',
+    },
+  },
+  moduleDependencies: {
+    '@rstore/nuxt': {},
   },
   defaults: {},
   async setup(options, nuxt) {
     const log = useLogger('rstore-drizzle')
     const { resolve } = createResolver(import.meta.url)
-
-    if (!hasNuxtModule('@rstore/nuxt')) {
-      await installModule('@rstore/nuxt')
-    }
 
     // Add global types
     nuxt.hook('prepare:types', ({ references }) => {

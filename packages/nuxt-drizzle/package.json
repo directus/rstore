@@ -27,9 +27,9 @@
   "scripts": {
     "build": "nuxi prepare && nuxt-module-build build",
     "dev": "pnpm run build",
+    "dev:prepare": "nuxt prepare",
     "dev:playground": "nuxi dev playground",
     "dev:build": "nuxi build playground",
-    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare && nuxi prepare playground",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:types": "vue-tsc --noEmit"
