@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import { useDocumentVisibility, useIntervalFn } from '@vueuse/core'
+import { useDocumentVisibility, useElementVisibility, useIntervalFn } from '@vueuse/core'
 import { svg } from 'animejs'
 import { onMounted, shallowRef, useTemplateRef } from 'vue'
 import HomePageAnimationItem from './HomePageAnimationItem.vue'
@@ -39,16 +39,18 @@ function removeBall(listIndex: number, id: string) {
 }
 
 const docVisibility = useDocumentVisibility()
+const el = useTemplateRef('el')
+const elVisible = useElementVisibility(el)
 
 useIntervalFn(() => {
-  if (docVisibility.value === 'visible') {
+  if (docVisibility.value === 'visible' && elVisible.value) {
     addBall()
   }
 }, 500)
 </script>
 
 <template>
-  <div class="relative">
+  <div ref="el" class="relative">
     <img
       src="/animation-back.svg"
     >

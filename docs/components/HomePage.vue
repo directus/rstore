@@ -79,15 +79,35 @@ import HomePageAnimation from './HomePageAnimation.vue'
         details: 'Combine data from multiple sources into a single unified store.',
       },
       {
+        icon: '🔔',
+        title: 'Subscriptions',
+        details: 'Connect to WebSockets or other real-time data sources for live updates.',
+      },
+      {
+        icon: '📵',
+        title: 'Offline',
+        details: 'Built-in support for offline-first applications with automatic data synchronization.',
+      },
+      {
         icon: '🧩',
         title: 'Plugin System',
         details: 'Fetch any data from any source with the very flexible plugin system.',
       },
-      {
-        icon: { src: '/nuxt.svg' },
-        title: 'Nuxt Module',
-        details: 'Handles SSR and integrates with Nuxt Devtools.',
-      },
+      // {
+      //   icon: { src: '/nuxt.svg' },
+      //   title: 'Nuxt Module',
+      //   details: 'Handles SSR and integrates with Nuxt Devtools.',
+      // },
+      // {
+      //   icon: { src: '/drizzle-logo.png' },
+      //   title: 'Nuxt + Drizzle',
+      //   details: 'Handles SSR and integrates with Nuxt Devtools.',
+      // },
+      // {
+      //   icon: { src: '/directus-logo.svg' },
+      //   title: 'Nuxt + Directus',
+      //   details: 'Handles SSR and integrates with Nuxt Devtools.',
+      // },
     ]"
     class="VPHomeFeatures"
   />

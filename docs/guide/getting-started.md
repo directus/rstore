@@ -12,6 +12,8 @@ Define a data collection and then run queries or execute mutations (create, upda
 - **Scale down** to small prototypes and **scale up** to big enterprise apps
 - Query API designed for **local-first** and **realtime**
 - **Form API** to handle form state and validation
+- **Subscriptions** for realtime updates
+- **Offline support** with automatic synchronization
 - **TypeScript support** with full autocomplete
 - **Nuxt module** with devtools
 
