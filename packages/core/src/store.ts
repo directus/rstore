@@ -101,9 +101,8 @@ export async function createStoreCore<
 
   // Setup plugins
 
-  for (const plugin of store.$plugins) {
-    await setupPlugin(store, plugin)
-  }
+  // Call all of the plugins simultaneously so Nuxt context is available in all plugins
+  await Promise.all(store.$plugins.map(plugin => setupPlugin(store, plugin)))
 
   // Init store hook
 

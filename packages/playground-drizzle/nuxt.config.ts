@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   modules: [
     '@nuxt/ui',
     // '@rstore/nuxt-drizzle',
-    // '../nuxt/src',
+    '../nuxt/src',
     '../nuxt-drizzle/src',
     '@vueuse/nuxt',
 
@@ -44,8 +44,5 @@ export default defineNuxtConfig({
   css: ['~/assets/style.css'],
   rstoreDrizzle: {
     ws: true,
-  },
-  experimental: {
-    asyncContext: true,
   },
 })
