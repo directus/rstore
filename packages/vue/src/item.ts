@@ -1,6 +1,6 @@
+import type { UpdateOptions } from '@rstore/core'
 import type { VueCollectionApi } from './api'
 import type { VueStore } from './store'
-import { peekFirst, peekMany, type UpdateOptions } from '@rstore/core'
 import { cloneInfo, type Collection, type CollectionDefaults, type ResolvedCollection, type ResolvedCollectionItem, type StandardSchemaV1, type StoreSchema, type WrappedItem, type WrappedItemBase, type WrappedItemUpdateFormOptions, type WrappedItemUpdateOptions } from '@rstore/shared'
 import { markRaw, type Ref } from 'vue'
 
@@ -118,28 +118,19 @@ export function wrapItem<
               const currentKey = on[key]!
               values[foreignKey] = Reflect.get(proxy, currentKey)
             }
-            const cacheResultForTarget = (relation.many ? peekMany : peekFirst)({
-              store,
+            const cacheResultForTarget = store.$cache.readItems({
               collection: targetCollection,
-              findOptions: {
-                filter: (foreignItem) => {
-                  for (const key in values) {
-                    if (foreignItem[key] !== values[key]) {
-                      return false
-                    }
+              filter: (foreignItem) => {
+                for (const key in values) {
+                  if (foreignItem[key] !== values[key]) {
+                    return false
                   }
-                  return true
-                },
+                }
+                return true
               },
-              force: true,
-            }).result
-            if (Array.isArray(cacheResultForTarget)) {
-              result.push(...cacheResultForTarget)
-            }
-            else if (cacheResultForTarget) {
-              result.push(cacheResultForTarget)
-              break
-            }
+              limit: relation.many ? undefined : 1,
+            })
+            result.push(...cacheResultForTarget)
           }
 
           let finalResult

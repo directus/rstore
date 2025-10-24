@@ -1,17 +1,9 @@
 import type { VueStore } from '../src/store'
-import { emptySchemas, peekMany } from '@rstore/core'
+import { emptySchemas } from '@rstore/core'
 import { createHooks, type ResolvedCollection, type StandardSchemaV1 } from '@rstore/shared'
 import { beforeEach, describe, expect, it, type Mock, type MockedFunction, vi } from 'vitest'
 import { markRaw, ref } from 'vue'
 import { wrapItem, type WrappedItemMetadata } from '../src/item'
-
-vi.mock('@rstore/core', async (importOriginal) => {
-  return {
-    ...(await importOriginal()),
-    peekFirst: vi.fn(),
-    peekMany: vi.fn(),
-  }
-})
 
 type Schema = [
   { name: 'testCollection' },
@@ -65,6 +57,9 @@ describe('wrapItem', () => {
         { name: 'relatedCollection', getKey: vi.fn(), computed: {}, relations: {} },
       ],
       $getFetchPolicy: () => 'cache-first',
+      $cache: {
+        readItems: vi.fn(),
+      },
       $hooks: createHooks(),
       relatedCollection: {
         peekMany: vi.fn(),
@@ -139,11 +134,8 @@ describe('wrapItem', () => {
       { id: 3, foreignKey: 1 },
       { id: 4, foreignKey: 2 },
     ] as any[]
-    ;(peekMany as MockedFunction<typeof peekMany>).mockImplementation(({ findOptions }) => {
-      const filter = findOptions!.filter as (item: any) => boolean
-      return {
-        result: relatedItems.filter(filter),
-      }
+    ;(mockStore.$cache.readItems as MockedFunction<typeof mockStore.$cache.readItems>).mockImplementation(({ filter }) => {
+      return relatedItems.filter(filter as any)
     })
     const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() }) as any
     expect(wrappedItem.relatedItems.length).toBe(2)
@@ -164,11 +156,8 @@ describe('wrapItem', () => {
       { meow: 'meow', foreignKey1: 1, foreignKey2: 2 },
       { meow: 'purr', foreignKey1: 1, foreignKey2: 3 },
     ] as any[]
-    ;(peekMany as MockedFunction<typeof peekMany>).mockImplementation(({ findOptions }) => {
-      const filter = findOptions!.filter as (item: any) => boolean
-      return {
-        result: relatedItems.filter(filter),
-      }
+    ;(mockStore.$cache.readItems as MockedFunction<typeof mockStore.$cache.readItems>).mockImplementation(({ filter }) => {
+      return relatedItems.filter(filter as any)
     })
     const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() }) as any
     expect(wrappedItem.relatedItems.length).toBe(1)
