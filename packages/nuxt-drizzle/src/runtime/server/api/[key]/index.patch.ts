@@ -20,6 +20,7 @@ export default defineEventHandler(async (event) => {
     query,
     body,
     transformQuery: (transform) => { transforms.push(transform) },
+    key,
   })
 
   const { table, primaryKeys } = getDrizzleTableFromCollection(collectionName)
@@ -63,6 +64,7 @@ export default defineEventHandler(async (event) => {
     body,
     result,
     setResult: (r) => { result = r },
+    key,
   })
 
   return result

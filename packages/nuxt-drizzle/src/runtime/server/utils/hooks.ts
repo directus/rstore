@@ -1,8 +1,9 @@
 import type { Awaitable } from '@rstore/shared'
+import type { Peer } from 'crossws'
 import type { InferSelectModel, Table, TableConfig } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { QueryObject } from 'ufo'
-import { createHooks } from 'hookable'
+import { createHooks } from './hookable'
 import { getDrizzleCollectionNameFromTable } from './index'
 
 export interface RstoreDrizzleMeta {
@@ -54,6 +55,26 @@ export interface RstoreDrizzleAfterHookPayload<TResult> extends RstoreDrizzleHoo
   setResult: (result: TResult) => void
 }
 
+export interface RstoreDrizzleItemBeforeHookPayload extends RstoreDrizzleBeforeHookPayload {
+  key: string
+}
+
+export interface RstoreDrizzleItemAfterHookPayload<TResult> extends RstoreDrizzleAfterHookPayload<TResult> {
+  key: string
+}
+
+export interface RstoreDrizzleRealtimePayload<TResult, TType extends 'created' | 'updated' | 'deleted' = 'created' | 'updated' | 'deleted'> {
+  collection: string
+  record: TResult
+  key: TType extends 'created' ? undefined : string
+  type: TType
+}
+
+export interface RstoreDrizzleRealtimeFilterPayload<TResult, TType extends 'created' | 'updated' | 'deleted' = 'created' | 'updated' | 'deleted'> extends RstoreDrizzleRealtimePayload<TResult, TType> {
+  peer: Peer
+  reject: () => void
+}
+
 export interface RstoreDrizzleHooks<
   TResult = any,
 > {
@@ -61,12 +82,13 @@ export interface RstoreDrizzleHooks<
   'index.get.after': (payload: RstoreDrizzleAfterHookPayload<Array<TResult>>) => Awaitable<void>
   'index.post.before': (payload: RstoreDrizzleBeforeHookPayload) => Awaitable<void>
   'index.post.after': (payload: RstoreDrizzleAfterHookPayload<TResult>) => Awaitable<void>
-  'item.get.before': (payload: RstoreDrizzleBeforeHookPayload) => Awaitable<void>
-  'item.get.after': (payload: RstoreDrizzleAfterHookPayload<TResult>) => Awaitable<void>
-  'item.patch.before': (payload: RstoreDrizzleBeforeHookPayload) => Awaitable<void>
-  'item.patch.after': (payload: RstoreDrizzleAfterHookPayload<TResult>) => Awaitable<void>
-  'item.delete.before': (payload: RstoreDrizzleBeforeHookPayload) => Awaitable<void>
-  'item.delete.after': (payload: RstoreDrizzleAfterHookPayload<TResult>) => Awaitable<void>
+  'item.get.before': (payload: RstoreDrizzleItemBeforeHookPayload) => Awaitable<void>
+  'item.get.after': (payload: RstoreDrizzleItemAfterHookPayload<TResult>) => Awaitable<void>
+  'item.patch.before': (payload: RstoreDrizzleItemBeforeHookPayload) => Awaitable<void>
+  'item.patch.after': (payload: RstoreDrizzleItemAfterHookPayload<TResult>) => Awaitable<void>
+  'item.delete.before': (payload: RstoreDrizzleItemBeforeHookPayload) => Awaitable<void>
+  'item.delete.after': (payload: RstoreDrizzleItemAfterHookPayload<TResult>) => Awaitable<void>
+  'realtime.filter': (payload: RstoreDrizzleRealtimeFilterPayload<TResult>) => Awaitable<void>
 }
 
 export const rstoreDrizzleHooks = createHooks<RstoreDrizzleHooks>()

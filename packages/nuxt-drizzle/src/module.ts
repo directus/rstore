@@ -5,7 +5,7 @@ import type { getTableConfig as pgGetTableConfig } from 'drizzle-orm/pg-core'
 import type { getTableConfig as singleStoreGetTableConfig } from 'drizzle-orm/singlestore-core'
 import type { getTableConfig as sqliteGetTableConfig } from 'drizzle-orm/sqlite-core'
 import fs from 'node:fs'
-import { addImports, addImportsDir, addServerHandler, addServerImports, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, updateTemplates, useLogger } from '@nuxt/kit'
+import { addImports, addImportsDir, addServerHandler, addServerImports, addServerPlugin, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, updateTemplates, useLogger } from '@nuxt/kit'
 import { createTableRelationsHelpers, getTableName, is, isTable, Many, One, Relations, type Table, type TableConfig } from 'drizzle-orm'
 import { createJiti } from 'jiti'
 import path from 'pathe'
@@ -34,6 +34,13 @@ export interface ModuleOptions {
    * @default '/api/rstore'
    */
   apiPath?: string
+
+  /**
+   * Enable WebSocket support for real-time updates
+   */
+  ws?: boolean | {
+    apiPath?: string
+  }
 }
 
 type AllTableConfig = TableConfig & (
@@ -467,16 +474,47 @@ ${collections.map((collection, index) => {
       })
     }
 
-    // Runtime config
-    addTemplate({
-      filename: '$rstore-drizzle-config.js',
-      getContents: () => `export const apiPath = ${JSON.stringify(apiPath)}\n`,
-    })
-
     const { addCollectionImport, addPluginImport } = await import('@rstore/nuxt/api')
 
     addCollectionImport(nuxt, '#build/$rstore-drizzle-collections.js')
 
     addPluginImport(nuxt, resolve('./runtime/plugin'))
+
+    // Realtime updates
+
+    const wsOptions = typeof options.ws === 'object' ? options.ws : {}
+    const wsApiPath = wsOptions.apiPath ?? `${apiPath}/realtime-ws`
+
+    if (options.ws) {
+      nuxt.options.nitro.experimental ??= {}
+      nuxt.options.nitro.experimental.websocket = true
+
+      addServerHandler({
+        handler: resolve('./runtime/server/api/realtime.ws'),
+        route: wsApiPath,
+      })
+
+      addServerPlugin(resolve('./runtime/server/plugins/publish-hooks'))
+
+      addPluginImport(nuxt, resolve('./runtime/plugin-realtime'))
+
+      addServerImports({
+        name: 'setPubSub',
+        from: resolve('./runtime/server/utils/pubsub'),
+        as: 'setRstoreDrizzlePubSub',
+      })
+
+      addServerImports([
+        'RstoreDrizzlePubSubChannels',
+        'RstoreDrizzlePubSub',
+      ].map(name => ({ from: resolve('./runtime/server/utils/pubsub'), name })))
+    }
+
+    // Runtime config
+    addTemplate({
+      filename: '$rstore-drizzle-config.js',
+      getContents: () => `export const apiPath = ${JSON.stringify(apiPath)}
+export const wsApiPath = ${JSON.stringify(wsApiPath)}\n`,
+    })
   },
 })

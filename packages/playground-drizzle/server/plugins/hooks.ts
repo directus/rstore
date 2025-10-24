@@ -42,6 +42,12 @@ export default defineNitroPlugin(() => {
     'item.patch.after': async (payload) => {
       console.log('Specific hook for todos - item.patch.after', payload.collection, payload.result.id)
     },
+    'realtime.filter': (payload) => {
+      if (payload.record.title === 'Error') {
+        console.log('Rejecting realtime update for todo with title "Error"')
+        payload.reject()
+      }
+    },
   })
 
   allowTables([

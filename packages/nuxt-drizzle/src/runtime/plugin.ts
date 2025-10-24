@@ -10,7 +10,7 @@ export default definePlugin({
 
   category: 'remote',
 
-  // @TODO multi directus instances
+  // @TODO multi drizzle instances
   scopeId: 'rstore-drizzle',
 
   setup({ addCollectionDefaults, hook }) {

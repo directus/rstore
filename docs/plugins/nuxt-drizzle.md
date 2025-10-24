@@ -23,6 +23,11 @@ import { VPFeatures } from 'vitepress/theme'
         details: 'Easily restrict the tables exposed through the API with the `allowTables` function.',
       },
       {
+        icon: '⚡',
+        title: 'Realtime',
+        details: 'Built-in support for realtime updates using WebSockets and Pub/Sub.',
+      },
+      {
         icon: '🔌',
         title: 'Hooks',
         details: 'Run code server-side before or after certain actions on the tables using hooks.',
@@ -202,6 +207,48 @@ export default defineNitroPlugin(() => {
 
 Any table that is not explicitly listed will throw on all API endpoints. `allowTables` can be called multiple times, and the allowed tables will be merged.
 
+## Realtime Updates
+
+You can enable realtime updates using WebSockets by setting the `rstoreDrizzle.ws` option in your Nuxt config:
+
+```ts
+export default defineNuxtConfig({
+  modules: [
+    '@rstore/nuxt-drizzle',
+  ],
+  rstoreDrizzle: {
+    ws: true,
+  },
+})
+```
+
+Then in your components, you can replace `query` with `liveQuery` (or manually call `subscribe`):
+
+```vue
+<script lang="ts" setup>
+const store = useStore()
+
+const { data: todos } = await store.todos.liveQuery(q => q.many())
+</script>
+```
+
+By default the module will use a in-memory Pub/Sub implementation. You can use a custom implementation (for example with Redis) by calling `setRstoreDrizzlePubSub` in a Nitro plugin:
+
+```ts
+// server/plugins/pubsub.ts
+export default defineNitroPlugin(() => {
+  setRstoreDrizzlePubSub({
+    subscribe: async (topic, callback) => {
+      // Subscribe to the topic using your Pub/Sub implementation
+      // and call the callback with the payload when a message is received
+    },
+    publish: async (topic, payload) => {
+      // Publish the payload to the topic using your Pub/Sub implementation
+    },
+  }) // interface is `RstoreDrizzlePubSub`
+})
+```
+
 ## Hooks
 
 You can use hooks to run code before or after certain actions on the collections. You can register global hooks for all collections using the `rstoreDrizzleHooks` import, or specific hooks for a given table using the `hooksForTable` function (recommended).
@@ -222,6 +269,7 @@ You can use the following hooks:
 - `item.patch.after` - after updating a single item
 - `item.delete.before` - before deleting a single item
 - `item.delete.after` - after deleting a single item
+- `realtime.filter` - before sending a realtime update, allows to reject the update by calling `payload.reject()`
 
 If you throw an error in a `before` hook, the action will be aborted and the error will be returned to the client.
 
@@ -238,6 +286,13 @@ export default defineNitroPlugin(() => {
     },
     'item.patch.after': async (payload) => {
       console.log('Specific hook for todos - item.patch.after', payload.collection, payload.result.id)
+    },
+    'realtime.filter': async (payload) => {
+      // Check for permissions here...
+      if (payload.record.title === 'Error') {
+        console.log('Rejecting realtime update for todo with title "Error"')
+        payload.reject()
+      }
     },
   })
 })

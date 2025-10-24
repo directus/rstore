@@ -10,8 +10,8 @@
   "dependencies": {
     "@libsql/client": "^0.14.0",
     "@rstore/nuxt-directus": "workspace:*",
-    "@vueuse/core": "^12.7.0",
-    "@vueuse/nuxt": "^12.7.0",
+    "@vueuse/core": "^14.0.0",
+    "@vueuse/nuxt": "^14.0.0",
     "drizzle-orm": "^0.40.0"
   },
   "devDependencies": {

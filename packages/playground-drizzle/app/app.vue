@@ -7,7 +7,7 @@ const store = useStore()
 
 const filter = ref<'all' | 'unfinished' | 'finished'>('all')
 const page = ref(0)
-const { data: todos, loading } = await store.todos.query(q => q.many({
+const { data: todos, loading } = await store.todos.liveQuery(q => q.many({
   where: filter.value === 'all' ? undefined : eq('completed', Number(filter.value === 'finished')),
   params: {
     limit: 10,
