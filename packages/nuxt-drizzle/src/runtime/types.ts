@@ -32,6 +32,11 @@ declare module '@rstore/vue' {
     with?: DrizzleWith
     columns?: DrizzleColumns
     orderBy?: DrizzleOrderBy
+
+    /**
+     * Keys to fetch for the fetchMany operation.
+     */
+    keys?: Array<string | number>
   }
 }
 

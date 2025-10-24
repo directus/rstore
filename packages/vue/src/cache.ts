@@ -1,7 +1,7 @@
 import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheState, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { VueStore } from './store'
 import { pickNonSpecialProps } from '@rstore/shared'
-import { computed, ref, type Ref, shallowRef, toValue } from 'vue'
+import { computed, markRaw, ref, type Ref, shallowRef, toValue } from 'vue'
 import { wrapItem, type WrappedItemMetadata } from './item'
 
 declare module '@rstore/shared' {
@@ -339,13 +339,13 @@ export function createCache<
         const existing = collectionState[key]
         if (!existing) {
           // Disable deep reactivity tracking inside the `data` object
-          collectionState[key] = shallowRef(data)
+          collectionState[key] = shallowRef(markRaw(data))
         }
         else {
-          collectionState[key] = {
+          collectionState[key] = markRaw({
             ...existing,
             ...data,
-          }
+          })
         }
       }
       if (marker) {

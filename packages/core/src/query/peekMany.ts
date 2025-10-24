@@ -36,7 +36,7 @@ export function peekMany<
 
   const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
-    let marker = defaultMarker(collection, findOptions)
+    let marker: string | undefined = defaultMarker(collection, findOptions)
     let overrideFilter: ((item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean) | undefined
 
     store.$hooks.callHookSync('beforeCacheReadMany', {

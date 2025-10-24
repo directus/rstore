@@ -46,7 +46,7 @@ export function peekFirst<
 
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let result: any
-    let marker = defaultMarker(collection, findOptions)
+    let marker: string | undefined = defaultMarker(collection, findOptions)
 
     store.$hooks.callHookSync('beforeCacheReadFirst', {
       store: store as unknown as GlobalStoreType,
@@ -104,7 +104,7 @@ export function peekFirst<
         // Try with first marker first
         let items = store.$cache.readItems({
           collection,
-          marker: force ? undefined : getMarker('first', marker),
+          marker: force || !marker ? undefined : getMarker('first', marker),
           filter: getFilter(),
         }) ?? []
 
@@ -112,7 +112,7 @@ export function peekFirst<
         if (!items.length) {
           items = store.$cache.readItems({
             collection,
-            marker: getMarker('many', marker),
+            marker: marker ? getMarker('many', marker) : undefined,
             filter: getFilter(),
           }) ?? []
         }

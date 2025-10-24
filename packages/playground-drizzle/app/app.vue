@@ -22,7 +22,11 @@ const { data: todos, loading } = await store.todos.liveQuery(q => q.many({
   },
 }))
 
-const createTodo = store.todos.createForm()
+const createTodo = store.todos.createForm({
+  defaultValues: () => ({
+    id: crypto.randomUUID(),
+  }),
+})
 const createInput = useTemplateRef('input')
 createTodo.$onSuccess(() => {
   createInput.value?.inputRef?.focus()

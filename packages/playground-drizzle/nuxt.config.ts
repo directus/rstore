@@ -44,5 +44,6 @@ export default defineNuxtConfig({
   css: ['~/assets/style.css'],
   rstoreDrizzle: {
     ws: true,
+    offline: true,
   },
 })

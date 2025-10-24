@@ -2,7 +2,7 @@ import type { Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOp
 import { createStoreCore, normalizeCollectionRelations, resolveCollection } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook } from '@vueuse/core'
-import { ref } from 'vue'
+import { reactive, ref } from 'vue'
 import { createCollectionApi, type VueCollectionApi } from './api'
 import { createCache } from './cache'
 
@@ -10,11 +10,30 @@ export interface CreateStoreOptions<
   TSchema extends StoreSchema = StoreSchema,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > {
+  /**
+   * The schema of the store with collections and relations.
+   */
   schema: TSchema
+  /**
+   * Default options for collections.
+   */
   collectionDefaults?: TCollectionDefaults
+  /**
+   * Plugins to extend the store functionality and handle multiple collections and data sources.
+   */
   plugins: Array<Plugin>
+  /**
+   * Default options for find queries.
+   */
   findDefaults?: Partial<FindOptions<any, any, any>>
+  /**
+   * Indicates whether the store is running on the server side.
+   */
   isServer?: boolean
+  /**
+   * Start a sync immediately after store creation.
+   */
+  syncImmediately?: boolean
   /**
    * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
    */
@@ -60,6 +79,7 @@ export async function createStore<
     hooks: createHooks(),
     findDefaults: options.findDefaults,
     isServer: options.isServer,
+    syncImmediately: options.syncImmediately,
     transformStore: (store) => {
       const privateStore = store as unknown as PrivateVueStore
 
@@ -83,6 +103,8 @@ export async function createStore<
       store.$hooks.hook('afterCacheReset', async () => {
         await cacheResetEvent.trigger()
       })
+
+      store.$syncState = reactive(store.$syncState)
 
       storeProxy = new Proxy(store, {
         get(_, key) {

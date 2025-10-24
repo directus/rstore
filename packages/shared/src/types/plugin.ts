@@ -1,6 +1,5 @@
 import type { CollectionDefaults, StoreSchema } from './collection.js'
 import type { HookDefinitions } from './hooks.js'
-import type { Awaitable } from './utils.js'
 
 export interface CustomPluginMeta {
   description?: string
@@ -25,7 +24,7 @@ export interface Plugin {
    * @param api
    * @returns
    */
-  setup: (api: PluginSetupApi) => Awaitable<void>
+  setup: (api: PluginSetupApi) => void
 
   /**
    * Allows scoping the plugin to specific collections with the same scopeId.

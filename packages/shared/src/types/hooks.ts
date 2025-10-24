@@ -77,7 +77,7 @@ export interface HookDefinitions<
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
       setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined, options?: AbortableOptions) => void
-      setMarker: (marker: string) => void
+      setMarker: (marker: string | undefined) => void
       /**
        * Don't call the remaining hooks in the queue.
        */
@@ -94,7 +94,7 @@ export interface HookDefinitions<
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
-      setMarker: (marker: string) => void
+      setMarker: (marker: string | undefined) => void
     }
   ) => void
 
@@ -129,7 +129,7 @@ export interface HookDefinitions<
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
       getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>, options?: AbortableOptions) => void
-      setMarker: (marker: string) => void
+      setMarker: (marker: string | undefined) => void
       /**
        * Don't call the remaining hooks in the queue.
        */
@@ -146,7 +146,7 @@ export interface HookDefinitions<
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key?: string | number
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
-      setMarker: (marker: string) => void
+      setMarker: (marker: string | undefined) => void
       setFilter: (filter: (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean) => void
     }
   ) => void
@@ -467,6 +467,49 @@ export interface HookDefinitions<
     payload: {
       store: GlobalStoreType
       layer: CacheLayer
+    }
+  ) => Awaitable<void>
+
+  sync: (
+    payload: {
+      store: GlobalStoreType
+      meta: CustomHookMeta
+      /**
+       * Update sync progress
+       */
+      setProgress: (info: { percent: number, message?: string }) => void
+      /**
+       * Mark a collection as loaded and ready to be used from local storage.
+       */
+      setCollectionLoaded: (collectionName: string) => void
+      /**
+       * Mark a collection as successfully synced with remote.
+       */
+      setCollectionSynced: (collectionName: string) => void
+    }
+  ) => Awaitable<void>
+
+  syncCollection: (
+    payload: {
+      store: GlobalStoreType
+      meta: CustomHookMeta
+      collection: ResolvedCollection<Collection, CollectionDefaults, TSchema>
+      /**
+       * Date of the last successful sync operation for the collection.
+       */
+      lastUpdatedAt?: Date
+      /**
+       * Items that were loaded from the local storage.
+       */
+      loadedItems: () => Array<ResolvedCollectionItemBase<Collection, CollectionDefaults, TSchema>>
+      /**
+       * Set the result items fetched from remote that should be saved in the local storage.
+       */
+      storeItems: (items: Array<ResolvedCollectionItemBase<Collection, CollectionDefaults, TSchema>>) => void
+      /**
+       * Delete items from the collection if they no longer exist on remote.
+       */
+      deleteItems: (keys: Array<string | number>) => void
     }
   ) => Awaitable<void>
 }

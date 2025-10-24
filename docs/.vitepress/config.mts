@@ -56,6 +56,7 @@ export default defineConfig({
             { text: 'Subscriptions', link: '/guide/data/live' },
             { text: 'Cache', link: '/guide/data/cache' },
             { text: 'Module', link: '/guide/data/module' },
+            { text: 'Offline', link: '/guide/data/offline' },
           ],
         },
         {
@@ -69,6 +70,7 @@ export default defineConfig({
           text: 'Migration',
           items: [
             { text: 'From 0.6 to 0.7', link: '/guide/migration/v0_7' },
+            { text: 'From 0.7 to 0.8', link: '/guide/migration/v0_8' },
           ],
         },
       ],

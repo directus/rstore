@@ -1,0 +1,47 @@
+{
+  "name": "@rstore/offline",
+  "type": "module",
+  "version": "0.7.7",
+  "description": "Rstore plugin to create an IndexedDB local data source.",
+  "repository": {
+    "url": "https://github.com/Akryum/rstore.git",
+    "type": "git",
+    "directory": "packages/offline"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",
+    "test:types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rstore/core": "workspace:^",
+    "@rstore/shared": "workspace:^"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "unbuild": "^3.2.0",
+    "vitest": "catalog:"
+  }
+}

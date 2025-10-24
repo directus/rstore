@@ -18,14 +18,19 @@ import { VPFeatures } from 'vitepress/theme'
         details: 'All collections are fully typed using your Drizzle schema.',
       },
       {
-        icon: '🔒',
-        title: 'Security',
-        details: 'Easily restrict the tables exposed through the API with the `allowTables` function.',
-      },
-      {
         icon: '⚡',
         title: 'Realtime',
         details: 'Built-in support for realtime updates using WebSockets and Pub/Sub.',
+      },
+      {
+        icon: '📡',
+        title: 'Offline Mode',
+        details: 'Builtin offline mode to allow your app to work seamlessly offline.',
+      },
+      {
+        icon: '🔒',
+        title: 'Security',
+        details: 'Easily restrict the tables exposed through the API with the `allowTables` function.',
       },
       {
         icon: '🔌',
@@ -207,7 +212,7 @@ export default defineNitroPlugin(() => {
 
 Any table that is not explicitly listed will throw on all API endpoints. `allowTables` can be called multiple times, and the allowed tables will be merged.
 
-## Realtime Updates
+## Realtime Updates <Badge text="New in v0.8" />
 
 You can enable realtime updates using WebSockets by setting the `rstoreDrizzle.ws` option in your Nuxt config:
 
@@ -246,6 +251,36 @@ export default defineNitroPlugin(() => {
       // Publish the payload to the topic using your Pub/Sub implementation
     },
   }) // interface is `RstoreDrizzlePubSub`
+})
+```
+
+## Offline Mode <Badge text="New in v0.8" />
+
+Turn on the offline mode by setting the `rstoreDrizzle.offline` option in your Nuxt config:
+
+```ts
+export default defineNuxtConfig({
+  modules: [
+    '@rstore/nuxt-drizzle',
+  ],
+  rstoreDrizzle: {
+    offline: true,
+  },
+})
+```
+
+The module will automatically add the `@rstore/offline` plugin to the store, enabling offline support for all collections. You can customize which collections have offline support with the `filterCollection` option:
+
+```ts
+export default defineNuxtConfig({
+  modules: [
+    '@rstore/nuxt-drizzle',
+  ],
+  rstoreDrizzle: {
+    offline: {
+      filterCollection: collection => collection.name.startsWith('offline'),
+    },
+  },
 })
 ```
 

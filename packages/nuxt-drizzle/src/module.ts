@@ -1,3 +1,4 @@
+import type { CreateOfflinePluginOptions } from '@rstore/offline'
 import type { Collection, CollectionRelation, CustomCollectionMeta } from '@rstore/shared'
 import type { Config as DrizzleKitConfig } from 'drizzle-kit'
 import type { getTableConfig as mysqlGetTableConfig } from 'drizzle-orm/mysql-core'
@@ -41,6 +42,16 @@ export interface ModuleOptions {
   ws?: boolean | {
     apiPath?: string
   }
+
+  /**
+   * Enable offline support
+   */
+  offline?: boolean | (CreateOfflinePluginOptions & {
+    /**
+     * Used in the query to synchronize the collections
+     */
+    serializeDateValue?: (date: Date) => any
+  })
 }
 
 type AllTableConfig = TableConfig & (
@@ -510,11 +521,38 @@ ${collections.map((collection, index) => {
       ].map(name => ({ from: resolve('./runtime/server/utils/pubsub'), name })))
     }
 
+    // Offline support
+
+    const offlineOptions = typeof options.offline === 'object' ? options.offline : (options.offline ? {} : null)
+
+    if (offlineOptions) {
+      const pluginFile = 'rstore-drizzle-offline-plugin.ts'
+      addTemplate({
+        filename: pluginFile,
+        write: true,
+        getContents: () => {
+          return `import { createOfflinePlugin } from '@rstore/offline'
+export default createOfflinePlugin({
+  filterCollections: ${offlineOptions.filterCollection ? offlineOptions.filterCollection.toString() : 'undefined'},
+  ...${JSON.stringify({
+    ...offlineOptions,
+  }, null, 2)}
+})`
+        },
+      })
+
+      addPluginImport(nuxt, `#build/${pluginFile}`)
+
+      addPluginImport(nuxt, resolve('./runtime/plugin-offline'))
+    }
+
     // Runtime config
     addTemplate({
       filename: '$rstore-drizzle-config.js',
       getContents: () => `export const apiPath = ${JSON.stringify(apiPath)}
-export const wsApiPath = ${JSON.stringify(wsApiPath)}\n`,
+export const wsApiPath = ${JSON.stringify(wsApiPath)}
+export const dialect = '${drizzleConfig.dialect}'
+export const syncSerializeDateValue = ${offlineOptions?.serializeDateValue ? offlineOptions.serializeDateValue.toString() : 'undefined'}\n`,
     })
   },
 })

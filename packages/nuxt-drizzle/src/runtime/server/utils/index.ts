@@ -10,12 +10,13 @@ import { createError } from 'h3'
 export type Dialect = 'postgresql' | 'mysql' | 'singlestore' | 'sqlite' | 'gel' | 'turso'
 
 export interface RstoreDrizzleQueryParams {
-  where?: string
-  limit?: string
-  offset?: string
+  where?: any
+  limit?: number
+  offset?: number
   orderBy?: string | string[]
-  with?: string
-  columns?: string
+  with?: any
+  columns?: any
+  keys?: Array<string | number>
 }
 
 export type RstoreDrizzleQueryParamsOne = Omit<RstoreDrizzleQueryParams, 'limit' | 'offset' | 'orderBy'>

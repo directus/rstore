@@ -40,4 +40,41 @@ export interface StoreCore<
    * @private
    */
   $wrapMutation: <TMutation> (mutation: TMutation) => TMutation & MutationSpecialProps
+  /**
+   * Synchronize the store offline storage with remote.
+   */
+  $sync: () => Promise<void>
+  /**
+   * The state of synchronization of the store.
+   */
+  $syncState: {
+    /**
+     * Whether the store is currently syncing.
+     */
+    isSyncing: boolean
+    /**
+     * Progress percentage of the sync operation (0-1).
+     */
+    progress?: number
+    /**
+     * Optional progress message.
+     */
+    progressMessage?: string
+    /**
+     * Date of the last successful sync operation.
+     */
+    lastSyncAt?: Date
+    /**
+     * Error encountered during the last sync operation.
+     */
+    error?: Error
+    /**
+     * Collection that are ready to be used from local storage.
+     */
+    loadedCollections: Set<string>
+    /**
+     * Collections that have been successfully synced with remote.
+     */
+    syncedCollections: Set<string>
+  }
 }

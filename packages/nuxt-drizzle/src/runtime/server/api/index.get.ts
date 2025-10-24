@@ -1,7 +1,8 @@
 import type { RelationalQueryBuilder } from 'drizzle-orm/pg-core/query-builders/query'
-import { and, asc, desc, sql } from 'drizzle-orm'
+import { and, asc, desc, or, sql } from 'drizzle-orm'
 import { createError, eventHandler, getQuery, getRouterParams } from 'h3'
-import { getDrizzleCondition, getDrizzleTableFromCollection, type RstoreDrizzleQueryParams, rstoreUseDrizzle } from '../utils'
+import SuperJSON from 'superjson'
+import { getDrizzleCondition, getDrizzleKeyWhere, getDrizzleTableFromCollection, type RstoreDrizzleQueryParams, rstoreUseDrizzle } from '../utils'
 import { rstoreDrizzleHooks, type RstoreDrizzleMeta, type RstoreDrizzleTransformQuery } from '../utils/hooks'
 
 const orderByOperators = {
@@ -15,7 +16,7 @@ export default eventHandler(async (event) => {
 
   const params = getRouterParams(event) as { collection: string }
   const { collection: collectionName } = params
-  const query = getQuery(event) as RstoreDrizzleQueryParams
+  const query = SuperJSON.parse(getQuery(event).superjson as any) as RstoreDrizzleQueryParams
 
   await rstoreDrizzleHooks.callHook('index.get.before', {
     event,
@@ -26,7 +27,7 @@ export default eventHandler(async (event) => {
     transformQuery: (transform) => { transforms.push(transform) },
   })
 
-  const { table } = getDrizzleTableFromCollection(collectionName)
+  const { table, primaryKeys } = getDrizzleTableFromCollection(collectionName)
 
   const dbQuery = rstoreUseDrizzle().query as unknown as Record<string, RelationalQueryBuilder<any, any>>
 
@@ -34,9 +35,14 @@ export default eventHandler(async (event) => {
 
   const whereConditions: any[] = []
 
+  if (query.keys) {
+    const keyConditions = query.keys.map(key => getDrizzleKeyWhere(String(key), primaryKeys, table))
+    whereConditions.push(or(...keyConditions))
+  }
+
   if (query.where) {
     try {
-      const where = JSON.parse(query.where as string) as any
+      const where = query.where
       if (where) {
         const condition = getDrizzleCondition(table, where)
         whereConditions.push(condition)
@@ -63,19 +69,19 @@ export default eventHandler(async (event) => {
   q.where = whereConditions.length ? and(...whereConditions) : undefined
 
   if (query.limit != null) {
-    q.limit = Number.parseInt(query.limit)
+    q.limit = query.limit
   }
 
   if (query.offset != null) {
-    q.offset = Number.parseInt(query.offset)
+    q.offset = query.offset
   }
 
   if (query.with) {
-    q.with = JSON.parse(query.with)
+    q.with = query.with
   }
 
   if (query.columns) {
-    q.columns = JSON.parse(query.columns)
+    q.columns = query.columns
   }
 
   q.extras = extras

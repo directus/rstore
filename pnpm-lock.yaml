@@ -209,6 +209,9 @@ importers:
       '@rstore/nuxt':
         specifier: workspace:^
         version: link:../nuxt
+      '@rstore/offline':
+        specifier: workspace:^
+        version: link:../offline
       '@rstore/shared':
         specifier: workspace:^
         version: link:../shared
@@ -227,6 +230,9 @@ importers:
       pathe:
         specifier: ^2.0.3
         version: 2.0.3
+      superjson:
+        specifier: ^2.2.3
+        version: 2.2.3
     devDependencies:
       '@nuxt/devtools':
         specifier: ^2.3.0
@@ -258,6 +264,25 @@ importers:
       vue-tsc:
         specifier: 'catalog:'
         version: 3.1.1(typescript@5.9.3)
+
+  packages/offline:
+    dependencies:
+      '@rstore/core':
+        specifier: workspace:^
+        version: link:../core
+      '@rstore/shared':
+        specifier: workspace:^
+        version: link:../shared
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      unbuild:
+        specifier: ^3.2.0
+        version: 3.6.1(typescript@5.9.3)(vue-tsc@3.1.1(typescript@5.9.3))(vue@3.5.22(typescript@5.9.3))
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.9.1)(jiti@2.6.1)(lightningcss@1.30.2)(terser@5.44.0)(yaml@2.8.1)
 
   packages/playground:
     dependencies:

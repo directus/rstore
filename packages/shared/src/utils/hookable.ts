@@ -83,16 +83,16 @@ export class Hookable<
     return returned
   }
 
-  // callHookWith<
-  //   NameT extends HookNameT,
-  //   CallFunction extends (hooks: HooksT[NameT][]) => any,
-  // >(
-  //   caller: CallFunction,
-  //   name: NameT,
-  // ): ReturnType<CallFunction> {
-  //   const result = caller(name in this._hooks ? [...this._hooks[name]] : [] as any[])
-  //   return result
-  // }
+  callHookWith<
+    NameT extends HookNameT,
+    CallFunction extends (hooks: Array<{ callback: HooksT[NameT] }>) => any,
+  >(
+    name: NameT,
+    caller: CallFunction,
+  ): ReturnType<CallFunction> {
+    const result = caller(name in this._hooks ? [...this._hooks[name]!] : [] as any[])
+    return result
+  }
 }
 
 export function createHooks<T extends Record<string, any>>(): Hookable<T> {

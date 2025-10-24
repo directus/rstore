@@ -2,7 +2,7 @@ import type { UpdateOptions } from '@rstore/core'
 import type { VueCollectionApi } from './api'
 import type { VueStore } from './store'
 import { cloneInfo, type Collection, type CollectionDefaults, type ResolvedCollection, type ResolvedCollectionItem, type StandardSchemaV1, type StoreSchema, type WrappedItem, type WrappedItemBase, type WrappedItemUpdateFormOptions, type WrappedItemUpdateOptions } from '@rstore/shared'
-import { markRaw, type Ref } from 'vue'
+import { markRaw, type Ref, toRaw } from 'vue'
 
 export interface WrapItemOptions<
   TCollection extends Collection,
@@ -86,6 +86,9 @@ export function wrapItem<
 
         case '$meta':
           return metadata
+
+        case '$raw':
+          return () => toRaw(item.value)
 
         case 'toJSON':
           return () => item.value
@@ -226,6 +229,7 @@ declare module '@rstore/shared' {
     TSchema extends StoreSchema,
   > {
     $meta: WrappedItemMetadata<TCollection, TCollectionDefaults, TSchema>
+    $raw: () => ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
   }
 }
 

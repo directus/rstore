@@ -2,6 +2,7 @@
 import { apiPath } from '#build/$rstore-drizzle-config.js'
 import { useRequestFetch } from '#imports'
 import { definePlugin, type VueStore } from '@rstore/vue'
+import SuperJSON from 'superjson'
 import { and, eq } from './utils/where'
 import { filterWhere } from './where'
 
@@ -37,7 +38,7 @@ export default definePlugin({
     hook('fetchFirst', async (payload) => {
       if (payload.key) {
         const result = await requestFetch(`${apiPath}/${payload.collection.name}/${payload.key}`, {
-          query: payload.findOptions?.params,
+          query: { superjson: SuperJSON.stringify(payload.findOptions?.params) },
         })
         if (result) {
           payload.setResult(result)
@@ -48,11 +49,11 @@ export default definePlugin({
       }
       else {
         const result: any = await requestFetch(`${apiPath}/${payload.collection.name}`, {
-          query: {
+          query: { superjson: SuperJSON.stringify({
             where: payload.findOptions?.where,
             ...payload.findOptions?.params,
             limit: 1,
-          },
+          }) },
         })
         payload.setResult(result?.[0])
       }
@@ -61,10 +62,10 @@ export default definePlugin({
     hook('fetchMany', async (payload) => {
       // @ts-expect-error excessive stack depth
       payload.setResult(await requestFetch(`${apiPath}/${payload.collection.name}`, {
-        query: {
+        query: { superjson: SuperJSON.stringify({
           where: payload.findOptions?.where,
           ...payload.findOptions?.params,
-        },
+        }) },
       }))
     })
 
@@ -156,7 +157,7 @@ export default definePlugin({
     hook('createItem', async (payload) => {
       const result: any = await requestFetch(`${apiPath}/${payload.collection.name}`, {
         method: 'POST',
-        body: payload.item,
+        body: SuperJSON.stringify(payload.item),
       })
       payload.setResult(result)
     })
@@ -164,10 +165,10 @@ export default definePlugin({
     hook('updateItem', async (payload) => {
       const result: any = await requestFetch(`${apiPath}/${payload.collection.name}/${payload.key}`, {
         method: 'PATCH',
-        body: {
+        body: SuperJSON.stringify({
           ...payload.item,
           id: undefined,
-        },
+        }),
       })
       payload.setResult(result)
     })

@@ -17,6 +17,7 @@ export interface CreateStoreCoreOptions<
   findDefaults?: Partial<FindOptions<any, any, any>>
   isServer?: boolean
   transformStore?: (store: StoreCore<TSchema, TCollectionDefaults>) => StoreCore<TSchema, TCollectionDefaults>
+  syncImmediately?: boolean
 }
 
 export async function createStoreCore<
@@ -85,6 +86,63 @@ export async function createStoreCore<
     $dedupePromises: new Map(),
     $registeredModules: new Map(),
     $wrapMutation: mutation => mutation as typeof mutation & MutationSpecialProps,
+    async $sync() {
+      store.$syncState.isSyncing = true
+      store.$syncState.error = undefined
+      store.$syncState.loadedCollections.clear()
+      store.$syncState.syncedCollections.clear()
+      try {
+        const meta: CustomHookMeta = {}
+
+        await store.$hooks.callHookWith('sync', async (callbacks) => {
+          let globalProgress = 0
+          for (const { callback } of callbacks) {
+            let callbackProgress = 0
+            await callback({
+              store: store as any,
+              meta,
+              setProgress: ({ percent, message }) => {
+                callbackProgress = percent
+                store.$syncState.progress = globalProgress + (callbackProgress / callbacks.length)
+                store.$syncState.progressMessage = message
+              },
+              setCollectionLoaded: (collectionName) => {
+                store.$syncState.loadedCollections.add(collectionName)
+              },
+              setCollectionSynced: (collectionName) => {
+                store.$syncState.syncedCollections.add(collectionName)
+              },
+            })
+            globalProgress += 1 / callbacks.length
+            store.$syncState.progress = globalProgress
+          }
+        })
+
+        store.$syncState.lastSyncAt = new Date()
+        window.localStorage.setItem('rstore-last-sync-at', store.$syncState.lastSyncAt.toISOString())
+      }
+      catch (error) {
+        store.$syncState.error = error as Error
+      }
+      finally {
+        store.$syncState.isSyncing = false
+      }
+    },
+    $syncState: {
+      isSyncing: false,
+      lastSyncAt: getLastSyncedAt(),
+      loadedCollections: new Set(),
+      syncedCollections: new Set(),
+    },
+  }
+
+  function getLastSyncedAt(): Date | undefined {
+    if (typeof window != 'undefined') {
+      const timestamp = window.localStorage.getItem('rstore-last-sync-at')
+      if (timestamp) {
+        return new Date(Number(timestamp))
+      }
+    }
   }
 
   for (const item of options.schema) {
@@ -101,8 +159,7 @@ export async function createStoreCore<
 
   // Setup plugins
 
-  // Call all of the plugins simultaneously so Nuxt context is available in all plugins
-  await Promise.all(store.$plugins.map(plugin => setupPlugin(store, plugin)))
+  store.$plugins.forEach(plugin => setupPlugin(store, plugin))
 
   // Init store hook
 
@@ -168,6 +225,10 @@ export async function createStoreCore<
       }
     }
   })
+
+  if (!store.$isServer && (options.syncImmediately ?? true)) {
+    store.$sync()
+  }
 
   return store
 }

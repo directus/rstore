@@ -1,6 +1,7 @@
 import type { RelationalQueryBuilder } from 'drizzle-orm/pg-core/query-builders/query'
 import { and } from 'drizzle-orm'
 import { defineEventHandler, getQuery, getRouterParams } from 'h3'
+import SuperJSON from 'superjson'
 import { getDrizzleKeyWhere, getDrizzleTableFromCollection, type RstoreDrizzleQueryParamsOne, rstoreUseDrizzle } from '../../utils'
 import { rstoreDrizzleHooks, type RstoreDrizzleMeta, type RstoreDrizzleTransformQuery } from '../../utils/hooks'
 
@@ -10,7 +11,7 @@ export default defineEventHandler(async (event) => {
 
   const params = getRouterParams(event) as { collection: string, key: string }
   const { collection: collectionName, key } = params
-  const query = getQuery(event) as RstoreDrizzleQueryParamsOne
+  const query = SuperJSON.parse(getQuery(event).superjson as any) as RstoreDrizzleQueryParamsOne
 
   await rstoreDrizzleHooks.callHook('item.get.before', {
     event,
@@ -41,8 +42,8 @@ export default defineEventHandler(async (event) => {
       getDrizzleKeyWhere(key, primaryKeys, table),
       ...whereConditions,
     ),
-    with: query.with ? JSON.parse(query.with) : undefined,
-    columns: query.columns ? JSON.parse(query.columns) : undefined,
+    with: query.with,
+    columns: query.columns,
     extras,
   })
 

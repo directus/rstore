@@ -1,5 +1,6 @@
 import { and } from 'drizzle-orm'
-import { defineEventHandler, getQuery, getRouterParams, readBody } from 'h3'
+import { defineEventHandler, getQuery, getRouterParams, readRawBody } from 'h3'
+import SuperJSON from 'superjson'
 import { getDrizzleDialect, getDrizzleKeyWhere, getDrizzleTableFromCollection, rstoreUseDrizzle } from '../../utils'
 import { rstoreDrizzleHooks, type RstoreDrizzleMeta, type RstoreDrizzleTransformQuery } from '../../utils/hooks'
 
@@ -10,7 +11,7 @@ export default defineEventHandler(async (event) => {
   const params = getRouterParams(event) as { collection: string, key: string }
   const { collection: collectionName, key } = params
   const query = getQuery(event)
-  const body = await readBody(event)
+  const body = SuperJSON.parse((await readRawBody(event)) ?? '') as Record<string, any>
 
   await rstoreDrizzleHooks.callHook('item.patch.before', {
     event,
