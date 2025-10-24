@@ -483,7 +483,7 @@ ${collections.map((collection, index) => {
     // Realtime updates
 
     const wsOptions = typeof options.ws === 'object' ? options.ws : {}
-    const wsApiPath = wsOptions.apiPath ?? `${apiPath}/realtime-ws`
+    const wsApiPath = wsOptions.apiPath ?? `/api/rstore-realtime/ws`
 
     if (options.ws) {
       nuxt.options.nitro.experimental ??= {}
