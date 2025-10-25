@@ -1,7 +1,7 @@
 {
   "name": "@rstore/core",
   "type": "module",
-  "version": "0.7.8",
+  "version": "0.8.0",
   "description": "Reactive Store",
   "repository": {
     "url": "https://github.com/Akryum/rstore.git",

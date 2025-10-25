@@ -1,7 +1,7 @@
 {
   "name": "@rstore/nuxt-directus",
   "type": "module",
-  "version": "0.7.8",
+  "version": "0.8.0",
   "description": "rstore + nuxt + directus",
   "license": "MIT",
   "repository": {

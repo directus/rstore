@@ -1,6 +1,41 @@
 # Changelog
 
 
+## v0.8.0
+
+[compare changes](https://github.com/Akryum/rstore/compare/v0.7.8...v0.8.0)
+
+### 🚀 Enhancements
+
+- Revamped cache and layers for faster performance ([2b59e9b](https://github.com/Akryum/rstore/commit/2b59e9b))
+- **nuxt:** Newer nuxt dependency and related improvements ([baa8497](https://github.com/Akryum/rstore/commit/baa8497))
+- **query:** Use onServerPrefetch to allow SSR without awaiting the query in script setup ([1f3394f](https://github.com/Akryum/rstore/commit/1f3394f))
+- **drizzle:** Realtime updates with websockets ([1070ed5](https://github.com/Akryum/rstore/commit/1070ed5))
+- Offline ([9556f2b](https://github.com/Akryum/rstore/commit/9556f2b))
+
+### 🔥 Performance
+
+- Simpler relation lookup ([1e0319f](https://github.com/Akryum/rstore/commit/1e0319f))
+
+### 🩹 Fixes
+
+- Call plugin setup simultaneously so they have the Nuxt context, preventing errors ([d0ec259](https://github.com/Akryum/rstore/commit/d0ec259))
+- **directus:** Import form `#imports` instead of `nuxt/app` ([6c854e4](https://github.com/Akryum/rstore/commit/6c854e4))
+- **drizzle:** Use `/api/rstore-realtime/ws` as default websocket path ([420ee34](https://github.com/Akryum/rstore/commit/420ee34))
+
+### 📖 Documentation
+
+- New home page design ([373b13d](https://github.com/Akryum/rstore/commit/373b13d))
+- More homepage content ([9beb2c5](https://github.com/Akryum/rstore/commit/9beb2c5))
+
+### 🏡 Chore
+
+- Update pnpm ([5c05331](https://github.com/Akryum/rstore/commit/5c05331))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.7.8
 
 [compare changes](https://github.com/directus/rstore/compare/v0.7.7...v0.7.8)
