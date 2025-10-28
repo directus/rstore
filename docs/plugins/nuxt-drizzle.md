@@ -42,7 +42,9 @@ import { VPFeatures } from 'vitepress/theme'
   />
 </div>
 
-[Online Demo](https://codesandbox.io/p/devbox/wonderful-sun-s4cgl6)
+[Online Demo](https://pokemon.akryum.dev) ([source code](https://github.com/Akryum/rstore-pokemon))
+
+[Codesandbox](https://codesandbox.io/p/devbox/wonderful-sun-s4cgl6)
 
 In case you are using [Drizzle](https://orm.drizzle.team), you can install the `@rstore/nuxt-drizzle` module instead of `@rstore/nuxt` to automatically generate the collections and plugins from your drizzle schema.
 
