@@ -16,7 +16,7 @@ export default eventHandler(async (event) => {
 
   const params = getRouterParams(event) as { collection: string }
   const { collection: collectionName } = params
-  const query = SuperJSON.parse(getQuery(event).superjson as any) as RstoreDrizzleQueryParams
+  const query = (SuperJSON.parse(getQuery(event).superjson as any) ?? {}) as RstoreDrizzleQueryParams
 
   await rstoreDrizzleHooks.callHook('index.get.before', {
     event,
