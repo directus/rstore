@@ -44,6 +44,23 @@ export function createCache<
   const wrappedItemsMetadata = new Map<string, WrappedItemMetadata<Collection, TCollectionDefaults, TSchema>>()
   const wrappedItemKeysPerLayer = new Map<string, Set<string>>()
 
+  const collectionStateCache = new Map<string, Record<string | number, any>>()
+  const collectionStateCacheReactivityMarker = new Map<string, Ref<number>>()
+
+  function ensureCollectionStateCacheReactivityMarker(collectionName: string) {
+    let marker = collectionStateCacheReactivityMarker.get(collectionName)
+    if (!marker) {
+      marker = ref(0)
+      collectionStateCacheReactivityMarker.set(collectionName, marker)
+    }
+    return marker
+  }
+
+  function invalidateCollectionStateCache(collectionName: string) {
+    collectionStateCache.delete(collectionName)
+    ensureCollectionStateCacheReactivityMarker(collectionName).value++
+  }
+
   function getItemWrapKey(collection: ResolvedCollection<any, any, any>, key: string | number, layer: CacheLayer | undefined) {
     return [layer?.id, collection.name, key].filter(Boolean).join(':')
   }
@@ -131,6 +148,7 @@ export function createCache<
     const collectionState = ensureCollectionRef(collection.name).value
     const item = collectionState[key]
     if (item) {
+      invalidateCollectionStateCache(collection.name)
       delete collectionState[key]
       const wrapKey = getItemWrapKey(collection, key, undefined)
       wrappedItems.delete(wrapKey)
@@ -161,49 +179,65 @@ export function createCache<
   }
 
   function getStateForCollection(collectionName: string) {
+    // eslint-disable-next-line ts/no-unused-expressions
+    ensureCollectionStateCacheReactivityMarker(collectionName).value // Track reactivity
+
+    const cached = collectionStateCache.get(collectionName)
+    if (cached) {
+      return cached
+    }
+
     let copied = false
     let result = ensureCollectionRef(collectionName).value
 
     // Add & modify from layers
-    const collectionLayersRef = layers[collectionName] ??= shallowRef([])
-    const collectionLayers = collectionLayersRef.value
-    for (const layer of collectionLayers) {
-      if (!layer.skip) {
-        // Lazy copy the state if needed
-        if (!copied) {
-          result = Object.assign({}, result)
-          copied = true
-        }
-
-        const layerState: Record<string | number, any> = {}
-        for (const [key, value] of Object.entries(layer.state)) {
-          const data = {
-            ...result[key],
-            ...value,
-            $layer: layer,
+    const collectionLayersRef = layers[collectionName]
+    if (collectionLayersRef) {
+      const collectionLayers = collectionLayersRef.value
+      for (const layer of collectionLayers) {
+        if (!layer.skip) {
+          // Lazy copy the state if needed
+          if (!copied) {
+            result = Object.assign({}, result)
+            copied = true
           }
-          layerState[key] = data
+
+          const layerState: Record<string | number, any> = {}
+          for (const [key, value] of Object.entries(layer.state)) {
+            const data = {
+              ...result[key],
+              ...value,
+              $layer: layer,
+            }
+            layerState[key] = data
+          }
+          Object.assign(result, layerState)
         }
-        Object.assign(result, layerState)
+      }
+
+      // Delete from layers
+      for (const layer of collectionLayers) {
+        if (!layer.skip && layer.deletedItems) {
+          // Lazy copy the state if needed
+          if (!copied) {
+            result = Object.assign({}, result)
+            copied = true
+          }
+
+          for (const key of layer.deletedItems) {
+            delete result[key]
+          }
+        }
       }
     }
 
-    // Delete from layers
-    for (const layer of collectionLayers) {
-      if (!layer.skip && layer.deletedItems) {
-        // Lazy copy the state if needed
-        if (!copied) {
-          result = Object.assign({}, result)
-          copied = true
-        }
-
-        for (const key of layer.deletedItems) {
-          delete result[key]
-        }
-      }
-    }
+    collectionStateCache.set(collectionName, result)
 
     return result
+  }
+
+  function ensureLayersForCollection(collectionName: string) {
+    return layers[collectionName] ??= shallowRef([])
   }
 
   function removeLayer(layerId: string) {
@@ -219,6 +253,7 @@ export function createCache<
     const index = collectionLayers.findIndex(l => l.id === layerId)
     if (index !== -1) {
       const layer = collectionLayers[index]!
+      invalidateCollectionStateCache(layer.collectionName)
       const keys = wrappedItemKeysPerLayer.get(layer.id)
       if (keys) {
         for (const key of keys) {
@@ -270,6 +305,8 @@ export function createCache<
       return result
     },
     writeItem({ collection, key, item, marker, fromWriteItems, meta }) {
+      invalidateCollectionStateCache(collection.name)
+
       const collectionState = ensureCollectionRef(collection.name).value
       const isFrozen = Object.isFrozen(item)
       if (isFrozen) {
@@ -471,6 +508,7 @@ export function createCache<
 
       wrappedItems.clear()
       wrappedItemsMetadata.clear()
+      collectionStateCache.clear()
 
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', {
@@ -488,6 +526,7 @@ export function createCache<
       }
       wrappedItems.clear()
       wrappedItemsMetadata.clear()
+      collectionStateCache.clear()
 
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', {
@@ -496,6 +535,7 @@ export function createCache<
       })
     },
     clearCollection({ collection }) {
+      invalidateCollectionStateCache(collection.name)
       const itemsForType = state.collections[collection.name]
       if (itemsForType) {
         for (const key in itemsForType.value) {
@@ -522,8 +562,9 @@ export function createCache<
       }
     },
     addLayer(layer) {
+      invalidateCollectionStateCache(layer.collectionName)
       removeLayer(layer.id)
-      const collectionLayersRef = layers[layer.collectionName] ??= shallowRef([])
+      const collectionLayersRef = ensureLayersForCollection(layer.collectionName)
       collectionLayersRef.value = [...collectionLayersRef.value, layer]
       layerIdToCollectionName[layer.id] = layer.collectionName
       const store = getStore()
@@ -537,10 +578,7 @@ export function createCache<
       if (!collectionName) {
         return undefined
       }
-      const collectionLayers = layers[collectionName]
-      if (!collectionLayers) {
-        return undefined
-      }
+      const collectionLayers = ensureLayersForCollection(collectionName)
       return collectionLayers.value.find(l => l.id === layerId)
     },
     removeLayer,
@@ -550,6 +588,7 @@ export function createCache<
       wrappedItemsMetadata,
       getWrappedItem,
       layers,
+      ensureLayersForCollection,
     },
   } satisfies Cache & {
     _private: {
@@ -558,6 +597,7 @@ export function createCache<
       wrappedItemsMetadata: typeof wrappedItemsMetadata
       getWrappedItem: typeof getWrappedItem
       layers: typeof layers
+      ensureLayersForCollection: typeof ensureLayersForCollection
     }
   } as any
 }
