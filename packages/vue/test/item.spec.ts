@@ -78,26 +78,26 @@ describe('wrapItem', () => {
   })
 
   it('should return a proxy with $collection property', () => {
-    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata(), relationCache: ref(new Map()) })
     expect(wrappedItem.$collection).toBe('testCollection')
   })
 
   it('should return the key using $getKey', () => {
     mockCollection.getKey.mockReturnValue('itemKey')
-    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata(), relationCache: ref(new Map()) })
     expect(wrappedItem.$getKey()).toBe('itemKey')
   })
 
   it('should throw an error if key is undefined in $getKey', () => {
     mockCollection.getKey.mockReturnValue(undefined)
-    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata(), relationCache: ref(new Map()) })
     expect(() => wrappedItem.$getKey()).toThrow('Key is undefined on item')
   })
 
   it('should call updateForm with correct arguments in $updateForm', async () => {
     const mockForm = { $schema: null }
     ;(mockStore.testCollection.updateForm as MockedFunction<any>).mockResolvedValue(mockForm)
-    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata(), relationCache: ref(new Map()) })
     const schema = { type: 'object' } as unknown as StandardSchemaV1
     const form = await wrappedItem.$updateForm({ schema })
     expect(mockStore.testCollection.updateForm).toHaveBeenCalledWith(
@@ -108,7 +108,7 @@ describe('wrapItem', () => {
   })
 
   it('should call update with correct arguments in $update', () => {
-    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata(), relationCache: ref(new Map()) })
     wrappedItem.$update({ name: 'updatedName' })
     expect(mockStore.testCollection.update).toHaveBeenCalledWith(
       { name: 'updatedName' },
@@ -117,14 +117,14 @@ describe('wrapItem', () => {
   })
 
   it('should call delete with correct arguments in $delete', () => {
-    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata(), relationCache: ref(new Map()) })
     wrappedItem.$delete()
     expect(mockStore.testCollection.delete).toHaveBeenCalledWith(1)
   })
 
   it('should resolve computed properties', () => {
     mockCollection.computed.computedProp.mockReturnValue('computedValue')
-    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() }) as any
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata(), relationCache: ref(new Map()) }) as any
     expect(wrappedItem.computedProp).toBe('computedValue')
   })
 
@@ -137,7 +137,7 @@ describe('wrapItem', () => {
     ;(mockStore.$cache.readItems as MockedFunction<typeof mockStore.$cache.readItems>).mockImplementation(({ filter }) => {
       return relatedItems.filter(filter as any)
     })
-    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() }) as any
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata(), relationCache: ref(new Map()) }) as any
     expect(wrappedItem.relatedItems.length).toBe(2)
     expect(wrappedItem.relatedItems[0].id).toBe(2)
     expect(wrappedItem.relatedItems[1].id).toBe(3)
@@ -159,13 +159,13 @@ describe('wrapItem', () => {
     ;(mockStore.$cache.readItems as MockedFunction<typeof mockStore.$cache.readItems>).mockImplementation(({ filter }) => {
       return relatedItems.filter(filter as any)
     })
-    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() }) as any
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata(), relationCache: ref(new Map()) }) as any
     expect(wrappedItem.relatedItems.length).toBe(1)
     expect(wrappedItem.relatedItems[0].meow).toBe('meow')
   })
 
   it('should throw an error when trying to set a property', () => {
-    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata() })
+    const wrappedItem = wrapItem<any, any, Schema>({ store: mockStore, collection: mockCollection, item: mockItem, metadata: createMetadata(), relationCache: ref(new Map()) })
     expect(() => {
       (wrappedItem as any).newProp = 'value'
     }).toThrow('Items are read-only. Use `item.$updateForm()` to update the item.')

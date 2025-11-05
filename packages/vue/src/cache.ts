@@ -47,6 +47,8 @@ export function createCache<
   const collectionStateCache = new Map<string, Record<string | number, any>>()
   const collectionStateCacheReactivityMarker = new Map<string, Ref<number>>()
 
+  const relationCache = ref(new Map<string, Record<PropertyKey, any>>())
+
   function ensureCollectionStateCacheReactivityMarker(collectionName: string) {
     let marker = collectionStateCacheReactivityMarker.get(collectionName)
     if (!marker) {
@@ -57,6 +59,7 @@ export function createCache<
   }
 
   function invalidateCollectionStateCache(collectionName: string) {
+    relationCache.value.clear()
     collectionStateCache.delete(collectionName)
     ensureCollectionStateCacheReactivityMarker(collectionName).value++
   }
@@ -110,6 +113,7 @@ export function createCache<
           queries: new Set(),
           dirtyQueries: new Set(),
         },
+        relationCache,
       })
     }
 
@@ -133,6 +137,7 @@ export function createCache<
           ? item
           : ensureCollectionRef(collection.name).value[key] ?? item),
         metadata,
+        relationCache,
       })
       wrappedItems.set(wrapKey, wrappedItem)
       addWrappedItemKeyToLayer(item.$layer, wrapKey)
@@ -270,6 +275,13 @@ export function createCache<
         layer,
       })
     }
+  }
+
+  function clearAllCaches() {
+    wrappedItems.clear()
+    wrappedItemsMetadata.clear()
+    collectionStateCache.clear()
+    relationCache.value.clear()
   }
 
   return {
@@ -506,9 +518,7 @@ export function createCache<
       }
       state.modules = newModulesState
 
-      wrappedItems.clear()
-      wrappedItemsMetadata.clear()
-      collectionStateCache.clear()
+      clearAllCaches()
 
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', {
@@ -524,9 +534,8 @@ export function createCache<
       for (const moduleKey in state.modules) {
         state.modules[moduleKey]!.value = {}
       }
-      wrappedItems.clear()
-      wrappedItemsMetadata.clear()
-      collectionStateCache.clear()
+
+      clearAllCaches()
 
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', {

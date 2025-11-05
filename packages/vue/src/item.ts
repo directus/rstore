@@ -13,6 +13,7 @@ export interface WrapItemOptions<
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
   item: Ref<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   metadata: WrappedItemMetadata<TCollection, TCollectionDefaults, TSchema>
+  relationCache: Ref<Map<string, Record<PropertyKey, any>>>
 }
 
 export function wrapItem<
@@ -24,12 +25,17 @@ export function wrapItem<
   collection,
   item,
   metadata,
+  relationCache,
 }: WrapItemOptions<TCollection, TCollectionDefaults, TSchema>): WrappedItem<TCollection, TCollectionDefaults, TSchema> {
   function getApi(): VueCollectionApi<TCollection, TCollectionDefaults, TSchema, WrappedItem<TCollection, TCollectionDefaults, TSchema>> {
     return store[collection.name as keyof typeof store] as any
   }
 
   const isFrozen = Object.isFrozen(item.value)
+
+  function getRelationCacheKey() {
+    return `${collection.name}:${collection.getKey(item.value)}`
+  }
 
   const proxy = new Proxy(item.value, {
     get: (proxyTarget, key) => {
@@ -106,6 +112,14 @@ export function wrapItem<
           return Reflect.get(item.value, key)
         }
         else {
+          const cacheKey = getRelationCacheKey()
+          let cache = relationCache.value.get(cacheKey)
+          const cached = cache?.[key]
+
+          if (cached != null) {
+            return cached
+          }
+
           const relation = collection.relations[key as string]!
           const result: Array<any> = []
           for (const targetCollectionName in relation.to) {
@@ -143,6 +157,12 @@ export function wrapItem<
           else {
             finalResult = result[0]
           }
+
+          if (!cache) {
+            cache = {}
+            relationCache.value.set(cacheKey, cache)
+          }
+          cache[key] = markRaw(finalResult)
 
           return finalResult
         }
