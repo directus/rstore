@@ -1,6 +1,30 @@
 # Changelog
 
 
+## v0.8.1
+
+[compare changes](https://github.com/directus/rstore/compare/v0.8.0...v0.8.1)
+
+### 🔥 Performance
+
+- **vue:** Cache collection state with layers ([38e0b55](https://github.com/directus/rstore/commit/38e0b55))
+
+### 🩹 Fixes
+
+- **drizzle:** Query can be nullish ([e9d93b7](https://github.com/directus/rstore/commit/e9d93b7))
+
+### 📖 Documentation
+
+- Link to rstore drizzle demo ([4b4f279](https://github.com/directus/rstore/commit/4b4f279))
+
+### 🏡 Chore
+
+- Update pnpm ([cccf426](https://github.com/directus/rstore/commit/cccf426))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.8.0
 
 [compare changes](https://github.com/Akryum/rstore/compare/v0.7.8...v0.8.0)
