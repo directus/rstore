@@ -126,7 +126,7 @@ export function createQuery<
             $queryTracking: queryTrackingEnabled ? newQueryTracking2 : undefined,
           }).then(() => {
             if (queryTracking && newQueryTracking2) {
-              queryTracking.handleQueryTracking(newQueryTracking2)
+              queryTracking.handleQueryTracking(newQueryTracking2, undefined, finalOptions.include)
             }
           })
         }
@@ -143,7 +143,7 @@ export function createQuery<
           : meta.value)
 
         if (queryTrackingEnabled && shouldHandleQueryTracking && queryTracking && newQueryTracking) {
-          queryTracking.handleQueryTracking(newQueryTracking)
+          queryTracking.handleQueryTracking(newQueryTracking, undefined, finalOptions.include)
         }
       }
       catch (e: any) {

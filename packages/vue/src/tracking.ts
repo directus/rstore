@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, HookMetaQueryTracking, StoreSchema, WrappedItemBase } from '@rstore/shared'
+import type { Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryTracking, StoreSchema, WrappedItemBase } from '@rstore/shared'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueStore } from './store'
 import { tryOnScopeDispose } from '@vueuse/core'
@@ -34,7 +34,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     return res
   })
 
-  function handleQueryTracking(newQueryTracking: HookMetaQueryTracking, result?: TResult) {
+  function handleQueryTracking(newQueryTracking: HookMetaQueryTracking, result?: TResult, include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> = {}) {
     if (newQueryTracking.skipped) {
       return
     }
@@ -52,7 +52,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
         const list = (Array.isArray(_result) ? _result : [_result])
         for (const item of list) {
           if (item) {
-            addToQueryTracking(newQueryTracking, item)
+            addToQueryTracking(newQueryTracking, item, include)
           }
         }
       }
@@ -62,7 +62,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
         const list = Array.isArray(filteredCached.value) ? filteredCached.value : (filteredCached.value ? [filteredCached.value] : [])
         for (const item of list) {
           if (item) {
-            addToQueryTracking(queryTracking, item)
+            addToQueryTracking(queryTracking, item, include)
           }
         }
       }
@@ -149,7 +149,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     return obj
   }
 
-  function addToQueryTracking(qt: HookMetaQueryTracking, item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>) {
+  function addToQueryTracking(qt: HookMetaQueryTracking, item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>, include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema>) {
     if (!item.$collection) {
       return
     }
@@ -163,12 +163,17 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     }
     set.add(item.$getKey())
     for (const relationName in collection.relations) {
-      const value = item[relationName as keyof typeof item]
-      if (Array.isArray(value)) {
-        for (const relatedItem of value) {
-          if (relatedItem) {
-            addToQueryTracking(qt, relatedItem as WrappedItemBase<Collection, CollectionDefaults, StoreSchema>)
+      if (include?.[relationName] && include[relationName] !== false) {
+        const value = item[relationName as keyof typeof item] as unknown as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | Array<WrappedItemBase<Collection, CollectionDefaults, StoreSchema>>
+        if (Array.isArray(value)) {
+          for (const relatedItem of value) {
+            if (relatedItem) {
+              addToQueryTracking(qt, relatedItem, include[relationName])
+            }
           }
+        }
+        else if (value != null) {
+          addToQueryTracking(qt, value, include[relationName])
         }
       }
     }
