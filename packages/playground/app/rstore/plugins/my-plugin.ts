@@ -253,7 +253,7 @@ export default defineRstorePlugin({
               const collection = payload.store.$getCollection(item)
               if (collection) {
                 const key = collection.getKey(item)
-                if (!key) {
+                if (key == null) {
                   throw new Error(`Key not found for collection ${collection.name}`)
                 }
                 payload.store.$cache.writeItem({

@@ -79,7 +79,7 @@ export default definePlugin({
                 case 'created':
                 case 'updated': {
                   const key = collection.getKey(message.update.record)
-                  if (!key) {
+                  if (key == null) {
                     throw new Error(`Key not found for collection ${collection.name}`)
                   }
                   store.$cache.writeItem({
@@ -91,7 +91,7 @@ export default definePlugin({
                 }
                 case 'deleted': {
                   const key = message.update.key
-                  if (!key) {
+                  if (key == null) {
                     throw new Error(`Key not found for collection ${collection.name}`)
                   }
                   store.$cache.deleteItem({

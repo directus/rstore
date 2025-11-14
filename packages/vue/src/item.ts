@@ -40,7 +40,7 @@ export function wrapItem<
         case '$getKey':
           return () => {
             const key = collection.getKey(item.value)
-            if (!key) {
+            if (key == null) {
               throw new Error('Key is undefined on item')
             }
             return key
@@ -49,7 +49,7 @@ export function wrapItem<
         case '$updateForm':
           return (async (options?: WrappedItemUpdateFormOptions<TCollection, TCollectionDefaults, TSchema>) => {
             const key = collection.getKey(item.value)
-            if (!key) {
+            if (key == null) {
               throw new Error('Key is required on item to update')
             }
             const form = await getApi().updateForm({
@@ -75,7 +75,7 @@ export function wrapItem<
         case '$delete':
           return (() => {
             const key = collection.getKey(item.value)
-            if (!key) {
+            if (key == null) {
               throw new Error('Key is required on item to delete')
             }
             return getApi().delete(key)

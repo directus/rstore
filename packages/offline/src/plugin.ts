@@ -111,7 +111,7 @@ export function createOfflinePlugin(options: CreateOfflinePluginOptions = {}) {
           const loadedItems = await db.readAllItems(collection.name)
           for (const item of loadedItems) {
             const key = collection.getKey(item)
-            if (!key) {
+            if (key == null) {
               continue
             }
             store.$cache.writeItem({
@@ -151,7 +151,7 @@ export function createOfflinePlugin(options: CreateOfflinePluginOptions = {}) {
           // Store new/updated items
           for (const item of newItems) {
             const key = collection.getKey(item)
-            if (!key) {
+            if (key == null) {
               continue
             }
             await db.writeItem(collection.name, String(key), item)
@@ -235,7 +235,7 @@ export function createOfflinePlugin(options: CreateOfflinePluginOptions = {}) {
 
         // Queue mutation
         const key = collection.getKey(item)
-        if (!key) {
+        if (key == null) {
           console.warn('[rstore/offline] Cannot createItem operation without a key. Please make sure to provide as much data as possible when creating offline items.')
           return
         }
@@ -295,7 +295,7 @@ export function createOfflinePlugin(options: CreateOfflinePluginOptions = {}) {
         const keys: Array<string | number> = []
         for (const item of items) {
           const key = collection.getKey(item)
-          if (!key) {
+          if (key == null) {
             console.warn('[rstore/offline] Cannot createMany operation without a key. Please make sure to provide as much data as possible when creating offline items.')
             continue
           }
@@ -329,7 +329,7 @@ export function createOfflinePlugin(options: CreateOfflinePluginOptions = {}) {
         const keys: Array<string | number> = []
         for (const item of items) {
           const key = collection.getKey(item)
-          if (!key) {
+          if (key == null) {
             console.warn('[rstore/offline] Cannot updateMany operation without a key. Please make sure to provide as much data as possible when creating offline items.')
             continue
           }

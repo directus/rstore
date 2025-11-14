@@ -606,7 +606,7 @@ export function createCollectionApi<
 
     writeItem: (item) => {
       const key = collection.getKey(item)
-      if (!key) {
+      if (key == null) {
         throw new Error('Item write failed: key is not defined')
       }
       store.$cache.writeItem({

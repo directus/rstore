@@ -139,7 +139,7 @@ async function _findFirst<
 
       if (fetchPolicy !== 'no-cache') {
         const key = collection.getKey(result)
-        if (!key) {
+        if (key == null) {
           console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
         }
         else {

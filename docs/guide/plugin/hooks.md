@@ -903,7 +903,7 @@ export default definePlugin({
             if (collection) {
               // Compute the key for the item
               const key = collection.getKey(item)
-              if (!key) {
+              if (key == null) {
                 throw new Error(`Key not found for collection ${collection.name}`)
               }
 

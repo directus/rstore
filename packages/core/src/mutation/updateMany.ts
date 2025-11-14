@@ -33,7 +33,7 @@ export async function updateMany<
   function getItemsWithKey(items: Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>) {
     return items.map((item) => {
       const key = collection.getKey(item)
-      if (!key) {
+      if (key == null) {
         throw new Error('Item update failed: key is not defined')
       }
       allKeys.add(key)
@@ -211,7 +211,7 @@ export async function updateMany<
         const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
         for (const item of items) {
           const key = collection.getKey(item)
-          if (!key) {
+          if (key == null) {
             console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
             continue
           }

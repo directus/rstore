@@ -136,7 +136,7 @@ async function _findMany<
         const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
         for (const item of items) {
           const key = collection.getKey(item)
-          if (!key) {
+          if (key == null) {
             console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
             continue
           }

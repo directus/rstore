@@ -52,7 +52,7 @@ export async function createItem<
 
   if (!skipCache && optimistic) {
     let key = collection.getKey(item)
-    if (!key) {
+    if (key == null) {
       key = crypto.randomUUID()
     }
     layer = {

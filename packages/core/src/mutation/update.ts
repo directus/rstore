@@ -35,7 +35,7 @@ export async function updateItem<
 
   key ??= collection.getKey(item)
 
-  if (!key) {
+  if (key == null) {
     throw new Error('Item update failed: key is not defined')
   }
 
