@@ -152,8 +152,6 @@ async function _findFirst<
           })
         }
       }
-
-      result = store.$cache.wrapItem({ collection, item: result })
     }
   }
   else if (meta.$queryTracking) {

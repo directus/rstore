@@ -33,7 +33,7 @@ describe('findFirst', () => {
         readItem: ({ key }: any) => ({ id: key, name: 'Test Item' }),
         readItems: () => [{ id: '1', name: 'Test Item 1' }, { id: '2', name: 'Test Item 2' }],
         writeItem: vi.fn(),
-        wrapItem: ({ item }: any) => {
+        wrapItem: vi.fn(({ item }: any) => {
           return new Proxy(item, {
             get: (target, key) => {
               if (key === '$meta') {
@@ -45,7 +45,7 @@ describe('findFirst', () => {
               return Reflect.get(target, key)
             },
           })
-        },
+        }),
       },
       $hooks: createHooks(),
       $getFetchPolicy: () => 'cache-first',
@@ -125,6 +125,9 @@ describe('findFirst', () => {
 
   it('should not write item to cache if fetch policy is no-cache', async () => {
     mockStore.$getFetchPolicy = () => 'no-cache'
+    mockStore.$hooks.hook('fetchFirst', (payload) => {
+      payload.setResult({ id: '1' })
+    })
     await findFirst({
       store: mockStore,
       collection,
@@ -132,6 +135,24 @@ describe('findFirst', () => {
     })
 
     expect(mockStore.$cache.writeItem).not.toHaveBeenCalled()
+  })
+
+  it('should wrap item with noCache if fetch policy is no-cache', async () => {
+    mockStore.$getFetchPolicy = () => 'no-cache'
+    mockStore.$hooks.hook('fetchFirst', (payload) => {
+      payload.setResult({ id: '1' })
+    })
+
+    await findFirst({
+      store: mockStore,
+      collection,
+      findOptions: '1',
+    })
+
+    expect(mockStore.$cache.wrapItem).toHaveBeenCalledOnce()
+    expect(mockStore.$cache.wrapItem).toHaveBeenCalledWith(expect.objectContaining({
+      noCache: true,
+    }))
   })
 
   describe('should dedupe finds', () => {
