@@ -1,8 +1,9 @@
+import type { VueStore } from '@rstore/vue'
 // @ts-expect-error virtual module
 import { url } from '#build/$rstore-directus-config.js'
 import { useNuxtApp } from '#imports'
 import { authentication, createDirectus, createItem, deleteItem, readItem, readItems, realtime, rest, updateItem } from '@directus/sdk'
-import { definePlugin, type VueStore } from '@rstore/vue'
+import { definePlugin } from '@rstore/vue'
 import { filterItem } from './filter'
 
 export default definePlugin({

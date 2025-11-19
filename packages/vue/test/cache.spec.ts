@@ -1,7 +1,8 @@
 import type { CacheLayer, ResolvedCollection } from '@rstore/shared'
+import type { MockedFunction } from 'vitest'
 import type { VueStore } from '../src'
 import { createHooks } from '@rstore/shared'
-import { beforeEach, describe, expect, it, type MockedFunction, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createCache } from '../src/cache'
 
 describe('cache', () => {

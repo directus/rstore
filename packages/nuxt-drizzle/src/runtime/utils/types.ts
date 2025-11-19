@@ -26,9 +26,9 @@ export interface RstoreDrizzleConditionGroup {
   conditions: Array<RstoreDrizzleCondition>
 }
 
-export type RstoreDrizzleCondition = RestoreDrizzleConditionModifier |
-  RstoreDrizzleUnaryOperator |
-  RstoreDrizzleBinaryOperator |
-  RstoreDrizzleTernaryOperator |
-  RstoreDrizzleConditionGroup |
-  undefined
+export type RstoreDrizzleCondition = RestoreDrizzleConditionModifier
+  | RstoreDrizzleUnaryOperator
+  | RstoreDrizzleBinaryOperator
+  | RstoreDrizzleTernaryOperator
+  | RstoreDrizzleConditionGroup
+  | undefined

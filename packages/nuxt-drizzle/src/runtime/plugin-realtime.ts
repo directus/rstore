@@ -1,9 +1,10 @@
+import type { SubscriptionMessage, SubscriptionUpdateMessage } from './utils/realtime'
 // @ts-expect-error virtual module
 import { wsApiPath } from '#build/$rstore-drizzle-config.js'
 import { definePlugin } from '@rstore/vue'
 import { useWebSocket } from '@vueuse/core'
 import { watch } from 'vue'
-import { getSubscriptionId, type SubscriptionMessage, type SubscriptionUpdateMessage } from './utils/realtime'
+import { getSubscriptionId } from './utils/realtime'
 
 export default definePlugin({
   name: 'rstore-drizzle-realtime',

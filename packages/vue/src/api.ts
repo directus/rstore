@@ -1,6 +1,7 @@
 import type { CreateManyOptions, CreateOptions, DeleteManyOptions, DeleteOptions, UpdateManyOptions, UpdateOptions } from '@rstore/core'
 import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StandardSchemaV1, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
+import type { CreateFormObjectOptions, VueCreateFormObject, VueUpdateFormObject } from './form'
 import type { VueLiveQueryReturn } from './live'
 import type { VueQueryReturn } from './query'
 import type { VueStore } from './store'
@@ -8,7 +9,7 @@ import { createItem, createMany, deleteItem, deleteMany, findFirst, findMany, pe
 import { pickNonSpecialProps } from '@rstore/shared'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { ref, toValue, watch } from 'vue'
-import { createFormObject, type CreateFormObjectOptions, type VueCreateFormObject, type VueUpdateFormObject } from './form'
+import { createFormObject } from './form'
 import { createQuery } from './query'
 
 export type QueryType = 'first' | 'many'
@@ -172,7 +173,7 @@ export interface VueCollectionApi<
    */
   create: (
     item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
-    createOptions?: Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>
+    createOptions?: Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
   ) => Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
   /**
@@ -180,7 +181,7 @@ export interface VueCollectionApi<
    */
   createMany: (
     items: Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>,
-    createOptions?: Pick<CreateManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>
+    createOptions?: Pick<CreateManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
   ) => Promise<Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>
 
   /**

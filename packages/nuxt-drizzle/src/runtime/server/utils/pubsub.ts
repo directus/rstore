@@ -3,12 +3,12 @@ import type { RstoreDrizzleRealtimePayload } from './hooks'
 interface PubSub<TChannels> {
   subscribe: <K extends Extract<keyof TChannels, string>>(
     channel: K,
-    callback: (payload: TChannels[K]) => void
+    callback: (payload: TChannels[K]) => void,
   ) => () => void
 
   publish: <K extends Extract<keyof TChannels, string>>(
     channel: K,
-    payload: TChannels[K]
+    payload: TChannels[K],
   ) => void
 }
 

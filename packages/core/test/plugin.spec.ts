@@ -1,4 +1,5 @@
-import { type CollectionDefaults, createHooks, type RegisteredPlugin, type StoreCore, type StoreSchema } from '@rstore/shared'
+import type { CollectionDefaults, RegisteredPlugin, StoreCore, StoreSchema } from '@rstore/shared'
+import { createHooks } from '@rstore/shared'
 import { describe, expect, it, vi } from 'vitest'
 import { setupPlugin, sortPlugins } from '../src/plugin'
 

@@ -87,6 +87,6 @@ export interface PluginSetupApi {
     TName extends keyof HookDefinitions<StoreSchema, CollectionDefaults>,
   > (name: TName,
     callback: HookDefinitions<StoreSchema, CollectionDefaults>[TName],
-    options?: HookPluginOptions
+    options?: HookPluginOptions,
   ) => () => void
 }

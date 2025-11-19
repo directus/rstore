@@ -209,8 +209,8 @@ const categoryClass = {
             <template #content>
               <div class="p-2 max-w-120 max-h-70 overflow-auto space-y-2">
                 <div
-                  v-for="(hookData, index) in hooks"
-                  :key="index"
+                  v-for="(hookData, hookIndex) in hooks"
+                  :key="hookIndex"
                   class="text-xs border border-default rounded p-2 flex flex-col gap-2"
                 >
                   <CodeSnippet

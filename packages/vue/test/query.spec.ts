@@ -1,7 +1,8 @@
 import type { CustomHookMeta, ResolvedCollection } from '@rstore/shared'
+import type { MockedFunction } from 'vitest'
 import type { VueStore } from '../src'
 import type { WrappedItemMetadata } from '../src/item'
-import { beforeEach, describe, expect, it, type MockedFunction, vi } from 'vitest'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import { createQuery } from '../src/query'
 

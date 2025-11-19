@@ -1,6 +1,8 @@
 import type { GlobalStoreType } from '@rstore/shared'
-import { type App, inject, type InjectionKey } from 'vue'
-import { getActiveStore, type VueStore } from './store'
+import type { App, InjectionKey } from 'vue'
+import type { VueStore } from './store'
+import { inject } from 'vue'
+import { getActiveStore } from './store'
 
 interface RstoreVueGlobal {
   store: GlobalStoreType

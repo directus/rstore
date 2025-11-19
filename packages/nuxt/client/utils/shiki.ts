@@ -1,4 +1,5 @@
-import { createHighlighter, type Highlighter } from 'shiki'
+import type { Highlighter } from 'shiki'
+import { createHighlighter } from 'shiki'
 
 let highlighter: Highlighter | undefined
 

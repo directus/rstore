@@ -1,6 +1,8 @@
+import type { Awaitable, Collection, CollectionDefaults, CreateFormObject, FormObjectBase, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, UpdateFormObject } from '@rstore/shared'
+import type { EventHookOn } from '@vueuse/core'
 import { emptySchema } from '@rstore/core'
-import { type Awaitable, type Collection, type CollectionDefaults, type CreateFormObject, type FormObjectBase, pickNonSpecialProps, type ResolvedCollectionItem, type StandardSchemaV1, type StoreSchema, type UpdateFormObject } from '@rstore/shared'
-import { createEventHook, type EventHookOn } from '@vueuse/core'
+import { pickNonSpecialProps } from '@rstore/shared'
+import { createEventHook } from '@vueuse/core'
 import { markRaw, nextTick, reactive } from 'vue'
 
 export interface CreateFormObjectOptions<

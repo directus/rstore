@@ -1,8 +1,10 @@
 import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheState, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Ref } from 'vue'
+import type { WrappedItemMetadata } from './item'
 import type { VueStore } from './store'
 import { pickNonSpecialProps } from '@rstore/shared'
-import { computed, markRaw, ref, type Ref, shallowRef, toValue } from 'vue'
-import { wrapItem, type WrappedItemMetadata } from './item'
+import { computed, markRaw, ref, shallowRef, toValue } from 'vue'
+import { wrapItem } from './item'
 
 declare module '@rstore/shared' {
   export interface CustomCacheState {

@@ -28,7 +28,7 @@
   },
   "devDependencies": {
     "@akryum/sheep": "^0.5.2",
-    "@antfu/eslint-config": "^3.12.1",
+    "@antfu/eslint-config": "^6.2.0",
     "@tailwindcss/vite": "4.0.7",
     "animejs": "^4.2.2",
     "eslint": "^9.17.0",

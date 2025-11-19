@@ -1,5 +1,6 @@
+import type { SubscriptionMessage } from '../../utils/realtime'
 import { defineWebSocketHandler } from 'h3'
-import { getSubscriptionId, type SubscriptionMessage } from '../../utils/realtime'
+import { getSubscriptionId } from '../../utils/realtime'
 import { filterWhere } from '../../where'
 import { rstoreDrizzleHooks } from '../utils/hooks'
 import { usePeerPubSub } from '../utils/pubsub'

@@ -31,7 +31,7 @@ export interface HookDefinitions<
     payload: {
       store: GlobalStoreType
       meta: CustomHookMeta
-    }
+    },
   ) => Awaitable<void>
 
   beforeFetch: <
@@ -45,7 +45,7 @@ export interface HookDefinitions<
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
       many: boolean
       updateFindOptions: (findOptions: FindOptions<TCollection, TCollectionDefaults, TSchema>) => void
-    }
+    },
   ) => Awaitable<void>
 
   afterFetch: <
@@ -60,7 +60,7 @@ export interface HookDefinitions<
       many: boolean
       getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> | ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
       setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => void
-    }
+    },
   ) => Awaitable<void>
 
   /**
@@ -82,7 +82,7 @@ export interface HookDefinitions<
        * Don't call the remaining hooks in the queue.
        */
       abort: () => void
-    }
+    },
   ) => Awaitable<void>
 
   beforeCacheReadFirst: <
@@ -95,7 +95,7 @@ export interface HookDefinitions<
       key?: string | number
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
       setMarker: (marker: string | undefined) => void
-    }
+    },
   ) => void
 
   /**
@@ -113,7 +113,7 @@ export interface HookDefinitions<
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
       setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined) => void
       readItemsFromCache: (options?: ReadItemsFromCacheOptions<TCollection, TCollectionDefaults, TSchema>) => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
-    }
+    },
   ) => void
 
   /**
@@ -134,7 +134,7 @@ export interface HookDefinitions<
        * Don't call the remaining hooks in the queue.
        */
       abort: () => void
-    }
+    },
   ) => Awaitable<void>
 
   beforeCacheReadMany: <
@@ -148,7 +148,7 @@ export interface HookDefinitions<
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
       setMarker: (marker: string | undefined) => void
       setFilter: (filter: (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean) => void
-    }
+    },
   ) => void
 
   /**
@@ -164,7 +164,7 @@ export interface HookDefinitions<
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
       getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>) => void
-    }
+    },
   ) => void
 
   fetchRelations: <
@@ -182,7 +182,7 @@ export interface HookDefinitions<
        * Don't call the remaining hooks in the queue.
        */
       abort: () => void
-    }
+    },
   ) => Awaitable<void>
 
   /**
@@ -197,7 +197,7 @@ export interface HookDefinitions<
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
       modifyItem: <TItem extends ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
-    }
+    },
   ) => void
 
   serializeItem: <
@@ -209,7 +209,7 @@ export interface HookDefinitions<
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
       modifyItem: <TItem extends Record<string, any>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
-    }
+    },
   ) => void
 
   beforeMutation: <
@@ -224,7 +224,7 @@ export interface HookDefinitions<
       modifyItem: <TItem extends ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
       setItem: (item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>) => void
       mutation: 'create' | 'update' | 'delete'
-    }
+    },
   ) => Awaitable<void>
 
   afterMutation: <
@@ -239,7 +239,7 @@ export interface HookDefinitions<
       mutation: 'create' | 'update' | 'delete'
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
       setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => void
-    }
+    },
   ) => Awaitable<void>
 
   beforeManyMutation: <
@@ -253,7 +253,7 @@ export interface HookDefinitions<
       items?: Array<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>>
       setItems: (item: Array<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>>) => void
       mutation: 'create' | 'update' | 'delete'
-    }
+    },
   ) => Awaitable<void>
 
   afterManyMutation: <
@@ -268,7 +268,7 @@ export interface HookDefinitions<
       mutation: 'create' | 'update' | 'delete'
       getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>) => void
-    }
+    },
   ) => Awaitable<void>
 
   /**
@@ -288,7 +288,7 @@ export interface HookDefinitions<
        * Don't call the remaining hooks in the queue.
        */
       abort: () => void
-    }
+    },
   ) => Awaitable<void>
 
   /**
@@ -308,7 +308,7 @@ export interface HookDefinitions<
        * Don't call the remaining hooks in the queue.
        */
       abort: () => void
-    }
+    },
   ) => Awaitable<void>
 
   /**
@@ -329,7 +329,7 @@ export interface HookDefinitions<
        * Don't call the remaining hooks in the queue.
        */
       abort: () => void
-    }
+    },
   ) => Awaitable<void>
 
   /**
@@ -349,7 +349,7 @@ export interface HookDefinitions<
        * Don't call the remaining hooks in the queue.
        */
       abort: () => void
-    }
+    },
   ) => Awaitable<void>
 
   /**
@@ -367,7 +367,7 @@ export interface HookDefinitions<
        * Don't call the remaining hooks in the queue.
        */
       abort: () => void
-    }
+    },
   ) => Awaitable<void>
 
   /**
@@ -385,7 +385,7 @@ export interface HookDefinitions<
        * Don't call the remaining hooks in the queue.
        */
       abort: () => void
-    }
+    },
   ) => Awaitable<void>
 
   afterCacheWrite: <
@@ -399,14 +399,14 @@ export interface HookDefinitions<
       result?: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       marker?: string
       operation: 'write' | 'delete'
-    }
+    },
   ) => void
 
   afterCacheReset: (
     payload: {
       store: GlobalStoreType
       meta: CustomHookMeta
-    }
+    },
   ) => void
 
   subscribe: <
@@ -422,7 +422,7 @@ export interface HookDefinitions<
       subscriptionId: string
       key?: string | number
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
-    }
+    },
   ) => Awaitable<void>
 
   unsubscribe: <
@@ -435,14 +435,14 @@ export interface HookDefinitions<
       subscriptionId: string
       key?: string | number
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
-    }
+    },
   ) => Awaitable<void>
 
   moduleResolved: (
     payload: {
       store: GlobalStoreType
       module: ResolvedModule<any, any>
-    }
+    },
   ) => Awaitable<void>
 
   itemGarbageCollect: <
@@ -453,21 +453,21 @@ export interface HookDefinitions<
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       key: string | number
       item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
-    }
+    },
   ) => Awaitable<void>
 
   cacheLayerAdd: (
     payload: {
       store: GlobalStoreType
       layer: CacheLayer
-    }
+    },
   ) => Awaitable<void>
 
   cacheLayerRemove: (
     payload: {
       store: GlobalStoreType
       layer: CacheLayer
-    }
+    },
   ) => Awaitable<void>
 
   sync: (
@@ -486,7 +486,7 @@ export interface HookDefinitions<
        * Mark a collection as successfully synced with remote.
        */
       setCollectionSynced: (collectionName: string) => void
-    }
+    },
   ) => Awaitable<void>
 
   syncCollection: (
@@ -510,7 +510,7 @@ export interface HookDefinitions<
        * Delete items from the collection if they no longer exist on remote.
        */
       deleteItems: (keys: Array<string | number>) => void
-    }
+    },
   ) => Awaitable<void>
 }
 

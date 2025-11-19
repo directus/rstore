@@ -1,8 +1,10 @@
 import type { UpdateOptions } from '@rstore/core'
+import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions, WrappedItemUpdateOptions } from '@rstore/shared'
+import type { Ref } from 'vue'
 import type { VueCollectionApi } from './api'
 import type { VueStore } from './store'
-import { cloneInfo, type Collection, type CollectionDefaults, type ResolvedCollection, type ResolvedCollectionItem, type StandardSchemaV1, type StoreSchema, type WrappedItem, type WrappedItemBase, type WrappedItemUpdateFormOptions, type WrappedItemUpdateOptions } from '@rstore/shared'
-import { markRaw, type Ref, toRaw } from 'vue'
+import { cloneInfo } from '@rstore/shared'
+import { markRaw, toRaw } from 'vue'
 
 export interface WrapItemOptions<
   TCollection extends Collection,

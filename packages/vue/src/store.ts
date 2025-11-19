@@ -1,9 +1,11 @@
 import type { Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOptions, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { MaybeRefOrGetter } from 'vue'
+import type { VueCollectionApi } from './api'
 import { createStoreCore, normalizeCollectionRelations, resolveCollection } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
-import { type MaybeRefOrGetter, reactive, ref, toValue, watch } from 'vue'
-import { createCollectionApi, type VueCollectionApi } from './api'
+import { reactive, ref, toValue, watch } from 'vue'
+import { createCollectionApi } from './api'
 import { createCache } from './cache'
 
 export interface CreateStoreOptions<

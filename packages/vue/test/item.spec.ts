@@ -1,9 +1,12 @@
+import type { ResolvedCollection, StandardSchemaV1 } from '@rstore/shared'
+import type { Mock, MockedFunction } from 'vitest'
+import type { WrappedItemMetadata } from '../src/item'
 import type { VueStore } from '../src/store'
 import { emptySchemas } from '@rstore/core'
-import { createHooks, type ResolvedCollection, type StandardSchemaV1 } from '@rstore/shared'
-import { beforeEach, describe, expect, it, type Mock, type MockedFunction, vi } from 'vitest'
+import { createHooks } from '@rstore/shared'
+import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { markRaw, ref } from 'vue'
-import { wrapItem, type WrappedItemMetadata } from '../src/item'
+import { wrapItem } from '../src/item'
 
 type Schema = [
   { name: 'testCollection' },

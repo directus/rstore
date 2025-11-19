@@ -1,6 +1,7 @@
+import type { VueStore } from '@rstore/vue'
 // @ts-expect-error virtual file
 import { syncSerializeDateValue } from '#build/$rstore-drizzle-config'
-import { definePlugin, type VueStore } from '@rstore/vue'
+import { definePlugin } from '@rstore/vue'
 import { gte } from './utils/where'
 
 export default definePlugin({

@@ -1,13 +1,14 @@
 import type { CreateOfflinePluginOptions } from '@rstore/offline'
 import type { Collection, CollectionRelation, CustomCollectionMeta } from '@rstore/shared'
 import type { Config as DrizzleKitConfig } from 'drizzle-kit'
+import type { Table, TableConfig } from 'drizzle-orm'
 import type { getTableConfig as mysqlGetTableConfig } from 'drizzle-orm/mysql-core'
 import type { getTableConfig as pgGetTableConfig } from 'drizzle-orm/pg-core'
 import type { getTableConfig as singleStoreGetTableConfig } from 'drizzle-orm/singlestore-core'
 import type { getTableConfig as sqliteGetTableConfig } from 'drizzle-orm/sqlite-core'
 import fs from 'node:fs'
 import { addImports, addImportsDir, addServerHandler, addServerImports, addServerPlugin, addServerTemplate, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, updateTemplates, useLogger } from '@nuxt/kit'
-import { createTableRelationsHelpers, getTableName, is, isTable, Many, One, Relations, type Table, type TableConfig } from 'drizzle-orm'
+import { createTableRelationsHelpers, getTableName, is, isTable, Many, One, Relations } from 'drizzle-orm'
 import { createJiti } from 'jiti'
 import path from 'pathe'
 
@@ -55,10 +56,10 @@ export interface ModuleOptions {
 }
 
 type AllTableConfig = TableConfig & (
-  ReturnType<typeof pgGetTableConfig> |
-  ReturnType<typeof mysqlGetTableConfig> |
-  ReturnType<typeof sqliteGetTableConfig> |
-  ReturnType<typeof singleStoreGetTableConfig>
+  ReturnType<typeof pgGetTableConfig>
+  | ReturnType<typeof mysqlGetTableConfig>
+  | ReturnType<typeof sqliteGetTableConfig>
+  | ReturnType<typeof singleStoreGetTableConfig>
 )
 
 type Column = AllTableConfig['columns'][number]

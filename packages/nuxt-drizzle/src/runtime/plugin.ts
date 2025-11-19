@@ -1,7 +1,8 @@
+import type { VueStore } from '@rstore/vue'
 // @ts-expect-error virtual module
 import { apiPath } from '#build/$rstore-drizzle-config.js'
 import { useRequestFetch } from '#imports'
-import { definePlugin, type VueStore } from '@rstore/vue'
+import { definePlugin } from '@rstore/vue'
 import SuperJSON from 'superjson'
 import { and, eq } from './utils/where'
 import { filterWhere } from './where'
