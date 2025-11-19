@@ -34,7 +34,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     return res
   })
 
-  function handleQueryTracking(newQueryTracking: HookMetaQueryTracking, result?: TResult, include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> = {}) {
+  function handleQueryTracking(newQueryTracking: HookMetaQueryTracking, result?: TResult, include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> = {}, markPreviousItemsAsDirty: boolean = true) {
     if (newQueryTracking.skipped) {
       return
     }
@@ -87,7 +87,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
 
     // Mark old tracked items as dirty if they are not tracked anymore
     let hasAddedDirty = false
-    if (queryTracking) {
+    if (queryTracking && markPreviousItemsAsDirty) {
       for (const collectionName in queryTracking.items) {
         const collection = store.$collections.find(c => c.name === collectionName)!
         for (const key of queryTracking.items[collectionName]!) {

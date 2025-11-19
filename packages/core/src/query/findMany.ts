@@ -65,6 +65,11 @@ async function _findMany<
 
   const fetchPolicy = store.$getFetchPolicy(findOptions.fetchPolicy)
 
+  findOptions = {
+    ...findOptions,
+    fetchPolicy,
+  }
+
   let result: any[] | undefined
   let marker: string | undefined
 

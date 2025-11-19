@@ -1,5 +1,7 @@
 import { faker } from '@faker-js/faker'
 
+const PAGE_SIZE = 20
+
 export default defineRstorePlugin({
   name: 'my-rstore-plugin',
 
@@ -56,13 +58,23 @@ export default defineRstorePlugin({
       // payload.setMarker(`many:${payload.collection.name}:${JSON.stringify(payload.findOptions?.filter ?? {})}`)
 
       if (payload.collection.meta?.path) {
-        const result = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
+        const { result, meta } = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
           method: 'GET',
           query: {
+            ...payload.findOptions?.pageIndex != null
+              ? {
+                  offset: payload.findOptions.pageIndex * PAGE_SIZE,
+                  limit: PAGE_SIZE,
+                }
+              : {},
             ...payload.findOptions?.params,
             include: payload.findOptions?.include ? JSON.stringify(payload.findOptions.include) : undefined,
+            sort: payload.findOptions?.sort && typeof payload.findOptions.sort === 'object' ? `${payload.findOptions.sort.id}:${payload.findOptions.sort.desc ? 'desc' : 'asc'}` : undefined,
           },
         })
+        if (meta) {
+          Object.assign(payload.meta, meta)
+        }
         payload.setResult(result)
       }
     })

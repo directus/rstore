@@ -27,6 +27,16 @@ declare module '@rstore/vue' {
 
   export interface CustomHookMeta {
     storeHistoryItem?: Pick<StoreHistoryItem, 'started'>
+    totalCount?: number
+  }
+
+  export interface CustomSortOption<
+    TCollection extends Collection,
+    TCollectionDefaults extends CollectionDefaults,
+    TSchema extends StoreSchema,
+  > {
+    id: string
+    desc: boolean
   }
 }
 
