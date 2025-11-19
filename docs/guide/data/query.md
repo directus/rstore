@@ -401,3 +401,48 @@ declare module '@rstore/vue' {
 
 export {}
 ```
+
+## Dynamic collection name <Badge text="New in v0.8.2" />
+
+You can access a collection with a dynamic name by using a string, a ref or a getter with the `$collection` method on the store instead of accessing it directly as a property.
+
+When the collection name changes, the query will automatically call its `refresh` method to fetch data from the new collection.
+
+Example with a ref:
+
+```ts
+const collectionName = ref('posts')
+
+const {
+  data: items
+} = await store.$collection(collectionName).query(q => q.many())
+
+// some time later...
+
+collectionName.value = 'comments'
+// The query will automatically refresh
+// to fetch the comments instead of the posts
+```
+
+Example with a getter:
+
+```ts
+const route = useRoute()
+
+const {
+  data: items
+} = await store.$collection(() => route.params.collectionName as string)
+  .query(q => q.many())
+// When the route changes, the query will automatically refresh
+// to fetch the new collection
+```
+
+If you can't need reactivity but don't know the collection name in advance, you can also pass a simple string:
+
+```ts
+const query = await store.$collection('posts').query(q => q.many())
+```
+
+::: warning
+Using `$collection` will not provide type inference for the collection API. You will need to manually type the result if needed.
+:::

@@ -1,8 +1,8 @@
 import type { Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOptions, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { createStoreCore, normalizeCollectionRelations, resolveCollection } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
-import { createEventHook } from '@vueuse/core'
-import { reactive, ref } from 'vue'
+import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
+import { type MaybeRefOrGetter, reactive, ref, toValue, watch } from 'vue'
 import { createCollectionApi, type VueCollectionApi } from './api'
 import { createCache } from './cache'
 
@@ -51,7 +51,7 @@ export type VueStore<
   TSchema extends StoreSchema = StoreSchema,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > = StoreCore<TSchema, TCollectionDefaults> & VueStoreCollectionApiProxy<TSchema, TCollectionDefaults> & {
-  $collection: (collectionName: string) => VueCollectionApi<any, TCollectionDefaults, TSchema, WrappedItem<any, TCollectionDefaults, TSchema>>
+  $collection: (collectionName: MaybeRefOrGetter<string>) => VueCollectionApi<any, TCollectionDefaults, TSchema, WrappedItem<any, TCollectionDefaults, TSchema>>
   $onCacheReset: (callback: () => void) => () => void
   $experimentalGarbageCollection?: boolean
   $modulesCache: WeakMap<(...args: any[]) => ResolvedModule<any, any>, ResolvedModule<any, any>>
@@ -85,13 +85,16 @@ export async function createStore<
 
       const queryCache: Map<string, VueCollectionApi<Collection, TCollectionDefaults, TSchema, WrappedItem<Collection, TCollectionDefaults, TSchema>>> = new Map()
 
-      function getApi(key: string) {
+      function getCachedApiByKey(key: string) {
         if (!queryCache.has(key)) {
           const collection = storeProxy.$collections.find(m => m.name === key)
           if (!collection) {
             throw new Error(`Collection ${key} not found`)
           }
-          queryCache.set(key, createCollectionApi(storeProxy, collection))
+          queryCache.set(key, createCollectionApi({
+            store: storeProxy,
+            getCollection: () => collection,
+          }))
         }
         return queryCache.get(key)
       }
@@ -109,11 +112,38 @@ export async function createStore<
       storeProxy = new Proxy(store, {
         get(_, key) {
           if (typeof key === 'string' && privateStore.$_collectionNames.has(key)) {
-            return getApi(key)
+            return getCachedApiByKey(key)
           }
 
           if (key === '$collection') {
-            return (collectionName: string) => getApi(collectionName)
+            return (collectionName: MaybeRefOrGetter<string>) => {
+              if (typeof collectionName === 'string') {
+                return getCachedApiByKey(collectionName)
+              }
+
+              const invalidateEvent = createEventHook()
+
+              tryOnScopeDispose(() => {
+                invalidateEvent.clear()
+              })
+
+              watch(collectionName, () => {
+                invalidateEvent.trigger()
+              })
+
+              return createCollectionApi({
+                store: storeProxy,
+                getCollection: () => {
+                  const name = toValue(collectionName)
+                  const collection = storeProxy.$collections.find(m => m.name === name)
+                  if (!collection) {
+                    throw new Error(`Collection ${name} not found`)
+                  }
+                  return collection
+                },
+                onInvalidate: invalidateEvent.on,
+              })
+            }
           }
 
           if (key === '$onCacheReset') {

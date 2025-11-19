@@ -277,13 +277,26 @@ export interface VueCollectionApi<
   ) => void
 }
 
+export interface CreateCollectionApiOptions<
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> {
+  store: VueStore<TSchema, TCollectionDefaults>
+  getCollection: () => ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  onInvalidate?: (cb: () => unknown) => { off: () => void }
+}
+
 export function createCollectionApi<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 >(
-  store: VueStore<TSchema, TCollectionDefaults>,
-  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>,
+  {
+    store,
+    getCollection,
+    onInvalidate,
+  }: CreateCollectionApiOptions<TCollection, TCollectionDefaults, TSchema>,
 ): VueCollectionApi<TCollection, TCollectionDefaults, TSchema, WrappedItem<TCollection, TCollectionDefaults, TSchema>> {
   /**
    * Bind the options getter to track the type of query (`first` or `many`).
@@ -333,11 +346,37 @@ export function createCollectionApi<
     return createQuery<TCollection, TCollectionDefaults, TSchema, any, WrappedItem<TCollection, TCollectionDefaults, TSchema> | null | Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>>({
       store,
       fetchMethod: (options, meta) => toValue(type) === 'first'
-        ? (options ? findFirst({ store, collection, findOptions: options, meta }).then(r => r.result) : Promise.resolve(null))
-        : findMany({ store, collection, findOptions: options, meta }).then(r => r.result),
+        ? (options
+            ? findFirst({
+                store,
+                collection: getCollection(),
+                findOptions: options,
+                meta,
+              }).then(r => r.result)
+            : Promise.resolve(null))
+        : findMany({
+            store,
+            collection: getCollection(),
+            findOptions: options,
+            meta,
+          }).then(r => r.result),
       cacheMethod: (options, meta) => toValue(type) === 'first'
-        ? (options ? peekFirst({ store, collection, findOptions: options, meta, force: true }).result : null)
-        : peekMany({ store, collection, findOptions: options, meta, force: true }).result,
+        ? (options
+            ? peekFirst({
+              store,
+              collection: getCollection(),
+              findOptions: options,
+              meta,
+              force: true,
+            }).result
+            : null)
+        : peekMany({
+          store,
+          collection: getCollection(),
+          findOptions: options,
+          meta,
+          force: true,
+        }).result,
       defaultValue: () => toValue(type) === 'first' ? null : [],
       options: boundOptionsGetter,
     })
@@ -365,7 +404,7 @@ export function createCollectionApi<
         unsubscribe({
           store,
           meta: meta.value,
-          collection,
+          collection: getCollection(),
           subscriptionId,
           key: previousKey,
           findOptions: previousFindOptions,
@@ -387,7 +426,7 @@ export function createCollectionApi<
       await subscribe({
         store,
         meta: meta.value,
-        collection,
+        collection: getCollection(),
         subscriptionId,
         key,
         findOptions,
@@ -401,6 +440,15 @@ export function createCollectionApi<
     })
 
     tryOnScopeDispose(unsub)
+
+    if (onInvalidate) {
+      const { off } = onInvalidate(() => {
+        return sub(toValue(keyOrFindOptions))
+      })
+      tryOnScopeDispose(() => {
+        off()
+      })
+    }
 
     return {
       unsubscribe: unsub,
@@ -430,6 +478,16 @@ export function createCollectionApi<
     if (meta) {
       Object.assign(query.meta.value, meta)
     }
+
+    if (onInvalidate) {
+      const { off } = onInvalidate(() => {
+        query.refresh()
+      })
+      tryOnScopeDispose(() => {
+        off()
+      })
+    }
+
     return query as ReturnType<Api['query']>
   }
 
@@ -437,27 +495,27 @@ export function createCollectionApi<
   const api: Api = {
     peekFirst: findOptions => peekFirst({
       store,
-      collection,
+      collection: getCollection(),
       findOptions,
       force: true,
     }).result,
 
     findFirst: findOptions => findFirst({
       store,
-      collection,
+      collection: getCollection(),
       findOptions,
     }).then(r => r.result),
 
     peekMany: findOptions => peekMany({
       store,
-      collection,
+      collection: getCollection(),
       findOptions,
       force: true,
     }).result,
 
     findMany: findOptions => findMany({
       store,
-      collection,
+      collection: getCollection(),
       findOptions,
     }).then(r => r.result),
 
@@ -470,14 +528,14 @@ export function createCollectionApi<
     create: (item, options) => createItem({
       ...options,
       store,
-      collection,
+      collection: getCollection(),
       item,
     }),
 
     createMany: (items, options) => createMany({
       ...options,
       store,
-      collection,
+      collection: getCollection(),
       items,
     }),
 
@@ -487,7 +545,7 @@ export function createCollectionApi<
         ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
       >({
         defaultValues: formOptions?.defaultValues,
-        schema: formOptions?.schema ?? collection.formSchema.create,
+        schema: formOptions?.schema ?? getCollection().formSchema.create,
         submit: data => api.create(data, {
           optimistic: formOptions?.optimistic,
         }),
@@ -500,14 +558,14 @@ export function createCollectionApi<
     update: (item, updateOptions) => updateItem({
       ...updateOptions,
       store,
-      collection,
+      collection: getCollection(),
       item,
     }),
 
     updateMany: (items, options) => updateMany({
       ...options,
       store,
-      collection,
+      collection: getCollection(),
       items,
     }),
 
@@ -531,7 +589,7 @@ export function createCollectionApi<
           ...formOptions?.defaultValues?.() as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
           ...initialData,
         }),
-        schema: formOptions?.schema ?? collection.formSchema.update,
+        schema: formOptions?.schema ?? getCollection().formSchema.update,
         resetDefaultValues: () => getFormData(),
         // Only use changed props
         transformData: (form) => {
@@ -550,7 +608,7 @@ export function createCollectionApi<
           return data
         },
         submit: data => api.update(data, {
-          key: collection.getKey(initialData),
+          key: getCollection().getKey(initialData),
           optimistic: formOptions?.optimistic,
         }),
         resetOnSuccess: formOptions?.resetOnSuccess,
@@ -560,6 +618,8 @@ export function createCollectionApi<
     },
 
     delete: (keyOrItem, options) => {
+      const collection = getCollection()
+
       let key: string | number | number
       if (typeof keyOrItem !== 'string' && typeof keyOrItem !== 'number') {
         const result = collection.getKey(keyOrItem)
@@ -581,6 +641,8 @@ export function createCollectionApi<
     },
 
     deleteMany: (keysOrItems, options) => {
+      const collection = getCollection()
+
       const keys = keysOrItems.map((keyOrItem) => {
         if (typeof keyOrItem !== 'string' && typeof keyOrItem !== 'number') {
           const result = collection.getKey(keyOrItem)
@@ -602,9 +664,10 @@ export function createCollectionApi<
       })
     },
 
-    getKey: item => collection.getKey(item),
+    getKey: item => getCollection().getKey(item),
 
     writeItem: (item) => {
+      const collection = getCollection()
       const key = collection.getKey(item)
       if (key == null) {
         throw new Error('Item write failed: key is not defined')
@@ -622,7 +685,7 @@ export function createCollectionApi<
 
     clearItem: (key) => {
       store.$cache.deleteItem({
-        collection,
+        collection: getCollection(),
         key,
       })
     },
