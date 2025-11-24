@@ -110,23 +110,13 @@ export default defineNuxtModule<ModuleOptions>({
       filename: '$rstore-collection.ts',
       getContents: async () => {
         const files = await resolveCollectionFiles()
-        return `${files.map((file, index) => `import * as M${index} from '${file}'`).join('\n')}
-export default [
-  ${files.map((file, index) => `...Object.values(M${index}),`).join('\n')}
-]`
-      },
-    })
-
-    addTypeTemplate({
-      filename: '$rstore-collection-const.d.ts',
-      getContents: async () => {
-        const files = await resolveCollectionFiles()
         return `import type { StoreSchema } from '@rstore/shared'
 ${files.map((file, index) => `import * as M${index} from '${file}'`).join('\n')}
-export const constCollections = [
+export default [
   ${files.map((file, index) => `...Object.values(M${index}),`).join('\n')}
 ] satisfies StoreSchema`
       },
+      write: true,
     })
 
     addTemplate({
