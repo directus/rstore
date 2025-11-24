@@ -111,7 +111,7 @@ export default defineNuxtModule<ModuleOptions>({
       getContents: async () => {
         const files = await resolveCollectionFiles()
         return `import type { StoreSchema } from '@rstore/shared'
-${files.map((file, index) => `import * as M${index} from '${file}'`).join('\n')}
+${files.map((file, index) => `import * as M${index} from '${file.replace('.ts', '')}'`).join('\n')}
 export default [
   ${files.map((file, index) => `...Object.values(M${index}),`).join('\n')}
 ] satisfies StoreSchema`
