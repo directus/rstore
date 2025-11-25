@@ -3,9 +3,14 @@ import { z } from 'zod'
 const querySchema = z.object({
   filter: z.string().optional(),
   include: z.string().optional(),
+  sort: z.string().optional(),
+  limit: z.string().optional(),
+  offset: z.string().optional(),
+  cursor: z.string().optional(),
 })
 
 export default defineEventHandler(async (event) => {
+  await wait(500)
   const { type } = getRouterParams(event) as { type: keyof Db }
   let result = db[type]
 
@@ -34,5 +39,39 @@ export default defineEventHandler(async (event) => {
     }
   }
 
-  return result
+  const totalCount = result.length
+
+  if (query.sort) {
+    const [key, direction] = query.sort.split(':')
+    result = result.toSorted((a, b) => {
+      if (a[key as keyof typeof a] < b[key as keyof typeof b]) {
+        return direction === 'desc' ? 1 : -1
+      }
+      if (a[key as keyof typeof a] > b[key as keyof typeof b]) {
+        return direction === 'desc' ? -1 : 1
+      }
+      return 0
+    }) as Db[keyof Db]
+  }
+
+  if (query.cursor != null) {
+    const cursorIndex = result.findIndex(item => item.id === query.cursor)
+    if (cursorIndex !== -1) {
+      result = result.slice(cursorIndex + 1) as Db[keyof Db]
+    }
+  }
+  else if (query.offset != null) {
+    result = result.slice(Number.parseInt(query.offset)) as Db[keyof Db]
+  }
+
+  if (query.limit != null) {
+    result = result.slice(0, Number.parseInt(query.limit)) as Db[keyof Db]
+  }
+
+  return {
+    result,
+    meta: {
+      totalCount,
+    },
+  }
 })

@@ -69,6 +69,10 @@ export interface Cache<
      */
     filter?: (item: WrappedItem<TCollection, TCollectionDefaults, TSchema>) => boolean
     /**
+     * Specific keys to read.
+     */
+    keys?: Array<string | number>
+    /**
      * Limit the number of items returned.
      */
     limit?: number

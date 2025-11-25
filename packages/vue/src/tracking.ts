@@ -14,7 +14,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
   const { store } = options
 
   const trackingQueryId = crypto.randomUUID()
-  let queryTracking: HookMetaQueryTracking | null = null
+  const queryTrackings = new Map<string, HookMetaQueryTracking>()
 
   const dataKey = ref(0)
 
@@ -34,7 +34,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     return res
   })
 
-  function handleQueryTracking(newQueryTracking: HookMetaQueryTracking, result?: TResult, include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> = {}) {
+  function handleQueryTracking(id: string, newQueryTracking: HookMetaQueryTracking, result?: TResult, include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> = {}, markPreviousItemsAsDirty: boolean = true) {
     if (newQueryTracking.skipped) {
       return
     }
@@ -42,6 +42,8 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     const _result = result ?? toValue(options.result)
 
     const isResultEmpty = _result == null || (Array.isArray(_result) && _result.length === 0)
+
+    let queryTracking = queryTrackings.get(id)
 
     // Init the query tracking object if the result is not empty and there is no previous tracking
     if (!isResultEmpty && !queryTracking) {
@@ -59,6 +61,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
 
       {
         queryTracking = createTrackingObject()
+        queryTrackings.set(id, queryTracking)
         const list = Array.isArray(filteredCached.value) ? filteredCached.value : (filteredCached.value ? [filteredCached.value] : [])
         for (const item of list) {
           if (item) {
@@ -87,7 +90,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
 
     // Mark old tracked items as dirty if they are not tracked anymore
     let hasAddedDirty = false
-    if (queryTracking) {
+    if (queryTracking && markPreviousItemsAsDirty) {
       for (const collectionName in queryTracking.items) {
         const collection = store.$collections.find(c => c.name === collectionName)!
         for (const key of queryTracking.items[collectionName]!) {
@@ -121,11 +124,12 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     }
 
     queryTracking = newQueryTracking
+    queryTrackings.set(id, queryTracking)
   }
 
   // Mark tracked items as dirty on unmount
   tryOnScopeDispose(() => {
-    if (queryTracking) {
+    for (const [, queryTracking] of queryTrackings) {
       for (const collectionName in queryTracking.items) {
         const collection = store.$collections.find(c => c.name === collectionName)!
         for (const key of queryTracking.items[collectionName]!) {
