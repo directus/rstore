@@ -10,5 +10,14 @@ export default antfu({
     'vue/object-property-newline': ['error', {
       allowAllPropertiesOnSameLine: false,
     }],
+    'no-console': 'error',
+  },
+}, {
+  files: [
+    'docs/**/*',
+    'scripts/**/*.js',
+  ],
+  rules: {
+    'no-console': 'off',
   },
 })

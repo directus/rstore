@@ -106,13 +106,18 @@ Instead of defining the hooks in the collection, you can also create a plugin to
 :::
 
 Each hook receives a payload object with the following properties:
-- `fetchFirst`:
+- `fetchFirst`: All the find options [see findFirst](../data/query.md#find-first) such as:
   - `key` (optional): the key of the item to fetch
   - `params` (optional): additional parameters for the fetch
   - `include` (optional): dictionnary of related items to include (see [Relations](./relations.md))
-- `fetchMany`:
+  - etc.
+- `fetchMany`: All the find options [see findMany](../data/query.md#find-many) such as:
+  - `filter` (optional): filter to apply to the fetch
   - `params` (optional): additional parameters for the fetch (if available)
   - `include` (optional): dictionnary of related items to include (see [Relations](./relations.md))
+  - `pageIndex` (optional): the page index for pagination
+  - `pageSize` (optional): the page size for pagination
+  - etc.
 - `create`:
   - `item`: the item to create
 - `createMany`:

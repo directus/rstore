@@ -97,6 +97,11 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
                   },
                 ],
               },
+              {
+                label: 'Books',
+                icon: 'lucide:book-open',
+                to: '/books',
+              },
             ]"
             content-orientation="vertical"
           />

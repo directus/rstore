@@ -1,4 +1,4 @@
-import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheState, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from './item'
 import type { VueStore } from './store'
@@ -11,6 +11,7 @@ declare module '@rstore/shared' {
     markers: Record<string, boolean>
     collections: Record<string, Record<string | number, any>>
     modules: Record<string, any>
+    queryMeta: Record<string, CustomHookMeta>
   }
 }
 
@@ -18,6 +19,8 @@ interface InternalCacheState {
   markers: Record<string, boolean>
   collections: Record<string, Ref<Record<string | number, any>>>
   modules: Record<string, Ref<any>>
+  queryMeta: Record<string, CustomHookMeta>
+  pageRefs: Map<string, { type: 'ref', key: string | number } | { type: 'refs', keys: Array<string | number> }>
 }
 
 export interface CreateCacheOptions<
@@ -37,6 +40,8 @@ export function createCache<
     markers: {},
     collections: {},
     modules: {},
+    queryMeta: {},
+    pageRefs: new Map(),
   }
 
   const layers: Record<string, Ref<CacheLayer[]>> = {}
@@ -281,14 +286,15 @@ export function createCache<
     readItem({ collection, key }) {
       return getWrappedItem(collection, getStateForCollection(collection.name)[key])
     },
-    readItems({ collection, marker, filter, limit }) {
+    readItems({ collection, marker, filter, keys, limit }) {
       if (marker && !state.markers[marker]) {
         return []
       }
       const data: Record<string | number, ResolvedCollectionItemBase<any, any, any>> = getStateForCollection(collection.name)
       const result: Array<WrappedItem<any, any, any>> = []
       let count = 0
-      for (const key in data) {
+      const keysToRead = keys ?? Object.keys(data)
+      for (const key of keysToRead) {
         const item = data[key]
         if (item) {
           if (filter && !filter(item)) {
@@ -460,6 +466,7 @@ export function createCache<
         collections: {},
         markers: toValue(state.markers),
         modules: {},
+        queryMeta: state.queryMeta,
       }
 
       for (const collectionName in state.collections) {
@@ -517,6 +524,9 @@ export function createCache<
         store,
         meta: {},
       })
+
+      // Query Meta
+      state.queryMeta = value.queryMeta || {}
     },
     clear() {
       state.markers = {}
@@ -592,14 +602,20 @@ export function createCache<
       layers,
       ensureLayersForCollection,
     },
-  } satisfies Cache & {
-    _private: {
-      state: typeof state
-      wrappedItems: typeof wrappedItems
-      wrappedItemsMetadata: typeof wrappedItemsMetadata
-      getWrappedItem: typeof getWrappedItem
-      layers: typeof layers
-      ensureLayersForCollection: typeof ensureLayersForCollection
-    }
-  } as any
+  } satisfies Cache & VueCachePrivate as any
+}
+
+export interface VueCachePrivate {
+  _private: {
+    state: InternalCacheState
+    wrappedItems: Map<string, WrappedItem<Collection, CollectionDefaults, StoreSchema>>
+    wrappedItemsMetadata: Map<string, WrappedItemMetadata<Collection, CollectionDefaults, StoreSchema>>
+    getWrappedItem: <TCollection extends Collection>(
+      collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
+      item: ResolvedCollectionItem<TCollection, CollectionDefaults, StoreSchema> | null | undefined,
+      noCache?: boolean,
+    ) => WrappedItem<TCollection, CollectionDefaults, StoreSchema> | undefined
+    layers: Record<string, Ref<CacheLayer[]>>
+    ensureLayersForCollection: (collectionName: string) => Ref<CacheLayer[]>
+  }
 }

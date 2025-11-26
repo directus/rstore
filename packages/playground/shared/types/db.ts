@@ -55,3 +55,11 @@ export interface DataField {
   type: string
   nullable: boolean
 }
+
+export interface Book {
+  id: string
+  title: string
+  author: string
+  genre: string
+  publishedAt: Date
+}

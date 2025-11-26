@@ -129,6 +129,18 @@ export interface FindOptionsBase<
   enabled?: boolean
 
   /**
+   * Index of the page in the pagination.
+   *
+   * Inside a query, will be used to put the page in the `pages` array. If not specified, the page will be added to the end of the `pages` array.
+   */
+  pageIndex?: number
+
+  /**
+   * Size of the page in the pagination.
+   */
+  pageSize?: number
+
+  /**
    * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
    */
   experimentalGarbageCollection?: boolean

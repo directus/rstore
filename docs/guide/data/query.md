@@ -159,6 +159,162 @@ const { data: projects } = store.Project.query(q => q.many(
 ))
 ```
 
+### Pagination <Badge text="New in v0.8.2" />
+
+#### Fetch more
+
+You can use the `fetchMore` function returned by the query composable to fetch additional pages of data. This is useful for implementing infinite scrolling or "Load more" buttons.
+
+By default, rstore exposes the `pageIndex` and `pageSize` options for pagination, that can be used in the [Collection hooks](../schema/collection.md#collection-hooks) or in the [Plugin hooks](../plugin/hooks.md#fetchmany) to send the pagination parameters to the backend accordingly:
+
+- `pageIndex`: The index of the page to fetch (starting from 0). This is used to put the page at the correct position in the `pages` array ref (see [Distinct Pages](#distinct-pages)).
+- `pageSize`: The number of items per page.
+
+```ts
+const { data: messages, fetchMore }
+  = await store.messages.query(q => q.many({
+    pageIndex: 0,
+    pageSize: 10,
+  }))
+
+// ...
+
+const { page } = await fetchMore({
+  pageIndex: 1,
+})
+```
+
+In case you don't really need to keep track of the pages, you don't have to use the `pageIndex` nor the `pageSize` options.
+
+```ts
+const { data: messages, fetchMore }
+  = await store.messages.query(q => q.many({
+    // Some options here...
+  }))
+
+// ...
+
+await fetchMore({
+  // Some other options here...
+})
+```
+
+#### Distinct Pages
+
+In case you want to implement pagination in the listing view as well, you can use the `pages` ref returned by the query composable. It allows to display only one page at a time.
+
+When `fetchMore` is called, the fetched page is stored in the `pages` ref at the index corresponding to the `pageIndex` used in the fetch (or at the end of `pages` if not provided). This way, you can keep track of all the fetched pages and display them accordingly.
+
+First you need to pass the `pageIndex` and `pageSize` options to the initial query:
+
+```ts
+const pageSize = 10
+const pageIndex = ref(0)
+
+const { pages, fetchMore }
+  = await store.messages.query(q => q.many({
+    pageIndex: 0,
+    pageSize,
+  }))
+```
+
+::: warning
+Don't use the reactive `pageIndex` ref directly in the query options. The query should always be initialized with a static `pageIndex` (usually `0`) to fetch the first page. The `pageIndex` ref should only be used to read the current page from the `pages` ref and to pass the correct `pageIndex` to the `fetchMore` function.
+:::
+
+Then you can create a computed property to get the current page based on the `pageIndex` ref. If the page is not yet fetched, it will call `fetchMore` to fetch it:
+
+```ts
+const currentPage = computed(() =>
+  pages.value[pageIndex.value] ?? fetchMore({
+    pageIndex: pageIndex.value,
+  }).page
+)
+```
+
+::: tip
+The `fetchMore` method returns an "hybrid promise", meaning you can use it both with `await` and directly in the computed property - which proves to be very convenient in this case with the nullish coalescing operator (`??`) operator.
+:::
+
+You can then access some useful properties of the `currentPage`:
+
+- `page.data`: the items for the page.
+- `page.loading`: whether the page is being fetched.
+- `page.error`: the error if the page could not be fetched.
+
+```vue
+<template>
+  <UTable
+    :data="currentPage.data"
+    :loading="currentPage.loading"
+  />
+  <UAlert v-if="currentPage.error">
+    <template #title>
+      Error loading page: {{ currentPage.error.message }}
+    </template>
+  </UAlert>
+</template>
+```
+
+#### Page data caching and reactivity
+
+All the first consecutive pages data will be reactively computed from the cache, while other "scarce" pages will hold in memory a list of item keys instead - meaning that the list will not be reactive to added items (but it will still react to updates and deletes).
+
+For example, if you fetch the pages 0 and 1, their respective `data` properties will be computed from the cache using `pageIndex` and `pageSize`. If you then fetch the page 3, its `data` property will also be computed from the cache, but the items will only be looked up by their keys stored in the page result and not dynamically from `pageIndex` and `pageSize`.
+
+::: tip
+If you are using cursor-based pagination instead of index-based, you still need to pass the `pageIndex` and `pageSize` options so the pages are correctly stored in the `pages` ref and the `page.data` properties are correctly computed from the cache. In addition, you can pass your own custom parameters such as the cursor to the query options (see [Customizing Find Options Types](#customizing-find-options-types)).
+:::
+
+#### Pagination Example
+
+Here is the full example with navigation buttons:
+
+```vue
+<script setup lang="ts">
+const store = useStore()
+
+const pageSize = 10
+const pageIndex = ref(0)
+
+const { pages, fetchMore }
+  = await store.messages.query(q => q.many({
+    pageIndex: 0,
+    pageSize,
+  }))
+
+const currentPage = computed(() =>
+  pages.value[pageIndex.value] ?? fetchMore({
+    pageIndex: pageIndex.value,
+  }).page
+)
+</script>
+
+<template>
+  <UTable
+    :data="currentPage.data"
+    :loading="currentPage.loading"
+  />
+  <UAlert v-if="currentPage.error">
+    <template #title>
+      Error loading page: {{ currentPage.error.message }}
+    </template>
+  </UAlert>
+  <UButton
+    :disabled="pageIndex === 0"
+    @click="pageIndex--"
+  >
+    Previous Page
+  </UButton>
+  <UButton
+    :disabled="currentPage.loading || currentPage.data.length < pageSize"
+    @click="pageIndex++"
+  >
+    Next Page
+  </UButton>
+</template>
+```
+
 ## Cache read
 
 ### Peek first

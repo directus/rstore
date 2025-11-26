@@ -83,6 +83,7 @@ describe('cache', () => {
       },
       markers: {},
       modules: {},
+      queryMeta: {},
     })
   })
 

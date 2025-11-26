@@ -193,7 +193,7 @@ describe('store', () => {
     collectionName.value = 'posts'
     await nextTick()
     expect(query.loading.value).toBe(true)
-    await until(() => query.loading.value === false).toBeTruthy()
+    await until(() => query.loading.value).toBe(false)
 
     expect(query.loading.value).toBe(false)
     expect(query.data.value).toHaveLength(2)

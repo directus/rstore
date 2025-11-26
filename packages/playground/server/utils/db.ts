@@ -8,6 +8,7 @@ export interface Db {
   dataSources: DataSource[]
   dataCollections: DataCollection[]
   dataFields: DataField[]
+  books: Book[]
 }
 
 export const db: Db = {
@@ -115,4 +116,19 @@ export const db: Db = {
       nullable: true,
     },
   ],
+  books: generateBooks(500),
+}
+
+function generateBooks(count: number): Book[] {
+  const books: Book[] = []
+  for (let i = 0; i < count; i++) {
+    books.push({
+      id: `book${i + 1}`,
+      title: faker.book.title(),
+      author: faker.book.author(),
+      genre: faker.book.genre(),
+      publishedAt: faker.date.past({ years: 50 }),
+    })
+  }
+  return books
 }

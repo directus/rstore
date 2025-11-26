@@ -77,9 +77,9 @@ export type QueryResult<
   TOptions extends FindOptions<TCollection, TCollectionDefaults, TSchema> & { '~type': QueryType },
 > = HybridPromise<
   TOptions extends { '~type': 'first' }
-    ? VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TItem | null>
+    ? VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TItem | null>
     : TOptions extends { '~type': 'many' }
-      ? VueQueryReturn<TCollection, TCollectionDefaults, TSchema, Array<TItem>>
+      ? VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, Array<TItem>>
       : never
 >
 
@@ -325,7 +325,9 @@ export function createCollectionApi<
     const boundOptionsGetter = () => {
       const result = optionsGetter(queryBuilder)
       type.value = result['~type']
-      return result
+      const value = { ...result } as Omit<TOptions, '~type'>
+      delete (value as any)['~type']
+      return value
     }
     return {
       boundOptionsGetter,
@@ -379,6 +381,8 @@ export function createCollectionApi<
           force: true,
         }).result,
       defaultValue: () => toValue(type) === 'first' ? null : [],
+      id: () => `${toValue(getCollection().name)}-${toValue(type)}`,
+      getCollection,
       options: boundOptionsGetter,
     })
   }
