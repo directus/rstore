@@ -1,6 +1,38 @@
 # Changelog
 
 
+## v0.8.2
+
+[compare changes](https://github.com/directus/rstore/compare/v0.8.1...v0.8.2)
+
+### 🚀 Enhancements
+
+- Dynamic collection name ([a08d447](https://github.com/directus/rstore/commit/a08d447))
+- **vue:** Compare query options before reloading ([b10a34d](https://github.com/directus/rstore/commit/b10a34d))
+- Pagination ([3806b0c](https://github.com/directus/rstore/commit/3806b0c))
+
+### 🩹 Fixes
+
+- **gc:** Take into account include from the query ([f44d309](https://github.com/directus/rstore/commit/f44d309))
+- Check if key is nullish instead of falsy ([1d92c72](https://github.com/directus/rstore/commit/1d92c72))
+- Duplicate call to wrapItem in findFirst ([71b4d48](https://github.com/directus/rstore/commit/71b4d48))
+- Only generate one collections file and write it to disk ([06071d1](https://github.com/directus/rstore/commit/06071d1))
+- Exclude `.ts` from the generated collections file ([a904ded](https://github.com/directus/rstore/commit/a904ded))
+- FindFirst/findMany update options fetchPolicy ([e91e0d9](https://github.com/directus/rstore/commit/e91e0d9))
+- **vue**: `query(q => q.many()`: Typing of TOptions with no parameter passed to many ([a99a512](https://github.com/directus/rstore/commit/a99a512))
+
+### 🏡 Chore
+
+- Nuxt vite:extendConfig hook is deprecated ([8593237](https://github.com/directus/rstore/commit/8593237))
+
+### ✅ Tests
+
+- **lint:** Update antfu eslint to split type imports ([4773d8d](https://github.com/directus/rstore/commit/4773d8d))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.8.1
 
 [compare changes](https://github.com/directus/rstore/compare/v0.8.0...v0.8.1)
