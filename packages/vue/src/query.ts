@@ -1,7 +1,8 @@
 import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, HybridPromise, StoreSchema } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { VueStore } from './store'
-import { computed, getCurrentInstance, onServerPrefetch, ref, shallowRef, toValue, watch } from 'vue'
+import { deepEqual } from 'fast-equals'
+import { klona } from 'klona'
 import { useQueryTracking } from './tracking'
 
 export interface VueQueryReturn<
@@ -159,8 +160,12 @@ export function createQuery<
   }
 
   // Auto load on options change
-  watch(() => toValue(options), () => {
-    load()
+  let previousOptions = klona(toValue(options))
+  watch(() => toValue(options), (value) => {
+    if (!deepEqual(value, previousOptions)) {
+      previousOptions = klona(value)
+      loadMainPage()
+    }
   }, {
     deep: true,
   })

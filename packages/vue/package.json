@@ -41,7 +41,9 @@
   "dependencies": {
     "@rstore/core": "workspace:^",
     "@rstore/shared": "workspace:^",
-    "@vueuse/core": "^14.0.0"
+    "@vueuse/core": "^14.0.0",
+    "fast-equals": "^5.3.3",
+    "klona": "^2.0.6"
   },
   "devDependencies": {
     "typescript": "catalog:",
