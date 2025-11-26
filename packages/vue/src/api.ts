@@ -39,7 +39,7 @@ export interface QueryBuilder<
   /**
    * Create a reactive query for all items that match the given options.
    */
-  many: (() => { '~type': 'many' }) & ((options: QueryManyOptions<TCollection, TCollectionDefaults, TSchema>) => QueryManyOptions<TCollection, TCollectionDefaults, TSchema> & { '~type': 'many' })
+  many: (() => QueryManyOptions<TCollection, TCollectionDefaults, TSchema> & { '~type': 'many' }) & ((options: QueryManyOptions<TCollection, TCollectionDefaults, TSchema>) => QueryManyOptions<TCollection, TCollectionDefaults, TSchema> & { '~type': 'many' })
 }
 
 export interface LiveQueryBuilder<
@@ -55,7 +55,7 @@ export interface LiveQueryBuilder<
   /**
    * Create a reactive live query for all items that match the given options and subscribe to real-time updates (for example from WebSockets).
    */
-  many: (() => { '~type': 'many' }) & ((options: QueryManyOptions<TCollection, TCollectionDefaults, TSchema>) => QueryManyOptions<TCollection, TCollectionDefaults, TSchema> & { '~type': 'many' })
+  many: (() => QueryManyOptions<TCollection, TCollectionDefaults, TSchema> & { '~type': 'many' }) & ((options: QueryManyOptions<TCollection, TCollectionDefaults, TSchema>) => QueryManyOptions<TCollection, TCollectionDefaults, TSchema> & { '~type': 'many' })
 }
 
 export type SubscriptionQueryBuilder<
