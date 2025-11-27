@@ -2,7 +2,7 @@ import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollec
 import type { GlobalStoreType } from './global'
 import type { CacheLayer } from './layer'
 import type { ResolvedModule } from './module'
-import type { FindOptions } from './query'
+import type { FindFirstOptions, FindManyOptions, FindOptions } from './query'
 import type { Awaitable, Path, PathValue } from './utils'
 
 export interface HookMetaQueryTracking {
@@ -33,6 +33,24 @@ export interface HookDefinitions<
       meta: CustomHookMeta
     },
   ) => Awaitable<void>
+
+  resolveFindOptions: <
+    TCollection extends Collection,
+  > (
+    payload: {
+      store: GlobalStoreType
+      meta: CustomHookMeta
+      collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+    } & ({
+      many: true
+      findOptions?: FindManyOptions<TCollection, TCollectionDefaults, TSchema>
+      updateFindOptions: (findOptions: FindManyOptions<TCollection, TCollectionDefaults, TSchema>) => void
+    } | {
+      many: false
+      findOptions?: FindFirstOptions<TCollection, TCollectionDefaults, TSchema>
+      updateFindOptions: (findOptions: FindFirstOptions<TCollection, TCollectionDefaults, TSchema>) => void
+    }),
+  ) => void
 
   beforeFetch: <
     TCollection extends Collection,

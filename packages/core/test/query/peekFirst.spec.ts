@@ -22,7 +22,10 @@ describe('peekFirst', () => {
         readItems: () => [{ id: '1', name: 'Test Item 1' }, { id: '2', name: 'Test Item 2' }],
       },
       $hooks: createHooks(),
-      $getFetchPolicy: () => 'cache-first',
+      $resolveFindOptions: (collection: any, options: any) => ({
+        fetchPolicy: 'cache-first',
+        ...options,
+      }),
     } as any
 
     collection = {

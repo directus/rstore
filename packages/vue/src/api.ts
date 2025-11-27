@@ -380,10 +380,11 @@ export function createCollectionApi<
           meta,
           force: true,
         }).result,
-      defaultValue: () => toValue(type) === 'first' ? null : [],
+      defaultValue: toValue(type) === 'first' ? () => null : () => [],
       id: () => `${toValue(getCollection().name)}-${toValue(type)}`,
       getCollection,
       options: boundOptionsGetter,
+      many: toValue(type) === 'many',
     })
   }
 

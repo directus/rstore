@@ -59,7 +59,10 @@ describe('wrapItem', () => {
         mockCollection,
         { name: 'relatedCollection', getKey: vi.fn(), computed: {}, relations: {} },
       ],
-      $getFetchPolicy: () => 'cache-first',
+      $resolveFindOptions: (collection: any, options: any) => ({
+        fetchPolicy: 'cache-first',
+        ...options,
+      }),
       $cache: {
         readItems: vi.fn(),
       },

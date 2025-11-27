@@ -1,4 +1,4 @@
-import type { Cache, CollectionDefaults, FetchPolicy, Plugin, StoreSchema } from '@rstore/shared'
+import type { Cache, CollectionDefaults, Plugin, StoreSchema } from '@rstore/shared'
 import type { CreateStoreCoreOptions } from '../src/store'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -199,26 +199,68 @@ describe('createStoreCore', () => {
     })
   })
 
-  describe('getFetchPolicy', () => {
-    it('should return default fetch policy if no value is provided', async () => {
+  describe('resolve find options', () => {
+    it('should resolve to default fetch policy if not provided', async () => {
+      options.schema = [
+        { name: 'messages' },
+      ]
       const store = await createStoreCore(options)
-      const fetchPolicy = store.$getFetchPolicy(undefined)
-      expect(fetchPolicy).toBe(defaultFetchPolicy)
+
+      const collection = store.$collections.find(c => c.name === 'messages')!
+
+      const resolved = store.$resolveFindOptions(collection, {}, true, {})
+
+      expect(resolved.fetchPolicy).toBe(defaultFetchPolicy)
     })
 
-    it('should return provided fetch policy if value is provided', async () => {
-      const customFetchPolicy = 'some-policy' as FetchPolicy
+    it('should usee the default find options from the store', async () => {
+      options.schema = [
+        { name: 'messages' },
+      ]
+      options.findDefaults = {
+        fetchPolicy: 'fetch-only',
+      }
       const store = await createStoreCore(options)
-      const fetchPolicy = store.$getFetchPolicy(customFetchPolicy)
-      expect(fetchPolicy).toBe(customFetchPolicy)
+      const collection = store.$collections.find(c => c.name === 'messages')!
+
+      const resolved = store.$resolveFindOptions(collection, {}, true, {})
+
+      expect(resolved.fetchPolicy).toBe('fetch-only')
     })
 
-    it('should return findDefaults fetch policy if no value is provided and findDefaults has fetch policy', async () => {
-      const customFetchPolicy = 'find-default-policy' as FetchPolicy
-      options.findDefaults = { fetchPolicy: customFetchPolicy }
+    it('should override default find options with provided options', async () => {
+      options.schema = [
+        { name: 'messages' },
+      ]
+      options.findDefaults = {
+        pageSize: 25,
+        fetchPolicy: 'fetch-only',
+      }
       const store = await createStoreCore(options)
-      const fetchPolicy = store.$getFetchPolicy(undefined)
-      expect(fetchPolicy).toBe(customFetchPolicy)
+      const collection = store.$collections.find(c => c.name === 'messages')!
+
+      const resolved = store.$resolveFindOptions(collection, { fetchPolicy: 'cache-and-fetch' }, true, {})
+
+      expect(resolved.fetchPolicy).toBe('cache-and-fetch')
+      expect(resolved.pageSize).toBe(25)
+    })
+
+    it('should call resolveFindOptions hook', async () => {
+      options.schema = [
+        { name: 'messages' },
+      ]
+      options.hooks = createHooks()
+      options.hooks.hook('resolveFindOptions', ({ updateFindOptions }) => {
+        updateFindOptions({
+          fetchPolicy: 'cache-and-fetch',
+        })
+      })
+      const store = await createStoreCore(options)
+      const collection = store.$collections.find(c => c.name === 'messages')!
+
+      const resolved = store.$resolveFindOptions(collection, { fetchPolicy: 'cache-only' }, true, {})
+
+      expect(resolved.fetchPolicy).toBe('cache-and-fetch')
     })
   })
 

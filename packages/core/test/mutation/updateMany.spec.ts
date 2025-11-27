@@ -32,7 +32,10 @@ describe('updateMany', () => {
       $mutationHistory: [],
       $processItemParsing: vi.fn(),
       $processItemSerialization: vi.fn(),
-      $getFetchPolicy: vi.fn(() => 'cache-first'),
+      $resolveFindOptions: (collection: any, options: any) => ({
+        fetchPolicy: 'cache-first',
+        ...options,
+      }),
     } as unknown as StoreCore<StoreSchema, CollectionDefaults>
 
     mockCollection = {

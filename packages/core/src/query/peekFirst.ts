@@ -30,19 +30,16 @@ export function peekFirst<
 }: PeekFirstOptions<TCollection, TCollectionDefaults, TSchema>): QueryResult<WrappedItem<TCollection, TCollectionDefaults, TSchema> | null> {
   meta ??= {}
 
-  const findOptions: FindFirstOptions<TCollection, TCollectionDefaults, TSchema> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
+  let findOptions: FindFirstOptions<TCollection, TCollectionDefaults, TSchema> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
     ? {
         key: keyOrOptions,
       }
     : keyOrOptions
 
+  findOptions = store.$resolveFindOptions(collection, findOptions, false, meta)
+  const fetchPolicy = findOptions.fetchPolicy
+
   const key = findOptions?.key
-
-  if (findOptions.meta) {
-    Object.assign(meta, findOptions.meta)
-  }
-
-  const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
 
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let result: any

@@ -30,11 +30,9 @@ export function peekMany<
 }: PeekManyOptions<TCollection, TCollectionDefaults, TSchema>): QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>> {
   meta ??= {}
 
-  if (findOptions?.meta) {
-    Object.assign(meta, findOptions.meta)
-  }
+  findOptions = store.$resolveFindOptions(collection, findOptions ?? {}, true, meta)
+  const fetchPolicy = findOptions.fetchPolicy
 
-  const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let marker: string | undefined = defaultMarker(collection, findOptions)
     let overrideFilter: ((item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean) | undefined

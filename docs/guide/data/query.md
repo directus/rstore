@@ -535,6 +535,21 @@ The cache will automatically resolve the relations as soon as the data is availa
 
 Plugins hooked on the `fetchRelations` hook will also be called to potentially fetch the data of the relations. See [Plugin hooks](../plugin/hooks.md#fetching-relations) for more details.
 
+## Default find options <Badge text="New in v0.8.3" />
+
+You can set default find options for all queries in the store by using the `findDefaults` option when creating the store:
+
+```ts
+const store = createStore({
+  schema,
+  plugins,
+  findDefaults: {
+    fetchPolicy: 'cache-and-fetch',
+    // Other default find options...
+  },
+})
+```
+
 ## Customizing Find Options Types <Badge text="Changed in v0.7" type="warning" />
 
 You can customize the `FindOptions` type used in the `first` and `many` query builder methods and in the `peek*`/`find*` methods by declaring a module augmentation for `@rstore/vue` and extending the `FindOptions` interface.

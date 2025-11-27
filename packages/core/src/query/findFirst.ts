@@ -64,16 +64,8 @@ async function _findFirst<
       }
     : keyOrOptions
 
-  if (findOptions.meta) {
-    Object.assign(meta, findOptions.meta)
-  }
-
-  const fetchPolicy = store.$getFetchPolicy(findOptions?.fetchPolicy)
-
-  findOptions = {
-    ...findOptions,
-    fetchPolicy,
-  }
+  findOptions = store.$resolveFindOptions(collection, findOptions, false, meta)
+  const fetchPolicy = findOptions.fetchPolicy
 
   let result: any
   let marker: string | undefined

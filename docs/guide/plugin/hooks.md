@@ -972,3 +972,18 @@ hook('afterFetch', (payload) => {
   )
 })
 ```
+
+### resolveFindOptions <Badge text="New in v0.8.3" />
+
+```ts
+hook('resolveFindOptions', (payload) => {
+  console.log(
+    payload.store,
+    payload.meta,
+    payload.collection, // The current collection
+    payload.many, // Boolean indicating if the query is for many items or one item
+    payload.findOptions, // The find options passed to the query, such as filter or params
+    payload.updateFindOptions, // A function to update the find options
+  )
+})
+```

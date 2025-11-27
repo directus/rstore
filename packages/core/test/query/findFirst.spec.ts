@@ -48,7 +48,10 @@ describe('findFirst', () => {
         }),
       },
       $hooks: createHooks(),
-      $getFetchPolicy: () => 'cache-first',
+      $resolveFindOptions: (collection: any, options: any) => ({
+        fetchPolicy: 'cache-first',
+        ...options,
+      }),
       $processItemParsing: vi.fn(),
       $dedupePromises: new Map(),
     } as any
@@ -105,7 +108,6 @@ describe('findFirst', () => {
   })
 
   it('should write item to cache if fetch policy allows', async () => {
-    mockStore.$getFetchPolicy = () => 'cache-and-fetch'
     mockStore.$hooks.hook('fetchFirst', (payload) => {
       payload.setResult({ id: '42' })
     })
@@ -113,7 +115,10 @@ describe('findFirst', () => {
     const result = await findFirst({
       store: mockStore,
       collection,
-      findOptions: '42',
+      findOptions: {
+        key: '42',
+        fetchPolicy: 'cache-and-fetch',
+      },
     })
 
     expect(mockStore.$cache.writeItem).toHaveBeenCalledWith(expect.objectContaining({
@@ -124,21 +129,22 @@ describe('findFirst', () => {
   })
 
   it('should not write item to cache if fetch policy is no-cache', async () => {
-    mockStore.$getFetchPolicy = () => 'no-cache'
     mockStore.$hooks.hook('fetchFirst', (payload) => {
       payload.setResult({ id: '1' })
     })
     await findFirst({
       store: mockStore,
       collection,
-      findOptions: '1',
+      findOptions: {
+        key: '1',
+        fetchPolicy: 'no-cache',
+      },
     })
 
     expect(mockStore.$cache.writeItem).not.toHaveBeenCalled()
   })
 
   it('should wrap item with noCache if fetch policy is no-cache', async () => {
-    mockStore.$getFetchPolicy = () => 'no-cache'
     mockStore.$hooks.hook('fetchFirst', (payload) => {
       payload.setResult({ id: '1' })
     })
@@ -146,7 +152,10 @@ describe('findFirst', () => {
     await findFirst({
       store: mockStore,
       collection,
-      findOptions: '1',
+      findOptions: {
+        key: '1',
+        fetchPolicy: 'no-cache',
+      },
     })
 
     expect(mockStore.$cache.wrapItem).toHaveBeenCalledOnce()

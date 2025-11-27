@@ -1,6 +1,7 @@
 import type { Hooks } from '../utils/hooks'
 import type { Cache } from './cache'
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionList, StoreSchema } from './collection'
+import type { CustomHookMeta } from './hooks'
 import type { ResolvedModule } from './module'
 import type { MutationOperation, MutationSpecialProps } from './mutation'
 import type { RegisteredPlugin } from './plugin'
@@ -16,7 +17,12 @@ export interface StoreCore<
   $plugins: Array<RegisteredPlugin>
   $hooks: Hooks<TSchema, TCollectionDefaults>
   $findDefaults: Partial<FindOptions<any, any, any>>
-  $getFetchPolicy: (value: FetchPolicy | null | undefined) => FetchPolicy
+  /**
+   * @private
+   */
+  $resolveFindOptions: (collection: ResolvedCollection, options: Partial<FindOptions<any, any, any>>, many: boolean, meta: CustomHookMeta) => FindOptions<any, any, any> & {
+    fetchPolicy: FetchPolicy
+  }
   /**
    * @private
    */

@@ -63,6 +63,7 @@ export interface VueCreateQueryOptions<
   id: () => string
   getCollection: () => ResolvedCollection
   options?: MaybeRefOrGetter<TOptions | undefined | { enabled: boolean }>
+  many: boolean
 }
 
 type VueQueryPageOptions<TOptions> = Partial<Omit<TOptions, 'pageSize'>>
@@ -130,11 +131,14 @@ export function createQuery<
   id,
   getCollection,
   options,
+  many,
 }: VueCreateQueryOptions<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>): HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>> {
   type PageOverrideOptions = VueQueryPageOptions<TOptions>
 
   const cache = store.$cache as Cache & VueCachePrivate
   const queryId = computed(() => JSON.stringify([id(), toValue(options)]))
+
+  const meta = shallowRef<CustomHookMeta>(cache._private.state.queryMeta[queryId.value] || {})
 
   function getOptions(): TOptions | undefined {
     const result = toValue(options)
@@ -146,7 +150,7 @@ export function createQuery<
     return typeof result === 'object' && 'enabled' in result && result.enabled === false
   }
 
-  let fetchPolicy = store.$getFetchPolicy(getOptions()?.fetchPolicy)
+  let { fetchPolicy } = store.$resolveFindOptions(getCollection(), getOptions() ?? {}, many, meta.value)
 
   const queryTrackingEnabled = !store.$isServer && fetchPolicy !== 'no-cache' && (
     store.$experimentalGarbageCollection
@@ -212,8 +216,6 @@ export function createQuery<
     }
     return result
   })
-
-  const meta = shallowRef<CustomHookMeta>(cache._private.state.queryMeta[queryId.value] || {})
 
   // @TODO include nested relations in no-cache results
   const cached = computed(() => {
@@ -447,7 +449,8 @@ export function createQuery<
 
         // Main page
         if (page.main) {
-          fetchPolicy = store.$getFetchPolicy(finalOptions.fetchPolicy)
+          const resolvedOptions = store.$resolveFindOptions(getCollection(), finalOptions, many, meta.value)
+          fetchPolicy = resolvedOptions.fetchPolicy
         }
 
         // If fetchPolicy is `cache-and-fetch`, fetch in parallel

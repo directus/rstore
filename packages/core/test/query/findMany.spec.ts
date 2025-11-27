@@ -44,7 +44,10 @@ describe('findMany', () => {
         },
       },
       $hooks: createHooks(),
-      $getFetchPolicy: () => 'cache-first',
+      $resolveFindOptions: (collection: any, options: any) => ({
+        fetchPolicy: 'cache-first',
+        ...options,
+      }),
       $processItemParsing: vi.fn(),
       $dedupePromises: new Map(),
     } as any
@@ -95,7 +98,6 @@ describe('findMany', () => {
   })
 
   it('should write items to cache if fetch policy allows', async () => {
-    mockStore.$getFetchPolicy = () => 'cache-and-fetch'
     mockStore.$hooks.hook('fetchMany', (payload) => {
       payload.setResult([{ id: '42', name: 'Fetched Item' }])
     })
@@ -107,6 +109,7 @@ describe('findMany', () => {
         params: {
           email: '42',
         },
+        fetchPolicy: 'cache-and-fetch',
       },
     })
 
@@ -118,7 +121,6 @@ describe('findMany', () => {
   })
 
   it('should not write items to cache if fetch policy is no-cache', async () => {
-    mockStore.$getFetchPolicy = () => 'no-cache'
     await findMany({
       store: mockStore,
       collection,
@@ -126,6 +128,7 @@ describe('findMany', () => {
         params: {
           email: '42',
         },
+        fetchPolicy: 'no-cache',
       },
     })
 

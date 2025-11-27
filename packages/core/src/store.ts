@@ -20,6 +20,8 @@ export interface CreateStoreCoreOptions<
   syncImmediately?: boolean
 }
 
+const resolvedFindOptionsMarker = Symbol('resolvedFindOptions')
+
 export async function createStoreCore<
   TSchema extends StoreSchema = StoreSchema,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
@@ -38,8 +40,33 @@ export async function createStoreCore<
     $plugins: sortPlugins(optionPlugins.map(p => ({ ...p, hooks: {} }))),
     $hooks: options.hooks,
     $findDefaults: options.findDefaults ?? {},
-    $getFetchPolicy(value) {
-      return value ?? store.$findDefaults.fetchPolicy ?? defaultFetchPolicy
+    $resolveFindOptions(collection, options, many, meta) {
+      if ((options as any)[resolvedFindOptionsMarker]) {
+        return options as any
+      }
+      const resolvedOptions: FindOptions<any, any, any> = {
+        ...store.$findDefaults,
+        ...options,
+        fetchPolicy: options.fetchPolicy ?? store.$findDefaults.fetchPolicy ?? defaultFetchPolicy,
+      }
+      store.$hooks.callHookSync('resolveFindOptions', {
+        store: store as unknown as GlobalStoreType,
+        collection,
+        many,
+        meta,
+        findOptions: resolvedOptions,
+        updateFindOptions: (newFindOptions: any) => {
+          Object.assign(resolvedOptions, newFindOptions)
+        },
+      })
+      if (resolvedOptions.meta) {
+        Object.assign(meta, resolvedOptions.meta)
+      }
+      Object.defineProperty(resolvedOptions, resolvedFindOptionsMarker, {
+        value: true,
+        enumerable: false,
+      })
+      return resolvedOptions
     },
     $processItemParsing(collection, item) {
       store.$hooks.callHookSync('parseItem', {
