@@ -73,17 +73,19 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
 
     // Mark new tracked items as fresh
     for (const collectionName in newQueryTracking.items) {
-      const collection = store.$collections.find(c => c.name === collectionName)!
-      const oldKeys = queryTracking?.items[collectionName]
-      for (const key of newQueryTracking.items[collectionName]!) {
-        const item = store.$cache.readItem({
-          collection,
-          key,
-        }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
-        if (item) {
-          item.$meta.queries.add(trackingQueryId)
-          item.$meta.dirtyQueries.delete(trackingQueryId)
-          oldKeys?.delete(key)
+      const collection = store.$collections.find(c => c.name === collectionName)
+      if (collection) {
+        const oldKeys = queryTracking?.items[collectionName]
+        for (const key of newQueryTracking.items[collectionName]!) {
+          const item = store.$cache.readItem({
+            collection,
+            key,
+          }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
+          if (item) {
+            item.$meta.queries.add(trackingQueryId)
+            item.$meta.dirtyQueries.delete(trackingQueryId)
+            oldKeys?.delete(key)
+          }
         }
       }
     }
@@ -92,26 +94,28 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     let hasAddedDirty = false
     if (queryTracking && markPreviousItemsAsDirty) {
       for (const collectionName in queryTracking.items) {
-        const collection = store.$collections.find(c => c.name === collectionName)!
-        for (const key of queryTracking.items[collectionName]!) {
-          const item = store.$cache.readItem({
-            collection,
-            key,
-          }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
-          if (item) {
-            item.$meta.queries.delete(trackingQueryId)
-            item.$meta.dirtyQueries.add(trackingQueryId)
+        const collection = store.$collections.find(c => c.name === collectionName)
+        if (collection) {
+          for (const key of queryTracking.items[collectionName]!) {
+            const item = store.$cache.readItem({
+              collection,
+              key,
+            }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
+            if (item) {
+              item.$meta.queries.delete(trackingQueryId)
+              item.$meta.dirtyQueries.add(trackingQueryId)
 
-            hasAddedDirty = true
+              hasAddedDirty = true
 
-            // Clean garbage after the dirty items have a change to be removed from other queries
-            // (e.g. after `dataKey.value++` updates the `cached` computed property)
-            nextTick(() => {
-              store.$cache.garbageCollectItem({
-                collection,
-                item: item as any,
+              // Clean garbage after the dirty items have a change to be removed from other queries
+              // (e.g. after `dataKey.value++` updates the `cached` computed property)
+              nextTick(() => {
+                store.$cache.garbageCollectItem({
+                  collection,
+                  item: item as any,
+                })
               })
-            })
+            }
           }
         }
       }
@@ -131,15 +135,17 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
   tryOnScopeDispose(() => {
     for (const [, queryTracking] of queryTrackings) {
       for (const collectionName in queryTracking.items) {
-        const collection = store.$collections.find(c => c.name === collectionName)!
-        for (const key of queryTracking.items[collectionName]!) {
-          const item = store.$cache.readItem({
-            collection,
-            key,
-          }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
-          if (item) {
-            item.$meta.queries.delete(trackingQueryId)
-            item.$meta.dirtyQueries.add(trackingQueryId)
+        const collection = store.$collections.find(c => c.name === collectionName)
+        if (collection) {
+          for (const key of queryTracking.items[collectionName]!) {
+            const item = store.$cache.readItem({
+              collection,
+              key,
+            }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
+            if (item) {
+              item.$meta.queries.delete(trackingQueryId)
+              item.$meta.dirtyQueries.add(trackingQueryId)
+            }
           }
         }
       }
