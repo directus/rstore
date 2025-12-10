@@ -329,6 +329,8 @@ export function createCollectionApi<
       delete (value as any)['~type']
       return value
     }
+    // Call once to set the initial type
+    boundOptionsGetter()
     return {
       boundOptionsGetter,
       type,
