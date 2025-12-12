@@ -121,18 +121,18 @@ export function createFormObject<
     $error: null,
     $loading: false as boolean,
     async $reset() {
-      form.$changedProps = {}
-      for (const key in form) {
-        if (!key.startsWith('$')) {
-          delete (form as any)[key]
-        }
-      }
       if (options.resetDefaultValues) {
         const values = await options.resetDefaultValues()
         initialData = pickNonSpecialProps(values, true) as Partial<TData>
       }
       else if (options.defaultValues) {
         initialData = pickNonSpecialProps(options.defaultValues(), true) as Partial<TData>
+      }
+      form.$changedProps = {}
+      for (const key in form) {
+        if (!key.startsWith('$')) {
+          delete (form as any)[key]
+        }
       }
       Object.assign(form, initialData)
     },
