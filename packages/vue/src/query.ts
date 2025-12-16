@@ -405,11 +405,11 @@ export function createQuery<
       case 'data':
         return rawData.value
       case 'computed': {
+        const value = cached.value
         const pageSize = getOptions()?.pageSize
         if (pageSize == null) {
-          throw new Error('[rstore] Cannot read computed page data without pageSize option.')
+          return value
         }
-        const value = cached.value
         if (Array.isArray(value)) {
           return value.slice(page.index * pageSize, (page.index + 1) * pageSize) as TResult
         }
