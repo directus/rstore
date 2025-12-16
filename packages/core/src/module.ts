@@ -1,4 +1,5 @@
 import type { Awaitable, CreateModuleApi, GlobalStoreType, Module, ModuleMutation, ResolvedModule, StoreCore, StoreSchema } from '@rstore/shared'
+import { isKeyDefined } from './key'
 
 type ResolveCallbacks = Array<() => Awaitable<unknown>>
 
@@ -35,7 +36,7 @@ export function defineModule<
       store,
       onResolve,
       defineState<TState extends Record<string, any>>(s: TState, key?: string): TState {
-        if (key == null) {
+        if (!isKeyDefined(key)) {
           key = String(stateKey++)
         }
         const stateFromCache = store.$cache.getModuleState(name, key, s)
@@ -46,7 +47,7 @@ export function defineModule<
         let key: string | undefined
         const originalMutation = mutation
         mutation = ((...args: Parameters<typeof mutation>) => {
-          if (key == null) {
+          if (!isKeyDefined(key)) {
             key = Object.keys(_exposed).find(k => _exposed[k] === mutation)
           }
           store.$mutationHistory.push({

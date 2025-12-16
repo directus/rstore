@@ -3,6 +3,7 @@ import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { unwrapItem } from '../item'
+import { isKeyDefined } from '../key'
 import { peekFirst } from './peekFirst'
 
 export interface FindFirstParams<
@@ -139,7 +140,7 @@ async function _findFirst<
 
       if (fetchPolicy !== 'no-cache') {
         const key = collection.getKey(result)
-        if (key == null) {
+        if (!isKeyDefined(key)) {
           console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
         }
         else {

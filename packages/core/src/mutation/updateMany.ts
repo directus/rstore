@@ -1,6 +1,7 @@
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WriteItem } from '@rstore/shared'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { unwrapItem } from '../item'
+import { isKeyDefined } from '../key'
 import { peekMany } from '../query'
 
 export interface UpdateManyOptions<
@@ -34,7 +35,7 @@ export async function updateMany<
   function getItemsWithKey(items: Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>) {
     return items.map((item) => {
       const key = collection.getKey(item)
-      if (key == null) {
+      if (!isKeyDefined(key)) {
         throw new Error('Item update failed: key is not defined')
       }
       allKeys.add(key)
@@ -218,7 +219,7 @@ export async function updateMany<
         const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
         for (const item of items) {
           const key = collection.getKey(item)
-          if (key == null) {
+          if (!isKeyDefined(key)) {
             console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
             continue
           }
@@ -236,7 +237,7 @@ export async function updateMany<
       const resultByKey: Record<string | number, ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> = {}
       for (const item of result) {
         const key = collection.getKey(item)
-        if (key) {
+        if (isKeyDefined(key)) {
           resultByKey[key] = item
         }
       }

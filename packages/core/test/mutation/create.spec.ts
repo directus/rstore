@@ -190,4 +190,24 @@ describe('createItem', () => {
     expect(hook1).toHaveBeenCalled()
     expect(hook2).not.toHaveBeenCalled()
   })
+
+  describe('check for undefined key', () => {
+    it('should handle falsy key', async () => {
+      const resultItem = { id: 0 } as unknown as ResolvedCollectionItem<Collection, CollectionDefaults, StoreSchema>
+      mockStore.$hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
+      mockCollection.getKey = vi.fn(() => 0)
+
+      const result = await createItem(options)
+      expect(result).toEqual(resultItem)
+      expect(mockStore.$cache.writeItem).toHaveBeenCalled()
+    })
+
+    it('should throw if key is undefined', async () => {
+      const resultItem = { id: undefined } as unknown as ResolvedCollectionItem<Collection, CollectionDefaults, StoreSchema>
+      mockStore.$hooks.hook('createItem', vi.fn(({ setResult }) => setResult(resultItem)))
+      mockCollection.getKey = vi.fn(() => undefined)
+
+      await expect(createItem(options)).rejects.toThrow('Item creation failed: key is not defined')
+    })
+  })
 })

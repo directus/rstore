@@ -1,6 +1,7 @@
 import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, GlobalStoreType, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
+import { isKeyDefined } from '../key'
 
 export interface PeekFirstOptions<
   TCollection extends Collection,
@@ -55,7 +56,7 @@ export function peekFirst<
       },
     })
 
-    if (key) {
+    if (isKeyDefined(key)) {
       result = store.$cache.readItem({ collection, key })
     }
     else if (typeof findOptions?.filter === 'function') {

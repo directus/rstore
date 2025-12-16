@@ -2,6 +2,7 @@ import type { Cache, Collection, CollectionDefaults, CustomHookMeta, FindOptions
 import type { MaybeRefOrGetter, Raw, Ref } from 'vue'
 import type { VueCachePrivate } from './cache'
 import type { VueStore } from './store'
+import { isKeyDefined } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { deepEqual } from 'fast-equals'
 import { klona } from 'klona'
@@ -333,7 +334,7 @@ export function createQuery<
       const collection = getCollection()
       for (const item of pageResult as any[]) {
         const key = collection.getKey(item)
-        if (key == null) {
+        if (!isKeyDefined(key)) {
           console.warn(`[rstore] Item returned from query is missing primary key for collection "${collection.name}".`, item)
         }
         else {
@@ -348,7 +349,7 @@ export function createQuery<
     else if (pageResult && typeof pageResult === 'object') {
       const collection = getCollection()
       const key = collection.getKey(pageResult)
-      if (key == null) {
+      if (!isKeyDefined(key)) {
         console.warn(`[rstore] Item returned from query is missing primary key for collection "${collection.name}".`, pageResult)
         page.rawData = {
           type: 'data',

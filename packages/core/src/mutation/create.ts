@@ -1,6 +1,7 @@
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 import { unwrapItem } from '../item'
+import { isKeyDefined } from '../key'
 
 export interface CreateOptions<
   TCollection extends Collection,
@@ -53,7 +54,7 @@ export async function createItem<
 
   if (!skipCache && optimistic) {
     let key = collection.getKey(item)
-    if (key == null) {
+    if (!isKeyDefined(key)) {
       key = crypto.randomUUID()
     }
     layer = {
@@ -118,7 +119,7 @@ export async function createItem<
 
         const key = collection.getKey(result)
 
-        if (key) {
+        if (isKeyDefined(key)) {
           store.$cache.writeItem({
             collection,
             key,

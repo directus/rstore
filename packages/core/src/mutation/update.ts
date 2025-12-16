@@ -1,6 +1,7 @@
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 import { unwrapItem } from '../item'
+import { isKeyDefined } from '../key'
 import { peekFirst } from '../query'
 
 export interface UpdateOptions<
@@ -36,7 +37,7 @@ export async function updateItem<
 
   key ??= collection.getKey(item)
 
-  if (key == null) {
+  if (!isKeyDefined(key)) {
     throw new Error('Item update failed: key is not defined')
   }
 

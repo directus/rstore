@@ -398,4 +398,27 @@ describe('updateMany', () => {
     expect(result).toEqual(resultItems)
     expect(mockStore.$cache.addLayer).not.toHaveBeenCalled()
   })
+
+  describe('check for undefined keys', () => {
+    it('should not throw for falsy keys', async () => {
+      const resultItems = [{ id: 0, name: 'updated-item1' }] as Array<ResolvedCollectionItem<Collection, CollectionDefaults, StoreSchema>>
+      mockStore.$hooks.hook('updateMany', vi.fn(({ setResult }) => setResult(resultItems)))
+      mockCollection.getKey = vi.fn(() => 0)
+      mockStore.$cache.readItem = vi.fn(() => null as any)
+
+      const result = await updateMany({ ...options, items: [{ id: 0, name: 'updated-item1' }] })
+
+      expect(result).toEqual(resultItems)
+      expect(mockStore.$cache.writeItems).toHaveBeenCalled()
+    })
+
+    it('should throw if key is undefined', async () => {
+      const resultItems = [{ name: 'updated-item1' }] as Array<ResolvedCollectionItem<Collection, CollectionDefaults, StoreSchema>>
+      mockStore.$hooks.hook('updateMany', vi.fn(({ setResult }) => setResult(resultItems)))
+      mockCollection.getKey = vi.fn(() => undefined)
+      mockStore.$cache.readItem = vi.fn(() => null as any)
+
+      await expect(updateMany({ ...options, items: [{ name: 'updated-item1' }] })).rejects.toThrow('Item update failed: key is not defined')
+    })
+  })
 })

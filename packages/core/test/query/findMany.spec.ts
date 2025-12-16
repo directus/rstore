@@ -1,6 +1,6 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, StoreCore, WrappedItem } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { findMany } from '../../src/query/findMany'
 
 interface TestCollectionDefaults extends CollectionDefaults {
@@ -393,6 +393,46 @@ describe('findMany', () => {
       expect(result.result).toEqual([])
       expect(fetchManyHook1).toHaveBeenCalled()
       expect(fetchManyHook2).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('check for undefined keys', () => {
+    let consoleMock: any
+
+    beforeEach(() => {
+      consoleMock = vi.spyOn(console, 'warn').mockImplementation(() => { })
+    })
+
+    afterEach(() => {
+      consoleMock.mockRestore()
+    })
+
+    it('should warn if an item has an undefined key', async () => {
+      mockStore.$hooks.hook('fetchMany', (payload) => {
+        payload.setResult([{ name: 'No Key Item' }])
+      })
+
+      await findMany({
+        store: mockStore,
+        collection,
+      })
+
+      expect(mockStore.$cache.writeItems).not.toHaveBeenCalled()
+      expect(consoleMock).toHaveBeenCalledWith(expect.stringContaining('Key is undefined'))
+    })
+
+    it('should write items with falsy keys', async () => {
+      mockStore.$hooks.hook('fetchMany', (payload) => {
+        payload.setResult([{ id: 0, name: 'Falsy Key Item' }])
+      })
+
+      await findMany({
+        store: mockStore,
+        collection,
+      })
+
+      expect(mockStore.$cache.writeItems).toHaveBeenCalled()
+      expect(consoleMock).not.toHaveBeenCalled()
     })
   })
 })

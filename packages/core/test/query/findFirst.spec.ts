@@ -1,6 +1,7 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, StoreCore, WrappedItem } from '@rstore/shared'
+import type { MockInstance } from 'vitest'
 import { createHooks } from '@rstore/shared'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { findFirst } from '../../src/query/findFirst'
 
 interface TestCollectionDefaults extends CollectionDefaults {
@@ -453,6 +454,51 @@ describe('findFirst', () => {
       expect(result.result).toBeNull()
       expect(fetchFirstHook1).toHaveBeenCalled()
       expect(fetchFirstHook2).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('check if key is defined', () => {
+    let consoleMock: MockInstance
+
+    beforeEach(() => {
+      consoleMock = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      consoleMock.mockClear()
+    })
+
+    it('write to cache if key is falsy', async () => {
+      mockStore.$hooks.hook('fetchFirst', (payload) => {
+        payload.setResult({ id: 0 })
+      })
+
+      await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: {
+          key: 0,
+        },
+      })
+
+      expect(mockStore.$cache.writeItem).toHaveBeenCalled()
+    })
+
+    it('should not write to cache if key is undefined', async () => {
+      mockStore.$hooks.hook('fetchFirst', (payload) => {
+        payload.setResult({ name: 'No Key Item' })
+      })
+
+      await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: {
+          key: 0,
+        },
+      })
+
+      expect(mockStore.$cache.writeItem).not.toHaveBeenCalled()
+      expect(consoleMock).toHaveBeenCalledWith(expect.stringContaining('Key is undefined'))
     })
   })
 })

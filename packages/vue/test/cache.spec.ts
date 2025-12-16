@@ -116,6 +116,35 @@ describe('cache', () => {
     expect(state.collections.RelatedCollection[2]).toEqual({ id: 2, name: 'Related Item' })
   })
 
+  it('should write items with falsy keys', () => {
+    const relationCollection = {
+      name: 'RelatedCollection',
+      getKey: (item: any) => item.id,
+      relations: {},
+      computed: {},
+    }
+
+    const mockCollectionWithRelation = {
+      ...mockCollection,
+      relations: {
+        related: { to: { RelatedCollection: { on: { id: 'relatedId' } } }, many: false },
+      },
+      computed: {},
+    }
+
+    const relatedItem = { id: 0, name: 'Related Item' }
+    const itemWithRelation = { id: 0, name: 'Test Item', relatedId: relatedItem.id, related: relatedItem }
+
+    ;(mockStore.$getCollection as MockedFunction<any>).mockReturnValue(relationCollection)
+
+    const cache = createCache({ getStore })
+    cache.writeItem({ collection: mockCollectionWithRelation, key: 0, item: itemWithRelation })
+
+    const state = cache.getState() as any
+    expect(state.collections.TestCollection[0]).toEqual({ id: 0, name: 'Test Item', relatedId: 0 })
+    expect(state.collections.RelatedCollection[0]).toEqual({ id: 0, name: 'Related Item' })
+  })
+
   it('should mark a marker when writing items', () => {
     const cache = createCache({ getStore })
     cache.writeItem({ collection: mockCollection, key: 1, item: mockItem, marker: 'testMarker' })

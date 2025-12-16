@@ -1,7 +1,8 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { MockInstance } from 'vitest'
 import type { CreateManyOptions } from '../../src/mutation/createMany'
 import { createHooks } from '@rstore/shared'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMany } from '../../src/mutation/createMany'
 
 describe('createMany', () => {
@@ -353,6 +354,58 @@ describe('createMany', () => {
       operation: 'create',
       collection: mockCollection,
       payload: modifiedItems,
+    })
+  })
+
+  describe('check for undefined keys', () => {
+    let consoleMock: MockInstance
+
+    beforeEach(() => {
+      consoleMock = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    })
+
+    afterEach(() => {
+      consoleMock.mockRestore()
+    })
+
+    it('should warn and skip items without keys when writing to cache', async () => {
+      const resultItems = [
+        { name: 'item1' },
+        { id: '2', name: 'item2' },
+      ] as Array<ResolvedCollectionItem<Collection, CollectionDefaults, StoreSchema>>
+
+      mockStore.$hooks.hook('createMany', vi.fn(({ setResult }) => setResult(resultItems)))
+      mockCollection.getKey = vi.fn(item => item.id)
+
+      await createMany(options)
+
+      expect(consoleMock).toHaveBeenCalledWith('Key is undefined for testCollection. Item was not written to cache.')
+      expect(mockStore.$cache.writeItems).toHaveBeenCalledWith({
+        collection: mockCollection,
+        items: [
+          { key: '2', value: resultItems[1] },
+        ],
+      })
+    })
+
+    it('should not warn items with falsy keys', async () => {
+      const resultItems = [
+        { id: 0, name: 'item1' },
+        { id: '', name: 'item2' },
+      ] as Array<ResolvedCollectionItem<Collection, CollectionDefaults, StoreSchema>>
+      mockStore.$hooks.hook('createMany', vi.fn(({ setResult }) => setResult(resultItems)))
+      mockCollection.getKey = vi.fn(item => item.id)
+
+      await createMany(options)
+
+      expect(consoleMock).not.toHaveBeenCalled()
+      expect(mockStore.$cache.writeItems).toHaveBeenCalledWith({
+        collection: mockCollection,
+        items: [
+          { key: 0, value: resultItems[0] },
+          { key: '', value: resultItems[1] },
+        ],
+      })
     })
   })
 })

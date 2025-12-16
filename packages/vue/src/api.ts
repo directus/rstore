@@ -5,7 +5,7 @@ import type { CreateFormObjectOptions, VueCreateFormObject, VueUpdateFormObject 
 import type { VueLiveQueryReturn } from './live'
 import type { VueQueryReturn } from './query'
 import type { VueStore } from './store'
-import { createItem, createMany, deleteItem, deleteMany, findFirst, findMany, peekFirst, peekMany, subscribe, unsubscribe, updateItem, updateMany } from '@rstore/core'
+import { createItem, createMany, deleteItem, deleteMany, findFirst, findMany, isKeyDefined, peekFirst, peekMany, subscribe, unsubscribe, updateItem, updateMany } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { ref, toValue, watch } from 'vue'
@@ -631,7 +631,7 @@ export function createCollectionApi<
       let key: string | number | number
       if (typeof keyOrItem !== 'string' && typeof keyOrItem !== 'number') {
         const result = collection.getKey(keyOrItem)
-        if (!result) {
+        if (!isKeyDefined(result)) {
           throw new Error('Item delete failed: key is not defined')
         }
         key = result
@@ -654,7 +654,7 @@ export function createCollectionApi<
       const keys = keysOrItems.map((keyOrItem) => {
         if (typeof keyOrItem !== 'string' && typeof keyOrItem !== 'number') {
           const result = collection.getKey(keyOrItem)
-          if (!result) {
+          if (!isKeyDefined(result)) {
             throw new Error('Item delete failed: key is not defined')
           }
           return result
@@ -677,7 +677,7 @@ export function createCollectionApi<
     writeItem: (item) => {
       const collection = getCollection()
       const key = collection.getKey(item)
-      if (key == null) {
+      if (!isKeyDefined(key)) {
         throw new Error('Item write failed: key is not defined')
       }
       store.$cache.writeItem({

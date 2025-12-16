@@ -3,6 +3,7 @@ import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { unwrapItem } from '../item'
+import { isKeyDefined } from '../key'
 import { peekMany } from './peekMany'
 
 export interface FindManyParams<
@@ -140,7 +141,7 @@ async function _findMany<
         const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
         for (const item of items) {
           const key = collection.getKey(item)
-          if (key == null) {
+          if (!isKeyDefined(key)) {
             console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
             continue
           }

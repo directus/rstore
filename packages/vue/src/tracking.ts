@@ -168,10 +168,11 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
       return
     }
     const set = qt!.items[collection.name] ??= new Set()
-    if (set.has(item.$getKey())) {
+    const itemKey = item.$getKey()
+    if (set.has(itemKey)) {
       return
     }
-    set.add(item.$getKey())
+    set.add(itemKey)
     for (const relationName in collection.relations) {
       if (include?.[relationName] && include[relationName] !== false) {
         const value = item[relationName as keyof typeof item] as unknown as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | Array<WrappedItemBase<Collection, CollectionDefaults, StoreSchema>>

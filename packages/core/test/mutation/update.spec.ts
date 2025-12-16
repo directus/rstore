@@ -198,4 +198,29 @@ describe('updateItem', () => {
     expect(hook1).toHaveBeenCalled()
     expect(hook2).not.toHaveBeenCalled()
   })
+
+  describe('check for undefined keys', () => {
+    it('should not throw for falsy keys', async () => {
+      const resultItem = { id: 0 } as unknown as ResolvedCollectionItem<Collection, CollectionDefaults, StoreSchema>
+      mockStore.$hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
+      mockCollection.getKey = vi.fn(() => 0)
+
+      const result = await updateItem(options)
+
+      expect(result).toEqual(resultItem)
+      expect(mockStore.$cache.writeItem).toHaveBeenCalledWith({
+        collection: mockCollection,
+        key: 0,
+        item: resultItem,
+      })
+    })
+
+    it('should throw if key is undefined', async () => {
+      const resultItem = {} as unknown as ResolvedCollectionItem<Collection, CollectionDefaults, StoreSchema>
+      mockStore.$hooks.hook('updateItem', vi.fn(({ setResult }) => setResult(resultItem)))
+      mockCollection.getKey = vi.fn(() => undefined)
+
+      await expect(updateItem(options)).rejects.toThrow('Item update failed: key is not defined')
+    })
+  })
 })

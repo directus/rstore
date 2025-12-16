@@ -2,6 +2,7 @@ import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheStat
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from './item'
 import type { VueStore } from './store'
+import { isKeyDefined } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { computed, markRaw, ref, shallowRef, toValue } from 'vue'
 import { wrapItem } from './item'
@@ -74,7 +75,7 @@ export function createCache<
 
   function getItemKey(collection: ResolvedCollection<any, any, any>, item: ResolvedCollectionItem<any, any, any>): string | number {
     const key = collection.getKey(item)
-    if (key == null) {
+    if (!isKeyDefined(key)) {
       throw new Error(`Item does not have a key for collection ${collection.name}: ${item}`)
     }
     return key
@@ -440,7 +441,7 @@ export function createCache<
         throw new Error(`Could not determine type for relation ${parentCollection.name}.${String(relationKey)}`)
       }
       const nestedKey = nestedItemCollection.getKey(childItem)
-      if (!nestedKey) {
+      if (!isKeyDefined(nestedKey)) {
         throw new Error(`Could not determine key for relation ${parentCollection.name}.${String(relationKey)}`)
       }
 

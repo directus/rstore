@@ -1,6 +1,7 @@
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WriteItem } from '@rstore/shared'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { unwrapItem } from '../item'
+import { isKeyDefined } from '../key'
 
 export interface CreateManyOptions<
   TCollection extends Collection,
@@ -171,7 +172,7 @@ export async function createMany<
         const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
         for (const item of items) {
           const key = collection.getKey(item)
-          if (key == null) {
+          if (!isKeyDefined(key)) {
             console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
             continue
           }
