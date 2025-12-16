@@ -1,5 +1,6 @@
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WriteItem } from '@rstore/shared'
 import { pickNonSpecialProps } from '@rstore/shared'
+import { unwrapItem } from '../item'
 
 export interface CreateManyOptions<
   TCollection extends Collection,
@@ -151,9 +152,15 @@ export async function createMany<
     })
 
     if (result.length) {
+      const newResult = [] as typeof result
+
       for (const item of result) {
-        store.$processItemParsing(collection, item)
+        const unwrappedItem = unwrapItem(item)
+        store.$processItemParsing(collection, unwrappedItem)
+        newResult.push(unwrappedItem)
       }
+
+      result = newResult
 
       if (!skipCache) {
         if (layer) {

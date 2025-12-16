@@ -2,6 +2,7 @@ import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, 
 import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
+import { unwrapItem } from '../item'
 import { peekFirst } from './peekFirst'
 
 export interface FindFirstParams<
@@ -132,6 +133,8 @@ async function _findFirst<
     })
 
     if (result) {
+      result = unwrapItem(result)
+
       store.$processItemParsing(collection, result)
 
       if (fetchPolicy !== 'no-cache') {

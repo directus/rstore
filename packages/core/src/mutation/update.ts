@@ -1,5 +1,6 @@
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
+import { unwrapItem } from '../item'
 import { peekFirst } from '../query'
 
 export interface UpdateOptions<
@@ -133,6 +134,8 @@ export async function updateItem<
     })
 
     if (result) {
+      result = unwrapItem(result)
+
       store.$processItemParsing(collection, result)
 
       if (!skipCache) {
@@ -143,7 +146,7 @@ export async function updateItem<
         store.$cache.writeItem({
           collection,
           key,
-          item: result,
+          item: result as NonNullable<typeof result>,
         })
       }
     }
@@ -166,5 +169,5 @@ export async function updateItem<
     throw error
   }
 
-  return result
+  return result as NonNullable<typeof result>
 }

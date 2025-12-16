@@ -2,6 +2,7 @@ import type { Collection, CollectionDefaults, CustomHookMeta, FindManyOptions, F
 import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
+import { unwrapItem } from '../item'
 import { peekMany } from './peekMany'
 
 export interface FindManyParams<
@@ -124,9 +125,15 @@ async function _findMany<
     })
 
     if (result) {
+      const newResult = [] as typeof result
+
       for (const item of result) {
-        store.$processItemParsing(collection, item)
+        const unwrappedItem = unwrapItem(item)
+        store.$processItemParsing(collection, unwrappedItem)
+        newResult.push(unwrappedItem)
       }
+
+      result = newResult
 
       if (fetchPolicy !== 'no-cache') {
         const items = result
