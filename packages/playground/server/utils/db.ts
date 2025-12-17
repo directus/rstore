@@ -8,8 +8,12 @@ export interface Db {
   dataSources: DataSource[]
   dataCollections: DataCollection[]
   dataFields: DataField[]
+  authors: Author[]
   books: Book[]
 }
+
+const authors = generateAuthors(1000)
+const books = generateBooks(5000, authors)
 
 export const db: Db = {
   todos: [],
@@ -116,16 +120,29 @@ export const db: Db = {
       nullable: true,
     },
   ],
-  books: generateBooks(500),
+  authors,
+  books,
 }
 
-function generateBooks(count: number): Book[] {
+function generateAuthors(count: number): Author[] {
+  const authors: Author[] = []
+  for (let i = 0; i < count; i++) {
+    authors.push({
+      id: `author${i + 1}`,
+      name: faker.person.fullName(),
+      birthDate: faker.date.past({ years: 100 }),
+    })
+  }
+  return authors
+}
+
+function generateBooks(count: number, authors: Author[]): Book[] {
   const books: Book[] = []
   for (let i = 0; i < count; i++) {
     books.push({
       id: `book${i + 1}`,
       title: faker.book.title(),
-      author: faker.book.author(),
+      authorId: authors[faker.number.int({ min: 0, max: authors.length - 1 })]!.id,
       genre: faker.book.genre(),
       publishedAt: faker.date.past({ years: 50 }),
     })

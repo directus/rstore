@@ -14,6 +14,8 @@ describe('defaultMarker', () => {
       'isInstanceOf': () => true,
       'relations': {},
       'formSchema': {} as any,
+      'indexes': new Map(),
+      'oppositeRelations': {},
     }
     const result = defaultMarker(collection)
     expect(result).toBe('TestType:{}:{}')
@@ -30,6 +32,8 @@ describe('defaultMarker', () => {
       'isInstanceOf': () => true,
       'relations': {},
       'formSchema': {} as any,
+      'indexes': new Map(),
+      'oppositeRelations': {},
     }
     const findOptions = { filter: { id: 1 } }
     const result = defaultMarker(collection, findOptions as any)
@@ -47,6 +51,8 @@ describe('defaultMarker', () => {
       'isInstanceOf': () => true,
       'relations': {},
       'formSchema': {} as any,
+      'indexes': new Map(),
+      'oppositeRelations': {},
     }
     const findOptions = { filter: { id: 1 }, sort: 'asc' }
     const result = defaultMarker(collection, findOptions as any)
@@ -64,6 +70,8 @@ describe('defaultMarker', () => {
       'isInstanceOf': () => true,
       'relations': {},
       'formSchema': {} as any,
+      'indexes': new Map(),
+      'oppositeRelations': {},
     }
     const findOptions = { filter: () => true, params: { foo: 'bar' } }
     const result = defaultMarker(collection, findOptions)

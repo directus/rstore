@@ -1,7 +1,7 @@
 import type { Cache, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, Hooks, MutationSpecialProps, Plugin, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { get, set } from '@rstore/shared'
 import { builtinCollectionHooksPlugin } from './builtin/collectionHooks'
-import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollections } from './collection'
+import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollectionOppositeRelations, resolveCollections } from './collection'
 import { defaultFetchPolicy } from './fetchPolicy'
 import { setupPlugin, sortPlugins } from './plugin'
 
@@ -179,6 +179,7 @@ export async function createStoreCore<
   }
 
   normalizeCollectionRelations(store.$collections)
+  resolveCollectionOppositeRelations(store.$collections)
 
   if (options.transformStore) {
     store = options.transformStore(store)

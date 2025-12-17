@@ -59,7 +59,13 @@ export interface DataField {
 export interface Book {
   id: string
   title: string
-  author: string
+  authorId: string
   genre: string
   publishedAt: Date
+}
+
+export interface Author {
+  id: string
+  name: string
+  birthDate: Date
 }

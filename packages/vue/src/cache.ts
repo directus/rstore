@@ -19,6 +19,10 @@ declare module '@rstore/shared' {
 interface InternalCacheState {
   markers: Record<string, boolean>
   collections: Record<string, Ref<Record<string | number, any>>>
+  /**
+   * collection name -> relation fields (ex: `authorId` or `field1:field2`) -> relation value (values.join(':')) -> item keys
+   */
+  collectionIndexes: Map<string, Map<string, Map<any, Ref<Set<string | number>>>>>
   modules: Record<string, Ref<any>>
   queryMeta: Record<string, CustomHookMeta>
   pageRefs: Map<string, { type: 'ref', key: string | number } | { type: 'refs', keys: Array<string | number> }>
@@ -40,6 +44,7 @@ export function createCache<
   const state: InternalCacheState = {
     markers: {},
     collections: {},
+    collectionIndexes: new Map(),
     modules: {},
     queryMeta: {},
     pageRefs: new Map(),
@@ -152,15 +157,41 @@ export function createCache<
     state.markers[marker] = true
   }
 
+  function getCollectionIndex(collectionName: string, indexKey: string) {
+    let collectionIndex = state.collectionIndexes.get(collectionName)
+    if (!collectionIndex) {
+      collectionIndex = new Map()
+      state.collectionIndexes.set(collectionName, collectionIndex)
+    }
+    let index = collectionIndex.get(indexKey)
+    if (!index) {
+      index = new Map()
+      collectionIndex.set(indexKey, index)
+    }
+    return index
+  }
+
   function deleteItem(collection: ResolvedCollection<any, any, any>, key: string | number) {
     const collectionState = ensureCollectionRef(collection.name).value
     const item = collectionState[key]
     if (item) {
+      // Update indexes
+      for (const [indexKey, indexFields] of collection.indexes) {
+        const index = getCollectionIndex(collection.name, indexKey)
+        // Remove previous index entry
+        const previousValue = indexFields.map(f => item[f]).join(':')
+        const existingKeys = index.get(previousValue)
+        if (existingKeys) {
+          existingKeys.value.delete(key)
+        }
+      }
+
       invalidateCollectionStateCache(collection.name)
       delete collectionState[key]
       const wrapKey = getItemWrapKey(collection, key, undefined)
       wrappedItems.delete(wrapKey)
       wrappedItemsMetadata.delete(wrapKey)
+
       const store = getStore()
       store.$hooks.callHookSync('afterCacheWrite', {
         store,
@@ -287,13 +318,26 @@ export function createCache<
     readItem({ collection, key }) {
       return getWrappedItem(collection, getStateForCollection(collection.name)[key])
     },
-    readItems({ collection, marker, filter, keys, limit }) {
+    readItems({ collection, marker, filter, keys, limit, indexKey, indexValue }) {
       if (marker && !state.markers[marker]) {
         return []
       }
       const data: Record<string | number, ResolvedCollectionItemBase<any, any, any>> = getStateForCollection(collection.name)
       const result: Array<WrappedItem<any, any, any>> = []
       let count = 0
+
+      // Index
+      if (keys == null && indexKey != null) {
+        const index = getCollectionIndex(collection.name, indexKey)
+        const itemKeys = index.get(indexValue)
+        if (itemKeys) {
+          keys = Array.from(itemKeys.value)
+        }
+        else {
+          keys = []
+        }
+      }
+
       const keysToRead = keys ?? Object.keys(data)
       for (const key of keysToRead) {
         const item = data[key]
@@ -364,17 +408,17 @@ export function createCache<
               })
             }
             else {
-            // TODO: figure out deletions
-            // // If to-one relation is null, we delete the existing item
-            // const existingItem = this.readItem({ collection, key })
-            // if (existingItem) {
-            //   const childItem: WrappedItemBase<Collection, CollectionDefaults, StoreSchema> = existingItem[field]
-            //   const nestedItemCollection = getStore().$getCollection(childItem, [childItem.$collection])
-            //   const nestedKey = nestedItemCollection?.getKey(childItem)
-            //   if (nestedItemCollection && nestedKey) {
-            //     this.deleteItem({ collection: nestedItemCollection, key: nestedKey })
-            //   }
-            // }
+              // TODO: figure out deletions
+              // // If to-one relation is null, we delete the existing item
+              // const existingItem = this.readItem({ collection, key })
+              // if (existingItem) {
+              //   const childItem: WrappedItemBase<Collection, CollectionDefaults, StoreSchema> = existingItem[field]
+              //   const nestedItemCollection = getStore().$getCollection(childItem, [childItem.$collection])
+              //   const nestedKey = nestedItemCollection?.getKey(childItem)
+              //   if (nestedItemCollection && nestedKey) {
+              //     this.deleteItem({ collection: nestedItemCollection, key: nestedKey })
+              //   }
+              // }
             }
           }
           else {
@@ -383,6 +427,36 @@ export function createCache<
         }
 
         const existing = collectionState[key]
+
+        // Update indexes
+        for (const [indexKey, indexFields] of collection.indexes) {
+          // Check if updated fields are part of the index
+          if (indexFields.some(f => f in data && (!existing || data[f] !== existing[f]))) {
+            const index = getCollectionIndex(collection.name, indexKey)
+            if (existing) {
+              // Remove previous index entry
+              const values = indexFields.map(f => existing?.[f])
+              if (values.every(v => v != null)) {
+                const previousValue = values.join(':')
+                const existingKeys = index.get(previousValue)
+                if (existingKeys) {
+                  existingKeys.value.delete(key)
+                }
+              }
+            }
+            const newValues = indexFields.map(f => data[f] ?? existing?.[f])
+            if (newValues.every(v => v != null)) {
+              const newValue = newValues.join(':')
+              let existingKeys = index.get(newValue)
+              if (!existingKeys) {
+                existingKeys = ref(new Set())
+                index.set(newValue, existingKeys)
+              }
+              existingKeys.value.add(key)
+            }
+          }
+        }
+
         if (!existing) {
           // Disable deep reactivity tracking inside the `data` object
           collectionState[key] = shallowRef(markRaw(data))

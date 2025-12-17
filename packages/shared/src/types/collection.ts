@@ -173,6 +173,8 @@ export interface ResolvedCollection<
   'getKey': NonNullable<TCollection['getKey']>
   'isInstanceOf': NonNullable<TCollection['isInstanceOf']>
   'relations': NonNullable<TCollection['relations']>
+  'oppositeRelations': Record<string, { relation: CollectionRelation, fields: string[] }>
+  'indexes': Map<string, Array<string>>
   'computed': NonNullable<TCollectionDefaults['computed'] & TCollection['computed']>
   'fields': TCollection['fields']
   'formSchema': Full<TSchemas>

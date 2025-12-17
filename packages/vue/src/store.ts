@@ -1,7 +1,7 @@
 import type { Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOptions, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueCollectionApi } from './api'
-import { createStoreCore, normalizeCollectionRelations, resolveCollection } from '@rstore/core'
+import { createStoreCore, normalizeCollectionRelations, resolveCollection, resolveCollectionOppositeRelations } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
 import { reactive, ref, toValue, watch } from 'vue'
@@ -226,6 +226,7 @@ export function addCollection(store: VueStore, collection: Collection) {
   privateStore.$_collectionNames.add(collection.name)
 
   normalizeCollectionRelations([resolvedCollection])
+  resolveCollectionOppositeRelations(store.$collections)
 }
 
 export function removeCollection(store: VueStore, collectionName: string) {

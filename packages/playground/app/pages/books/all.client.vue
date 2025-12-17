@@ -8,26 +8,11 @@ const sorting = ref<Array<{ id: string, desc: boolean }>>([])
 
 await store.Author.query(q => q.many())
 
-const { pages, meta, fetchMore } = await store.Book.query(q => q.many({
-  pageIndex: 0,
-  pageSize: 20,
+const { data: books, loading } = await store.Book.query(q => q.many({
   sort: sorting.value[0],
 }))
 
-const pageIndex = ref(0)
-
-const totalCount = computed(() => meta.value.totalCount ?? 0)
-
-const currentPage = computed(() => pages.value[pageIndex.value] ?? fetchMore({
-  pageIndex: pageIndex.value,
-}).page)
-
-const pageNumber = computed({
-  get: () => pageIndex.value + 1,
-  set: (value: number) => {
-    pageIndex.value = value - 1
-  },
-})
+const totalCount = computed(() => books.value?.length ?? 0)
 
 function getHeader(column: Column<any>, label: string) {
   const isSorted = column.getIsSorted()
@@ -92,7 +77,7 @@ function getHeader(column: Column<any>, label: string) {
   <div class="flex flex-col p-4 h-full">
     <UTable
       v-model:sorting="sorting"
-      :data="currentPage.data"
+      :data="books"
       :columns="[
         {
           accessorKey: 'id',
@@ -112,18 +97,13 @@ function getHeader(column: Column<any>, label: string) {
           header: ({ column }) => getHeader(column, 'Genre'),
         },
       ]"
-      :loading="currentPage.loading"
+      :loading
       :sorting-options="{
         enableMultiSort: false,
       }"
       class="flex-[1_1_0] min-h-0"
     />
     <nav class="flex items-center justify-between pt-2">
-      <UPagination
-        v-model:page="pageNumber"
-        :items-per-page="20"
-        :total="totalCount"
-      />
       <div>Total count: {{ totalCount }}</div>
     </nav>
   </div>

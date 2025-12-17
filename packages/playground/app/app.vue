@@ -100,7 +100,17 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
               {
                 label: 'Books',
                 icon: 'lucide:book-open',
-                to: '/books',
+                active: $route.path.startsWith('/books'),
+                children: [
+                  {
+                    label: 'Paginated',
+                    to: '/books',
+                  },
+                  {
+                    label: 'All',
+                    to: '/books/all',
+                  },
+                ],
               },
             ]"
             content-orientation="vertical"

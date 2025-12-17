@@ -1,7 +1,8 @@
 import type { UpdateOptions } from '@rstore/core'
-import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions, WrappedItemUpdateOptions } from '@rstore/shared'
+import type { Cache, Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions, WrappedItemUpdateOptions } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { VueCollectionApi } from './api'
+import type { VueCachePrivate } from './cache'
 import type { VueStore } from './store'
 import { isKeyDefined } from '@rstore/core'
 import { cloneInfo } from '@rstore/shared'
@@ -31,6 +32,8 @@ export function wrapItem<
   function getApi(): VueCollectionApi<TCollection, TCollectionDefaults, TSchema, WrappedItem<TCollection, TCollectionDefaults, TSchema>> {
     return store[collection.name as keyof typeof store] as any
   }
+
+  const cache = store.$cache as unknown as Cache & VueCachePrivate
 
   const isFrozen = Object.isFrozen(item.value)
 
@@ -117,26 +120,27 @@ export function wrapItem<
             if (!targetCollection) {
               throw new Error(`Collection "${targetCollectionName}" does not exist in the store`)
             }
-            const values: Record<string, any> = {}
-            const on = targetCollectionConfig.on as Record<string, string>
-            for (const key in on) {
-              const foreignKey = key
-              const currentKey = on[key]!
-              values[foreignKey] = Reflect.get(proxy, currentKey)
-            }
-            const cacheResultForTarget = store.$cache.readItems({
-              collection: targetCollection,
-              filter: (foreignItem) => {
-                for (const key in values) {
-                  if (foreignItem[key] !== values[key]) {
-                    return false
-                  }
-                }
-                return true
-              },
-              limit: relation.many ? undefined : 1,
+            const indexKeys = Object.keys(targetCollectionConfig.on).sort()
+            const indexKey = indexKeys.join(':')
+            const indexValues = indexKeys.map((k) => {
+              const currentKey = targetCollectionConfig.on[k]!
+              return Reflect.get(proxy, currentKey)
             })
-            result.push(...cacheResultForTarget)
+            if (indexValues.every(v => v != null)) {
+              const indexValue = indexValues.join(':')
+              const cacheResultForTarget = cache.readItems({
+                collection: targetCollection,
+                indexKey,
+                indexValue,
+                limit: relation.many ? undefined : 1,
+                filter: targetCollectionConfig.filter
+                  ? (item) => {
+                      return targetCollectionConfig.filter!(proxy, item)
+                    }
+                  : undefined,
+              })
+              result.push(...cacheResultForTarget)
+            }
           }
 
           let finalResult

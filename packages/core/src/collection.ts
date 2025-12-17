@@ -71,7 +71,7 @@ export function resolveCollection<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
->(collection: TCollection, defaults?: TCollectionDefaults): ResolvedCollection<TCollection, TCollectionDefaults, TSchema> {
+>(collection: TCollection, defaults: TCollectionDefaults | undefined): ResolvedCollection<TCollection, TCollectionDefaults, TSchema> {
   if (collection.name.startsWith('$')) {
     throw new Error(`Collection name "${collection.name}" cannot start with "$"`)
   }
@@ -94,6 +94,8 @@ export function resolveCollection<
     'getKey': item => item.$overrideKey ?? (collection.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
     'isInstanceOf': item => collection.isInstanceOf?.(item) || defaults?.isInstanceOf?.(collection)(item) || defaultIsInstanceOf(collection)(item),
     'relations': collection.relations ?? {},
+    'oppositeRelations': {},
+    'indexes': new Map(),
     'computed': {
       ...defaults?.computed,
       ...collection.computed,
@@ -164,5 +166,39 @@ export function normalizeCollectionRelations(collections: ResolvedCollection[]):
         relation.to[toCollectionName]!.on = newOn
       }
     }
+  }
+}
+
+/**
+ * Populate opposite relations for a collection based on the store schema. Opposite relations are used to track which collections relate back to the current collection.
+ *
+ * This should be called after all collections (and their eventual separate relation definitions) are added to the store because it needs to lookup the current collection in all the other collections. It should also be called after normalizing relations to ensure the 'on' fields are in a consistent format (with `normalizeCollectionRelations`).
+ */
+export function resolveCollectionOppositeRelations(collections: ResolvedCollection[]): void {
+  for (const collection of collections) {
+    collection.oppositeRelations = {}
+    const indexes = new Map<string, string[]>()
+    for (const otherCollection of collections) {
+      if (otherCollection.name === collection.name || !otherCollection.relations) {
+        continue
+      }
+      for (const relationKey in otherCollection.relations) {
+        const relation = otherCollection.relations[relationKey]!
+        for (const toCollectionName in relation.to) {
+          if (toCollectionName === collection.name) {
+            const fields = Object.keys(relation.to[toCollectionName]!.on as Record<string, string>).sort()
+            collection.oppositeRelations[otherCollection.name] = {
+              relation,
+              fields,
+            }
+            const indexField = fields.join(':')
+            if (!indexes.has(indexField)) {
+              indexes.set(indexField, fields)
+            }
+          }
+        }
+      }
+    }
+    collection.indexes = indexes
   }
 }

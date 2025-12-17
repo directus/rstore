@@ -76,6 +76,16 @@ export interface Cache<
      * Limit the number of items returned.
      */
     limit?: number
+    /**
+     * Index key to use for reading items. Used for resolving relations.
+     *
+     * Example: `field1:field2`
+     */
+    indexKey?: string
+    /**
+     * Value of the index to filter items by.
+     */
+    indexValue?: any
   }) => Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>
 
   writeItems: <TCollection extends Collection = Collection>(params: {
