@@ -1,7 +1,6 @@
 import type { CacheLayer } from '@rstore/shared'
 import { describe, expect, it } from 'vitest'
 import { createStore } from '../src'
-import { createCache } from '../src/cache'
 
 describe('cache', () => {
   const mockItem = { id: 1, name: 'Test Item' }
@@ -11,7 +10,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     cache.writeItem({ collection: store.$collections[0]!, key: 1, item: mockItem })
 
     const state = cache.getState() as any
@@ -23,7 +22,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     cache.writeItem({ collection: store.$collections[0]!, key: 1, item: {
       ...mockItem,
       $special: true,
@@ -38,7 +37,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: mockItem })
 
@@ -52,7 +51,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: mockItem })
 
@@ -65,7 +64,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: mockItem })
     cache.deleteItem({ collection, key: 1 })
@@ -79,7 +78,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     cache.writeItem({ collection: store.$collections[0]!, key: 1, item: mockItem })
     cache.clear()
 
@@ -107,7 +106,7 @@ describe('cache', () => {
       ],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
 
     const relatedItem = { id: 2, name: 'Related Item' }
     const itemWithRelation = { id: 1, name: 'Test Item', relatedId: relatedItem.id, related: relatedItem }
@@ -132,7 +131,7 @@ describe('cache', () => {
       ],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
 
     const relatedItem = { id: 0, name: 'Related Item' }
     const itemWithRelation = { id: 0, name: 'Test Item', relatedId: relatedItem.id, related: relatedItem }
@@ -149,7 +148,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     cache.writeItem({ collection: store.$collections[0]!, key: 1, item: mockItem, marker: 'testMarker' })
 
     const state = cache.getState() as any
@@ -161,7 +160,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: mockItem, marker: 'testMarker' })
 
@@ -175,7 +174,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: mockItem, marker: 'testMarker' })
 
@@ -188,7 +187,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: { id: 1, label: 'Meow' }, marker: 'testMarker' })
     cache.writeItem({ collection, key: 2, item: { id: 2, label: 'Woof' }, marker: 'testMarker' })
@@ -208,7 +207,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: { id: 1, label: 'Item 1' }, marker: 'testMarker' })
     cache.writeItem({ collection, key: 2, item: { id: 2, label: 'Item 2' }, marker: 'testMarker' })
@@ -225,7 +224,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: { id: 1, label: 'Meow' }, marker: 'testMarker' })
     cache.writeItem({ collection, key: 2, item: { id: 2, label: 'Woof' }, marker: 'testMarker' })
@@ -241,7 +240,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: mockItem })
 
@@ -259,7 +258,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: mockItem })
 
@@ -277,7 +276,7 @@ describe('cache', () => {
       schema: [{ name: 'TestCollection' }],
       plugins: [],
     })
-    const cache = createCache({ getStore: () => store })
+    const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: { id: 1, name: 'item 1' } })
     cache.writeItem({ collection, key: 2, item: { id: 2, name: 'item 2' } })
@@ -306,7 +305,7 @@ describe('cache', () => {
         schema: [{ name: 'TestCollection' }],
         plugins: [],
       })
-      const cache = createCache({ getStore: () => store })
+      const cache = store.$cache
       const collection = store.$collections[0]!
       cache.writeItem({ collection, key: 1, item: { id: 1, name: 'item1' } })
 
@@ -340,7 +339,7 @@ describe('cache', () => {
         schema: [{ name: 'TestCollection' }],
         plugins: [],
       })
-      const cache = createCache({ getStore: () => store })
+      const cache = store.$cache
       const collection = store.$collections[0]!
       cache.writeItem({ collection, key: 1, item: { id: 1, name: 'item1' } })
 
@@ -368,7 +367,7 @@ describe('cache', () => {
         schema: [{ name: 'TestCollection' }],
         plugins: [],
       })
-      const cache = createCache({ getStore: () => store })
+      const cache = store.$cache
       const collection = store.$collections[0]!
       cache.writeItem({ collection, key: 1, item: { id: 1, name: 'item1' } })
       cache.writeItem({ collection, key: 2, item: { id: 2, name: 'item2' } })
@@ -393,6 +392,61 @@ describe('cache', () => {
       expect(itemsAfter).toHaveLength(2)
       expect(itemsAfter.find(i => i.id === 1)).toBeDefined()
       expect(itemsAfter.find(i => i.id === 2)).toBeDefined()
+    })
+
+    it('should read items from layer in relation', async () => {
+      const store = await createStore({
+        schema: [
+          {
+            name: 'CollectionA',
+            relations: {
+              relatedItems: {
+                to: {
+                  CollectionB: {
+                    on: {
+                      foreignKey: 'id',
+                    },
+                  },
+                },
+                many: true,
+              },
+            },
+          },
+          { name: 'CollectionB' },
+        ],
+        plugins: [],
+      })
+      const cache = store.$cache
+
+      // Write initial items
+      cache.writeItem({
+        collection: store.$collections[0]!,
+        item: { id: 1 },
+        key: 1,
+      })
+
+      cache.addLayer({
+        id: 'layer1',
+        collectionName: 'CollectionB',
+        state: {
+          2: { id: 2, foreignKey: 1 },
+          3: { id: 3, foreignKey: 1 },
+        },
+        deletedItems: new Set(),
+      })
+
+      const wrappedItem = cache.readItem({
+        collection: store.$collections[0]!,
+        key: 1,
+      }) as any
+
+      expect(wrappedItem.relatedItems?.length).toBe(2)
+      expect(wrappedItem.relatedItems[0].id).toBe(2)
+      expect(wrappedItem.relatedItems[1].id).toBe(3)
+
+      cache.removeLayer('layer1')
+
+      expect(wrappedItem.relatedItems?.length).toBe(0)
     })
   })
 })

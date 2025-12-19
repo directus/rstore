@@ -303,11 +303,53 @@ export function createCache<
       }
       collectionLayersRef.value = collectionLayers.filter(l => l.id !== layerId)
       delete layerIdToCollectionName[layerId]
+
+      // Update indexes
+      const collection = getStore().$collections.find(c => c.name === layer.collectionName)
+      if (collection) {
+        for (const key in layer.state) {
+          const currentData = getStateForCollection(collection.name)[key]
+          const previousData = { ...currentData, ...layer.state[key] }
+          updateItemIndexes(collection, key, previousData, currentData)
+        }
+      }
+
       const store = getStore()
       store.$hooks.callHookSync('cacheLayerRemove', {
         store,
         layer,
       })
+    }
+  }
+
+  function updateItemIndexes<TCollection extends Collection>(collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>, key: string | number, previousData: any, newData: any = {}) {
+    // Update indexes
+    for (const [indexKey, indexFields] of collection.indexes) {
+      // Check if updated fields are part of the index
+      if (indexFields.some(f => f in newData && (!previousData || newData[f] !== previousData[f]))) {
+        const index = getCollectionIndex(collection.name, indexKey)
+        if (previousData) {
+          // Remove previous index entry
+          const values = indexFields.map(f => previousData?.[f])
+          if (values.every(v => v != null)) {
+            const previousValue = values.join(':')
+            const existingKeys = index.get(previousValue)
+            if (existingKeys) {
+              existingKeys.value.delete(key)
+            }
+          }
+        }
+        const newValues = indexFields.map(f => newData[f] ?? previousData?.[f])
+        if (newValues.every(v => v != null)) {
+          const newValue = newValues.join(':')
+          let existingKeys = index.get(newValue)
+          if (!existingKeys) {
+            existingKeys = ref(new Set())
+            index.set(newValue, existingKeys)
+          }
+          existingKeys.value.add(key)
+        }
+      }
     }
   }
 
@@ -428,34 +470,7 @@ export function createCache<
 
         const existing = collectionState[key]
 
-        // Update indexes
-        for (const [indexKey, indexFields] of collection.indexes) {
-          // Check if updated fields are part of the index
-          if (indexFields.some(f => f in data && (!existing || data[f] !== existing[f]))) {
-            const index = getCollectionIndex(collection.name, indexKey)
-            if (existing) {
-              // Remove previous index entry
-              const values = indexFields.map(f => existing?.[f])
-              if (values.every(v => v != null)) {
-                const previousValue = values.join(':')
-                const existingKeys = index.get(previousValue)
-                if (existingKeys) {
-                  existingKeys.value.delete(key)
-                }
-              }
-            }
-            const newValues = indexFields.map(f => data[f] ?? existing?.[f])
-            if (newValues.every(v => v != null)) {
-              const newValue = newValues.join(':')
-              let existingKeys = index.get(newValue)
-              if (!existingKeys) {
-                existingKeys = ref(new Set())
-                index.set(newValue, existingKeys)
-              }
-              existingKeys.value.add(key)
-            }
-          }
-        }
+        updateItemIndexes(collection, key, existing, data)
 
         if (!existing) {
           // Disable deep reactivity tracking inside the `data` object
@@ -571,12 +586,18 @@ export function createCache<
 
       const newCollectionsState: Record<string, Ref<Record<string | number, any>>> = {}
       for (const collectionName in value.collections) {
+        const collection = getStore().$collections.find(c => c.name === collectionName)
+        if (!collection) {
+          continue
+        }
         const incomingCollectionState = value.collections[collectionName as keyof typeof value.collections] as Record<string | number, any>
         const collectionState = newCollectionsState[collectionName] = ref<Record<string | number, any>>({})
         for (const key in incomingCollectionState) {
           const item = incomingCollectionState[key]
           if (item) {
+            const existing = collectionState.value[key]
             collectionState.value[key] = Object.isFrozen(item) ? item : shallowRef(item)
+            updateItemIndexes(collection, key, existing, item)
           }
         }
       }
@@ -614,6 +635,7 @@ export function createCache<
       wrappedItems.clear()
       wrappedItemsMetadata.clear()
       collectionStateCache.clear()
+      state.collectionIndexes.clear()
 
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', {
@@ -649,11 +671,32 @@ export function createCache<
       }
     },
     addLayer(layer) {
-      invalidateCollectionStateCache(layer.collectionName)
+      const collection = getStore().$collections.find(c => c.name === layer.collectionName)
+      if (!collection) {
+        throw new Error(`Collection not found for layer: ${layer.collectionName}`)
+      }
+
       removeLayer(layer.id)
+
+      // Update indexes
+      const queuedIndexUpdates: Array<[string | number, any, any]> = []
+      for (const key in layer.state) {
+        const existing = getStateForCollection(collection.name)[key]
+        const newData = layer.state[key]
+        queuedIndexUpdates.push([key, existing, newData])
+      }
+
       const collectionLayersRef = ensureLayersForCollection(layer.collectionName)
       collectionLayersRef.value = [...collectionLayersRef.value, layer]
       layerIdToCollectionName[layer.id] = layer.collectionName
+
+      invalidateCollectionStateCache(layer.collectionName)
+
+      // Update indexes after adding the layer
+      for (const [key, existing, newData] of queuedIndexUpdates) {
+        updateItemIndexes(collection, key, existing, newData)
+      }
+
       const store = getStore()
       store.$hooks.callHookSync('cacheLayerAdd', {
         store,
