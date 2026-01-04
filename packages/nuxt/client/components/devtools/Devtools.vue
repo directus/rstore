@@ -36,7 +36,7 @@ const tabs: Array<TabsItem> = [
 
 const tab = useLocalStorage('rstore-devtools-tab', '0')
 
-const currentTab = computed(() => tabs[Number.parseInt(tab.value)] ?? tabs[0])
+const currentTab = computed(() => tabs[Number.parseInt(tab.value)] ?? tabs[0]!)
 </script>
 
 <template>

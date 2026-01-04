@@ -5,7 +5,7 @@ const showCacheOps = useLocalStorage('rstore-devtools-show-cache-ops', false)
 </script>
 
 <template>
-  <div>
+  <div v-if="stats">
     <Empty
       v-if="!stats.history.length"
       icon="lucide:history"

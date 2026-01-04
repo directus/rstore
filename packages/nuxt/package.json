@@ -38,7 +38,7 @@
     "client:prepare": "nuxi prepare client",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "test:types": "vue-tsc --noEmit"
+    "test:types": "vue-tsc --noEmit && cd client && vue-tsc --noEmit"
   },
   "dependencies": {
     "@nuxt/devtools-kit": "^2.2.1",

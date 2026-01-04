@@ -244,14 +244,6 @@ export function removeCollection(store: VueStore, collectionName: string) {
   privateStore.$_collectionNames.delete(collectionName)
 }
 
-declare module '@rstore/shared' {
-  export interface MutationSpecialProps {
-    $loading: boolean
-    $error: Error | null
-    $time: number
-  }
-}
-
 let activeStore: VueStore | null = null
 
 /**

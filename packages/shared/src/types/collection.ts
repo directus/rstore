@@ -1,7 +1,7 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { CollectionHooks } from './collectionHooks'
 import type { WrappedItem } from './item'
-import type { FilterArray, Full, KeysToUnion, Path, PathValue } from './utils'
+import type { FilterArray, Full, KeysToUnion, MaybeArray, Path, PathValue } from './utils'
 
 /* eslint-disable unused-imports/no-unused-vars */
 
@@ -136,7 +136,7 @@ export interface CollectionRelation<
   TRelatedItem = any,
 > {
   many?: boolean
-  to: Record<string, CollectionRelationReference<TCollection, Collection, TRelatedItem>>
+  to: Record<string, MaybeArray<CollectionRelationReference<TCollection, Collection, TRelatedItem>>>
 }
 
 export interface CollectionRelations<
@@ -173,18 +173,30 @@ export interface ResolvedCollection<
   'getKey': NonNullable<TCollection['getKey']>
   'isInstanceOf': NonNullable<TCollection['isInstanceOf']>
   'relations': NonNullable<TCollection['relations']>
-  'oppositeRelations': Record<string, { relation: CollectionRelation, fields: string[] }>
+  'normalizedRelations': Record<string, NormalizedRelation>
+  'oppositeRelations': Record<string, { relation: NormalizedRelation, fields: string[] }>
   'indexes': Map<string, Array<string>>
   'computed': NonNullable<TCollectionDefaults['computed'] & TCollection['computed']>
   'fields': TCollection['fields']
   'formSchema': Full<TSchemas>
   'scopeId'?: string
-  // 'state': () => ResolvedCollectionState<TCollection>
-  // // 'global': NonNullable<TCollection['global']>
-  // // 'mutations': NonNullable<TCollection['mutations']>
   'hooks': TCollection['hooks']
   'meta'?: CustomCollectionMeta
   '~item'?: TCollection['~item']
+}
+
+/**
+ * Used to resolve related items in Wrapped Items.
+ */
+export interface NormalizedRelation {
+  many: boolean
+  to: Array<NormalizedRelationTarget>
+}
+
+export interface NormalizedRelationTarget {
+  collection: string
+  on: Record<string, string>
+  filter?: (item: any, relationItem: any) => boolean
 }
 
 type MapToResolvedCollectionList<

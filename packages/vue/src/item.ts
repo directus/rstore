@@ -1,5 +1,4 @@
-import type { UpdateOptions } from '@rstore/core'
-import type { Cache, Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions, WrappedItemUpdateOptions } from '@rstore/shared'
+import type { Cache, Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions, WrappedItemUpdateOptions } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { VueCollectionApi } from './api'
 import type { VueCachePrivate } from './cache'
@@ -106,24 +105,23 @@ export function wrapItem<
       }
 
       // Resolve related items in the cache
-      if (!isFrozen && key in collection.relations) {
+      if (!isFrozen && key in collection.normalizedRelations) {
         if (Reflect.has(item.value, key)) {
           // @TODO resolve references
           return Reflect.get(item.value, key)
         }
         else {
-          const relation = collection.relations[key as string]!
+          const relation = collection.normalizedRelations[key as string]!
           const result: Array<any> = []
-          for (const targetCollectionName in relation.to) {
-            const targetCollectionConfig = relation.to[targetCollectionName]!
-            const targetCollection = store.$collections.find(m => m.name === targetCollectionName)
+          for (const target of relation.to) {
+            const targetCollection = store.$collections.find(m => m.name === target.collection)
             if (!targetCollection) {
-              throw new Error(`Collection "${targetCollectionName}" does not exist in the store`)
+              throw new Error(`Collection "${target.collection}" does not exist in the store`)
             }
-            const indexKeys = Object.keys(targetCollectionConfig.on).sort()
+            const indexKeys = Object.keys(target.on).sort()
             const indexKey = indexKeys.join(':')
             const indexValues = indexKeys.map((k) => {
-              const currentKey = targetCollectionConfig.on[k]!
+              const currentKey = target.on[k]!
               return Reflect.get(proxy, currentKey)
             })
             if (indexValues.every(v => v != null)) {
@@ -133,9 +131,9 @@ export function wrapItem<
                 indexKey,
                 indexValue,
                 limit: relation.many ? undefined : 1,
-                filter: targetCollectionConfig.filter
+                filter: target.filter
                   ? (item) => {
-                      return targetCollectionConfig.filter!(proxy, item)
+                      return target.filter!(proxy, item)
                     }
                   : undefined,
               })
@@ -200,44 +198,6 @@ export function wrapItem<
   })
 
   return proxy as WrappedItem<TCollection, TCollectionDefaults, TSchema>
-}
-
-declare module '@rstore/shared' {
-  export interface WrappedItemUpdateFormOptions<
-    TCollection extends Collection = Collection,
-    TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
-    TSchema extends StoreSchema = StoreSchema,
-  > extends Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'> {
-    /**
-     * Default values set in the form object initially and when it is reset.
-     *
-     * By default `updateForm` will initialize the fields with the existing item data.
-     */
-    defaultValues?: () => Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
-
-    /**
-     * Schema to validate the form object.
-     *
-     * @default collection.schema.update
-     */
-    schema?: StandardSchemaV1
-  }
-
-  export interface WrappedItemUpdateOptions<
-    TCollection extends Collection = Collection,
-    TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
-    TSchema extends StoreSchema = StoreSchema,
-  > extends Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'> {
-  }
-
-  export interface WrappedItemBase<
-    TCollection extends Collection,
-    TCollectionDefaults extends CollectionDefaults,
-    TSchema extends StoreSchema,
-  > {
-    $meta: WrappedItemMetadata<TCollection, TCollectionDefaults, TSchema>
-    $raw: () => ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
-  }
 }
 
 export interface WrappedItemMetadata<

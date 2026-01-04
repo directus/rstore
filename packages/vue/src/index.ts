@@ -1,3 +1,5 @@
+import './types'
+
 export {
   createFormObject,
   createFormObjectWithChangeDetection,

@@ -1,5 +1,5 @@
 <script lang="ts" setup>
-import type { CollectionRelation, ResolvedCollection } from '@rstore/shared'
+import type { ResolvedCollection } from '@rstore/shared'
 
 const props = defineProps<{
   item: ResolvedCollection
@@ -52,13 +52,13 @@ function goToCache() {
       </div>
     </div>
 
-    <div v-if="Object.keys(item.relations).length" class="text-xs font-mono border border-default rounded p-2 flex flex-col gap-1">
+    <div v-if="Object.keys(item.normalizedRelations).length" class="text-xs font-mono border border-default rounded p-2 flex flex-col gap-1">
       <div class="opacity-75 flex items-center gap-1">
         <UIcon name="lucide:link" />
         Relations
       </div>
       <DevtoolsCollectionRelation
-        v-for="(relation, key) in item.relations as Record<string, CollectionRelation>"
+        v-for="(relation, key) in item.normalizedRelations"
         :key
         :collection="item"
         :relation-name="key"
