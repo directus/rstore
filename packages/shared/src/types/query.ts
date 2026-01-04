@@ -168,4 +168,9 @@ export type FindManyOptions<
 export interface QueryResult<TResult> {
   result: TResult
   marker?: string
+  /**
+   * Promise that resolves when the (optional) fetch is complete.
+   * Useful when fetchPolicy is `cache-and-fetch` to wait for the background fetch to complete.
+   */
+  fetchPromise?: Promise<void>
 }

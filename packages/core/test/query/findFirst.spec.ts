@@ -108,7 +108,7 @@ describe('findFirst', () => {
     expect(callHookSpy).toHaveBeenCalledWith('fetchFirst', expect.any(Object))
   })
 
-  it('should write item to cache if fetch policy allows', async () => {
+  it('should write item to cache if fetch policy is cache-first', async () => {
     mockStore.$hooks.hook('fetchFirst', (payload) => {
       payload.setResult({ id: '42' })
     })
@@ -122,10 +122,17 @@ describe('findFirst', () => {
       },
     })
 
+    expect(mockStore.$cache.writeItem).not.toHaveBeenCalled()
+    expect(result.result).toBeNull()
+
+    await result.fetchPromise
+
     expect(mockStore.$cache.writeItem).toHaveBeenCalledWith(expect.objectContaining({
       collection,
       key: '42',
-      item: result.result,
+      item: {
+        id: '42',
+      },
     }))
   })
 

@@ -71,6 +71,7 @@ async function _findFirst<
 
   let result: any
   let marker: string | undefined
+  let fetchPromise: Promise<void> | undefined
 
   if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     const peekResult = peekFirst({
@@ -84,75 +85,83 @@ async function _findFirst<
   }
 
   if (!result && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
-    if (!marker) {
-      marker = defaultMarker(collection, findOptions)
-    }
+    const fetch = async () => {
+      if (!marker) {
+        marker = defaultMarker(collection, findOptions)
+      }
 
-    await store.$hooks.callHook('beforeFetch', {
-      store: store as unknown as GlobalStoreType,
-      meta,
-      collection,
-      key: findOptions.key,
-      findOptions,
-      many: false,
-      updateFindOptions: (value) => {
-        Object.assign(findOptions, value)
-      },
-    })
+      await store.$hooks.callHook('beforeFetch', {
+        store: store as unknown as GlobalStoreType,
+        meta,
+        collection,
+        key: findOptions.key,
+        findOptions,
+        many: false,
+        updateFindOptions: (value) => {
+          Object.assign(findOptions, value)
+        },
+      })
 
-    const abort = store.$hooks.withAbort()
-    await store.$hooks.callHook('fetchFirst', {
-      store: store as unknown as GlobalStoreType,
-      meta,
-      collection,
-      key: findOptions.key,
-      findOptions,
-      getResult: () => result,
-      setResult: (value, options) => {
-        result = value
-        if (result && options?.abort !== false) {
-          abort()
-        }
-      },
-      setMarker: (value) => {
-        marker = value
-      },
-      abort,
-    })
+      const abort = store.$hooks.withAbort()
+      await store.$hooks.callHook('fetchFirst', {
+        store: store as unknown as GlobalStoreType,
+        meta,
+        collection,
+        key: findOptions.key,
+        findOptions,
+        getResult: () => result,
+        setResult: (value, options) => {
+          result = value
+          if (result && options?.abort !== false) {
+            abort()
+          }
+        },
+        setMarker: (value) => {
+          marker = value
+        },
+        abort,
+      })
 
-    await store.$hooks.callHook('afterFetch', {
-      store: store as unknown as GlobalStoreType,
-      meta,
-      collection,
-      key: findOptions.key,
-      findOptions,
-      many: false,
-      getResult: () => result,
-      setResult: (value) => {
-        result = value
-      },
-    })
+      await store.$hooks.callHook('afterFetch', {
+        store: store as unknown as GlobalStoreType,
+        meta,
+        collection,
+        key: findOptions.key,
+        findOptions,
+        many: false,
+        getResult: () => result,
+        setResult: (value) => {
+          result = value
+        },
+      })
 
-    if (result) {
-      result = unwrapItem(result)
+      if (result) {
+        result = unwrapItem(result)
 
-      store.$processItemParsing(collection, result)
+        store.$processItemParsing(collection, result)
 
-      if (fetchPolicy !== 'no-cache') {
-        const key = collection.getKey(result)
-        if (!isKeyDefined(key)) {
-          console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
-        }
-        else {
-          store.$cache.writeItem({
-            collection,
-            key,
-            item: result,
-            marker: getMarker('first', marker),
-            meta,
-          })
+        if (fetchPolicy !== 'no-cache') {
+          const key = collection.getKey(result)
+          if (!isKeyDefined(key)) {
+            console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
+          }
+          else {
+            store.$cache.writeItem({
+              collection,
+              key,
+              item: result,
+              marker: getMarker('first', marker),
+              meta,
+            })
+          }
         }
       }
+    }
+
+    fetchPromise = fetch()
+
+    if (fetchPolicy !== 'cache-and-fetch') {
+      await fetchPromise
     }
   }
   else if (meta.$queryTracking) {
@@ -180,5 +189,6 @@ async function _findFirst<
   return {
     result,
     marker,
+    fetchPromise,
   }
 }

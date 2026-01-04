@@ -66,6 +66,7 @@ async function _findMany<
 
   let result: any[] | undefined
   let marker: string | undefined
+  let fetchPromise: Promise<void> | undefined
 
   if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     const peekManyResult = peekMany({
@@ -79,83 +80,91 @@ async function _findMany<
   }
 
   if (!result?.length && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
-    if (!marker) {
-      marker = defaultMarker(collection, findOptions)
+    const fetch = async () => {
+      if (!marker) {
+        marker = defaultMarker(collection, findOptions)
+      }
+
+      await store.$hooks.callHook('beforeFetch', {
+        store: store as unknown as GlobalStoreType,
+        meta,
+        collection,
+        findOptions,
+        many: true,
+        updateFindOptions: (value) => {
+          Object.assign(findOptions, value)
+        },
+      })
+
+      const abort = store.$hooks.withAbort()
+      await store.$hooks.callHook('fetchMany', {
+        store: store as unknown as GlobalStoreType,
+        meta,
+        collection,
+        findOptions,
+        getResult: () => result ?? [],
+        setResult: (value, options) => {
+          result = value
+          if (result?.length && options?.abort !== false) {
+            abort()
+          }
+        },
+        setMarker: (value) => {
+          marker = value
+        },
+        abort,
+      })
+
+      await store.$hooks.callHook('afterFetch', {
+        store: store as unknown as GlobalStoreType,
+        meta,
+        collection,
+        findOptions,
+        many: true,
+        getResult: () => result,
+        setResult: (value) => {
+          result = value
+        },
+      })
+
+      if (result) {
+        const newResult = [] as typeof result
+
+        for (const item of result) {
+          const unwrappedItem = unwrapItem(item)
+          store.$processItemParsing(collection, unwrappedItem)
+          newResult.push(unwrappedItem)
+        }
+
+        result = newResult
+
+        if (fetchPolicy !== 'no-cache') {
+          const items = result
+          const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
+          for (const item of items) {
+            const key = collection.getKey(item)
+            if (!isKeyDefined(key)) {
+              console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
+              continue
+            }
+            writes.push({ key, value: item })
+          }
+          if (writes.length) {
+            store.$cache.writeItems<TCollection>({
+              collection,
+              items: writes,
+              marker: getMarker('many', marker),
+              meta,
+            })
+          }
+        }
+      }
     }
 
-    await store.$hooks.callHook('beforeFetch', {
-      store: store as unknown as GlobalStoreType,
-      meta,
-      collection,
-      findOptions,
-      many: true,
-      updateFindOptions: (value) => {
-        Object.assign(findOptions, value)
-      },
-    })
+    fetchPromise = fetch()
 
-    const abort = store.$hooks.withAbort()
-    await store.$hooks.callHook('fetchMany', {
-      store: store as unknown as GlobalStoreType,
-      meta,
-      collection,
-      findOptions,
-      getResult: () => result ?? [],
-      setResult: (value, options) => {
-        result = value
-        if (result?.length && options?.abort !== false) {
-          abort()
-        }
-      },
-      setMarker: (value) => {
-        marker = value
-      },
-      abort,
-    })
-
-    await store.$hooks.callHook('afterFetch', {
-      store: store as unknown as GlobalStoreType,
-      meta,
-      collection,
-      findOptions,
-      many: true,
-      getResult: () => result,
-      setResult: (value) => {
-        result = value
-      },
-    })
-
-    if (result) {
-      const newResult = [] as typeof result
-
-      for (const item of result) {
-        const unwrappedItem = unwrapItem(item)
-        store.$processItemParsing(collection, unwrappedItem)
-        newResult.push(unwrappedItem)
-      }
-
-      result = newResult
-
-      if (fetchPolicy !== 'no-cache') {
-        const items = result
-        const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
-        for (const item of items) {
-          const key = collection.getKey(item)
-          if (!isKeyDefined(key)) {
-            console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
-            continue
-          }
-          writes.push({ key, value: item })
-        }
-        if (writes.length) {
-          store.$cache.writeItems<TCollection>({
-            collection,
-            items: writes,
-            marker: getMarker('many', marker),
-            meta,
-          })
-        }
-      }
+    if (fetchPolicy !== 'cache-and-fetch') {
+      await fetchPromise
     }
   }
   else if (meta.$queryTracking) {
@@ -186,5 +195,6 @@ async function _findMany<
   return {
     result: result ?? [],
     marker,
+    fetchPromise,
   }
 }

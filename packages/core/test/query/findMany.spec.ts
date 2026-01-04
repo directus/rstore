@@ -97,7 +97,30 @@ describe('findMany', () => {
     expect(callHookSpy).toHaveBeenCalledWith('fetchMany', expect.any(Object))
   })
 
-  it('should write items to cache if fetch policy allows', async () => {
+  it('should write items to cache if fetch policy is cache-first', async () => {
+    mockStore.$hooks.hook('fetchMany', (payload) => {
+      payload.setResult([{ id: '42', name: 'Fetched Item' }])
+    })
+
+    const result = await findMany({
+      store: mockStore,
+      collection,
+      findOptions: {
+        params: {
+          email: '42',
+        },
+        fetchPolicy: 'cache-first',
+      },
+    })
+
+    expect(mockStore.$cache.writeItems).toHaveBeenCalledWith(expect.objectContaining({
+      collection,
+      items: [{ key: '42', value: result.result[0] }],
+      marker: expect.any(String),
+    }))
+  })
+
+  it('should write items to cache if fetch policy is cache-and-fetch', async () => {
     mockStore.$hooks.hook('fetchMany', (payload) => {
       payload.setResult([{ id: '42', name: 'Fetched Item' }])
     })
@@ -113,9 +136,17 @@ describe('findMany', () => {
       },
     })
 
+    expect(mockStore.$cache.writeItems).not.toHaveBeenCalled()
+    expect(result.result).toEqual([])
+
+    await result.fetchPromise
+
     expect(mockStore.$cache.writeItems).toHaveBeenCalledWith(expect.objectContaining({
       collection,
-      items: [{ key: '42', value: result.result[0] }],
+      items: [{ key: '42', value: {
+        id: '42',
+        name: 'Fetched Item',
+      } }],
       marker: expect.any(String),
     }))
   })
