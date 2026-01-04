@@ -34,7 +34,7 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     return res
   })
 
-  function handleQueryTracking(id: string, newQueryTracking: HookMetaQueryTracking, result?: TResult, include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> = {}, markPreviousItemsAsDirty: boolean = true) {
+  function handleQueryTracking(id: string, newQueryTracking: HookMetaQueryTracking, result: TResult | undefined, include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> | undefined, markPreviousItemsAsDirty: boolean) {
     if (newQueryTracking.skipped) {
       return
     }
@@ -47,6 +47,8 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
 
     // Init the query tracking object if the result is not empty and there is no previous tracking
     if (!isResultEmpty && !queryTracking) {
+      include ??= {}
+
       const keys = Object.keys(newQueryTracking.items)
       const isNewQueryTrackingEmpty = keys.length === 0 || keys.every(k => newQueryTracking.items[k]!.size === 0)
 

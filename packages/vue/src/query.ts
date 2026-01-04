@@ -467,9 +467,12 @@ export function createQuery<
           }).then(async (backgroundResult) => {
             const { valid } = await setPageResult(page, savedPageRequestId, backgroundResult)
             if (valid && queryTracking && newQueryTracking2) {
-              queryTracking.handleQueryTracking(page.id, newQueryTracking2, undefined, finalOptions.include)
+              queryTracking.handleQueryTracking(page.id, newQueryTracking2, undefined, finalOptions.include, page.main)
             }
           })
+
+          // We don't use the builtin 'cache-and-fetch' of `find*' methods to have better control over query tracking handling
+          finalOptions.fetchPolicy = 'cache-only'
         }
 
         // On refresh force fetch

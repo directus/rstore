@@ -599,5 +599,44 @@ describe('query', () => {
       expect(query.pages.value[1]?.data[0]?.text).toBe('Message 3')
       expect(query.pages.value[1]?.data[1]?.text).toBe('New Message')
     })
+
+    it('should load pages with cache-and-fetch and gc', async () => {
+      const fetchMessages = (pageIndex?: number) => {
+        return [
+          { id: `message${pageIndex! * 2 + 1}`, text: `Message ${pageIndex! * 2 + 1}` },
+          { id: `message${pageIndex! * 2 + 2}`, text: `Message ${pageIndex! * 2 + 2}` },
+        ]
+      }
+      const store = await createStore({
+        schema: [
+          {
+            name: 'messages',
+            hooks: {
+              fetchMany: ({ pageIndex }) => fetchMessages(pageIndex),
+            },
+          },
+        ],
+        plugins: [],
+      })
+
+      const query = await store.messages.query(q => q.many({
+        pageIndex: 0,
+        pageSize: 2,
+        fetchPolicy: 'cache-and-fetch',
+        experimentalGarbageCollection: true,
+      }))
+
+      expect(query.data.value?.length).toBe(2)
+
+      await query.fetchMore({
+        pageIndex: 1,
+      })
+
+      expect(query.data.value?.length).toBe(4)
+      expect(query.data.value?.[0]?.text).toBe('Message 1')
+      expect(query.data.value?.[1]?.text).toBe('Message 2')
+      expect(query.data.value?.[2]?.text).toBe('Message 3')
+      expect(query.data.value?.[3]?.text).toBe('Message 4')
+    })
   })
 })
