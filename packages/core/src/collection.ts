@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CollectionRelation, CollectionRelationReference, CollectionRelations, CollectionSchemas, DefaultIsInstanceOf, Exactly, Full, GetKey, ResolvedCollection, ResolvedCollectionList, StandardSchemaV1, StoreCore, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CollectionRelation, CollectionRelationReference, CollectionRelations, CollectionSchemas, DefaultIsInstanceOf, Exactly, Full, GetKey, MaybeArray, NormalizedRelation, ResolvedCollection, ResolvedCollectionList, StandardSchemaV1, StoreCore, StoreSchema } from '@rstore/shared'
 
 export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
 
@@ -38,7 +38,7 @@ export function defineRelations<
 >(
   collection: TCollection,
   relations: (payload: {
-    collection: <TTargetCollection extends Collection, T extends CollectionRelationReference<TCollection, TTargetCollection>> (collection: TTargetCollection, relation: T) => { [key in TTargetCollection['name']]: T & { '~collection': TTargetCollection } }
+    collection: <TTargetCollection extends Collection, T extends MaybeArray<CollectionRelationReference<TCollection, TTargetCollection>>> (collection: TTargetCollection, relation: T) => { [key in TTargetCollection['name']]: T & { '~collection': TTargetCollection } }
   }) => TRelations,
 ): CollectionRelations<TCollection, TRelations> {
   return {
@@ -94,6 +94,7 @@ export function resolveCollection<
     'getKey': item => item.$overrideKey ?? (collection.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
     'isInstanceOf': item => collection.isInstanceOf?.(item) || defaults?.isInstanceOf?.(collection)(item) || defaultIsInstanceOf(collection)(item),
     'relations': collection.relations ?? {},
+    'normalizedRelations': {},
     'oppositeRelations': {},
     'indexes': new Map(),
     'computed': {
@@ -151,21 +152,36 @@ export function addCollectionRelations<
 export function normalizeCollectionRelations(collections: ResolvedCollection[]): void {
   for (const collection of collections) {
     if (!collection.relations) {
+      collection.normalizedRelations = {}
       continue
     }
+    const newNormalizedRelations = {} as Record<string, NormalizedRelation>
     for (const relationKey in collection.relations) {
       const relation = collection.relations[relationKey]!
-      for (const toCollectionName in relation.to) {
-        const newOn = {} as Record<string, string>
-        const on = relation.to[toCollectionName]!.on as Record<string, string>
-        for (const key in on) {
-          const oppositeKey = key.replace(`${toCollectionName}.`, '')
-          const currentKey = on[key]!.replace(`${collection.name}.`, '')
-          newOn[oppositeKey] = currentKey
-        }
-        relation.to[toCollectionName]!.on = newOn
+      const newNormalizedRelation: NormalizedRelation = {
+        many: relation.many ?? false,
+        to: [],
       }
+      for (const toCollectionName in relation.to) {
+        const configArray = Array.isArray(relation.to[toCollectionName]) ? relation.to[toCollectionName] as CollectionRelationReference[] : [relation.to[toCollectionName] as CollectionRelationReference]
+        for (const config of configArray) {
+          const newOn = {} as Record<string, string>
+          const on = config.on as Record<string, string>
+          for (const key in on) {
+            const oppositeKey = key.replace(`${toCollectionName}.`, '')
+            const currentKey = on[key]!.replace(`${collection.name}.`, '')
+            newOn[oppositeKey] = currentKey
+          }
+          newNormalizedRelation.to.push({
+            collection: toCollectionName,
+            on: newOn,
+            filter: config.filter,
+          })
+        }
+      }
+      newNormalizedRelations[relationKey] = newNormalizedRelation
     }
+    collection.normalizedRelations = newNormalizedRelations
   }
 }
 
@@ -179,14 +195,14 @@ export function resolveCollectionOppositeRelations(collections: ResolvedCollecti
     collection.oppositeRelations = {}
     const indexes = new Map<string, string[]>()
     for (const otherCollection of collections) {
-      if (otherCollection.name === collection.name || !otherCollection.relations) {
+      if (otherCollection.name === collection.name) {
         continue
       }
-      for (const relationKey in otherCollection.relations) {
-        const relation = otherCollection.relations[relationKey]!
-        for (const toCollectionName in relation.to) {
-          if (toCollectionName === collection.name) {
-            const fields = Object.keys(relation.to[toCollectionName]!.on as Record<string, string>).sort()
+      for (const relationKey in otherCollection.normalizedRelations) {
+        const relation = otherCollection.normalizedRelations[relationKey]!
+        for (const target of relation.to) {
+          if (target.collection === collection.name) {
+            const fields = Object.keys(target.on as Record<string, string>).sort()
             collection.oppositeRelations[otherCollection.name] = {
               relation,
               fields,

@@ -328,7 +328,13 @@ export default defineNuxtModule<ModuleOptions>({
           for (const relationKey in targetCollection.relations) {
             for (const collectionName in targetCollection.relations[relationKey]!.to) {
               if (collectionName === collection.name) {
-                const targetTo = targetCollection.relations[relationKey]!.to[collectionName]!
+                const targetToRaw = targetCollection.relations[relationKey]!.to[collectionName]!
+                const targetToArray = Array.isArray(targetToRaw) ? targetToRaw : [targetToRaw]
+                const targetTo = targetToArray[0]
+                if (!targetTo) {
+                  continue
+                }
+
                 const invertedFields = Object.fromEntries(Object.entries(targetTo.on).map(([key, value]) => [value, key]))
 
                 newRelation = {
@@ -387,7 +393,13 @@ export default defineNuxtModule<ModuleOptions>({
           for (const relationKey in targetCollection.relations) {
             for (const collectionName in targetCollection.relations[relationKey]!.to) {
               if (collectionName === collection.name) {
-                const targetTo = targetCollection.relations[relationKey]!.to[collectionName]!
+                const targetToRaw = targetCollection.relations[relationKey]!.to[collectionName]!
+                const targetToArray = Array.isArray(targetToRaw) ? targetToRaw : [targetToRaw]
+                const targetTo = targetToArray[0]
+                if (!targetTo) {
+                  continue
+                }
+
                 const invertedFields = Object.fromEntries(Object.entries(targetTo.on).map(([key, value]) => [value, key]))
 
                 newRelation = {

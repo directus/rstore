@@ -1,10 +1,10 @@
 <script lang="ts" setup>
-import type { CollectionRelation, ResolvedCollection } from '@rstore/shared'
+import type { NormalizedRelation, ResolvedCollection } from '@rstore/shared'
 
 defineProps<{
   collection: ResolvedCollection
   relationName: string
-  relation: CollectionRelation
+  relation: NormalizedRelation
 }>()
 </script>
 
@@ -16,8 +16,8 @@ defineProps<{
     </div>
     <div>
       <div
-        v-for="([targetCollection, info], targetIndex) in Object.entries(relation.to)"
-        :key="targetCollection"
+        v-for="(target, targetIndex) in relation.to"
+        :key="targetIndex"
         class="flex items-center gap-2"
       >
         <div class="flex items-center">
@@ -35,12 +35,12 @@ defineProps<{
         </div>
 
         <div
-          v-for="([key, value], index) in Object.entries<string>(info.on as Record<string, string>)"
+          v-for="([key, value], index) in Object.entries<string>(target.on as Record<string, string>)"
           :key
         >
           <span v-if="index > 0" class="opacity-50 mr-2">&amp;</span>
           <span class="text-purple-500">
-            {{ targetCollection }}
+            {{ target.collection }}
           </span>
           <span class="opacity-50">.</span>
           <span class="text-purple-500">
@@ -56,13 +56,13 @@ defineProps<{
           </span>
         </div>
 
-        <div v-if="info.filter" class="flex items-center gap-1 ml-2">
+        <div v-if="target.filter" class="flex items-center gap-1 ml-2">
           <UIcon
             name="lucide:filter"
           />
           <span>Filter:</span>
           <CodeSnippet
-            :code="info.filter.toString()"
+            :code="target.filter.toString()"
             lang="js"
             class="text-xs max-h-90 overflow-auto"
           />

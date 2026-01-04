@@ -192,20 +192,24 @@ describe('normalizeCollectionRelations', () => {
             },
           },
         },
+        normalizedRelations: {},
       },
     ] as unknown as ResolvedCollection[]
 
     const result = collections.slice()
     normalizeCollectionRelations(result)
-    expect(result[0]!.relations).toEqual({
+    expect(result[0]!.normalizedRelations).toEqual({
       test: {
-        to: {
-          Test2: {
+        many: false,
+        to: [
+          {
+            collection: 'Test2',
             on: {
               id: 'testId',
             },
+            filter: undefined,
           },
-        },
+        ],
       },
     })
   })

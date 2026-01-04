@@ -3,11 +3,13 @@ const stats = useStoreStats()
 
 const subscriptionsPerCollection = computed(() => {
   const result = new Map<string, Array<StoreSubscriptionItem>>()
-  for (const s of stats.value?.subscriptions) {
-    if (!result.has(s.collection)) {
-      result.set(s.collection, [])
+  if (stats.value?.subscriptions) {
+    for (const s of stats.value.subscriptions) {
+      if (!result.has(s.collection)) {
+        result.set(s.collection, [])
+      }
+      result.get(s.collection)!.push(s)
     }
-    result.get(s.collection)!.push(s)
   }
   return result
 })

@@ -7,15 +7,6 @@ import { pickNonSpecialProps } from '@rstore/shared'
 import { computed, markRaw, ref, shallowRef, toValue } from 'vue'
 import { wrapItem } from './item'
 
-declare module '@rstore/shared' {
-  export interface CustomCacheState {
-    markers: Record<string, boolean>
-    collections: Record<string, Record<string | number, any>>
-    modules: Record<string, any>
-    queryMeta: Record<string, CustomHookMeta>
-  }
-}
-
 interface InternalCacheState {
   markers: Record<string, boolean>
   collections: Record<string, Ref<Record<string | number, any>>>

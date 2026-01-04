@@ -15,6 +15,7 @@ describe('defaultMarker', () => {
       'relations': {},
       'formSchema': {} as any,
       'indexes': new Map(),
+      'normalizedRelations': {},
       'oppositeRelations': {},
     }
     const result = defaultMarker(collection)
@@ -33,6 +34,7 @@ describe('defaultMarker', () => {
       'relations': {},
       'formSchema': {} as any,
       'indexes': new Map(),
+      'normalizedRelations': {},
       'oppositeRelations': {},
     }
     const findOptions = { filter: { id: 1 } }
@@ -52,6 +54,7 @@ describe('defaultMarker', () => {
       'relations': {},
       'formSchema': {} as any,
       'indexes': new Map(),
+      'normalizedRelations': {},
       'oppositeRelations': {},
     }
     const findOptions = { filter: { id: 1 }, sort: 'asc' }
@@ -71,6 +74,7 @@ describe('defaultMarker', () => {
       'relations': {},
       'formSchema': {} as any,
       'indexes': new Map(),
+      'normalizedRelations': {},
       'oppositeRelations': {},
     }
     const findOptions = { filter: () => true, params: { foo: 'bar' } }

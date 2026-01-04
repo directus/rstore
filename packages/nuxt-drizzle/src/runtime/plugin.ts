@@ -91,18 +91,17 @@ export default definePlugin({
               continue
             }
 
-            const relation = payload.collection.relations[relationKey]
+            const relation = payload.collection.normalizedRelations[relationKey]
             if (!relation) {
               throw new Error(`Relation "${relationKey}" does not exist on collection "${payload.collection.name}"`)
             }
 
-            await Promise.all(Object.keys(relation.to).map((collectionName) => {
-              const relationData = relation.to[collectionName]!
+            await Promise.all(relation.to.map((target) => {
               const where: any[] = []
-              for (const key in relationData.on) {
-                where.push(eq(key, wrappedItem[relationData.on[key]!]))
+              for (const key in target.on) {
+                where.push(eq(key, wrappedItem[target.on[key]!]))
               }
-              return store.$collection(collectionName).findMany({
+              return store.$collection(target.collection).findMany({
                 where: and(...where),
               })
             }))

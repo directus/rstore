@@ -16,10 +16,10 @@ export const Author = RStoreSchema.withItemType<Author>().defineCollection({
 
 export const BookRelations = RStoreSchema.defineRelations(Book, ({ collection }) => ({
   author: {
-    to: collection(Author, {
+    to: collection(Author, [{
       on: {
         'Author.id': 'Book.authorId',
       },
-    }),
+    }]),
   },
 }))
