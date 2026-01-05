@@ -236,6 +236,10 @@ const myCollectionRelations = defineRelations(myCollection, ({ collection }) => 
 }))
 ```
 
+In this example, the `relatedItems` relation will only match items from the `otherCollection` where both the `type` **AND** `subType` fields match the corresponding fields in the `myCollection`.
+
+If you need a relation on the same target collection with an **OR** condition instead, see [Alternate Mapping](#alternate-mapping) below.
+
 ## Custom Filter <Badge text="New in v0.7" />
 
 You can also define a custom filter function to determine if two items are related. The `filter` function receives two parameters: the item from the source collection and the item from the target collection. It should return `true` if the items are related, and `false` otherwise.
@@ -252,6 +256,58 @@ const userRelations = defineRelations(userCollection, ({ collection }) => ({
         message.createdAt > Date.now() - 7 * 24 * 60 * 60 * 1000,
     }),
     many: true,
+  },
+}))
+```
+
+## Alternate Mapping <Badge text="New in v0.8.3" />
+
+You can define multiple mappings for the same relation and on the same collection by providing an array of mapping objects to the `to` option of the relation:
+
+```ts
+const orderRelations = defineRelations(orderCollection, ({ collection }) => ({
+  billingAddress: {
+    to: collection(addressCollection, [
+      {
+        on: {
+          'addresses.altId': 'orders.billingAddressAltId',
+        },
+      },
+      {
+        on: {
+          'addresses.id': 'orders.billingAddressId',
+        },
+      },
+    ]),
+  },
+}))
+```
+
+In this example the `billingAddress` relation on the `orderCollection` can be resolved using either the `altId` **OR** the `id` field from the `addressCollection`. It will first try to resolve the relation using the first mapping, and if no related item is found, it will try the second mapping.
+
+::: tip
+The order of the mappings matters. The first mapping that matches will be used to resolve the relation first, especially important when the relation is not `many`.
+:::
+
+You can define multi-field mappings and custom filters in each mapping object as well:
+
+```ts
+const orderRelations = defineRelations(orderCollection, ({ collection }) => ({
+  billingAddress: {
+    to: collection(addressCollection, [
+      {
+        on: {
+          'addresses.type': 'orders.billingAddressType',
+          'addresses.altId': 'orders.billingAddressAltId',
+        },
+      },
+      {
+        on: {
+          'addresses.id': 'orders.billingAddressId',
+        },
+        filter: (order, address) => address.isActive,
+      },
+    ]),
   },
 }))
 ```
