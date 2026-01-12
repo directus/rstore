@@ -195,9 +195,6 @@ export function resolveCollectionOppositeRelations(collections: ResolvedCollecti
     collection.oppositeRelations = {}
     const indexes = new Map<string, string[]>()
     for (const otherCollection of collections) {
-      if (otherCollection.name === collection.name) {
-        continue
-      }
       for (const relationKey in otherCollection.normalizedRelations) {
         const relation = otherCollection.normalizedRelations[relationKey]!
         for (const target of relation.to) {
