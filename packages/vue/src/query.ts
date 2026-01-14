@@ -468,10 +468,12 @@ export function createQuery<
             ...finalOptions,
             fetchPolicy: 'fetch-only',
           } as FindOptions<TCollection, TCollectionDefaults, TSchema> as any, fetchMeta).then(async (backgroundResult) => {
-            meta.value = fetchMeta
             const { valid } = await setPageResult(page, savedPageRequestId, backgroundResult)
-            if (valid && queryTracking && newQueryTracking2) {
-              queryTracking.handleQueryTracking(page.id, newQueryTracking2, undefined, finalOptions.include, page.main)
+            if (valid) {
+              meta.value = fetchMeta
+              if (queryTracking && newQueryTracking2) {
+                queryTracking.handleQueryTracking(page.id, newQueryTracking2, undefined, finalOptions.include, page.main)
+              }
             }
           })
 

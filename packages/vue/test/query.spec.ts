@@ -250,6 +250,8 @@ describe('query', () => {
 
       await until(() => query.data.value.length).toBe(1)
 
+      await Promise.resolve()
+
       expect((query.meta.value as any).meow).toBe('waf')
     })
   })
