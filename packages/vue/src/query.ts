@@ -470,7 +470,8 @@ export function createQuery<
           } as FindOptions<TCollection, TCollectionDefaults, TSchema> as any, fetchMeta).then(async (backgroundResult) => {
             const { valid } = await setPageResult(page, savedPageRequestId, backgroundResult)
             if (valid) {
-              meta.value = fetchMeta
+              updateQueryMeta(page, fetchMeta)
+
               if (queryTracking && newQueryTracking2) {
                 queryTracking.handleQueryTracking(page.id, newQueryTracking2, undefined, finalOptions.include, page.main)
               }
@@ -502,11 +503,7 @@ export function createQuery<
 
           const { valid } = await setPageResult(page, savedPageRequestId, pageResult)
           if (valid) {
-            if (page.main) {
-              cache._private.state.queryMeta[queryId.value] = pickNonSpecialProps(fetchMeta)
-            }
-
-            meta.value = fetchMeta
+            updateQueryMeta(page, fetchMeta)
 
             if (queryTrackingEnabled && shouldHandleQueryTracking && queryTracking && newQueryTracking) {
               queryTracking.handleQueryTracking(page.id, newQueryTracking, undefined, finalOptions.include, page.main)
@@ -528,6 +525,14 @@ export function createQuery<
     return {
       page,
     }
+  }
+
+  function updateQueryMeta(page: VueQueryPage<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>, newMeta: CustomHookMeta) {
+    if (page.main) {
+      cache._private.state.queryMeta[queryId.value] = pickNonSpecialProps(newMeta)
+    }
+
+    meta.value = newMeta
   }
 
   // Auto load on options change
