@@ -458,13 +458,17 @@ export function createQuery<
         if (!forceFetch && fetchPolicy === 'cache-and-fetch') {
           shouldHandleQueryTracking = false
           const newQueryTracking2 = queryTracking?.createTrackingObject()
+
+          const fetchMeta: CustomHookMeta = {
+            ...meta.value,
+            $queryTracking: queryTrackingEnabled ? newQueryTracking2 : undefined,
+          }
+
           fetchMethod({
             ...finalOptions,
             fetchPolicy: 'fetch-only',
-          } as FindOptions<TCollection, TCollectionDefaults, TSchema> as any, {
-            ...meta.value,
-            $queryTracking: queryTrackingEnabled ? newQueryTracking2 : undefined,
-          }).then(async (backgroundResult) => {
+          } as FindOptions<TCollection, TCollectionDefaults, TSchema> as any, fetchMeta).then(async (backgroundResult) => {
+            meta.value = fetchMeta
             const { valid } = await setPageResult(page, savedPageRequestId, backgroundResult)
             if (valid && queryTracking && newQueryTracking2) {
               queryTracking.handleQueryTracking(page.id, newQueryTracking2, undefined, finalOptions.include, page.main)

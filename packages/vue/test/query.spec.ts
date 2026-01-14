@@ -226,6 +226,34 @@ describe('query', () => {
     })
   })
 
+  describe('cache-and-fetch', () => {
+    it('should update the query meta', async () => {
+      const store = await createStore({
+        schema: [
+          {
+            name: 'messages',
+          },
+        ],
+        plugins: [],
+      })
+
+      store.$hooks.hook('fetchMany', ({ meta, setResult }) => {
+        const anyMeta = meta as any
+        anyMeta.meow = 'waf'
+        setResult([{ id: '1', text: 'hello' }])
+      })
+
+      const query = await store.messages.query(q => q.many({
+        fetchPolicy: 'cache-and-fetch',
+        meta: { meow: 'meow' } as any,
+      }))
+
+      await until(() => query.data.value.length).toBe(1)
+
+      expect((query.meta.value as any).meow).toBe('waf')
+    })
+  })
+
   it('should handle fetch errors', async () => {
     const store = await createStore({
       schema: [
