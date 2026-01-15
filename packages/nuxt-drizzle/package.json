@@ -44,7 +44,7 @@
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
     "@vueuse/core": "^14.0.0",
-    "h3": "^1.15.1",
+    "h3": "^1.15.5",
     "jiti": "^2.4.2",
     "pathe": "^2.0.3",
     "superjson": "^2.2.3"
