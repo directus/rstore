@@ -266,13 +266,6 @@ export function createQuery<
 
     mainPage.requestId = crypto.randomUUID()
 
-    if (forceFetch) {
-      mainPage.rawData = {
-        type: 'data',
-        value: toValue(defaultValue),
-      }
-    }
-
     // Load main page
 
     mainPagePromise = loadPage(mainPage, forceFetch)
