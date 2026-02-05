@@ -3,6 +3,7 @@ import type { RstoreDrizzleCondition } from './utils/types'
 export function filterWhere(
   item: any,
   condition: RstoreDrizzleCondition,
+  dialect: string,
 ): boolean {
   if (condition == null) {
     return true
@@ -10,11 +11,11 @@ export function filterWhere(
   if ('operator' in condition) {
     switch (condition.operator) {
       case 'and':
-        return condition.conditions.every(c => filterWhere(item, c))
+        return condition.conditions.every(c => filterWhere(item, c, dialect))
       case 'or':
-        return condition.conditions.some(c => filterWhere(item, c))
+        return condition.conditions.some(c => filterWhere(item, c, dialect))
       case 'not':
-        return !filterWhere(item, condition.condition)
+        return !filterWhere(item, condition.condition, dialect)
       case 'isNull':
         return item[condition.field] == null
       case 'isNotNull':
@@ -41,9 +42,9 @@ export function filterWhere(
         return !condition.value.includes(item[condition.field])
       case 'like':
         // Including `%` in the pattern matches zero or more characters, and including `_` will match a single character.
-        return new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.')).test(item[condition.field])
+        return new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), dialect === 'sqlite' ? 'i' : undefined).test(item[condition.field])
       case 'notLike':
-        return !new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.')).test(item[condition.field])
+        return !new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), dialect === 'sqlite' ? 'i' : undefined).test(item[condition.field])
       case 'ilike':
         // Including `%` in the pattern matches zero or more characters, and including `_` will match a single character.
         return new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), 'i').test(item[condition.field])

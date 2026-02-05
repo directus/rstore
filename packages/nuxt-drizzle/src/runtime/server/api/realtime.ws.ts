@@ -1,4 +1,6 @@
 import type { SubscriptionMessage } from '../../utils/realtime'
+// @ts-expect-error virtual file
+import { dialect } from '$rstore-drizzle-server-utils.js'
 import { defineWebSocketHandler } from 'h3'
 import { getSubscriptionId } from '../../utils/realtime'
 import { filterWhere } from '../../where'
@@ -31,7 +33,7 @@ export default defineWebSocketHandler({
                   return
                 }
 
-                if (subscription.where && !filterWhere(payload.record, subscription.where)) {
+                if (subscription.where && !filterWhere(payload.record, subscription.where, dialect)) {
                   return
                 }
 

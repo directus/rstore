@@ -1,6 +1,6 @@
 import type { VueStore } from '@rstore/vue'
 // @ts-expect-error virtual module
-import { apiPath } from '#build/$rstore-drizzle-config.js'
+import { apiPath, dialect } from '#build/$rstore-drizzle-config.js'
 import { useRequestFetch } from '#imports'
 import { definePlugin } from '@rstore/vue'
 import SuperJSON from 'superjson'
@@ -116,7 +116,7 @@ export default definePlugin({
       const where = payload.findOptions?.where ?? payload.findOptions?.params?.where
       if (where) {
         const items = payload.readItemsFromCache()
-        payload.setResult(items.find(item => filterWhere(item, where)))
+        payload.setResult(items.find(item => filterWhere(item, where, dialect)))
       }
     })
 
@@ -129,7 +129,7 @@ export default definePlugin({
 
         // Filter
         if (where) {
-          items = items.filter(item => filterWhere(item, where))
+          items = items.filter(item => filterWhere(item, where, dialect))
         }
 
         // Order by
