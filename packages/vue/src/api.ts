@@ -578,27 +578,27 @@ export function createCollectionApi<
     }),
 
     updateForm: async (options, formOptions) => {
-      async function getFormData(): Promise<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> {
+      async function getDefaultValues(): Promise<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> {
         const item = await api.findFirst(options)
 
         if (!item) {
           throw new Error('Item not found')
         }
 
-        return pickNonSpecialProps(item, true)
+        return {
+          ...pickNonSpecialProps(item, true),
+          ...formOptions?.defaultValues?.() as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
+        }
       }
 
-      const initialData = await getFormData()
+      const initialData = await getDefaultValues()
 
       const form = createFormObject<
         ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
       >({
-        defaultValues: () => ({
-          ...formOptions?.defaultValues?.() as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
-          ...initialData,
-        }),
+        defaultValues: () => initialData,
         schema: formOptions?.schema ?? getCollection().formSchema.update,
-        resetDefaultValues: () => getFormData(),
+        resetDefaultValues: getDefaultValues,
         // Only use changed props
         transformData: (form) => {
           let data = {} as any
