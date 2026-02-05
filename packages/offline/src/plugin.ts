@@ -90,98 +90,107 @@ export function createOfflinePlugin(options: CreateOfflinePluginOptions = {}) {
       // CRDT State Synchronization
 
       hook('sync', async ({ store, setProgress, setCollectionLoaded, setCollectionSynced }) => {
-        let completed = 0
-        await Promise.all(store.$collections.map(async (collection) => {
-          if (!isCollectionIncluded(collection)) {
-            return
-          }
+        // Pause cache updates to prevent flickering while syncing
+        store.$cache.pause()
 
-          // Load metadata
-          const metadataKey = getMetadataKey(collection)
-          const metadata: OfflineCollectionMetadata | null = getLocalStorageItem(metadataKey)
-
-          // Get last updatedAt
-          let lastUpdatedAtRaw = 0
-          if (metadata) {
-            lastUpdatedAtRaw = metadata.updatedAt
-          }
-          const lastUpdatedAt = new Date(lastUpdatedAtRaw)
-
-          // Load local items into the cache
-          const loadedItems = await db.readAllItems(collection.name)
-          for (const item of loadedItems) {
-            const key = collection.getKey(item)
-            if (key == null) {
-              continue
+        try {
+          let completed = 0
+          await Promise.all(store.$collections.map(async (collection) => {
+            if (!isCollectionIncluded(collection)) {
+              return
             }
-            store.$cache.writeItem({
-              collection,
-              item,
-              key,
-            })
-          }
-          setCollectionLoaded(collection.name)
 
-          // Fetch new/updated items since last sync
-          const newItems: Array<any> = []
-          const deleteKeys: Array<string | number> = []
-          await store.$hooks.callHook('syncCollection', {
-            store,
-            meta: {},
-            collection,
-            lastUpdatedAt,
-            loadedItems: () => loadedItems,
-            storeItems: (items) => {
-              newItems.push(...items)
-            },
-            deleteItems: (keys) => {
-              deleteKeys.push(...keys)
-            },
-          })
+            // Load metadata
+            const metadataKey = getMetadataKey(collection)
+            const metadata: OfflineCollectionMetadata | null = getLocalStorageItem(metadataKey)
 
-          // Cleanup deleted items
-          for (const key of deleteKeys) {
-            await db.deleteItem(collection.name, String(key))
-            store.$cache.deleteItem({
-              collection,
-              key,
-            })
-          }
-
-          // Store new/updated items
-          for (const item of newItems) {
-            const key = collection.getKey(item)
-            if (key == null) {
-              continue
+            // Get last updatedAt
+            let lastUpdatedAtRaw = 0
+            if (metadata) {
+              lastUpdatedAtRaw = metadata.updatedAt
             }
-            await db.writeItem(collection.name, String(key), item)
-            store.$cache.writeItem({
+            const lastUpdatedAt = new Date(lastUpdatedAtRaw)
+
+            // Load local items into the cache
+            const loadedItems = await db.readAllItems(collection.name)
+            for (const item of loadedItems) {
+              const key = collection.getKey(item)
+              if (key == null) {
+                continue
+              }
+              store.$cache.writeItem({
+                collection,
+                item,
+                key,
+              })
+            }
+            setCollectionLoaded(collection.name)
+
+            // Fetch new/updated items since last sync
+            const newItems: Array<any> = []
+            const deleteKeys: Array<string | number> = []
+            await store.$hooks.callHook('syncCollection', {
+              store,
+              meta: {},
               collection,
-              item,
-              key,
+              lastUpdatedAt,
+              loadedItems: () => loadedItems,
+              storeItems: (items) => {
+                newItems.push(...items)
+              },
+              deleteItems: (keys) => {
+                deleteKeys.push(...keys)
+              },
             })
+
+            // Cleanup deleted items
+            for (const key of deleteKeys) {
+              await db.deleteItem(collection.name, String(key))
+              store.$cache.deleteItem({
+                collection,
+                key,
+              })
+            }
+
+            // Store new/updated items
+            for (const item of newItems) {
+              const key = collection.getKey(item)
+              if (key == null) {
+                continue
+              }
+              await db.writeItem(collection.name, String(key), item)
+              store.$cache.writeItem({
+                collection,
+                item,
+                key,
+              })
+            }
+
+            setCollectionSynced(collection.name)
+
+            // Update metadata
+            const newMetadata: OfflineCollectionMetadata = {
+              updatedAt: Date.now(),
+            }
+            setLocalStorageItem(metadataKey, newMetadata)
+
+            completed++
+            setProgress({
+              percent: completed / store.$collections.length,
+            })
+          }))
+
+          // Update global metadata
+          if (options.version) {
+            const newGlobalMetadata: OfflineMetadata = {
+              version: options.version,
+            }
+            setLocalStorageItem(globalMetadataKey, newGlobalMetadata)
           }
-
-          setCollectionSynced(collection.name)
-
-          // Update metadata
-          const newMetadata: OfflineCollectionMetadata = {
-            updatedAt: Date.now(),
-          }
-          setLocalStorageItem(metadataKey, newMetadata)
-
-          completed++
-          setProgress({
-            percent: completed / store.$collections.length,
-          })
-        }))
-
-        // Update global metadata
-        if (options.version) {
-          const newGlobalMetadata: OfflineMetadata = {
-            version: options.version,
-          }
-          setLocalStorageItem(globalMetadataKey, newGlobalMetadata)
+        }
+        finally {
+          // Resume cache updates to apply all changes at once
+          store.$cache.resume()
         }
       })
 
