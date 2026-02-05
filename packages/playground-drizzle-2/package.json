@@ -40,7 +40,7 @@
     "typescript": "catalog:",
     "vitest": "catalog:",
     "vue-tsc": "catalog:",
-    "wrangler": "^3.114.1",
+    "wrangler": "^3.114.17",
     "zod": "^3.24.2"
   }
 }
