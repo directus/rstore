@@ -136,4 +136,14 @@ export interface Cache<
   getLayer: (layerId: string) => CacheLayer | undefined
 
   removeLayer: (layerId: string) => void
+
+  /**
+   * Pause cache updates to prevent flickering. Queued updates will be applied when `resume()` is called.
+   */
+  pause: () => void
+
+  /**
+   * Resume cache updates and apply all queued updates.
+   */
+  resume: () => void
 }

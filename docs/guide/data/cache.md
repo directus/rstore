@@ -149,3 +149,29 @@ store.$cache.removeLayer('some-layer-id')
 ```
 
 It will effectively rollback all the changes applied by the layer.
+
+## Pause & Resume
+
+When your application receives multiple cache updates in quick succession (for example, from a WebSocket connection), this can cause UI flickering as Vue re-renders for each individual update. To prevent this, you can pause cache updates and resume them later:
+
+```ts
+// Pause cache updates
+store.$cache.pause()
+
+// Perform multiple operations
+store.$cache.writeItem({ collection, key: 1, item: item1 })
+store.$cache.writeItem({ collection, key: 2, item: item2 })
+store.$cache.deleteItem({ collection, key: 3 })
+
+// Resume and apply all queued updates at once
+store.$cache.resume()
+```
+
+When the cache is paused:
+- All write operations (`writeItem`, `writeItems`, `deleteItem`) are queued
+- All layer operations (`addLayer`, `removeLayer`) are queued
+- Read operations (`readItem`, `readItems`) still work and return the current (pre-pause) state
+
+When `resume()` is called:
+- All queued operations are applied in the order they were received
+- Vue will only re-render once after all updates are applied

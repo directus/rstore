@@ -7,6 +7,13 @@ import { pickNonSpecialProps } from '@rstore/shared'
 import { computed, markRaw, ref, shallowRef, toValue } from 'vue'
 import { wrapItem } from './item'
 
+type QueuedOperation
+  = | { type: 'writeItem', args: Parameters<Cache['writeItem']> }
+    | { type: 'writeItems', args: Parameters<Cache['writeItems']> }
+    | { type: 'deleteItem', args: Parameters<Cache['deleteItem']> }
+    | { type: 'addLayer', args: Parameters<Cache['addLayer']> }
+    | { type: 'removeLayer', args: Parameters<Cache['removeLayer']> }
+
 interface InternalCacheState {
   markers: Record<string, boolean>
   collections: Record<string, Ref<Record<string | number, any>>>
@@ -17,6 +24,8 @@ interface InternalCacheState {
   modules: Record<string, Ref<any>>
   queryMeta: Record<string, CustomHookMeta>
   pageRefs: Map<string, { type: 'ref', key: string | number } | { type: 'refs', keys: Array<string | number> }>
+  paused: boolean
+  queue: QueuedOperation[]
 }
 
 export interface CreateCacheOptions<
@@ -39,6 +48,8 @@ export function createCache<
     modules: {},
     queryMeta: {},
     pageRefs: new Map(),
+    paused: false,
+    queue: [],
   }
 
   const layers: Record<string, Ref<CacheLayer[]>> = {}
@@ -390,7 +401,12 @@ export function createCache<
       }
       return result
     },
-    writeItem({ collection, key, item, marker, fromWriteItems, meta }) {
+    writeItem(params) {
+      if (state.paused) {
+        state.queue.push({ type: 'writeItem', args: [params] })
+        return
+      }
+      const { collection, key, item, marker, fromWriteItems, meta } = params
       invalidateCollectionStateCache(collection.name)
 
       const collectionState = ensureCollectionRef(collection.name).value
@@ -496,7 +512,12 @@ export function createCache<
         })
       }
     },
-    writeItems({ collection, items, marker, meta }) {
+    writeItems(params) {
+      if (state.paused) {
+        state.queue.push({ type: 'writeItems', args: [params] })
+        return
+      }
+      const { collection, items, marker, meta } = params
       for (const { key, value: item } of items) {
         this.writeItem({ collection, key, item, meta, fromWriteItems: true })
       }
@@ -532,7 +553,12 @@ export function createCache<
         meta,
       })
     },
-    deleteItem({ collection, key }) {
+    deleteItem(params) {
+      if (state.paused) {
+        state.queue.push({ type: 'deleteItem', args: [params] })
+        return
+      }
+      const { collection, key } = params
       deleteItem(collection, key)
     },
     getModuleState(name, key, initState) {
@@ -662,6 +688,10 @@ export function createCache<
       }
     },
     addLayer(layer) {
+      if (state.paused) {
+        state.queue.push({ type: 'addLayer', args: [layer] })
+        return
+      }
       const collection = getStore().$collections.find(c => c.name === layer.collectionName)
       if (!collection) {
         throw new Error(`Collection not found for layer: ${layer.collectionName}`)
@@ -702,7 +732,40 @@ export function createCache<
       const collectionLayers = ensureLayersForCollection(collectionName)
       return collectionLayers.value.find(l => l.id === layerId)
     },
-    removeLayer,
+    removeLayer(layerId) {
+      if (state.paused) {
+        state.queue.push({ type: 'removeLayer', args: [layerId] })
+        return
+      }
+      removeLayer(layerId)
+    },
+    pause() {
+      state.paused = true
+    },
+    resume() {
+      state.paused = false
+      const queue = state.queue
+      state.queue = []
+      for (const operation of queue) {
+        switch (operation.type) {
+          case 'writeItem':
+            this.writeItem(...operation.args)
+            break
+          case 'writeItems':
+            this.writeItems(...operation.args)
+            break
+          case 'deleteItem':
+            this.deleteItem(...operation.args)
+            break
+          case 'addLayer':
+            this.addLayer(...operation.args)
+            break
+          case 'removeLayer':
+            this.removeLayer(...operation.args)
+            break
+        }
+      }
+    },
     _private: {
       state,
       wrappedItems,
