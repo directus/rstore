@@ -1,6 +1,51 @@
 # Changelog
 
 
+## v0.8.3
+
+[compare changes](https://github.com/directus/rstore/compare/v0.8.2...v0.8.3)
+
+### 🚀 Enhancements
+
+- FindDefaults + resolveFindOptions ([2eab3fc](https://github.com/directus/rstore/commit/2eab3fc))
+- Unwrap items before processing in find/create/update ([f4999b7](https://github.com/directus/rstore/commit/f4999b7))
+- Relations accept array of mappings ([f27c039](https://github.com/directus/rstore/commit/f27c039))
+- Cache pause/resume ([fcbd41e](https://github.com/directus/rstore/commit/fcbd41e))
+- **offline:** Pause cache while syncing to prevent flickering ([f37b8a7](https://github.com/directus/rstore/commit/f37b8a7))
+
+### 🔥 Performance
+
+- Relation read now use indexes ([64059ef](https://github.com/directus/rstore/commit/64059ef))
+
+### 🩹 Fixes
+
+- Check if collection wasn't removed in query tracking ([1f2aafc](https://github.com/directus/rstore/commit/1f2aafc))
+- Wrong query type on initial SSRed query meta lookup ([6ec5953](https://github.com/directus/rstore/commit/6ec5953))
+- **form:** Reset is applied synchronously preventing unwanted form data updates ([66ec510](https://github.com/directus/rstore/commit/66ec510))
+- Handle falsy keys ([bff4d0d](https://github.com/directus/rstore/commit/bff4d0d))
+- Remove Cannot read computed page data without pageSize option error ([32d47cc](https://github.com/directus/rstore/commit/32d47cc))
+- Update indexes on add/remove layer ([6764e84](https://github.com/directus/rstore/commit/6764e84))
+- FindFirst/findMany with cache-and-fetch not returning immediately + new fetchPromise returned ([ec7c7d1](https://github.com/directus/rstore/commit/ec7c7d1))
+- **query:** Pagination + cache-and-fetch + gc was incorrectly gcing items from previous pages ([f061ee7](https://github.com/directus/rstore/commit/f061ee7))
+- Opposite relations not computed on self ([edd226b](https://github.com/directus/rstore/commit/edd226b))
+- Update meta with fetch-and-cache ([5cc76f1](https://github.com/directus/rstore/commit/5cc76f1))
+- Update meta on background fetch only if fetch is valid ([d0dfd7c](https://github.com/directus/rstore/commit/d0dfd7c))
+- Don't reset main page data on refresh ([0c1db3a](https://github.com/directus/rstore/commit/0c1db3a))
+- **updateForm:** DefaultValues not overriding the current item values ([159dfb9](https://github.com/directus/rstore/commit/159dfb9))
+- **drizzle:** Sqlite like should be case insensitive ([e78d5b7](https://github.com/directus/rstore/commit/e78d5b7))
+
+### 💅 Refactors
+
+- **query:** UpdateQueryMeta ([1f17c87](https://github.com/directus/rstore/commit/1f17c87))
+
+### 📖 Documentation
+
+- **relation:** Alternate mappings ([f183409](https://github.com/directus/rstore/commit/f183409))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.8.2
 
 [compare changes](https://github.com/directus/rstore/compare/v0.8.1...v0.8.2)
