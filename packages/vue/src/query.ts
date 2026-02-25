@@ -441,14 +441,15 @@ export function createQuery<
       try {
         const finalOptions = getPageOptions(page)
 
-        // Main page
+        const resolvedOptions = store.$resolveFindOptions(getCollection(), finalOptions, many, meta.value)
+        const currentFetchPolicy = finalOptions.fetchPolicy = resolvedOptions.fetchPolicy
+
         if (page.main) {
-          const resolvedOptions = store.$resolveFindOptions(getCollection(), finalOptions, many, meta.value)
-          fetchPolicy = resolvedOptions.fetchPolicy
+          fetchPolicy = currentFetchPolicy
         }
 
         // If fetchPolicy is `cache-and-fetch`, fetch in parallel
-        if (!forceFetch && fetchPolicy === 'cache-and-fetch') {
+        if (!forceFetch && currentFetchPolicy === 'cache-and-fetch') {
           shouldHandleQueryTracking = false
           const newQueryTracking2 = queryTracking?.createTrackingObject()
 
@@ -477,7 +478,7 @@ export function createQuery<
 
         // On refresh force fetch
         if (forceFetch) {
-          finalOptions.fetchPolicy = fetchPolicy === 'no-cache' ? 'no-cache' : 'fetch-only'
+          finalOptions.fetchPolicy = currentFetchPolicy === 'no-cache' ? 'no-cache' : 'fetch-only'
         }
 
         // Reuse refs from cache if possible
