@@ -61,12 +61,19 @@ export default definePlugin({
     })
 
     hook('fetchMany', async (payload) => {
+      const options = {
+        where: payload.findOptions?.where,
+        ...payload.findOptions?.params,
+      }
+
+      if (payload.findOptions?.pageIndex != null && payload.findOptions?.pageSize != null) {
+        options.offset = payload.findOptions.pageIndex * payload.findOptions.pageSize
+        options.limit = payload.findOptions.pageSize
+      }
+
       // @ts-expect-error excessive stack depth
       payload.setResult(await requestFetch(`${apiPath}/${payload.collection.name}`, {
-        query: { superjson: SuperJSON.stringify({
-          where: payload.findOptions?.where,
-          ...payload.findOptions?.params,
-        }) },
+        query: { superjson: SuperJSON.stringify(options) },
       }))
     })
 
