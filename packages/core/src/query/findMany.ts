@@ -58,7 +58,7 @@ async function _findMany<
   collection,
   findOptions,
 }: FindManyParams<TCollection, TCollectionDefaults, TSchema>): Promise<QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>>> {
-  meta ??= {}
+  meta ??= findOptions?.meta ?? {}
   findOptions ??= {}
 
   findOptions = store.$resolveFindOptions(collection, findOptions, true, meta)

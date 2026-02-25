@@ -29,15 +29,16 @@ export function peekFirst<
   findOptions: keyOrOptions,
   force,
 }: PeekFirstOptions<TCollection, TCollectionDefaults, TSchema>): QueryResult<WrappedItem<TCollection, TCollectionDefaults, TSchema> | null> {
-  meta ??= {}
-
   let findOptions: FindFirstOptions<TCollection, TCollectionDefaults, TSchema> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
     ? {
         key: keyOrOptions,
       }
     : keyOrOptions
 
+  meta ??= findOptions?.meta ?? {}
+
   findOptions = store.$resolveFindOptions(collection, findOptions, false, meta)
+
   const fetchPolicy = findOptions.fetchPolicy
 
   const key = findOptions?.key

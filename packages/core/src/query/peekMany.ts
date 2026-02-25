@@ -28,7 +28,7 @@ export function peekMany<
   findOptions,
   force,
 }: PeekManyOptions<TCollection, TCollectionDefaults, TSchema>): QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>> {
-  meta ??= {}
+  meta ??= findOptions?.meta ?? {}
 
   findOptions = store.$resolveFindOptions(collection, findOptions ?? {}, true, meta)
   const fetchPolicy = findOptions.fetchPolicy

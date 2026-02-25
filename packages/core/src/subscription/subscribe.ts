@@ -25,7 +25,7 @@ export async function subscribe<
   findOptions,
   meta,
 }: SubscribeOptions<TCollection, TCollectionDefaults, TSchema>): Promise<void> {
-  meta ??= {}
+  meta ??= findOptions?.meta ?? {}
 
   await store.$hooks.callHook('subscribe', {
     store: store as unknown as GlobalStoreType,

@@ -58,15 +58,16 @@ async function _findFirst<
   collection,
   findOptions: keyOrOptions,
 }: FindFirstParams<TCollection, TCollectionDefaults, TSchema>): Promise<QueryResult<WrappedItem<TCollection, TCollectionDefaults, TSchema> | null>> {
-  meta ??= {}
-
   let findOptions: FindFirstOptions<TCollection, TCollectionDefaults, TSchema> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
     ? {
         key: keyOrOptions,
       }
     : keyOrOptions
 
+  meta ??= findOptions?.meta ?? {}
+
   findOptions = store.$resolveFindOptions(collection, findOptions, false, meta)
+
   const fetchPolicy = findOptions.fetchPolicy
 
   let result: any

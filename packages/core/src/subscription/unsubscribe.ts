@@ -25,7 +25,7 @@ export async function unsubscribe<
   findOptions,
   meta,
 }: UnsubscribeOptions<TCollection, TCollectionDefaults, TSchema>): Promise<void> {
-  meta ??= {}
+  meta ??= findOptions?.meta ?? {}
 
   await store.$hooks.callHook('unsubscribe', {
     store: store as unknown as GlobalStoreType,
