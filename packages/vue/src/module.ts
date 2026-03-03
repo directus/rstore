@@ -1,7 +1,7 @@
 import type { Awaitable, CreateModuleApi, GlobalStoreType, Module, ResolvedModule } from '@rstore/shared'
 import type { VueStore } from './store'
 import { defineModule as _defineModule } from '@rstore/core'
-import { hasInjectionContext } from 'vue'
+import { effectScope, hasInjectionContext } from 'vue'
 import { useStore } from './plugin'
 
 type TStore = ReturnType<typeof useStore>
@@ -25,7 +25,11 @@ export function defineModule<
       }
 
       // Create a new module and add it to the global store
-      const module = _defineModule(store as unknown as GlobalStoreType, name, cb)()
+
+      const scope = effectScope(true)
+      const module = scope.run(() => {
+        return _defineModule(store as unknown as GlobalStoreType, name, cb)()
+      })
       store.$modulesCache.set(cb, module)
       return module
     }
