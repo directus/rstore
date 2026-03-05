@@ -9,4 +9,7 @@ export const defaultValues = {
   todos: {
     completed: false,
   },
+  collabDocuments: {
+    status: 'draft' as const,
+  },
 } as const satisfies DefaultValues

@@ -1,6 +1,7 @@
 export * from './cache.js'
 export * from './collection.js'
 export * from './collectionHooks.js'
+export * from './crdt.js'
 export * from './form.js'
 export * from './formOperation.js'
 export * from './global.js'

@@ -1,6 +1,6 @@
-import type { Awaitable, Cache, Collection, CollectionDefaults, CreateFormObject, FormObjectBase, FormOperation, ResolvedCollection, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, UpdateFormObject } from '@rstore/shared'
-import type { EventHookOn } from '@vueuse/core'
-import { emptySchema, isKeyDefined } from '@rstore/core'
+import type { Awaitable, Cache, Collection, CollectionDefaults, CreateFormObject, FieldConflict, FormObjectBase, FormOperation, ResolvedCollection, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, UpdateFormObject } from '@rstore/shared'
+import type { EventHook, EventHookOn } from '@vueuse/core'
+import { diffFields, emptySchema, isKeyDefined } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { createEventHook } from '@vueuse/core'
 import { markRaw, nextTick, reactive, shallowReactive } from 'vue'
@@ -181,6 +181,35 @@ export interface FormObjectAdditionalProps<
   $onSuccess: EventHookOn<TResult>
   $onError: EventHookOn<Error>
   $onChange: EventHookOn<FormObjectChanged<TData>>
+  /**
+   * Rebase local changes on top of new remote data.
+   * Updates the initial data to `newBaseData` and replays the op log.
+   * Fields modified locally that were also changed remotely are reported as conflicts.
+   *
+   * This is useful for collaborative editing where remote updates arrive
+   * while the user is editing the form.
+   *
+   * @param remoteChangedFields - Optional list of field names that were explicitly changed remotely.
+   *   When provided, these fields are used as the set of remote changes instead of computing them
+   *   by diffing against the previous base data. This is important when a remote change sets a field
+   *   back to its original value — without this hint, the diff would see no change.
+   */
+  $rebase: (newBaseData: Partial<TData>, remoteChangedFields?: (keyof TData)[]) => void
+  /**
+   * Active field-level conflicts detected during the last `$rebase`.
+   * Each conflict indicates a field where both local and remote had different values.
+   */
+  $conflicts: FieldConflict[]
+  /**
+   * Resolve a conflict on a field by choosing a resolution.
+   * - `'local'`: Keep the local value (default on ties)
+   * - `'remote'`: Accept the remote value and discard the local op for this field
+   */
+  $resolveConflict: (field: keyof TData, resolution: 'local' | 'remote') => void
+  /**
+   * Register a callback that is called when conflicts are detected during rebase.
+   */
+  $onConflict: EventHookOn<FieldConflict[]>
 }
 
 type VueFormObject<
@@ -423,11 +452,7 @@ function applyOp<TData extends Record<string, any>>(
             const idx = current.findIndex((item: any) => {
               if (!op.oldValue)
                 return false
-              for (const [key, value] of Object.entries(op.oldValue)) {
-                if (item[key] === value)
-                  return true
-              }
-              return false
+              return Object.entries(op.oldValue).every(([key, value]) => item[key] === value)
             })
             if (idx !== -1)
               current.splice(idx, 1)
@@ -464,6 +489,7 @@ export function createFormObject<
   const onSuccess = createEventHook()
   const onError = createEventHook<Error>()
   const onChange = createEventHook()
+  const onConflict: EventHook<FieldConflict[]> = createEventHook<FieldConflict[]>()
 
   // Event sourcing: op log is the source of truth, state is projected from it
   const opLog = shallowReactive<FormOperation<TData>[]>([])
@@ -488,22 +514,38 @@ export function createFormObject<
       opLog.length = 0
       redoStack.length = 0
       form.$changedProps = {}
+      form.$conflicts = []
       for (const key in form) {
         if (!key.startsWith('$') && !key.startsWith('_$')) {
           delete (form as any)[key]
         }
       }
       Object.assign(form, initialData)
-      // Restore relation methods after reset
-      for (const [rKey, rMethods] of Object.entries(relationMethods)) {
-        ;(form as any)[rKey] = rMethods
+      // Reinitialize relation data and restore methods after reset
+      if (options.collection) {
+        for (const [rKey, rel] of Object.entries(options.collection.normalizedRelations)) {
+          const dataKey = `_$${rKey}Data`
+          const initialRelData = initialData[rKey as keyof typeof initialData]
+          ;(form as any)[dataKey] = initialRelData
+            ? (Array.isArray(initialRelData) ? [...initialRelData as any[]] : initialRelData)
+            : (rel.many ? [] : null)
+          ;(form as any)[rKey] = relationMethods[rKey]
+        }
       }
+      // Re-validate after reset
+      queueChange()
     },
     async $submit() {
       form.$loading = true
       form.$error = null
       try {
-        const data = options?.transformData ? options.transformData(form as unknown as Partial<TData>) : pickNonSpecialProps(form, true) as Partial<TData>
+        let data = options?.transformData ? options.transformData(form as unknown as Partial<TData>) : pickNonSpecialProps(form, true) as Partial<TData>
+        // Remove internal relation data keys (_$*Data) that shouldn't be submitted
+        for (const key of Object.keys(data)) {
+          if (key.startsWith('_$')) {
+            delete (data as any)[key]
+          }
+        }
         if (options.validateOnSubmit ?? true) {
           const { issues } = await this.$schema['~standard'].validate(data)
           if (issues) {
@@ -604,9 +646,17 @@ export function createFormObject<
     $onError: onError.on,
     $onSaved(...args) {
       console.warn(`$onSaved() is deprecated, use $onSuccess() instead`)
-      return this.$onSaved(...args)
+      return this.$onSuccess(...args)
     },
     $onChange: onChange.on,
+    $rebase: (newBaseData: Partial<TData>, remoteChangedFields?: (keyof TData)[]) => {
+      rebaseForm(newBaseData, remoteChangedFields)
+    },
+    $conflicts: [] as FieldConflict[],
+    $resolveConflict: (field: keyof TData, resolution: 'local' | 'remote') => {
+      resolveConflict(field, resolution)
+    },
+    $onConflict: onConflict.on,
   } satisfies FormObjectBase<TResult, TSchema> & FormObjectAdditionalProps<TData>) as FormObjectBase<TResult, TSchema> & FormObjectAdditionalProps<TData>
 
   // On change
@@ -686,6 +736,95 @@ export function createFormObject<
     updateChangedProps()
     changedSinceLastHandled = { ...form.$changedProps }
     queueChange()
+  }
+
+  // CRDT rebase and conflict resolution
+
+  /**
+   * Rebase local changes on top of new remote data.
+   * Detects fields that were changed both locally and remotely (conflicts).
+   */
+  function rebaseForm(newBaseData: Partial<TData>, explicitRemoteChangedFields?: (keyof TData)[]) {
+    const cleanNewBase = pickNonSpecialProps(newBaseData, true) as Partial<TData>
+
+    // Determine which fields changed remotely
+    // If the caller provides an explicit list (e.g. from a collab broadcast), use it;
+    // otherwise fall back to diffing old initial data vs new base.
+    const remoteChangedFields: string[] = explicitRemoteChangedFields
+      ? explicitRemoteChangedFields.map(String)
+      : diffFields(
+          initialData as Record<string, any>,
+          cleanNewBase as Record<string, any>,
+        )
+
+    // Determine which fields were locally modified via the op log
+    const localChangedFields = new Set<string>()
+    for (const op of opLog) {
+      if (op.type === 'set') {
+        localChangedFields.add(String(op.field))
+      }
+    }
+
+    // Detect conflicts: fields changed both locally and remotely with different values
+    const conflicts: FieldConflict[] = []
+    const now = Date.now()
+    for (const field of remoteChangedFields) {
+      if (localChangedFields.has(field)) {
+        const localValue = (form as any)[field]
+        const remoteValue = (cleanNewBase as any)[field]
+        if (localValue !== remoteValue) {
+          conflicts.push({
+            field,
+            localValue,
+            remoteValue,
+            localTimestamp: now,
+            remoteTimestamp: now,
+          })
+        }
+      }
+    }
+
+    // Update initial data to the new base
+    initialData = cleanNewBase
+
+    // Rebuild state: start from new base, replay op log
+    rebuildState()
+
+    // Set conflicts
+    form.$conflicts = conflicts
+
+    // Trigger conflict event if there are any
+    if (conflicts.length > 0) {
+      onConflict.trigger(conflicts)
+    }
+  }
+
+  /**
+   * Resolve a field conflict by choosing local or remote value.
+   */
+  function resolveConflict(field: keyof TData, resolution: 'local' | 'remote') {
+    const fieldStr = String(field)
+
+    if (resolution === 'remote') {
+      // Remove all ops for this field from the log (accept remote value)
+      const opsToRemove: number[] = []
+      for (let i = opLog.length - 1; i >= 0; i--) {
+        if (String(opLog[i]!.field) === fieldStr && opLog[i]!.type === 'set') {
+          opsToRemove.push(i)
+        }
+      }
+      for (const idx of opsToRemove) {
+        opLog.splice(idx, 1)
+      }
+      // Rebuild state to reflect the removal
+      rebuildState()
+    }
+    // For 'local', we keep the current state (local ops are already applied)
+
+    // Remove the resolved conflict
+    form.$conflicts = form.$conflicts.filter(
+      (c: FieldConflict) => c.field !== fieldStr,
+    )
   }
 
   // Relation cache resolution helpers
@@ -855,7 +994,7 @@ export function createFormObject<
       return Reflect.get(form, key)
     },
     ownKeys() {
-      return Reflect.ownKeys(form).filter(key => typeof key !== 'string' || !key.startsWith('$'))
+      return Reflect.ownKeys(form).filter(key => typeof key !== 'string' || (!key.startsWith('$') && !key.startsWith('_$')))
     },
   })
 
@@ -882,12 +1021,7 @@ export function createFormObject<
             const current = (form as any)[relationDataKey]
             if (Array.isArray(current)) {
               const index = current.findIndex((currentItem: any) => {
-                for (const [key, value] of Object.entries(item)) {
-                  if (currentItem[key] === value) {
-                    return true
-                  }
-                }
-                return false
+                return Object.entries(item).every(([key, value]) => currentItem[key] === value)
               })
               if (index !== -1) {
                 found = current[index]

@@ -1,4 +1,5 @@
 import type { Collection, CollectionDefaults, CollectionRelation, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from './collection'
+import type { FieldTimestamps } from './crdt'
 import type { CustomHookMeta } from './hooks'
 import type { WrappedItem } from './item'
 import type { CacheLayer } from './layer'
@@ -51,6 +52,12 @@ export interface Cache<
     marker?: string
     fromWriteItems?: boolean
     meta?: CustomHookMeta
+    /**
+     * Per-field timestamps for CRDT-like field-level LWW merge.
+     * When provided, the cache will merge at the field level using
+     * Last-Writer-Wins strategy instead of overwriting the entire object.
+     */
+    fieldTimestamps?: FieldTimestamps
   }) => void
 
   deleteItem: <TCollection extends Collection = Collection>(params: {
@@ -104,6 +111,24 @@ export interface Cache<
     relation: CollectionRelation
     childItem: any
     meta?: CustomHookMeta
+  }) => void
+
+  /**
+   * Read the per-field timestamps for an item.
+   * Returns undefined if no timestamps are stored for the item.
+   */
+  readFieldTimestamps: (params: {
+    collectionName: string
+    key: string | number
+  }) => FieldTimestamps | undefined
+
+  /**
+   * Write per-field timestamps for an item.
+   */
+  writeFieldTimestamps: (params: {
+    collectionName: string
+    key: string | number
+    timestamps: FieldTimestamps
   }) => void
 
   getModuleState: <TModule extends Module> (name: TModule['name'], key: string, initState: TModule['state']) => ResolvedModuleState<TModule>

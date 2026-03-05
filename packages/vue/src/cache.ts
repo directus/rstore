@@ -1,8 +1,8 @@
-import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from './item'
 import type { VueStore } from './store'
-import { isKeyDefined } from '@rstore/core'
+import { isKeyDefined, mergeItemFields } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { computed, markRaw, ref, shallowRef, toValue } from 'vue'
 import { wrapItem } from './item'
@@ -26,6 +26,11 @@ interface InternalCacheState {
   pageRefs: Map<string, { type: 'ref', key: string | number } | { type: 'refs', keys: Array<string | number> }>
   paused: boolean
   queue: QueuedOperation[]
+  /**
+   * Per-field timestamps for CRDT field-level LWW merge.
+   * collectionName -> key -> FieldTimestamps
+   */
+  fieldTimestamps: Map<string, Map<string | number, FieldTimestamps>>
 }
 
 export interface CreateCacheOptions<
@@ -50,6 +55,7 @@ export function createCache<
     pageRefs: new Map(),
     paused: false,
     queue: [],
+    fieldTimestamps: new Map(),
   }
 
   const layers: Record<string, Ref<CacheLayer[]>> = {}
@@ -482,6 +488,45 @@ export function createCache<
         if (!existing) {
           // Disable deep reactivity tracking inside the `data` object
           collectionState[key] = shallowRef(markRaw(data))
+
+          // Store field timestamps if provided
+          if (params.fieldTimestamps) {
+            let collectionTs = state.fieldTimestamps.get(collection.name)
+            if (!collectionTs) {
+              collectionTs = new Map()
+              state.fieldTimestamps.set(collection.name, collectionTs)
+            }
+            collectionTs.set(key, { ...params.fieldTimestamps })
+          }
+        }
+        else if (params.fieldTimestamps) {
+          // CRDT field-level LWW merge
+          let collectionTs = state.fieldTimestamps.get(collection.name)
+          if (!collectionTs) {
+            collectionTs = new Map()
+            state.fieldTimestamps.set(collection.name, collectionTs)
+          }
+          const localTimestamps = collectionTs.get(key) ?? {}
+          const { merged, mergedTimestamps, conflicts } = mergeItemFields(
+            existing,
+            data,
+            localTimestamps,
+            params.fieldTimestamps,
+          )
+          collectionTs.set(key, mergedTimestamps)
+          collectionState[key] = markRaw(merged)
+
+          // Emit conflict hook if there are conflicts
+          if (conflicts.length > 0) {
+            const store = getStore()
+            store.$hooks.callHookSync('cacheConflict', {
+              store,
+              meta: {},
+              collection,
+              key,
+              conflicts,
+            })
+          }
         }
         else {
           collectionState[key] = markRaw({
@@ -559,7 +604,23 @@ export function createCache<
         return
       }
       const { collection, key } = params
+      // Clean up field timestamps
+      const collectionTs = state.fieldTimestamps.get(collection.name)
+      if (collectionTs) {
+        collectionTs.delete(key)
+      }
       deleteItem(collection, key)
+    },
+    readFieldTimestamps({ collectionName, key }) {
+      return state.fieldTimestamps.get(collectionName)?.get(key)
+    },
+    writeFieldTimestamps({ collectionName, key, timestamps }) {
+      let collectionTs = state.fieldTimestamps.get(collectionName)
+      if (!collectionTs) {
+        collectionTs = new Map()
+        state.fieldTimestamps.set(collectionName, collectionTs)
+      }
+      collectionTs.set(key, { ...timestamps })
     },
     getModuleState(name, key, initState) {
       const cacheKey = `${name}:${key}`
@@ -653,6 +714,7 @@ export function createCache<
       wrappedItemsMetadata.clear()
       collectionStateCache.clear()
       state.collectionIndexes.clear()
+      state.fieldTimestamps.clear()
 
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', {
@@ -662,6 +724,7 @@ export function createCache<
     },
     clearCollection({ collection }) {
       invalidateCollectionStateCache(collection.name)
+      state.fieldTimestamps.delete(collection.name)
       const itemsForType = state.collections[collection.name]
       if (itemsForType) {
         for (const key in itemsForType.value) {

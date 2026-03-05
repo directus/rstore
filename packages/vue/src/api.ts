@@ -634,7 +634,7 @@ export function createCollectionApi<
     delete: (keyOrItem, options) => {
       const collection = getCollection()
 
-      let key: string | number | number
+      let key: string | number
       if (typeof keyOrItem !== 'string' && typeof keyOrItem !== 'number') {
         const result = collection.getKey(keyOrItem)
         if (!isKeyDefined(result)) {
