@@ -3,10 +3,13 @@ import './types'
 export {
   createFormObject,
   createFormObjectWithChangeDetection,
+  optimizeOpLog,
 } from './form'
 
 export type {
   VueCreateFormObject as CreateFormObject,
+  FormOperation,
+  FormOperationType,
   VueUpdateFormObject as UpdateFormObject,
 } from './form'
 
