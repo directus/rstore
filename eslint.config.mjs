@@ -5,6 +5,7 @@ export default antfu({
   ignores: [
     '**/.nitro',
     'docs/guide/migration/**',
+    '**/skills/**',
   ],
   rules: {
     'vue/object-property-newline': ['error', {

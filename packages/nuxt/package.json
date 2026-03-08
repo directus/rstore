@@ -26,7 +26,8 @@
   "main": "./dist/module.cjs",
   "types": "./dist/types.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "scripts": {
     "build": "nuxi prepare playground && nuxt-module-build build && npm run client:build",
