@@ -1,6 +1,25 @@
 # Changelog
 
 
+## v0.8.4
+
+[compare changes](https://github.com/directus/rstore/compare/v0.8.3...v0.8.4)
+
+### 🚀 Enhancements
+
+- Pass pagination options to drizzle ([f294f7e](https://github.com/directus/rstore/commit/f294f7e))
+- AI skills (experimental) ([5b4172f](https://github.com/directus/rstore/commit/5b4172f))
+
+### 🩹 Fixes
+
+- Pass findOptions.meta to core methods ([3969992](https://github.com/directus/rstore/commit/3969992))
+- Allow overriding fetchPolicy in fetchMore ([d8f593e](https://github.com/directus/rstore/commit/d8f593e))
+- **module:** Module getting disposed ([4d458c9](https://github.com/directus/rstore/commit/4d458c9))
+
+### ❤️ Contributors
+
+- Guillaume Chau ([@Akryum](http://github.com/Akryum))
+
 ## v0.8.3
 
 [compare changes](https://github.com/directus/rstore/compare/v0.8.2...v0.8.3)
