@@ -1,16 +1,19 @@
-import type { CollabEditMessage, CollabPresenceLeaveMessage, CollabPresenceMessage } from '~~/shared/types/ws'
+import type { CollabEditMessage, CollabPresenceLeaveMessage, CollabPresenceMessage, CollabTextCursor } from '~~/shared/types/ws'
 
 export interface CollabPeer {
   userId: string
   userName: string
   userColor: string
-  field?: string
+  field?: string | null
+  cursor?: CollabTextCursor | null
   lastSeen: number
 }
 
 export function useCollabSync(documentId: string) {
   const runtimeConfig = useRuntimeConfig()
-  const ws = useWebSocket(runtimeConfig.public.wsEndpoint)
+  const ws = useWebSocket(runtimeConfig.public.wsEndpoint, {
+    autoReconnect: true,
+  })
 
   // Generate a random user identity for this session
   const userId = crypto.randomUUID()
@@ -20,16 +23,24 @@ export function useCollabSync(documentId: string) {
 
   const peers = ref<Map<string, CollabPeer>>(new Map())
   const remoteUpdates = ref<Record<string, any> | null>(null)
+  const localField = ref<string | null>(null)
+  const localCursor = ref<CollabTextCursor | null>(null)
 
-  // Join the collab room
-  function joinRoom() {
+  function sendPresence() {
     ws.send(JSON.stringify({
       type: 'collab:presence',
       documentId,
       userId,
       userName,
       userColor,
+      field: localField.value,
+      cursor: localCursor.value,
     } satisfies CollabPresenceMessage))
+  }
+
+  // Join the collab room
+  function joinRoom() {
+    sendPresence()
   }
 
   // Leave the collab room
@@ -53,21 +64,28 @@ export function useCollabSync(documentId: string) {
 
   // Broadcast which field the user is currently editing
   function broadcastFocus(field?: string) {
-    ws.send(JSON.stringify({
-      type: 'collab:presence',
-      documentId,
-      userId,
-      userName,
-      userColor,
-      field,
-    } satisfies CollabPresenceMessage))
+    const nextField = field ?? null
+    if (nextField !== localField.value) {
+      localCursor.value = null
+    }
+    localField.value = nextField
+    if (!nextField) {
+      localCursor.value = null
+    }
+    sendPresence()
   }
 
-  // Clean up stale peers (not seen in 10s)
+  function broadcastCursor(field: string, cursor: CollabTextCursor) {
+    localField.value = field
+    localCursor.value = cursor
+    sendPresence()
+  }
+
+  // Clean up stale peers (not seen in 15s)
   const cleanupInterval = setInterval(() => {
     const now = Date.now()
     for (const [id, peer] of peers.value) {
-      if (now - peer.lastSeen > 10000) {
+      if (now - peer.lastSeen > 15000) {
         peers.value.delete(id)
       }
     }
@@ -87,7 +105,8 @@ export function useCollabSync(documentId: string) {
           userId: msg.userId,
           userName: msg.userName,
           userColor: msg.userColor,
-          field: msg.field,
+          field: msg.field ?? null,
+          cursor: msg.cursor ?? null,
           lastSeen: Date.now(),
         })
       }
@@ -103,15 +122,15 @@ export function useCollabSync(documentId: string) {
   // Heartbeat presence every 5s
   const heartbeatInterval = setInterval(() => {
     if (ws.status.value === 'OPEN') {
-      ws.send(JSON.stringify({
-        type: 'collab:presence',
-        documentId,
-        userId,
-        userName,
-        userColor,
-      } satisfies CollabPresenceMessage))
+      sendPresence()
     }
   }, 5000)
+
+  watch(ws.status, (status) => {
+    if (status === 'OPEN') {
+      sendPresence()
+    }
+  })
 
   onUnmounted(() => {
     leaveRoom()
@@ -131,5 +150,6 @@ export function useCollabSync(documentId: string) {
     leaveRoom,
     broadcastChanges,
     broadcastFocus,
+    broadcastCursor,
   }
 }

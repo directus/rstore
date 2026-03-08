@@ -52,6 +52,9 @@ export function createYjsPlugin(options: YjsPluginOptions) {
   /** Maps collection name → Yjs Y.Map for that collection */
   const collectionMaps = new Map<string, YMap<YMap<any>>>()
 
+  /** Reverse map: child Y.Map → parent key string, per collection. Avoids O(n) scans in observeDeep. */
+  const childToKey = new WeakMap<YMap<any>, string>()
+
   /**
    * Tracks whether we're currently applying remote Yjs changes to the rstore cache.
    * Prevents re-entrant loops (Yjs → cache → mutation hook → Yjs).
@@ -153,8 +156,6 @@ export function createYjsPlugin(options: YjsPluginOptions) {
       return true
     if (a == null && b == null)
       return true
-    if (a == null || b == null)
-      return false
     return false
   }
 
@@ -171,9 +172,10 @@ export function createYjsPlugin(options: YjsPluginOptions) {
 
           const ymap = getCollectionMap(collection)
 
-          // Hydrate rstore cache from existing Yjs state
+          // Hydrate rstore cache from existing Yjs state and build reverse map
           for (const [key, value] of ymap.entries()) {
             if (isYMap(value)) {
+              childToKey.set(value, key)
               const item = readYMapToObject(value)
               store.$cache.writeItem({
                 collection,
@@ -198,6 +200,7 @@ export function createYjsPlugin(options: YjsPluginOptions) {
                     if (change.action === 'add' || change.action === 'update') {
                       const itemMap = ymap.get(key)
                       if (isYMap(itemMap)) {
+                        childToKey.set(itemMap, key)
                         const item = readYMapToObject(itemMap)
                         store.$cache.writeItem({
                           collection,
@@ -216,7 +219,8 @@ export function createYjsPlugin(options: YjsPluginOptions) {
                 }
                 else {
                   // Nested Y.Map: a field inside an item changed
-                  const parentKey = findParentKey(ymap, event.target as YMap<any>)
+                  const parentKey = childToKey.get(event.target as YMap<any>)
+                    ?? findParentKey(ymap, event.target as YMap<any>)
                   if (parentKey != null) {
                     const itemMap = ymap.get(parentKey)
                     if (isYMap(itemMap)) {
@@ -259,6 +263,7 @@ export function createYjsPlugin(options: YjsPluginOptions) {
                   let itemMap = ymap.get(sKey) as YMap<any> | undefined
                   if (!isYMap(itemMap)) {
                     itemMap = new YMapCtor()
+                    childToKey.set(itemMap, sKey)
                     ymap.set(sKey, itemMap as any)
                   }
                   writeItemToYMap(itemMap, result as Record<string, any>)
@@ -297,6 +302,7 @@ export function createYjsPlugin(options: YjsPluginOptions) {
                     let itemMap = ymap.get(sKey) as YMap<any> | undefined
                     if (!isYMap(itemMap)) {
                       itemMap = new YMapCtor()
+                      childToKey.set(itemMap, sKey)
                       ymap.set(sKey, itemMap as any)
                     }
                     writeItemToYMap(itemMap, result as Record<string, any>)
@@ -325,7 +331,7 @@ export function createYjsPlugin(options: YjsPluginOptions) {
  * Check if a value is a Y.Map instance.
  */
 function isYMap(value: any): value is YMap<any> {
-  return value != null && typeof value === 'object' && typeof value.entries === 'function' && typeof value.set === 'function' && typeof value.get === 'function'
+  return value instanceof YMapCtor
 }
 
 function serializeKey(key: string | number): string {

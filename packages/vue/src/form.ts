@@ -1,6 +1,6 @@
 import type { Awaitable, Cache, Collection, CollectionDefaults, CreateFormObject, FieldConflict, FormObjectBase, FormOperation, ResolvedCollection, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, UpdateFormObject } from '@rstore/shared'
-import type { EventHook, EventHookOn } from '@vueuse/core'
-import { diffFields, emptySchema, isKeyDefined } from '@rstore/core'
+import type { EventHookOn } from '@vueuse/core'
+import { diffFields, emptySchema, isKeyDefined, mergeText } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { createEventHook } from '@vueuse/core'
 import { markRaw, nextTick, reactive, shallowReactive } from 'vue'
@@ -391,6 +391,15 @@ export function optimizeOpLog<TData extends Record<string, any>>(
 }
 
 /**
+ * Resolve a potentially dot-separated field path to its leaf name.
+ * e.g. `"author.id"` → `"id"`, `"name"` → `"name"`
+ */
+function leafFieldName(field: string): string {
+  const dotIndex = field.lastIndexOf('.')
+  return dotIndex !== -1 ? field.slice(dotIndex + 1) : field
+}
+
+/**
  * Apply a single operation to a target object (state projection).
  * Does NOT record the operation — only mutates the target.
  */
@@ -427,12 +436,8 @@ function applyOp<TData extends Record<string, any>>(
           // One-to-one: set FK fields from the on mapping
           for (const to of relation.to) {
             for (const [targetField, sourceField] of Object.entries(to.on)) {
-              const sourceFieldName = (sourceField as string).includes('.')
-                ? (sourceField as string).split('.').pop()!
-                : (sourceField as string)
-              const targetFieldName = targetField.includes('.')
-                ? targetField.split('.').pop()!
-                : targetField
+              const sourceFieldName = leafFieldName(sourceField as string)
+              const targetFieldName = leafFieldName(targetField)
               if (op.newValue?.[targetFieldName] !== undefined) {
                 target[sourceFieldName] = op.newValue[targetFieldName]
               }
@@ -449,11 +454,7 @@ function applyOp<TData extends Record<string, any>>(
           if (op.oldValue && typeof op.oldValue === 'object' && !Array.isArray(op.oldValue)) {
             // Disconnect specific item
             const current = target[dataKey] || []
-            const idx = current.findIndex((item: any) => {
-              if (!op.oldValue)
-                return false
-              return Object.entries(op.oldValue).every(([key, value]) => item[key] === value)
-            })
+            const idx = current.findIndex((item: any) => itemsMatch(item, op.oldValue))
             if (idx !== -1)
               current.splice(idx, 1)
           }
@@ -466,10 +467,7 @@ function applyOp<TData extends Record<string, any>>(
           // One-to-one: clear FK fields
           for (const to of relation.to) {
             for (const [, sourceField] of Object.entries(to.on)) {
-              const sourceFieldName = (sourceField as string).includes('.')
-                ? (sourceField as string).split('.').pop()!
-                : (sourceField as string)
-              target[sourceFieldName] = null
+              target[leafFieldName(sourceField as string)] = null
             }
           }
         }
@@ -489,12 +487,31 @@ export function createFormObject<
   const onSuccess = createEventHook()
   const onError = createEventHook<Error>()
   const onChange = createEventHook()
-  const onConflict: EventHook<FieldConflict[]> = createEventHook<FieldConflict[]>()
+  const onConflict = createEventHook<FieldConflict[]>()
 
   // Event sourcing: op log is the source of truth, state is projected from it
   const opLog = shallowReactive<FormOperation<TData>[]>([])
   const redoStack = shallowReactive<FormOperation<TData>[]>([])
   const relationMethods: Record<string, any> = {}
+
+  /**
+   * Initialize (or reset) relation data fields on a target object.
+   * Sets `_$<key>Data` to a copy of the initial relation data, and
+   * optionally restores the relation methods object on the field key.
+   */
+  function initRelationData(target: Record<string, any>, restoreMethods = true) {
+    if (!options.collection)
+      return
+    for (const [rKey, rel] of Object.entries(options.collection.normalizedRelations)) {
+      const initialRelData = initialData[rKey as keyof typeof initialData]
+      target[`_$${rKey}Data`] = initialRelData
+        ? (Array.isArray(initialRelData) ? [...initialRelData as any[]] : initialRelData)
+        : (rel.many ? [] : null)
+      if (restoreMethods) {
+        target[rKey] = relationMethods[rKey]
+      }
+    }
+  }
 
   const form = reactive({
     ...initialData as TData,
@@ -521,17 +538,7 @@ export function createFormObject<
         }
       }
       Object.assign(form, initialData)
-      // Reinitialize relation data and restore methods after reset
-      if (options.collection) {
-        for (const [rKey, rel] of Object.entries(options.collection.normalizedRelations)) {
-          const dataKey = `_$${rKey}Data`
-          const initialRelData = initialData[rKey as keyof typeof initialData]
-          ;(form as any)[dataKey] = initialRelData
-            ? (Array.isArray(initialRelData) ? [...initialRelData as any[]] : initialRelData)
-            : (rel.many ? [] : null)
-          ;(form as any)[rKey] = relationMethods[rKey]
-        }
-      }
+      initRelationData(form as Record<string, any>)
       // Re-validate after reset
       queueChange()
     },
@@ -539,11 +546,13 @@ export function createFormObject<
       form.$loading = true
       form.$error = null
       try {
-        let data = options?.transformData ? options.transformData(form as unknown as Partial<TData>) : pickNonSpecialProps(form, true) as Partial<TData>
+        const data = options?.transformData ? options.transformData(form as unknown as Partial<TData>) : pickNonSpecialProps(form, true) as Partial<TData>
         // Remove internal relation data keys (_$*Data) that shouldn't be submitted
-        for (const key of Object.keys(data)) {
-          if (key.startsWith('_$')) {
-            delete (data as any)[key]
+        if (options.collection) {
+          for (const key of Object.keys(data)) {
+            if (key.startsWith('_$')) {
+              delete (data as any)[key]
+            }
           }
         }
         if (options.validateOnSubmit ?? true) {
@@ -627,14 +636,7 @@ export function createFormObject<
       },
       stateAt: (index: number): Partial<TData> => {
         const state: Record<string, any> = { ...(initialData as TData) }
-        if (options.collection) {
-          for (const [rKey, rel] of Object.entries(options.collection.normalizedRelations)) {
-            const initialRelData = initialData[rKey as keyof typeof initialData]
-            state[`_$${rKey}Data`] = initialRelData
-              ? (Array.isArray(initialRelData) ? [...initialRelData as any[]] : initialRelData)
-              : (rel.many ? [] : null)
-          }
-        }
+        initRelationData(state, false)
         const count = Math.min(index, opLog.length)
         for (let i = 0; i < count; i++) {
           applyOp(state, opLog[i]!, options.collection)
@@ -686,11 +688,30 @@ export function createFormObject<
 
   function updateChangedProps() {
     const changed: FormObjectChanged<TData> = {}
+    const relationKeys = options.collection
+      ? new Set(Object.keys(options.collection.normalizedRelations))
+      : undefined
     for (const key in initialData) {
+      if (relationKeys?.has(key))
+        continue
       const current = (form as any)[key]
       const initial = initialData[key]
       if (current !== initial) {
         changed[key as keyof TData] = [current, initial] as [TData[keyof TData], TData[keyof TData]]
+      }
+    }
+    // Also detect fields from the op log that aren't in initialData
+    for (const op of opLog) {
+      if (op.type !== 'set')
+        continue
+      const key = String(op.field)
+      if (key in (initialData as Record<string, any>))
+        continue
+      if (key in changed)
+        continue
+      const current = (form as any)[key]
+      if (current !== undefined) {
+        changed[key as keyof TData] = [current, undefined] as [TData[keyof TData], TData[keyof TData]]
       }
     }
     form.$changedProps = changed
@@ -705,17 +726,7 @@ export function createFormObject<
     }
     Object.assign(form, initialData)
 
-    // Reset relation data and restore methods
-    if (options.collection) {
-      for (const [rKey, rel] of Object.entries(options.collection.normalizedRelations)) {
-        const dataKey = `_$${rKey}Data`
-        const initialRelData = initialData[rKey as keyof typeof initialData]
-        ;(form as any)[dataKey] = initialRelData
-          ? (Array.isArray(initialRelData) ? [...initialRelData as any[]] : initialRelData)
-          : (rel.many ? [] : null)
-        ;(form as any)[rKey] = relationMethods[rKey]
-      }
-    }
+    initRelationData(form as Record<string, any>)
 
     // Replay all ops from the log (state projection)
     for (const op of opLog) {
@@ -738,6 +749,112 @@ export function createFormObject<
     queueChange()
   }
 
+  function collapseFieldSetOps(field: keyof TData, nextValue: TData[keyof TData], baseValue: TData[keyof TData]) {
+    const fieldStr = String(field)
+    const setOpIndexes: number[] = []
+    let lastTimestamp = Date.now()
+
+    for (let i = 0; i < opLog.length; i++) {
+      const op = opLog[i]
+      if (op && String(op.field) === fieldStr && op.type === 'set') {
+        setOpIndexes.push(i)
+        lastTimestamp = op.timestamp
+      }
+    }
+
+    if (setOpIndexes.length === 0) {
+      return
+    }
+
+    const insertAt = setOpIndexes[setOpIndexes.length - 1]! - (setOpIndexes.length - 1)
+    for (let i = setOpIndexes.length - 1; i >= 0; i--) {
+      opLog.splice(setOpIndexes[i]!, 1)
+    }
+
+    if (nextValue !== baseValue) {
+      opLog.splice(insertAt, 0, {
+        timestamp: lastTimestamp,
+        field,
+        type: 'set',
+        newValue: nextValue,
+        oldValue: baseValue,
+      })
+    }
+  }
+
+  function rebaseTextFieldSetOps(
+    field: keyof TData,
+    previousBaseValue: TData[keyof TData],
+    nextBaseValue: TData[keyof TData],
+    expectedFinalValue: TData[keyof TData],
+  ) {
+    if (
+      typeof previousBaseValue !== 'string'
+      || typeof nextBaseValue !== 'string'
+      || typeof expectedFinalValue !== 'string'
+    ) {
+      collapseFieldSetOps(field, expectedFinalValue, nextBaseValue)
+      return
+    }
+
+    const fieldStr = String(field)
+    const setOpIndexes: number[] = []
+    const rebasedOps: Array<FormOperation<TData> | null> = []
+    let rebasedPreviousValue = nextBaseValue
+
+    for (let i = 0; i < opLog.length; i++) {
+      const op = opLog[i]
+      if (!op || String(op.field) !== fieldStr || op.type !== 'set') {
+        continue
+      }
+
+      setOpIndexes.push(i)
+
+      if (typeof op.newValue !== 'string') {
+        collapseFieldSetOps(field, expectedFinalValue, nextBaseValue)
+        return
+      }
+
+      const mergeResult = mergeText(previousBaseValue, op.newValue, nextBaseValue)
+      if (mergeResult.conflicts.length > 0) {
+        collapseFieldSetOps(field, expectedFinalValue, nextBaseValue)
+        return
+      }
+
+      const rebasedNextValue = mergeResult.merged as TData[keyof TData]
+      if (rebasedNextValue === rebasedPreviousValue) {
+        rebasedOps.push(null)
+        continue
+      }
+
+      rebasedOps.push({
+        ...op,
+        oldValue: rebasedPreviousValue,
+        newValue: rebasedNextValue,
+      })
+      rebasedPreviousValue = rebasedNextValue
+    }
+
+    if (setOpIndexes.length === 0) {
+      return
+    }
+
+    if (rebasedPreviousValue !== expectedFinalValue) {
+      collapseFieldSetOps(field, expectedFinalValue, nextBaseValue)
+      return
+    }
+
+    for (let i = setOpIndexes.length - 1; i >= 0; i--) {
+      const rebasedOp = rebasedOps[i]
+      if (rebasedOp) {
+        opLog[setOpIndexes[i]!] = rebasedOp
+      }
+      else {
+        opLog.splice(setOpIndexes[i]!, 1)
+      }
+    }
+  }
+
   // CRDT rebase and conflict resolution
 
   /**
@@ -745,7 +862,11 @@ export function createFormObject<
    * Detects fields that were changed both locally and remotely (conflicts).
    */
   function rebaseForm(newBaseData: Partial<TData>, explicitRemoteChangedFields?: (keyof TData)[]) {
+    const previousBaseData = initialData
     const cleanNewBase = pickNonSpecialProps(newBaseData, true) as Partial<TData>
+    const explicitRemoteChangedFieldSet = explicitRemoteChangedFields
+      ? new Set(explicitRemoteChangedFields.map(String))
+      : null
 
     // Determine which fields changed remotely
     // If the caller provides an explicit list (e.g. from a collab broadcast), use it;
@@ -753,7 +874,7 @@ export function createFormObject<
     const remoteChangedFields: string[] = explicitRemoteChangedFields
       ? explicitRemoteChangedFields.map(String)
       : diffFields(
-          initialData as Record<string, any>,
+          previousBaseData as Record<string, any>,
           cleanNewBase as Record<string, any>,
         )
 
@@ -767,11 +888,28 @@ export function createFormObject<
 
     // Detect conflicts: fields changed both locally and remotely with different values
     const conflicts: FieldConflict[] = []
+    const mergedTextFields = new Map<string, any>()
     const now = Date.now()
     for (const field of remoteChangedFields) {
       if (localChangedFields.has(field)) {
         const localValue = (form as any)[field]
         const remoteValue = (cleanNewBase as any)[field]
+        const previousValue = (previousBaseData as any)[field]
+        const shouldTreatAsExplicitConflict = explicitRemoteChangedFieldSet?.has(field) && previousValue === remoteValue
+
+        if (
+          !shouldTreatAsExplicitConflict
+          && typeof previousValue === 'string'
+          && typeof localValue === 'string'
+          && typeof remoteValue === 'string'
+        ) {
+          const mergeResult = mergeText(previousValue, localValue, remoteValue)
+          if (mergeResult.conflicts.length === 0) {
+            mergedTextFields.set(field, mergeResult.merged)
+            continue
+          }
+        }
+
         if (localValue !== remoteValue) {
           conflicts.push({
             field,
@@ -787,6 +925,15 @@ export function createFormObject<
     // Update initial data to the new base
     initialData = cleanNewBase
 
+    for (const [field, mergedValue] of mergedTextFields) {
+      rebaseTextFieldSetOps(
+        field as keyof TData,
+        (previousBaseData as any)[field] as TData[keyof TData],
+        (cleanNewBase as any)[field] as TData[keyof TData],
+        mergedValue as TData[keyof TData],
+      )
+    }
+
     // Rebuild state: start from new base, replay op log
     rebuildState()
 
@@ -795,7 +942,7 @@ export function createFormObject<
 
     // Trigger conflict event if there are any
     if (conflicts.length > 0) {
-      onConflict.trigger(conflicts)
+      onConflict.trigger(conflicts as any)
     }
   }
 
@@ -844,11 +991,7 @@ export function createFormObject<
       const indexKeys = Object.keys(target.on).sort()
       const indexKey = indexKeys.join(':')
       const indexValues = indexKeys.map((k: string) => {
-        const currentKey = target.on[k]!
-        const fieldName = (currentKey as string).includes('.')
-          ? (currentKey as string).split('.').pop()!
-          : currentKey
-        return (form as any)[fieldName]
+        return (form as any)[leafFieldName(target.on[k]! as string)]
       })
 
       if (indexValues.every((v: any) => v != null)) {
@@ -940,8 +1083,9 @@ export function createFormObject<
 
   // We need to create the proxy first and then add relation methods that use it
   proxy = new Proxy(form, {
-    set(target, key, value) {
-      if (typeof key === 'string' && !key.startsWith('$') && !key.startsWith('_$')) {
+    set(_target, key, value) {
+      if (typeof key === 'string' && !key.startsWith('$') && !key.startsWith('_$')
+        && !(options.collection && key in (options.collection.normalizedRelations as Record<string, any>))) {
         const oldValue = (form as any)[key]
 
         // New operation invalidates redo history
@@ -971,7 +1115,7 @@ export function createFormObject<
       }
       return Reflect.set(form, key, value)
     },
-    get(target, key) {
+    get(_target, key) {
       // Resolve relation fields from cache when store is available
       if (typeof key === 'string' && options.store && options.collection
         && key in (options.collection.normalizedRelations as Record<string, any>)) {
@@ -1020,12 +1164,7 @@ export function createFormObject<
             let found: Record<string, any> | undefined
             const current = (form as any)[relationDataKey]
             if (Array.isArray(current)) {
-              const index = current.findIndex((currentItem: any) => {
-                return Object.entries(item).every(([key, value]) => currentItem[key] === value)
-              })
-              if (index !== -1) {
-                found = current[index]
-              }
+              found = current.find((currentItem: any) => itemsMatch(currentItem, item))
             }
             // Also check cache-resolved items when store is available
             if (!found && options.store && options.collection) {

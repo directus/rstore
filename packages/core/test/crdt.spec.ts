@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createFieldTimestamps, diffFields, fieldValuesEqual, mergeItemFields, touchFields } from '../src/crdt'
+import { applyTextChanges, createFieldTimestamps, diffFields, diffText, fieldValuesEqual, mergeItemFields, mergeText, touchFields } from '../src/crdt'
 
 describe('mergeItemFields', () => {
   it('should keep local values when local timestamps are newer', () => {
@@ -74,8 +74,8 @@ describe('mergeItemFields', () => {
   })
 
   it('should handle fields present only in local', () => {
-    const local = { title: 'Title', extra: 'local-only' }
-    const remote = { title: 'Title' }
+    const local: Record<string, any> = { title: 'Title', extra: 'local-only' }
+    const remote: Record<string, any> = { title: 'Title' }
     const localTs = { title: 100, extra: 100 }
     const remoteTs = { title: 100 }
 
@@ -86,8 +86,8 @@ describe('mergeItemFields', () => {
   })
 
   it('should handle fields present only in remote', () => {
-    const local = { title: 'Title' }
-    const remote = { title: 'Title', newField: 'remote-only' }
+    const local: Record<string, any> = { title: 'Title' }
+    const remote: Record<string, any> = { title: 'Title', newField: 'remote-only' }
     const localTs = { title: 100 }
     const remoteTs = { title: 100, newField: 200 }
 
@@ -253,5 +253,72 @@ describe('fieldValuesEqual', () => {
   it('should handle type mismatches', () => {
     expect(fieldValuesEqual(1, '1')).toBe(false)
     expect(fieldValuesEqual(0, false)).toBe(false)
+  })
+})
+
+describe('diffText', () => {
+  it('should create changes that reproduce the target string', () => {
+    const source = 'Hello world'
+    const target = 'Hello brave new world!'
+
+    const changes = diffText(source, target)
+
+    expect(applyTextChanges(source, changes)).toBe(target)
+  })
+
+  it('should collapse adjacent inserts and deletes into replace operations', () => {
+    const source = 'abcd'
+    const target = 'abXYd'
+
+    expect(diffText(source, target)).toEqual([
+      {
+        index: 2,
+        deleteCount: 1,
+        insertText: 'XY',
+      },
+    ])
+  })
+})
+
+describe('mergeText', () => {
+  it('should merge non-overlapping concurrent edits', () => {
+    const result = mergeText(
+      'Hello world',
+      'Hello brave world',
+      'Hello world!',
+    )
+
+    expect(result.conflicts).toHaveLength(0)
+    expect(result.merged).toBe('Hello brave world!')
+  })
+
+  it('should keep deterministic ordering for concurrent inserts at the same position', () => {
+    const result = mergeText(
+      'Hello world',
+      'Hello brave world',
+      'Hello dear world',
+    )
+
+    expect(result.conflicts).toHaveLength(0)
+    expect(result.merged).toBe('Hello brave dear world')
+  })
+
+  it('should report overlapping replacements as conflicts', () => {
+    const result = mergeText(
+      'Hello world',
+      'Hello planet',
+      'Hello there',
+    )
+
+    expect(result.conflicts).toHaveLength(1)
+    expect(result.conflicts[0]).toMatchObject({
+      index: 6,
+      localChange: {
+        index: 6,
+      },
+      remoteChange: {
+        index: 6,
+      },
+    })
   })
 })

@@ -11,13 +11,20 @@ export interface CollabEditMessage {
   userId: string
 }
 
+export interface CollabTextCursor {
+  start: number
+  end: number
+  direction: 'forward' | 'backward' | 'none'
+}
+
 export interface CollabPresenceMessage {
   type: 'collab:presence'
   documentId: string
   userId: string
   userName: string
   userColor: string
-  field?: string
+  field?: string | null
+  cursor?: CollabTextCursor | null
 }
 
 export interface CollabPresenceLeaveMessage {

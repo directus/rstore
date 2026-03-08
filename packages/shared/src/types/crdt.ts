@@ -27,3 +27,32 @@ export interface MergeResult<T extends Record<string, any> = Record<string, any>
   /** Fields where both local and remote had concurrent modifications */
   conflicts: FieldConflict[]
 }
+
+/**
+ * A text change relative to a base string.
+ * Deletes `deleteCount` characters starting at `index`, then inserts `insertText`.
+ */
+export interface TextChange {
+  index: number
+  deleteCount: number
+  insertText: string
+}
+
+/**
+ * Describes an overlapping text edit that cannot be merged automatically.
+ */
+export interface TextMergeConflict {
+  index: number
+  localChange: TextChange
+  remoteChange: TextChange
+}
+
+/**
+ * Result of merging two text values edited concurrently from the same base.
+ */
+export interface TextMergeResult {
+  merged: string
+  localChanges: TextChange[]
+  remoteChanges: TextChange[]
+  conflicts: TextMergeConflict[]
+}

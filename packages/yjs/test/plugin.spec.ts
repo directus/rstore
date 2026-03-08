@@ -1,11 +1,11 @@
-import type { CollectionDefaults, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CollectionDefaults, HookDefinitions, Hooks, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import * as Y from 'yjs'
 import { createYjsPlugin } from '../src/plugin'
 
 function createMockStore() {
-  const hooks = createHooks<StoreSchema, CollectionDefaults>()
+  const hooks = createHooks<HookDefinitions<StoreSchema, CollectionDefaults>>()
 
   const cacheItems = new Map<string, Map<string | number, any>>()
 
@@ -53,7 +53,7 @@ function createMockCollection(name: string): ResolvedCollection {
 describe('createYjsPlugin', () => {
   let ydoc: Y.Doc
   let store: StoreCore<StoreSchema, CollectionDefaults>
-  let hooks: ReturnType<typeof createHooks<StoreSchema, CollectionDefaults>>
+  let hooks: Hooks<StoreSchema, CollectionDefaults>
   let collection: ResolvedCollection
 
   beforeEach(() => {

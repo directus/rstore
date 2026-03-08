@@ -87,6 +87,7 @@ awareness.setCursor({ collection: 'posts', key: '1', field: 'title' })
 
 // Listen for presence changes
 const unsubscribe = awareness.onChange(({ added, updated, removed }) => {
+  // eslint-disable-next-line no-console
   console.log('Peers changed:', { added, updated, removed })
 })
 

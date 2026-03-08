@@ -1,4 +1,7 @@
 <script lang="ts" setup>
+import type { Ref } from 'vue'
+import { isRef } from 'vue'
+
 const props = defineProps<{
   id: string
 }>()
@@ -17,7 +20,28 @@ const {
   joinRoom,
   broadcastChanges,
   broadcastFocus,
+  broadcastCursor,
 } = useCollabSync(props.id)
+
+type TextField = 'title' | 'body'
+type MaybeElementRef<T> = T | Ref<T>
+
+interface InputComponentRef {
+  inputRef: MaybeElementRef<HTMLInputElement | null>
+}
+
+interface TextareaComponentRef {
+  textareaRef: MaybeElementRef<HTMLTextAreaElement | null>
+}
+
+const titleFieldRef = ref<HTMLElement | null>(null)
+const bodyFieldRef = ref<HTMLElement | null>(null)
+const titleInputRef = ref<InputComponentRef | null>(null)
+const bodyTextareaRef = ref<TextareaComponentRef | null>(null)
+const titleInputEl = computed(() => titleInputRef.value ? resolveElementRef(titleInputRef.value.inputRef) : null)
+const bodyTextareaEl = computed(() => bodyTextareaRef.value ? resolveElementRef(bodyTextareaRef.value.textareaRef) : null)
+const activePresenceField = ref<string | null>(null)
+let pendingBlurTimer: ReturnType<typeof setTimeout> | null = null
 
 // Join the room when mounted
 onMounted(() => {
@@ -91,16 +115,76 @@ form.$onConflict((conflicts) => {
 
 // Track which field has focus
 function onFieldFocus(field: string) {
+  clearPendingBlur()
+  activePresenceField.value = field
   broadcastFocus(field)
 }
 
-function onFieldBlur() {
-  broadcastFocus(undefined)
+function onFieldBlur(field: string) {
+  clearPendingBlur()
+  pendingBlurTimer = setTimeout(() => {
+    pendingBlurTimer = null
+
+    if (activePresenceField.value !== field) {
+      return
+    }
+
+    if (!document.hasFocus()) {
+      return
+    }
+
+    activePresenceField.value = null
+    broadcastFocus(undefined)
+  }, 0)
+}
+
+function onTextFieldFocus(field: TextField, event: FocusEvent) {
+  onFieldFocus(field)
+  updateTextCursor(field, event)
+}
+
+function onTextCursorEvent(field: TextField, event: Event) {
+  updateTextCursor(field, event)
+}
+
+function updateTextCursor(field: TextField, event: Event) {
+  const target = event.target
+  if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLTextAreaElement)) {
+    return
+  }
+
+  const start = target.selectionStart ?? 0
+  const end = target.selectionEnd ?? start
+
+  broadcastCursor(field, {
+    start,
+    end,
+    direction: normalizeSelectionDirection(target.selectionDirection),
+  })
+}
+
+function normalizeSelectionDirection(direction: string | null): 'forward' | 'backward' | 'none' {
+  if (direction === 'forward' || direction === 'backward') {
+    return direction
+  }
+
+  return 'none'
+}
+
+function resolveElementRef<T>(value: MaybeElementRef<T>) {
+  return isRef(value) ? value.value : value
+}
+
+function clearPendingBlur() {
+  if (pendingBlurTimer != null) {
+    clearTimeout(pendingBlurTimer)
+    pendingBlurTimer = null
+  }
 }
 
 // Get peers editing a specific field
 function peersOnField(field: string) {
-  return peers.value.filter((p: { field?: string }) => p.field === field)
+  return peers.value.filter(peer => peer.field === field)
 }
 
 const toast = useToast()
@@ -111,6 +195,10 @@ form.$onSuccess(() => {
     icon: 'lucide:check',
     color: 'success',
   })
+})
+
+onUnmounted(() => {
+  clearPendingBlur()
 })
 </script>
 
@@ -196,14 +284,25 @@ form.$onSuccess(() => {
         label="Title"
         name="title"
       >
-        <div class="relative w-full">
+        <div ref="titleFieldRef" class="relative w-full">
           <UInput
+            ref="titleInputRef"
             v-model="form.title"
             placeholder="Document title"
             size="lg"
             class="w-full"
-            @focus="onFieldFocus('title')"
-            @blur="onFieldBlur()"
+            @focus="onTextFieldFocus('title', $event)"
+            @blur="onFieldBlur('title')"
+            @click="onTextCursorEvent('title', $event)"
+            @input="onTextCursorEvent('title', $event)"
+            @keyup="onTextCursorEvent('title', $event)"
+            @select="onTextCursorEvent('title', $event)"
+          />
+          <CollabTextCursorOverlay
+            field="title"
+            :peers="peers"
+            :container="titleFieldRef"
+            :target="titleInputEl"
           />
           <div
             v-for="peer in peersOnField('title')"
@@ -223,14 +322,25 @@ form.$onSuccess(() => {
         label="Content"
         name="body"
       >
-        <div class="relative w-full">
+        <div ref="bodyFieldRef" class="relative w-full">
           <UTextarea
+            ref="bodyTextareaRef"
             v-model="form.body"
             placeholder="Write your content here..."
             :rows="10"
             class="w-full"
-            @focus="onFieldFocus('body')"
-            @blur="onFieldBlur()"
+            @focus="onTextFieldFocus('body', $event)"
+            @blur="onFieldBlur('body')"
+            @click="onTextCursorEvent('body', $event)"
+            @input="onTextCursorEvent('body', $event)"
+            @keyup="onTextCursorEvent('body', $event)"
+            @select="onTextCursorEvent('body', $event)"
+          />
+          <CollabTextCursorOverlay
+            field="body"
+            :peers="peers"
+            :container="bodyFieldRef"
+            :target="bodyTextareaEl"
           />
           <div
             v-for="peer in peersOnField('body')"
@@ -260,7 +370,7 @@ form.$onSuccess(() => {
           ]"
           class="w-48"
           @focus="onFieldFocus('status')"
-          @blur="onFieldBlur()"
+          @blur="onFieldBlur('status')"
         />
       </UFormField>
 
