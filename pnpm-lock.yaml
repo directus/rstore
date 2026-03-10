@@ -6,21 +6,159 @@ settings:
 
 catalogs:
   default:
+    '@akryum/sheep':
+      specifier: ^0.5.2
+      version: 0.5.2
+    '@antfu/eslint-config':
+      specifier: ^6.2.0
+      version: 6.7.3
+    '@directus/sdk':
+      specifier: ^19.0.1
+      version: 19.1.0
+    '@faker-js/faker':
+      specifier: ^9.4.0
+      version: 9.9.0
+    '@iconify-json/lucide':
+      specifier: ^1.2.22
+      version: 1.2.96
+    '@iconify-json/simple-icons':
+      specifier: ^1.2.19
+      version: 1.2.73
+    '@iconify/vue':
+      specifier: ^5.0.0
+      version: 5.0.0
+    '@libsql/client':
+      specifier: ^0.14.0
+      version: 0.14.0
+    '@lucia-auth/adapter-sqlite':
+      specifier: ^3.0.2
+      version: 3.0.2
+    '@nuxt/devtools':
+      specifier: ^2.0.0
+      version: 2.7.0
+    '@nuxt/devtools-kit':
+      specifier: ^2.2.1
+      version: 2.7.0
+    '@nuxt/eslint-config':
+      specifier: ^1.0.1
+      version: 1.15.2
+    '@nuxt/kit':
+      specifier: ^4.0.0
+      version: 4.3.1
+    '@nuxt/module-builder':
+      specifier: ^0.8.4
+      version: 0.8.4
     '@nuxt/schema':
       specifier: ^4.1.1
       version: 4.3.1
+    '@nuxt/test-utils':
+      specifier: ^3.15.4
+      version: 3.23.0
     '@nuxt/ui':
       specifier: ^3.3.3
       version: 3.3.7
+    '@nuxthub/core':
+      specifier: ^0.8.18
+      version: 0.8.27
+    '@standard-schema/spec':
+      specifier: ^1.0.0
+      version: 1.1.0
+    '@tailwindcss/vite':
+      specifier: 4.0.7
+      version: 4.0.7
+    '@tresjs/core':
+      specifier: ^5.6.0
+      version: 5.7.0
+    '@tresjs/post-processing':
+      specifier: ^3.5.0
+      version: 3.6.0
     '@types/node':
       specifier: ^24.3.1
       version: 24.12.0
+    '@vueuse/core':
+      specifier: ^14.0.0
+      version: 14.2.1
+    '@vueuse/nuxt':
+      specifier: ^14.0.0
+      version: 14.2.1
+    animejs:
+      specifier: ^4.2.2
+      version: 4.3.6
+    arctic:
+      specifier: ^3.5.0
+      version: 3.7.0
+    changelogen:
+      specifier: ^0.5.7
+      version: 0.5.7
+    drizzle-kit:
+      specifier: ^0.30.5
+      version: 0.30.6
+    drizzle-orm:
+      specifier: ^0.40.0
+      version: 0.40.1
+    eslint:
+      specifier: ^9.20.0
+      version: 9.39.4
+    fast-equals:
+      specifier: ^5.3.3
+      version: 5.4.0
+    h3:
+      specifier: ^1.15.1
+      version: 1.15.6
+    jiti:
+      specifier: ^2.4.2
+      version: 2.6.1
+    klona:
+      specifier: ^2.0.6
+      version: 2.0.6
+    lint-staged:
+      specifier: ^15.4.3
+      version: 15.5.2
+    lucia:
+      specifier: ^3.2.2
+      version: 3.2.2
+    nitropack:
+      specifier: latest
+      version: 2.13.1
+    npm-run-all2:
+      specifier: ^7.0.2
+      version: 7.0.2
     nuxt:
       specifier: ^4.1.3
       version: 4.3.1
+    nuxt-auth-utils:
+      specifier: 0.5.18
+      version: 0.5.18
+    pathe:
+      specifier: ^2.0.3
+      version: 2.0.3
+    shiki:
+      specifier: ^3.1.0
+      version: 3.23.0
+    simple-git-hooks:
+      specifier: ^2.11.1
+      version: 2.13.1
+    sirv:
+      specifier: ^3.0.1
+      version: 3.0.2
+    superjson:
+      specifier: ^2.2.3
+      version: 2.2.6
+    tailwindcss:
+      specifier: 4.0.7
+      version: 4.0.7
+    three:
+      specifier: ^0.183.2
+      version: 0.183.2
     typescript:
       specifier: ^5.9.2
       version: 5.9.3
+    unbuild:
+      specifier: ^3.2.0
+      version: 3.6.1
+    vitepress:
+      specifier: ^2.0.0-alpha.16
+      version: 2.0.0-alpha.16
     vitest:
       specifier: ^3.2.4
       version: 3.2.4
@@ -30,61 +168,67 @@ catalogs:
     vue-tsc:
       specifier: ^3.0.6
       version: 3.2.5
+    wrangler:
+      specifier: ^3.114.1
+      version: 3.114.17
+    zod:
+      specifier: ^3.24.2
+      version: 3.25.76
 
 importers:
 
   .:
     devDependencies:
       '@akryum/sheep':
-        specifier: ^0.5.2
+        specifier: 'catalog:'
         version: 0.5.2
       '@antfu/eslint-config':
-        specifier: ^6.2.0
+        specifier: 'catalog:'
         version: 6.7.3(@typescript-eslint/rule-tester@8.57.0(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3))(@typescript-eslint/typescript-estree@8.57.0(typescript@5.9.3))(@typescript-eslint/utils@8.57.0(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3))(@vue/compiler-sfc@3.5.30)(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@iconify-json/lucide':
-        specifier: ^1.2.96
+        specifier: 'catalog:'
         version: 1.2.96
       '@iconify/vue':
-        specifier: ^5.0.0
+        specifier: 'catalog:'
         version: 5.0.0(vue@3.5.30(typescript@5.9.3))
       '@tailwindcss/vite':
-        specifier: 4.0.7
+        specifier: 'catalog:'
         version: 4.0.7(vite@7.3.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@tresjs/core':
-        specifier: ^5.6.0
+        specifier: 'catalog:'
         version: 5.7.0(three@0.183.2)(vue@3.5.30(typescript@5.9.3))
       '@tresjs/post-processing':
-        specifier: ^3.5.0
+        specifier: 'catalog:'
         version: 3.6.0(@tresjs/core@5.7.0(three@0.183.2)(vue@3.5.30(typescript@5.9.3)))(three@0.183.2)(vue@3.5.30(typescript@5.9.3))
       animejs:
-        specifier: ^4.2.2
+        specifier: 'catalog:'
         version: 4.3.6
       eslint:
-        specifier: ^9.17.0
+        specifier: 'catalog:'
         version: 9.39.4(jiti@2.6.1)
       lint-staged:
-        specifier: ^15.4.3
+        specifier: 'catalog:'
         version: 15.5.2
       npm-run-all2:
-        specifier: ^7.0.2
+        specifier: 'catalog:'
         version: 7.0.2
       pathe:
-        specifier: ^2.0.3
+        specifier: 'catalog:'
         version: 2.0.3
       simple-git-hooks:
-        specifier: ^2.11.1
+        specifier: 'catalog:'
         version: 2.13.1
       tailwindcss:
-        specifier: 4.0.7
+        specifier: 'catalog:'
         version: 4.0.7
       three:
-        specifier: ^0.183.2
+        specifier: 'catalog:'
         version: 0.183.2
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
       vitepress:
-        specifier: ^2.0.0-alpha.16
+        specifier: 'catalog:'
         version: 2.0.0-alpha.16(@types/node@25.4.0)(change-case@5.4.4)(fuse.js@7.1.0)(jiti@2.6.1)(lightningcss@1.32.0)(oxc-minify@0.112.0)(postcss@8.5.8)(terser@5.46.0)(typescript@5.9.3)(yaml@2.8.2)
       vitest:
         specifier: 'catalog:'
@@ -103,7 +247,7 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
       unbuild:
-        specifier: ^3.2.0
+        specifier: 'catalog:'
         version: 3.6.1(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))
       vitest:
         specifier: 'catalog:'
@@ -111,39 +255,42 @@ importers:
 
   packages/devtools:
     dependencies:
+      sirv:
+        specifier: 'catalog:'
+        version: 3.0.2
+    devDependencies:
+      '@nuxt/devtools-kit':
+        specifier: 'catalog:'
+        version: 2.7.0(magicast@0.5.2)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
+      '@nuxt/ui':
+        specifier: 'catalog:'
+        version: 3.3.7(@babel/parser@7.29.0)(change-case@5.4.4)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(embla-carousel@8.6.0)(focus-trap@7.8.0)(ioredis@5.10.0)(magicast@0.5.2)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-router@4.6.4(vue@3.5.30(typescript@5.9.3)))(vue@3.5.30(typescript@5.9.3))(zod@3.25.76)
       '@rstore/shared':
         specifier: workspace:^
         version: link:../shared
       '@rstore/vue':
         specifier: workspace:^
         version: link:../vue
-    devDependencies:
-      '@nuxt/devtools-kit':
-        specifier: ^2.2.1
-        version: 2.7.0(magicast@0.5.2)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
-      '@nuxt/ui':
-        specifier: 'catalog:'
-        version: 3.3.7(@babel/parser@7.29.0)(change-case@5.4.4)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(embla-carousel@8.6.0)(focus-trap@7.8.0)(ioredis@5.10.0)(magicast@0.5.2)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-router@4.6.4(vue@3.5.30(typescript@5.9.3)))(vue@3.5.30(typescript@5.9.3))(zod@3.25.76)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.0
       '@vueuse/core':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(vue@3.5.30(typescript@5.9.3))
       '@vueuse/nuxt':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(magicast@0.5.2)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       nuxt:
         specifier: 'catalog:'
         version: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
       shiki:
-        specifier: ^3.1.0
+        specifier: 'catalog:'
         version: 3.23.0
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
       unbuild:
-        specifier: ^3.2.0
+        specifier: 'catalog:'
         version: 3.6.1(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))
       vue:
         specifier: 'catalog:'
@@ -155,11 +302,11 @@ importers:
   packages/nuxt:
     dependencies:
       '@nuxt/devtools-kit':
-        specifier: ^2.2.1
-        version: 2.7.0(magicast@0.3.5)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
+        specifier: 'catalog:'
+        version: 2.7.0(magicast@0.5.2)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@nuxt/kit':
-        specifier: ^4.0.0
-        version: 4.3.1(magicast@0.3.5)
+        specifier: 'catalog:'
+        version: 4.3.1(magicast@0.5.2)
       '@rstore/devtools':
         specifier: workspace:^
         version: link:../devtools
@@ -170,41 +317,41 @@ importers:
         specifier: workspace:^
         version: link:../vue
       sirv:
-        specifier: ^3.0.1
+        specifier: 'catalog:'
         version: 3.0.2
     devDependencies:
       '@iconify-json/lucide':
-        specifier: ^1.2.28
+        specifier: 'catalog:'
         version: 1.2.96
       '@nuxt/devtools':
-        specifier: ^2.0.0
+        specifier: 'catalog:'
         version: 2.7.0(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       '@nuxt/module-builder':
-        specifier: ^0.8.4
-        version: 0.8.4(@nuxt/kit@4.3.1(magicast@0.3.5))(nuxi@3.33.1)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))
+        specifier: 'catalog:'
+        version: 0.8.4(@nuxt/kit@4.3.1(magicast@0.5.2))(nuxi@3.33.1)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))
       '@nuxt/schema':
         specifier: 'catalog:'
         version: 4.3.1
       '@nuxt/test-utils':
-        specifier: ^3.15.4
-        version: 3.23.0(magicast@0.3.5)(typescript@5.9.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
+        specifier: 'catalog:'
+        version: 3.23.0(magicast@0.5.2)(typescript@5.9.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@nuxt/ui':
         specifier: 'catalog:'
-        version: 3.3.7(@babel/parser@7.29.0)(change-case@5.4.4)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(embla-carousel@8.6.0)(focus-trap@7.8.0)(ioredis@5.10.0)(magicast@0.3.5)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-router@4.6.4(vue@3.5.30(typescript@5.9.3)))(vue@3.5.30(typescript@5.9.3))(zod@3.25.76)
+        version: 3.3.7(@babel/parser@7.29.0)(change-case@5.4.4)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(embla-carousel@8.6.0)(focus-trap@7.8.0)(ioredis@5.10.0)(magicast@0.5.2)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-router@4.6.4(vue@3.5.30(typescript@5.9.3)))(vue@3.5.30(typescript@5.9.3))(zod@3.25.76)
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.0
       '@vueuse/core':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(vue@3.5.30(typescript@5.9.3))
       '@vueuse/nuxt':
-        specifier: ^14.0.0
-        version: 14.2.1(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
+        specifier: 'catalog:'
+        version: 14.2.1(magicast@0.5.2)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       nuxt:
         specifier: 'catalog:'
-        version: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
+        version: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
       shiki:
-        specifier: ^3.1.0
+        specifier: 'catalog:'
         version: 3.23.0
       typescript:
         specifier: 'catalog:'
@@ -219,10 +366,10 @@ importers:
   packages/nuxt-directus:
     dependencies:
       '@directus/sdk':
-        specifier: ^19.0.1
+        specifier: 'catalog:'
         version: 19.1.0
       '@nuxt/kit':
-        specifier: ^4.0.0
+        specifier: 'catalog:'
         version: 4.3.1(magicast@0.5.2)
       '@rstore/nuxt':
         specifier: workspace:^
@@ -235,16 +382,16 @@ importers:
         version: link:../vue
     devDependencies:
       '@nuxt/devtools':
-        specifier: ^2.3.0
+        specifier: 'catalog:'
         version: 2.7.0(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       '@nuxt/module-builder':
-        specifier: ^0.8.4
+        specifier: 'catalog:'
         version: 0.8.4(@nuxt/kit@4.3.1(magicast@0.5.2))(nuxi@3.33.1)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))
       '@nuxt/schema':
         specifier: 'catalog:'
         version: 4.3.1
       '@nuxt/test-utils':
-        specifier: ^3.17.2
+        specifier: 'catalog:'
         version: 3.23.0(magicast@0.5.2)(typescript@5.9.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@types/node':
         specifier: 'catalog:'
@@ -265,7 +412,7 @@ importers:
   packages/nuxt-drizzle:
     dependencies:
       '@nuxt/kit':
-        specifier: ^4.0.0
+        specifier: 'catalog:'
         version: 4.3.1(magicast@0.5.2)
       '@rstore/nuxt':
         specifier: workspace:^
@@ -280,38 +427,38 @@ importers:
         specifier: workspace:^
         version: link:../vue
       '@vueuse/core':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(vue@3.5.30(typescript@5.9.3))
       h3:
-        specifier: ^1.15.1
+        specifier: 'catalog:'
         version: 1.15.6
       jiti:
-        specifier: ^2.4.2
+        specifier: 'catalog:'
         version: 2.6.1
       pathe:
-        specifier: ^2.0.3
+        specifier: 'catalog:'
         version: 2.0.3
       superjson:
-        specifier: ^2.2.3
+        specifier: 'catalog:'
         version: 2.2.6
     devDependencies:
       '@nuxt/devtools':
-        specifier: ^2.3.0
+        specifier: 'catalog:'
         version: 2.7.0(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       '@nuxt/module-builder':
-        specifier: ^0.8.4
+        specifier: 'catalog:'
         version: 0.8.4(@nuxt/kit@4.3.1(magicast@0.5.2))(nuxi@3.33.1)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))
       '@nuxt/schema':
         specifier: 'catalog:'
         version: 4.3.1
       '@nuxt/test-utils':
-        specifier: ^3.17.2
+        specifier: 'catalog:'
         version: 3.23.0(magicast@0.5.2)(typescript@5.9.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@types/node':
         specifier: 'catalog:'
         version: 24.12.0
       drizzle-orm:
-        specifier: ^0.40.0
+        specifier: 'catalog:'
         version: 0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)
       nuxt:
         specifier: 'catalog:'
@@ -339,7 +486,7 @@ importers:
         specifier: 'catalog:'
         version: 5.9.3
       unbuild:
-        specifier: ^3.2.0
+        specifier: 'catalog:'
         version: 3.6.1(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))
       vitest:
         specifier: 'catalog:'
@@ -348,8 +495,11 @@ importers:
   packages/playground:
     dependencies:
       '@nuxt/kit':
-        specifier: ^4.0.0
+        specifier: 'catalog:'
         version: 4.3.1(magicast@0.3.5)
+      '@rstore/devtools':
+        specifier: workspace:^
+        version: link:../devtools
       '@rstore/nuxt':
         specifier: workspace:^
         version: link:../nuxt
@@ -360,32 +510,32 @@ importers:
         specifier: workspace:^
         version: link:../vue
       '@vueuse/core':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(vue@3.5.30(typescript@5.9.3))
       shiki:
-        specifier: ^3.1.0
+        specifier: 'catalog:'
         version: 3.23.0
     devDependencies:
       '@faker-js/faker':
-        specifier: ^9.4.0
+        specifier: 'catalog:'
         version: 9.9.0
       '@nuxt/devtools':
-        specifier: ^2.0.0
+        specifier: 'catalog:'
         version: 2.7.0(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       '@nuxt/devtools-kit':
-        specifier: ^2.2.1
+        specifier: 'catalog:'
         version: 2.7.0(magicast@0.3.5)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@nuxt/eslint-config':
-        specifier: ^1.0.1
+        specifier: 'catalog:'
         version: 1.15.2(@typescript-eslint/utils@8.57.0(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3))(@vue/compiler-sfc@3.5.30)(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)
       '@nuxt/module-builder':
-        specifier: ^0.8.4
+        specifier: 'catalog:'
         version: 0.8.4(@nuxt/kit@4.3.1(magicast@0.3.5))(nuxi@3.33.1)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))
       '@nuxt/schema':
         specifier: 'catalog:'
         version: 4.3.1
       '@nuxt/test-utils':
-        specifier: ^3.15.4
+        specifier: 'catalog:'
         version: 3.23.0(magicast@0.3.5)(typescript@5.9.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@nuxt/ui':
         specifier: 'catalog:'
@@ -394,19 +544,19 @@ importers:
         specifier: 'catalog:'
         version: 24.12.0
       '@vueuse/nuxt':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       changelogen:
-        specifier: ^0.5.7
+        specifier: 'catalog:'
         version: 0.5.7(magicast@0.3.5)
       eslint:
-        specifier: ^9.20.0
+        specifier: 'catalog:'
         version: 9.39.4(jiti@2.6.1)
       nuxt:
         specifier: 'catalog:'
         version: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
       nuxt-auth-utils:
-        specifier: 0.5.18
+        specifier: 'catalog:'
         version: 0.5.18(magicast@0.3.5)
       typescript:
         specifier: 'catalog:'
@@ -418,38 +568,38 @@ importers:
         specifier: 'catalog:'
         version: 3.2.5(typescript@5.9.3)
       zod:
-        specifier: ^3.24.2
+        specifier: 'catalog:'
         version: 3.25.76
 
   packages/playground-drizzle:
     dependencies:
       '@libsql/client':
-        specifier: ^0.14.0
+        specifier: 'catalog:'
         version: 0.14.0
       '@rstore/nuxt-drizzle':
         specifier: workspace:*
         version: link:../nuxt-drizzle
       '@vueuse/core':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(vue@3.5.30(typescript@5.9.3))
       '@vueuse/nuxt':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(magicast@0.5.2)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@25.4.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       drizzle-orm:
-        specifier: ^0.40.0
+        specifier: 'catalog:'
         version: 0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)
     devDependencies:
       '@iconify-json/lucide':
-        specifier: ^1.2.22
+        specifier: 'catalog:'
         version: 1.2.96
       '@iconify-json/simple-icons':
-        specifier: ^1.2.19
+        specifier: 'catalog:'
         version: 1.2.73
       '@nuxt/ui':
         specifier: 'catalog:'
         version: 3.3.7(@babel/parser@7.29.0)(change-case@5.4.4)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(embla-carousel@8.6.0)(focus-trap@7.8.0)(ioredis@5.10.0)(magicast@0.5.2)(typescript@5.9.3)(vite@7.3.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-router@4.6.4(vue@3.5.30(typescript@5.9.3)))(vue@3.5.30(typescript@5.9.3))(zod@3.25.76)
       drizzle-kit:
-        specifier: ^0.30.5
+        specifier: 'catalog:'
         version: 0.30.6
       nuxt:
         specifier: 'catalog:'
@@ -458,10 +608,10 @@ importers:
   packages/playground-drizzle-2:
     dependencies:
       '@lucia-auth/adapter-sqlite':
-        specifier: ^3.0.2
+        specifier: 'catalog:'
         version: 3.0.2(@libsql/client@0.14.0)(lucia@3.2.2)
       '@nuxthub/core':
-        specifier: ^0.8.18
+        specifier: 'catalog:'
         version: 0.8.27(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(ioredis@5.10.0)(magicast@0.3.5)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@rstore/nuxt':
         specifier: workspace:^
@@ -470,41 +620,41 @@ importers:
         specifier: workspace:^
         version: link:../nuxt-drizzle
       arctic:
-        specifier: ^3.5.0
+        specifier: 'catalog:'
         version: 3.7.0
       drizzle-orm:
-        specifier: ^0.40.0
+        specifier: 'catalog:'
         version: 0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)
       lucia:
-        specifier: ^3.2.2
+        specifier: 'catalog:'
         version: 3.2.2
       shiki:
-        specifier: ^3.1.0
+        specifier: 'catalog:'
         version: 3.23.0
     devDependencies:
       '@faker-js/faker':
-        specifier: ^9.4.0
+        specifier: 'catalog:'
         version: 9.9.0
       '@libsql/client':
-        specifier: ^0.14.0
+        specifier: 'catalog:'
         version: 0.14.0
       '@nuxt/devtools':
-        specifier: ^2.0.0
+        specifier: 'catalog:'
         version: 2.7.0(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       '@nuxt/devtools-kit':
-        specifier: ^2.2.1
+        specifier: 'catalog:'
         version: 2.7.0(magicast@0.3.5)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@nuxt/eslint-config':
-        specifier: ^1.0.1
+        specifier: 'catalog:'
         version: 1.15.2(@typescript-eslint/utils@8.57.0(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3))(@vue/compiler-sfc@3.5.30)(eslint@9.39.4(jiti@2.6.1))(typescript@5.9.3)
       '@nuxt/module-builder':
-        specifier: ^0.8.4
+        specifier: 'catalog:'
         version: 0.8.4(@nuxt/kit@4.3.1(magicast@0.3.5))(nuxi@3.33.1)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))
       '@nuxt/schema':
         specifier: 'catalog:'
         version: 4.3.1
       '@nuxt/test-utils':
-        specifier: ^3.15.4
+        specifier: 'catalog:'
         version: 3.23.0(magicast@0.3.5)(typescript@5.9.3)(vitest@3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@nuxt/ui':
         specifier: 'catalog:'
@@ -513,19 +663,19 @@ importers:
         specifier: 'catalog:'
         version: 24.12.0
       '@vueuse/core':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(vue@3.5.30(typescript@5.9.3))
       '@vueuse/nuxt':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       changelogen:
-        specifier: ^0.5.7
+        specifier: 'catalog:'
         version: 0.5.7(magicast@0.3.5)
       drizzle-kit:
-        specifier: ^0.30.5
+        specifier: 'catalog:'
         version: 0.30.6
       eslint:
-        specifier: ^9.20.0
+        specifier: 'catalog:'
         version: 9.39.4(jiti@2.6.1)
       nuxt:
         specifier: 'catalog:'
@@ -540,41 +690,41 @@ importers:
         specifier: 'catalog:'
         version: 3.2.5(typescript@5.9.3)
       wrangler:
-        specifier: ^3.114.1
+        specifier: 'catalog:'
         version: 3.114.17(@cloudflare/workers-types@4.20260310.1)
       zod:
-        specifier: ^3.24.2
+        specifier: 'catalog:'
         version: 3.25.76
 
   packages/playground-nuxt-directus:
     dependencies:
       '@libsql/client':
-        specifier: ^0.14.0
+        specifier: 'catalog:'
         version: 0.14.0
       '@rstore/nuxt-directus':
         specifier: workspace:*
         version: link:../nuxt-directus
       '@vueuse/core':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(vue@3.5.30(typescript@5.9.3))
       '@vueuse/nuxt':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(magicast@0.5.2)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@25.4.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       drizzle-orm:
-        specifier: ^0.40.0
+        specifier: 'catalog:'
         version: 0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)
     devDependencies:
       '@iconify-json/lucide':
-        specifier: ^1.2.22
+        specifier: 'catalog:'
         version: 1.2.96
       '@iconify-json/simple-icons':
-        specifier: ^1.2.19
+        specifier: 'catalog:'
         version: 1.2.73
       '@nuxt/ui':
         specifier: 'catalog:'
         version: 3.3.7(@babel/parser@7.29.0)(change-case@5.4.4)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(embla-carousel@8.6.0)(focus-trap@7.8.0)(ioredis@5.10.0)(magicast@0.5.2)(typescript@5.9.3)(vite@7.3.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-router@4.6.4(vue@3.5.30(typescript@5.9.3)))(vue@3.5.30(typescript@5.9.3))(zod@3.25.76)
       drizzle-kit:
-        specifier: ^0.30.5
+        specifier: 'catalog:'
         version: 0.30.6
       nuxt:
         specifier: 'catalog:'
@@ -583,23 +733,23 @@ importers:
   packages/playground-ws-server:
     devDependencies:
       nitropack:
-        specifier: latest
+        specifier: 'catalog:'
         version: 2.13.1(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))
 
   packages/shared:
     dependencies:
       '@standard-schema/spec':
-        specifier: ^1.0.0
+        specifier: 'catalog:'
         version: 1.1.0
       klona:
-        specifier: ^2.0.6
+        specifier: 'catalog:'
         version: 2.0.6
     devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
       unbuild:
-        specifier: ^3.2.0
+        specifier: 'catalog:'
         version: 3.6.1(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))
       vitest:
         specifier: 'catalog:'
@@ -614,20 +764,20 @@ importers:
         specifier: workspace:^
         version: link:../shared
       '@vueuse/core':
-        specifier: ^14.0.0
+        specifier: 'catalog:'
         version: 14.2.1(vue@3.5.30(typescript@5.9.3))
       fast-equals:
-        specifier: ^5.3.3
+        specifier: 'catalog:'
         version: 5.4.0
       klona:
-        specifier: ^2.0.6
+        specifier: 'catalog:'
         version: 2.0.6
     devDependencies:
       typescript:
         specifier: 'catalog:'
         version: 5.9.3
       unbuild:
-        specifier: ^3.2.0
+        specifier: 'catalog:'
         version: 3.6.1(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))
       vitest:
         specifier: 'catalog:'
@@ -9917,7 +10067,7 @@ snapshots:
       - typescript
       - vue-tsc
 
-  '@nuxt/nitro-server@4.3.1(@libsql/client@0.14.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(ioredis@5.10.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(typescript@5.9.3)':
+  '@nuxt/nitro-server@4.3.1(@libsql/client@0.14.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(ioredis@5.10.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(typescript@5.9.3)':
     dependencies:
       '@nuxt/devalue': 2.0.2
       '@nuxt/kit': 4.3.1(magicast@0.3.5)
@@ -9935,7 +10085,7 @@ snapshots:
       klona: 2.0.6
       mocked-exports: 0.1.1
       nitropack: 2.13.1(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))
-      nuxt: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
+      nuxt: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
       ohash: 2.0.11
       pathe: 2.0.3
       pkg-types: 2.3.0
@@ -9983,10 +10133,10 @@ snapshots:
       - uploadthing
       - xml2js
 
-  '@nuxt/nitro-server@4.3.1(@libsql/client@0.14.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(ioredis@5.10.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(typescript@5.9.3)':
+  '@nuxt/nitro-server@4.3.1(@libsql/client@0.14.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(ioredis@5.10.0)(magicast@0.5.2)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(typescript@5.9.3)':
     dependencies:
       '@nuxt/devalue': 2.0.2
-      '@nuxt/kit': 4.3.1(magicast@0.3.5)
+      '@nuxt/kit': 4.3.1(magicast@0.5.2)
       '@unhead/vue': 2.1.12(vue@3.5.30(typescript@5.9.3))
       '@vue/shared': 3.5.30
       consola: 3.4.2
@@ -10001,7 +10151,7 @@ snapshots:
       klona: 2.0.6
       mocked-exports: 0.1.1
       nitropack: 2.13.1(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))
-      nuxt: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
+      nuxt: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
       ohash: 2.0.11
       pathe: 2.0.3
       pkg-types: 2.3.0
@@ -10545,10 +10695,10 @@ snapshots:
       - vite
       - vue
 
-  '@nuxt/vite-builder@4.3.1(@types/node@24.12.0)(eslint@9.39.4(jiti@2.6.1))(lightningcss@1.32.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))(yaml@2.8.2)':
+  '@nuxt/vite-builder@4.3.1(@types/node@24.12.0)(eslint@9.39.4(jiti@2.6.1))(lightningcss@1.32.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))(yaml@2.8.2)':
     dependencies:
       '@nuxt/kit': 4.3.1(magicast@0.3.5)
-      '@rollup/plugin-replace': 6.0.3(rollup@3.30.0)
+      '@rollup/plugin-replace': 6.0.3(rollup@4.59.0)
       '@vitejs/plugin-vue': 6.0.4(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       '@vitejs/plugin-vue-jsx': 5.1.4(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       autoprefixer: 10.4.27(postcss@8.5.8)
@@ -10564,11 +10714,11 @@ snapshots:
       magic-string: 0.30.21
       mlly: 1.8.1
       mocked-exports: 0.1.1
-      nuxt: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
+      nuxt: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
       pathe: 2.0.3
       pkg-types: 2.3.0
       postcss: 8.5.8
-      rollup-plugin-visualizer: 6.0.11(rollup@3.30.0)
+      rollup-plugin-visualizer: 6.0.11(rollup@4.59.0)
       seroval: 1.5.1
       std-env: 3.10.0
       ufo: 1.6.3
@@ -10603,10 +10753,10 @@ snapshots:
       - vue-tsc
       - yaml
 
-  '@nuxt/vite-builder@4.3.1(@types/node@24.12.0)(eslint@9.39.4(jiti@2.6.1))(lightningcss@1.32.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))(yaml@2.8.2)':
+  '@nuxt/vite-builder@4.3.1(@types/node@24.12.0)(eslint@9.39.4(jiti@2.6.1))(lightningcss@1.32.0)(magicast@0.5.2)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))(yaml@2.8.2)':
     dependencies:
-      '@nuxt/kit': 4.3.1(magicast@0.3.5)
-      '@rollup/plugin-replace': 6.0.3(rollup@4.59.0)
+      '@nuxt/kit': 4.3.1(magicast@0.5.2)
+      '@rollup/plugin-replace': 6.0.3(rollup@3.30.0)
       '@vitejs/plugin-vue': 6.0.4(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       '@vitejs/plugin-vue-jsx': 5.1.4(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       autoprefixer: 10.4.27(postcss@8.5.8)
@@ -10622,11 +10772,11 @@ snapshots:
       magic-string: 0.30.21
       mlly: 1.8.1
       mocked-exports: 0.1.1
-      nuxt: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
+      nuxt: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
       pathe: 2.0.3
       pkg-types: 2.3.0
       postcss: 8.5.8
-      rollup-plugin-visualizer: 6.0.11(rollup@4.59.0)
+      rollup-plugin-visualizer: 6.0.11(rollup@3.30.0)
       seroval: 1.5.1
       std-env: 3.10.0
       ufo: 1.6.3
@@ -12182,17 +12332,6 @@ snapshots:
 
   '@vueuse/metadata@14.2.1': {}
 
-  '@vueuse/nuxt@14.2.1(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))':
-    dependencies:
-      '@nuxt/kit': 4.3.1(magicast@0.3.5)
-      '@vueuse/core': 14.2.1(vue@3.5.30(typescript@5.9.3))
-      '@vueuse/metadata': 14.2.1
-      local-pkg: 1.1.2
-      nuxt: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
-      vue: 3.5.30(typescript@5.9.3)
-    transitivePeerDependencies:
-      - magicast
-
   '@vueuse/nuxt@14.2.1(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))':
     dependencies:
       '@nuxt/kit': 4.3.1(magicast@0.3.5)
@@ -12200,6 +12339,17 @@ snapshots:
       '@vueuse/metadata': 14.2.1
       local-pkg: 1.1.2
       nuxt: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
+      vue: 3.5.30(typescript@5.9.3)
+    transitivePeerDependencies:
+      - magicast
+
+  '@vueuse/nuxt@14.2.1(magicast@0.5.2)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))':
+    dependencies:
+      '@nuxt/kit': 4.3.1(magicast@0.5.2)
+      '@vueuse/core': 14.2.1(vue@3.5.30(typescript@5.9.3))
+      '@vueuse/metadata': 14.2.1
+      local-pkg: 1.1.2
+      nuxt: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2)
       vue: 3.5.30(typescript@5.9.3)
     transitivePeerDependencies:
       - magicast
@@ -15062,16 +15212,16 @@ snapshots:
       - bcrypt
       - magicast
 
-  nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2):
+  nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2):
     dependencies:
       '@dxup/nuxt': 0.3.2(magicast@0.3.5)
       '@nuxt/cli': 3.33.1(@nuxt/schema@4.3.1)(cac@6.7.14)(commander@13.1.0)(magicast@0.3.5)
       '@nuxt/devtools': 3.2.3(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
       '@nuxt/kit': 4.3.1(magicast@0.3.5)
-      '@nuxt/nitro-server': 4.3.1(@libsql/client@0.14.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(ioredis@5.10.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(typescript@5.9.3)
+      '@nuxt/nitro-server': 4.3.1(@libsql/client@0.14.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(ioredis@5.10.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(typescript@5.9.3)
       '@nuxt/schema': 4.3.1
       '@nuxt/telemetry': 2.7.0(@nuxt/kit@4.3.1(magicast@0.3.5))
-      '@nuxt/vite-builder': 4.3.1(@types/node@24.12.0)(eslint@9.39.4(jiti@2.6.1))(lightningcss@1.32.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))(yaml@2.8.2)
+      '@nuxt/vite-builder': 4.3.1(@types/node@24.12.0)(eslint@9.39.4(jiti@2.6.1))(lightningcss@1.32.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))(yaml@2.8.2)
       '@unhead/vue': 2.1.12(vue@3.5.30(typescript@5.9.3))
       '@vue/shared': 3.5.30
       c12: 3.3.3(magicast@0.3.5)
@@ -15186,19 +15336,19 @@ snapshots:
       - xml2js
       - yaml
 
-  nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2):
+  nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2):
     dependencies:
-      '@dxup/nuxt': 0.3.2(magicast@0.3.5)
-      '@nuxt/cli': 3.33.1(@nuxt/schema@4.3.1)(cac@6.7.14)(commander@13.1.0)(magicast@0.3.5)
+      '@dxup/nuxt': 0.3.2(magicast@0.5.2)
+      '@nuxt/cli': 3.33.1(@nuxt/schema@4.3.1)(cac@6.7.14)(commander@13.1.0)(magicast@0.5.2)
       '@nuxt/devtools': 3.2.3(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
-      '@nuxt/kit': 4.3.1(magicast@0.3.5)
-      '@nuxt/nitro-server': 4.3.1(@libsql/client@0.14.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(ioredis@5.10.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(typescript@5.9.3)
+      '@nuxt/kit': 4.3.1(magicast@0.5.2)
+      '@nuxt/nitro-server': 4.3.1(@libsql/client@0.14.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(ioredis@5.10.0)(magicast@0.5.2)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(typescript@5.9.3)
       '@nuxt/schema': 4.3.1
-      '@nuxt/telemetry': 2.7.0(@nuxt/kit@4.3.1(magicast@0.3.5))
-      '@nuxt/vite-builder': 4.3.1(@types/node@24.12.0)(eslint@9.39.4(jiti@2.6.1))(lightningcss@1.32.0)(magicast@0.3.5)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.3.5)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))(yaml@2.8.2)
+      '@nuxt/telemetry': 2.7.0(@nuxt/kit@4.3.1(magicast@0.5.2))
+      '@nuxt/vite-builder': 4.3.1(@types/node@24.12.0)(eslint@9.39.4(jiti@2.6.1))(lightningcss@1.32.0)(magicast@0.5.2)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@24.12.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.40.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-tsc@3.2.5(typescript@5.9.3))(yaml@2.8.2))(optionator@0.9.4)(rollup@3.30.0)(terser@5.46.0)(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))(yaml@2.8.2)
       '@unhead/vue': 2.1.12(vue@3.5.30(typescript@5.9.3))
       '@vue/shared': 3.5.30
-      c12: 3.3.3(magicast@0.3.5)
+      c12: 3.3.3(magicast@0.5.2)
       chokidar: 5.0.0
       compatx: 0.2.0
       consola: 3.4.2
