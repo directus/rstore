@@ -29,7 +29,11 @@
   "devDependencies": {
     "@akryum/sheep": "^0.5.2",
     "@antfu/eslint-config": "^6.2.0",
+    "@iconify-json/lucide": "^1.2.96",
+    "@iconify/vue": "^5.0.0",
     "@tailwindcss/vite": "4.0.7",
+    "@tresjs/core": "^5.6.0",
+    "@tresjs/post-processing": "^3.5.0",
     "animejs": "^4.2.2",
     "eslint": "^9.17.0",
     "lint-staged": "^15.4.3",
@@ -37,8 +41,9 @@
     "pathe": "^2.0.3",
     "simple-git-hooks": "^2.11.1",
     "tailwindcss": "4.0.7",
+    "three": "^0.183.2",
     "typescript": "catalog:",
-    "vitepress": "^1.6.3",
+    "vitepress": "^2.0.0-alpha.16",
     "vitest": "catalog:",
     "vue": "catalog:"
   },

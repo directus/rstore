@@ -1,9 +1,9 @@
 <script setup lang="ts">
 import { useData } from 'vitepress'
-import { useSidebar } from 'vitepress/theme'
+import { useLayout } from 'vitepress/theme'
 
 const { theme, frontmatter } = useData()
-const { hasSidebar } = useSidebar()
+const { hasSidebar } = useLayout()
 </script>
 
 <template>
@@ -13,8 +13,8 @@ const { hasSidebar } = useSidebar()
       <p v-if="theme.footer.copyright" class="copyright" v-html="theme.footer.copyright" />
 
       <a href="https://directus.io" target="_blank" class="flex items-center justify-center gap-2 mt-4 text-sm !no-underline hover:!underline">
-        <img src="/directus-black.svg" alt="directus logo" class="dark:!hidden size-8">
-        <img src="/directus.svg" alt="directus logo" class="not-dark:!hidden size-8">
+        <img src="/directus-black.svg" alt="directus logo" class="dark:!hidden size-8 object-contain">
+        <img src="/directus.svg" alt="directus logo" class="not-dark:!hidden size-8 object-contain">
       </a>
     </div>
   </footer>

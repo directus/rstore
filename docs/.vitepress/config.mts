@@ -1,6 +1,7 @@
 import type { ElementContent, Properties } from 'hast'
 import { fileURLToPath, URL } from 'node:url'
 import tailwindcss from '@tailwindcss/vite'
+import { templateCompilerOptions } from '@tresjs/core'
 import { defineConfig } from 'vitepress'
 
 const MARKERS: Record<string, 'add' | 'remove'> = {
@@ -12,6 +13,7 @@ const MARKERS: Record<string, 'add' | 'remove'> = {
 export default defineConfig({
   title: 'rstore',
   description: 'Reactive store',
+  vue: templateCompilerOptions,
   themeConfig: {
     // https://vitepress.dev/reference/default-theme-config
     logo: '/logo.svg',
@@ -34,8 +36,8 @@ export default defineConfig({
         {
           text: 'Guide',
           items: [
-            { text: 'Learn More', link: '/guide/learn-more' },
             { text: 'Getting Started', link: '/guide/getting-started' },
+            { text: 'Learn More', link: '/guide/learn-more' },
           ],
         },
         {

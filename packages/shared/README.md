@@ -11,7 +11,6 @@
 <p align="center">
   <a href="https://rstore.akryum.dev">Documentation</a> |
   <a href="https://nightly.akryum.dev/Akryum/rstore">Nightly releases</a> |
-  <!-- <a href="https://rstore-playground.pages.dev">Demo</a> | -->
   <a href="./CONTRIBUTING.md">Contributing guide</a>
 </p>
 
@@ -21,19 +20,53 @@
   </a>
 </p>
 
-rstore is a data store allowing you to handle all data in your application.
+rstore is a local-first data store for Vue and Nuxt applications.
 
-Define a data collection and then run queries or execute mutations (create, update and delete) on your data.
+It gives you a normalized reactive cache, a structured query and mutation API, and plugin-based integration with your own data sources.
 
-**FEATURES**
+## Why rstore
 
-- **Normalized reactive cache** to ensure all components are up-to-date
-- **Co-locate queries** within the components that need them
-- **Fully adaptable** with plugins to fetch from any source (REST, GraphQL...)
-- **Scale down** to small prototypes and **scale up** to big enterprise apps
-- Query API designed for **local-first** and **realtime**
-- **Form API** to handle form state and validation
-- **TypeScript support** with full autocomplete
-- **Nuxt module** with devtools
+- Normalized reactive cache shared across your app
+- Queries and mutations co-located with components
+- Plugins for REST, GraphQL, local databases, and custom backends
+- Built for local-first, realtime, forms, and offline workflows
+- Strong TypeScript support
+- Nuxt module with DevTools integration
 
 ![Devtools screenshot](./docs/guide/img/nuxt-devtools2.png)
+
+## Start here
+
+- Vue quickstart: <https://rstore.akryum.dev/guide/getting-started#vue>
+- Nuxt quickstart: <https://rstore.akryum.dev/guide/getting-started#nuxt>
+- Nuxt + Drizzle: <https://rstore.akryum.dev/guide/getting-started#nuxt-drizzle>
+- Core concepts: <https://rstore.akryum.dev/guide/learn-more>
+
+## Core workflow
+
+1. Define collections that describe your application data.
+2. Add collection hooks or plugins to connect those collections to your backend.
+3. Query and mutate data from components through the store.
+4. Layer on forms, subscriptions, offline support, and federation as needed.
+
+## Example
+
+```ts
+const store = useStore()
+
+const { data: todos, loading } = await store.todos.query(q => q.many())
+
+await store.todos.create({
+  id: crypto.randomUUID(),
+  title: 'Ship the docs',
+  completed: false,
+})
+```
+
+## Learn more
+
+- Getting started: <https://rstore.akryum.dev/guide/getting-started>
+- Collections and schema: <https://rstore.akryum.dev/guide/schema/collection>
+- Querying data: <https://rstore.akryum.dev/guide/data/query>
+- Mutations and forms: <https://rstore.akryum.dev/guide/data/mutation>
+- Plugin system: <https://rstore.akryum.dev/guide/plugin/setup>

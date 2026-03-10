@@ -233,32 +233,6 @@
   }
 }
 
-/* Features */
-
-.VPHomeFeatures {
-  h2 {
-    margin: 0 !important;
-    padding: 0 !important;
-    border: none !important;
-  }
-}
-
-.VPFeature {
-  @apply !bg-transparent !border-2 !border-(--vp-c-brand-1)/75;
-
-  article {
-    @apply items-center text-center;
-  }
-
-  .icon {
-    @apply !bg-(--vp-c-brand-1)/5 !rounded-full;
-  }
-
-  h2 {
-    @apply text-(--vp-c-brand-1);
-  }
-}
-
 /* Footer */
 
 footer.VPFooter {
