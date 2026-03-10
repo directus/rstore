@@ -4,9 +4,17 @@ This is a Nuxt module to integrate rstore with [Directus](https://directus.io/do
 
 1. Install the `@rstore/nuxt-directus` module:
 
-```bash
+::: code-group
+
+```sh [npm]
 npm install @rstore/nuxt-directus
 ```
+
+```sh [pnpm]
+pnpm add @rstore/nuxt-directus
+```
+
+:::
 
 2. Go in your Directus project instance with an admin user and create a new Admin Token.
 
@@ -16,9 +24,9 @@ npm install @rstore/nuxt-directus
 This Admin Token will be used to automatically retrieve the collections in your Directus instance - then the module will generate from this introspection all of the necessary rstore collections for you.
 :::
 
-3. Create an `.env` file and put your Directus Admin Token there:
+3. Create an `.env` entry with your Directus Admin Token:
 
-```env
+```txt
 DIRECTUS_TOKEN=<paste-your-token-here>
 ```
 
@@ -30,12 +38,21 @@ export default defineNuxtConfig({
     '@rstore/nuxt-directus',
   ],
 
+  runtimeConfig: {
+    // Server-only
+    directusToken: process.env.DIRECTUS_TOKEN,
+  },
+
   rstoreDirectus: {
     url: 'https://your-directus-instance.com', // The URL of your Directus instance
-    adminToken: import.meta.env.DIRECTUS_TOKEN, // The admin token you created in step 2
+    adminToken: process.env.DIRECTUS_TOKEN, // or use runtime config indirection
   },
 })
 ```
+
+::: warning
+Keep the admin token server-side only. Do not expose it in public runtime config.
+:::
 
 5. Now you can use the `useStore` composable in your components to access the Directus collections:
 
@@ -56,7 +73,7 @@ const { data: todos } = await store.Todos.query(q => q.many({
 </script>
 ```
 
-In this example, we are accessing the collection named `Todos` in Directus, and also using the [filter rules](https://directus.io/docs/guides/connect/filter-rules) for our query. Since rstore is local-first, the filter rules will also be computed client-side.
+In this example, `Todos` is the Directus collection name exposed on the store API. The query uses standard Directus [filter rules](https://directus.io/docs/guides/connect/filter-rules), which are also computed client-side because rstore is local-first.
 
 ## Filtering
 

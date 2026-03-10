@@ -97,7 +97,7 @@ In practice this means that all data reads in components are computed client-sid
 
 rstore's plugin system is designed to be highly adaptable, allowing you to fetch data from any source without making any assumptions about how the data should be retrieved. This flexibility ensures that rstore can be integrated seamlessly into any existing architecture or workflow.
 
-Multiple plugins can be added to a store allowing an architecture that primarily reads from a local data source (such as local storage or IndexedDB) and then fallbacks to a remote API. Data can also be synchronized upfront and all reads can happend on a local data source.
+Multiple plugins can be added to a store, allowing an architecture that primarily reads from a local data source (such as local storage or IndexedDB) and then falls back to a remote API. Data can also be synchronized upfront so all reads happen on a local data source.
 
 ::: info
 In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and other popular standards. Feel free to also share your own plugins with the community! 😸

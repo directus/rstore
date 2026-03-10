@@ -1,6 +1,6 @@
 # Module <Badge text="Changed in v0.7" type="warning" />
 
-In most application, there are cases where some specific logic or state is needed. For example, you may want to handle the current user with a specific key and also have special mutations for login or logout.
+In most applications, there are cases where specific logic or shared state is needed. For example, you may want to handle the current user with a dedicated key and provide special mutations for login/logout.
 
 For this, you can create an rstore module, which is a shared composable that calls `defineModule` with a module name and a setup function.
 
@@ -39,7 +39,7 @@ With the `@rstore/nuxt` module, you can directly use the auto-imported `defineRs
 - **SSR**: Modules are automatically SSR compatible, so you don't have to worry about the state being lost during server-side rendering.
 - **Async**: You can use async code (see `onResolve` below) to initialize the module.
 - **Hybrid promise**: Awaiting a module is optional, all exposed properties are also available directly.
-- **Devtools**: You can inspect the module in the rstore devtools (current only available in Nuxt).
+- **Devtools**: You can inspect the module in rstore DevTools (currently available in Nuxt).
 
 ![Modules tab in the rstore devtools](./img/devtools-modules.png)
 

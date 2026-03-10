@@ -1,6 +1,6 @@
 # Plugin Setup
 
-Plugins allow you to extend the functionality of the store. You can create your own plugins or use existing ones. The main use case for plugins is to add support for different data sources, such as REST APIs, GraphQL APIs, or local storage. Plugins can also be used to add support for different data formats, such as JSON, XML, or CSV.
+Plugins extend store behavior. The most common use case is adapting rstore to your data sources (REST, GraphQL, local DB, custom transports), but plugins can also transform or enrich data flows.
 
 ::: info
 In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and other popular standards. Feel free to also share your own plugins with the community! 😸
@@ -8,7 +8,7 @@ In the future rstore will provide some builtin plugins for GraphQL, OpenAPI and 
 
 ## Defining a plugin
 
-To define a plugin, you can use the `definePlugin` helper to get auto-completion and type checking. The plugin is an object with a `name` and a `setup` function.
+To define a plugin, use the `definePlugin` helper for autocomplete and type checking. A plugin is an object with a `name` and a `setup` function.
 
 ```ts
 import { definePlugin } from '@rstore/vue'
@@ -22,7 +22,7 @@ export default definePlugin({
 })
 ```
 
-The `setup` function is called when the plugin is registered. It receives a `pluginApi` object that contains useful methods to customize the store.
+The `setup` function runs when the plugin is registered. It receives a plugin API object with helpers like `hook` and `addCollectionDefaults`.
 
 ### Vue
 
@@ -47,7 +47,7 @@ export async function setupRstore(app) {
 
 ### Nuxt
 
-In Nuxt, you can add plugins by creating a file for each in the `app/rstore/plugins` directory. The plugin will be automatically registered when the store is created.
+In Nuxt, place plugin files in `app/rstore/plugins`. They are auto-registered when the store is created.
 
 ```
 package.json
@@ -62,6 +62,20 @@ app/
 ::: tip Nuxt Layers
 You can also add an `app/rstore` folder in Nuxt layers! rstore will automatically add those files too.
 :::
+
+Example Nuxt plugin file:
+
+```ts
+// app/rstore/plugins/my-plugin.ts
+export default defineRstorePlugin({
+  name: 'my-plugin',
+  setup({ hook }) {
+    hook('fetchMany', async (payload) => {
+      // ...
+    })
+  },
+})
+```
 
 ## Category <Badge text="New in v0.7" />
 
@@ -131,13 +145,13 @@ Explore the [Plugin hooks](./hooks.md) for a complete list of available hooks.
 
 ### Aborting hook <Badge text="New in v0.7" />
 
-You can abort most the hooks by calling either `setResult()` with a non-null/non-empty value, or `abort()`. This will prevent the remaining plugins from running the same hook. This is useful when you want to short-circuit the data flow, for example when you have a cache plugin that can return the data without needing to call a remote API.
+You can abort most hooks by calling either `setResult()` with a non-null/non-empty value or `abort()`. This stops remaining plugins for the same hook. It is useful to short-circuit data flow (for example, cache hit so no remote call).
 
 ```ts
 pluginApi.hook('fetchFirst', async (payload) => {
   // If the item is non-null,
   // remaining `fetchFirst` hooks will not be called
-  payload.setResult(cachedmyCache.get(payload.key))
+  payload.setResult(cache.get(payload.key))
 })
 ```
 
@@ -145,7 +159,7 @@ pluginApi.hook('fetchFirst', async (payload) => {
 You can prevent this behavior by setting `abort: false` to the second argument of `setResult()`.
 
 ```ts
-payload.setResult(cachedmyCache.get(payload.key), { abort: false })
+payload.setResult(cache.get(payload.key), { abort: false })
 ```
 
 :::
@@ -215,7 +229,7 @@ import { definePlugin } from '@rstore/vue'
 
 export default definePlugin({
   name: 'my-rstore-plugin',
-  setup() {
+  setup({ addCollectionDefaults }) {
     addCollectionDefaults({
       getKey: (collectionName, item) => item.customId,
       // ...

@@ -1,10 +1,10 @@
 # Federation & Multi-sources
 
-To implement multiple data sources, we can use the `scopeId` of the collections and the plugins to specify the source of the data. Plugins process all collections that share their `scopeId`.
+When you need multiple data sources, use `scopeId` on both collections and plugins. A plugin only processes collections with matching `scopeId` (unless `ignoreScope` is enabled).
 
 ## Collections
 
-The scope ID allows filtering which plugins will handle the collection. For example, if a collection has a scope A, only plugins with the scope A will be able to handle it by default. This is very useful to handle multiple data sources.
+Use `scopeId` to route a collection to the correct backend plugin.
 
 ```ts{3}
 const todoCollection = defineCollection({
@@ -21,7 +21,7 @@ If the scope ID is not defined, the collection will be handled by all plugins.
 
 ## Plugins
 
-The scope ID allows filtering which plugins will handle the collection. For example, if a collection has a scope A, only plugins with the scope A will be able to handle it by default. This is very useful to handle multiple data sources.
+Apply the same `scopeId` on the plugin side.
 
 ```ts{3}
 export default definePlugin({
@@ -58,4 +58,18 @@ export default definePlugin({
     })
   }
 })
+```
+
+## Typical pattern
+
+Use separate scopes for each backend, then add one plugin per scope.
+
+```ts
+// Collections
+defineCollection({ name: 'users', scopeId: 'main-api' })
+defineCollection({ name: 'auditLogs', scopeId: 'analytics-api' })
+
+// Plugins
+definePlugin({ name: 'main-api-plugin', scopeId: 'main-api' })
+definePlugin({ name: 'analytics-plugin', scopeId: 'analytics-api' })
 ```

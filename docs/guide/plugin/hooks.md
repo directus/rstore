@@ -8,7 +8,7 @@ Each hook has a payload object that is sent to the registered callback functions
 
 Most hook payloads have a `meta` object that can store any kind of metadata. For example, it can be used to expose additional information from the server to the queries.
 
-It's type can be extended like this:
+Its type can be extended like this:
 
 ```ts
 // hook.d.ts
@@ -46,7 +46,7 @@ hook('fetchFirst', (payload) => {
 ```
 
 ::: info
-Markers are used to remember if a query has already been fetched or not where it is not based on the item key. For example, if you have a query that fetches all items with a certain filter, the marker is used to remember if the query has already been fetched or not.
+Markers are used when a query is not keyed by item key. For example, a "many with filter" query uses markers to remember whether that specific query shape has already been fetched.
 :::
 
 ::: warning Auto-abort remaining callbacks
@@ -215,7 +215,7 @@ hook('createItem', async (payload) => {
 This hook is called when rstore needs to create many new items at once when [`createMany()`](../data/mutation.md#create-many) is used.
 
 ::: tip
-If no `createMany` hook is defined, rstore will fallback to calling the [`createItem`](#createitem) hook for each item in the array. If hooks for `createMany` are defined but none of them [aborts](#aborting), rstore will also fallback to calling the `createItem` hook for each item. Calling `abort()` or `setResult(value)` with a non-empty array in the `createMany` hook will prevent this behavior.
+If no `createMany` hook is defined, rstore falls back to calling [`createItem`](#createitem) for each item. If `createMany` hooks are defined but none of them [aborts](#aborting), rstore also falls back to `createItem` per item. Calling `abort()` or `setResult(value)` with a non-empty array in `createMany` prevents this behavior.
 :::
 
 ```ts
@@ -292,7 +292,7 @@ hook('updateItem', async (payload) => {
 This hook is called when rstore needs to update many existing items at once when [`updateMany()`](../data/mutation.md#update-many) is used.
 
 ::: tip
-If no `updateMany` hook is defined, rstore will fallback to calling the [`updateItem`](#updateitem) hook for each item in the array. If hooks for `updateMany` are defined but none of them [aborts](#aborting), rstore will also fallback to calling the `updateItem` hook for each item. Calling `abort()` or `setResult(value)` with a non-empty array in the `updateMany` hook will prevent this behavior.
+If no `updateMany` hook is defined, rstore falls back to calling [`updateItem`](#updateitem) for each item. If `updateMany` hooks are defined but none of them [aborts](#aborting), rstore also falls back to `updateItem` per item. Calling `abort()` or `setResult(value)` with a non-empty array in `updateMany` prevents this behavior.
 :::
 
 ::: danger
@@ -480,7 +480,7 @@ hook('fetchRelations', async (payload) => {
     const key = payload.collection.getKey(item)
     if (key) {
       // Read the item from the cache to also include computed properties
-      const currentItem = payload.store.cache.readItem({
+      const currentItem = payload.store.$cache.readItem({
         collection: payload.collection,
         key,
       })
@@ -496,7 +496,7 @@ hook('fetchRelations', async (payload) => {
 
         const relation = payload.collection.relations[relationKey]
         //    ^^^^^^^^
-        //    { to: { User: { on: 'id', eq: 'authorId' } } }
+        //    { to: { User: { on: { 'users.id': 'comments.authorId' } } } }
         if (!relation) {
           throw new Error(`Relation "${relationKey}" does not exist on collection "${payload.collection.name}"`)
         }
@@ -504,10 +504,20 @@ hook('fetchRelations', async (payload) => {
         await Promise.all(Object.keys(relation.to).map((collectionName) => {
           const relationData = relation.to[collectionName]!
           //    ^^^^^^^^^^^^
-          //    { on: 'id', eq: 'authorId' }
+          //    { on: { 'users.id': 'comments.authorId' } }
+          const mapping = Object.entries(relationData.on)[0]
+          if (!mapping) {
+            return Promise.resolve()
+          }
+          const [targetField, sourceField] = mapping
+          const targetProp = targetField.split('.').at(1)
+          const sourceProp = sourceField.split('.').at(1)
+          if (!targetProp || !sourceProp) {
+            return Promise.resolve()
+          }
           return store.$collection(collectionName).findMany({
             params: {
-              filter: `${relationData.on}:${currentItem[relationData.eq]}`,
+              filter: `${targetProp}:${currentItem[sourceProp]}`,
             },
           })
         }))
@@ -519,7 +529,7 @@ hook('fetchRelations', async (payload) => {
 
 ## Custom Cache filtering
 
-By default rstore doesn't know how to filter the cache based on the parameters passed to the queries. That's why you need to also pass a `filter` function to the `findOptions` object for `query` and [the other ones](../data/query.md).
+By default, rstore does not know how to interpret backend-specific query params for cache filtering. That is why you usually pass a `filter` function in `findOptions` for `query` and related read APIs.
 
 However, it is possible to automatically apply a filtering logic depending on the parameters used in your project with the `cacheFilterFirst` and `cacheFilterMany` hooks.
 
@@ -646,7 +656,7 @@ const { data: user } = store.users.query(q => q.first({
 }))
 ```
 
-If you are using TypeScript, you can augment the `` interface to customize the type of the `filter` find option:
+If you are using TypeScript, you can augment the `CustomFilterOption` interface to customize the type of the `filter` option:
 
 ```ts
 import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/shared'
@@ -785,7 +795,7 @@ const { data: users } = store.users.query(q => q.many({
 }))
 ```
 
-If you are using TypeScript, you can augment the `` interface to customize the type of the `filter` find option:
+If you are using TypeScript, you can augment the `CustomFilterOption` interface to customize the type of the `filter` option:
 
 ```ts
 import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/shared'

@@ -4,12 +4,12 @@ rstore provides a set of methods to help build realtime applications. Plugins ca
 
 ## Subscribe <Badge text="Changed in v0.7" type="warning" />
 
-Subscriptions are a way to listen for changes in the data store. You can subscribe to a specific collection and plugins will update the store in realtime. You can pass the same parameters than in the [queries](./query.md).
+Subscriptions are a way to listen for data changes. You can subscribe to a specific collection and let plugins update the store in realtime. You can pass the same options you use in [queries](./query.md).
 
 ```ts
 const store = useStore()
 
-store.ChatMessage.subscribe(q => q({
+store.ChatMessage.subscribe(q => q.many({
   params: {
     filter: {
       roomId: 'room1',
@@ -20,7 +20,7 @@ store.ChatMessage.subscribe(q => q({
 
 ## Unsubscribe
 
-The `subscribe` method returns a function that can be called to unsubscribe from the store. This is useful when you want to stop listening for changes in the data store. Futhermore, the subscription will be automatically removed when the current component is unmounted.
+The `subscribe` method returns a function you can call to stop listening. The subscription is also automatically removed when the current component is unmounted.
 
 ```ts
 const { unsubscribe } = store.ChatMessage.subscribe()
@@ -41,7 +41,7 @@ console.log(meta.value)
 
 ## Live Query <Badge text="Changed in v0.7" type="warning" />
 
-You can use the `liveQueryFirst` and `liveQueryMany` methods to do both a query and a subscription at the same time.
+Use `liveQuery` to combine query + subscription in one call.
 
 ```ts
 const { data: user } = store.User.liveQuery(q => q.first('some-id'))

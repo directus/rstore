@@ -1,12 +1,16 @@
 # Relations
 
-rstore supports relations between collections. This allows you to define relationships between different collections and automatically handle the loading and caching of related data.
+rstore supports relations between collections. This lets you define relationships and resolve related records from the normalized cache.
+
+::: info
+Relations define mapping. Remote fetching of missing related records is implemented by plugins (typically through the `fetchRelations` hook when queries use `include`).
+:::
 
 ## Defining Relations <Badge text="Changed in v0.7" type="warning" />
 
 Use the `defineRelations` function to define the relations between collections. It accepts an object where the keys are the names of the relations and the values are objects that define the relation.
 
-The first parameter is the source collection, andd the second parameter is a function that receives an object with a `collection` method to reference other collections.
+The first parameter is the source collection, and the second parameter is a function that receives an object with a `collection` method to reference other collections.
 
 The relation object can have the following properties:
 - `to`: an object that defines the target collection(s) and the fields to use for the relation.

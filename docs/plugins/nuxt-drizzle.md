@@ -25,7 +25,7 @@ import { VPFeatures } from 'vitepress/theme'
       {
         icon: '📡',
         title: 'Offline Mode',
-        details: 'Builtin offline mode to allow your app to work seamlessly offline.',
+        details: 'Built-in offline mode to allow your app to work seamlessly offline.',
       },
       {
         icon: '🔒',
@@ -47,6 +47,14 @@ import { VPFeatures } from 'vitepress/theme'
 [Codesandbox](https://codesandbox.io/p/devbox/wonderful-sun-s4cgl6)
 
 In case you are using [Drizzle](https://orm.drizzle.team), you can install the `@rstore/nuxt-drizzle` module instead of `@rstore/nuxt` to automatically generate the collections and plugins from your drizzle schema.
+
+::: info Prerequisites
+Before enabling this module, make sure your app already has:
+
+- a valid `drizzle.config.ts`
+- an exported Drizzle schema file
+- a `useDrizzle()` server utility (or custom import configured with `rstoreDrizzle.drizzleImport`)
+:::
 
 ```sh
 npm i @rstore/nuxt-drizzle
@@ -149,11 +157,11 @@ const { data: todos } = await store.todos.query(q => q.many())
 ```
 
 ::: tip Collection Names
-The collection names are infered from the exported variable names in the drizzle schema, **not** the table names.
+Collection names are inferred from exported variable names in your Drizzle schema, **not** table names.
 :::
 
 ::: tip
-You can use [nitro middlewares](https://nitro.build/guide/routing#middleware) to add authentication to the API, for example in a `server/middleware/auth.ts` file.
+You can use [Nitro middleware](https://nitro.build/guide/routing#middleware) to add API authentication, for example in `server/middleware/auth.ts`.
 :::
 
 ## Filtering
@@ -239,7 +247,7 @@ const { data: todos } = await store.todos.liveQuery(q => q.many())
 </script>
 ```
 
-By default the module will use a in-memory Pub/Sub implementation. You can use a custom implementation (for example with Redis) by calling `setRstoreDrizzlePubSub` in a Nitro plugin:
+By default the module uses an in-memory Pub/Sub implementation. You can provide a custom one (for example Redis) by calling `setRstoreDrizzlePubSub` in a Nitro plugin:
 
 ```ts
 // server/plugins/pubsub.ts

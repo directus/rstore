@@ -1,6 +1,6 @@
 # Querying Data
 
-For each collection, the store a set of functions to query the data. It can be accessed by using the collection name: `store.<collection_name>.<method>`.
+Each collection API exposes several ways to read data. Access them with `store.<collectionName>.<method>`.
 
 Here are some examples:
 
@@ -16,6 +16,15 @@ const { data: todos } = store.Todo.query(q => q.many())
 const { data: users } = store.users.query(q => q.many())
 ```
 
+## Which method should I use?
+
+| Use case | Recommended API |
+|---|---|
+| Reactive data in components | `query` |
+| Reactive data + realtime subscription | `liveQuery` |
+| One-off async read (non-reactive) | `findFirst` / `findMany` |
+| Synchronous cache-only read | `peekFirst` / `peekMany` |
+
 ## Query composables <Badge text="Changed in v0.7" type="warning" />
 
 The query composables are the recommended way to fetch data from the server. They are designed to be used in a Vue component and return a reactive result to be used in the components.
@@ -30,7 +39,7 @@ The `query` and `liveQuery` composables return an object with the following prop
 
 - `refresh`: a function that can be called to refresh the data.
 
-- `meta`: a ref that contains a metadata object that can modified by plugins.
+- `meta`: a ref that contains metadata that plugins can set or update.
 
 The composables also return a promise so they can be used with async setup.
 
@@ -44,7 +53,7 @@ const { data: todos } = await store.Todo.query(q => q.many())
 
 ### Query first
 
-With the `first` query buillder method, the `query` function can be used the first item that matches the key or the filter in the cache and fetches it if not found.
+With the `first` query builder method, `query` returns the first item matching the key or filter from cache, then fetches when needed.
 
 ```ts
 const { data: todo } = store.Todo.query(q => q.first('some-key'))
@@ -86,7 +95,7 @@ We can also create our own convention for the `params` and `filter`. For example
 
 ### Query many
 
-With the `many` query buillder method, the `query` function can be used to find all items that match the (optional) filter in the cache or fetches them if not found.
+With the `many` query builder method, `query` returns all items matching the (optional) filter from cache, then fetches when needed.
 
 ```ts
 const { data: todos } = store.Todo.query(q => q.many()) // All todos
@@ -124,7 +133,7 @@ const { data: todo } = store.Todo.query(q => q.first(
 ))
 ```
 
-This syntax is useful when you use TS as it will allow guarding against nullish values at the same time:
+This syntax is useful in TypeScript because it lets you guard against nullish values at the same time:
 
 ```ts
 const someItem = ref<Record<string, any> | null>(null)
@@ -145,7 +154,7 @@ const { data: parent } = store.Item.query(q => q.first(
 
 ```ts
 // Get the user
-const { data: user } = store.User.query({ /* ... */ })
+const { data: user } = store.User.query(q => q.first('user-id'))
 
 // Then get the user's projects
 const { data: projects } = store.Project.query(q => q.many(
@@ -440,9 +449,12 @@ const { data: todos } = store.Todo.query(q => q.many({
 
 ## Items list
 
-Usually we write list item components that are used to display a list of items. It is recommended to only pass the key to the list item component and then use `query` to fetch the data in the list item component. By default the fetch policy is `cache-first`, so the data will be red from the cache in the item component and no unnecessary requests will be made for each items.
+A common pattern is to pass only the item key to row/item components, then query inside the row component. With the default `cache-first` fetch policy, those row queries read from cache and avoid extra requests per item.
 
-The benefits are that the data is co-located with the component that uses it and there is no need to specify the types of the item prop again (usually a simple `id: string | number` is enough). The item component is also easier to potentially reuse in totally different contexts.
+Benefits:
+- Data requirements stay co-located with each component.
+- Props stay simple (often just `id: string | number`).
+- Components are easier to reuse in other screens.
 
 ::: code-group
 
@@ -480,7 +492,7 @@ const { data: todo } = await store.Todo.query(q => q.first(props.id))
 
 ## Co-locating queries
 
-The best of both worlds! You can co-locate the queries with the components that use them, while still enjoying the benefits of a centralized store thanks to the cache -- letting it deduplicating and synchronizing all components. This is a powerful pattern that improves the independence of components and thus their maintainability.
+You can co-locate queries with the components that use them while still benefiting from a centralized cache that deduplicates and synchronizes data across the app.
 
 ::: code-group
 
@@ -608,7 +620,7 @@ const {
 // to fetch the new collection
 ```
 
-If you can't need reactivity but don't know the collection name in advance, you can also pass a simple string:
+If you do not need reactivity but still need a dynamic collection name, you can pass a plain string:
 
 ```ts
 const query = await store.$collection('posts').query(q => q.many())

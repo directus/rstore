@@ -1,6 +1,6 @@
 # Collection
 
-The structure of your data is presented in rstore with Collections:
+In rstore, your data model is described with collections:
 
 ```ts
 import type { StoreSchema } from '@rstore/vue'
@@ -12,7 +12,7 @@ const schema: StoreSchema = [
 ]
 ```
 
-Each Collection defines information about the related item type. The only mandatory property is `name`, which can be different from the key in the collection map (see the above example).
+Each collection defines information about one item type. The only mandatory property is `name`, which can differ from the property name used on the store object.
 
 Various applications can have different collections based on their specific requirements. For instance, a blogging platform might include a `Post` collection to denote a blog entry and a `Comment` collection for user feedback. Conversely, a project management tool might feature collections such as `Task`, `Project`, or `Milestone`.
 
@@ -60,7 +60,7 @@ const store = await createStore({
 })
 ```
 
-For TypeScript, you should use the `withItemType` utility function instead to specify the type of the item, then call `collection` on it:
+For TypeScript, prefer `withItemType` to specify item shape, then call `defineCollection`:
 
 ```ts
 import { createStore, withItemType } from '@rstore/vue'
@@ -106,15 +106,15 @@ Instead of defining the hooks in the collection, you can also create a plugin to
 :::
 
 Each hook receives a payload object with the following properties:
-- `fetchFirst`: All the find options [see findFirst](../data/query.md#find-first) such as:
+- `fetchFirst`: all find options ([see findFirst](../data/query.md#find-first)), such as:
   - `key` (optional): the key of the item to fetch
   - `params` (optional): additional parameters for the fetch
-  - `include` (optional): dictionnary of related items to include (see [Relations](./relations.md))
+  - `include` (optional): dictionary of related items to include (see [Relations](./relations.md))
   - etc.
-- `fetchMany`: All the find options [see findMany](../data/query.md#find-many) such as:
+- `fetchMany`: all find options ([see findMany](../data/query.md#find-many)), such as:
   - `filter` (optional): filter to apply to the fetch
   - `params` (optional): additional parameters for the fetch (if available)
-  - `include` (optional): dictionnary of related items to include (see [Relations](./relations.md))
+  - `include` (optional): dictionary of related items to include (see [Relations](./relations.md))
   - `pageIndex` (optional): the page index for pagination
   - `pageSize` (optional): the page size for pagination
   - etc.
@@ -307,7 +307,7 @@ In the collection, you can add the metadata to the `meta` property:
 
 ```ts
 const todoCollection = defineCollection({
-  name: 'Todo',
+  name: 'todos',
   meta: {
     path: '/todos',
   },

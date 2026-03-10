@@ -1,31 +1,51 @@
 # Offline <Badge text="New in v0.8" />
 
-To implement an offline mode in your application using RStore, you can use the `@rstore/offline` plugin. This plugin allows your app to function seamlessly even when there is no internet connection, by caching data locally and synchronizing changes when the connection is restored.
+Use `@rstore/offline` to make your app resilient when the network is unavailable.
 
-```bash
+The plugin provides:
+
+- persisted local cache state
+- queued mutations that are replayed when connectivity returns
+
+```sh
 pnpm i @rstore/offline
 ```
 
 ## Setup
 
-To set up the offline plugin, you need to import it and add it to your RStore instance. Here's an example of how to do this:
+### 1. Register the offline plugin
 
 ```ts
 import { createOfflinePlugin } from '@rstore/offline'
+import { createStore } from '@rstore/vue'
 
 const offlinePlugin = createOfflinePlugin({
-  // Plugin options go here
+  // options (storage, serialization, filters...)
 })
 
-const store = createRStore({
+const store = await createStore({
+  schema,
   plugins: [
-    // ...other plugins
+    // local/cache-style plugins first
     offlinePlugin,
+    // then remote transport plugins
+    remoteApiPlugin,
   ],
 })
 ```
 
-Then, in your application, you need to implement the logic to synchronize the collections with the `syncCollection` plugin hook:
+::: tip
+Keep plugin order intentional. In most setups, local/offline plugins should run before remote plugins.
+:::
+
+### 2. Implement collection synchronization
+
+You must provide your own sync strategy using the `syncCollection` hook. A common approach is:
+
+1. Compare locally stored keys with keys that still exist on the backend.
+2. Delete missing local items.
+3. Fetch changed/new records since the last sync timestamp.
+4. Write those records into the local cache.
 
 ::: code-group
 
@@ -48,24 +68,28 @@ export default definePlugin({
         const loadedKeys = loadedItems().map(item => collection.getKey(item)!)
         const existingItems = await collectionApi.findMany({
           params: {
-            // Example of `filter` parameter for your backend
-            filter: {
-              updatedAt: {
-                gte: (lastUpdatedAt ?? new Date(0)).toISOString(),
-              }
-            }
+            // Ask the backend which of these keys still exist
+            keys: loadedKeys,
+            // It is recommended to return only primary keys here
           },
           fetchPolicy: 'no-cache',
         })
-        // Determine which items have been deleted
-        // by comparing loaded items with existing items
+
+        // Determine which locally cached items were deleted remotely
         const existingKeys = new Set(existingItems.map(item => collection.getKey(item)!))
         const itemsToDeleteKeys = loadedKeys.filter(key => !existingKeys.has(key))
         deleteItems(itemsToDeleteKeys)
 
-        // Fetch updated or new items
+        // Fetch updated or newly created records since last sync
         const items = await collectionApi.findMany({
-          where: gte('updatedAt', lastUpdatedAt ?? new Date(0)),
+          params: {
+            // Example shape, adapt to your backend
+            filter: {
+              updatedAt: {
+                gte: (lastUpdatedAt ?? new Date(0)).toISOString(),
+              }
+            },
+          },
           fetchPolicy: 'no-cache',
         })
 
@@ -100,21 +124,21 @@ export default defineRstorePlugin({
           },
           fetchPolicy: 'no-cache',
         })
-        // Determine which items have been deleted
-        // by comparing loaded items with existing items
+
+        // Determine which locally cached items were deleted remotely
         const existingKeys = new Set(existingItems.map(item => collection.getKey(item)!))
         const itemsToDeleteKeys = loadedKeys.filter(key => !existingKeys.has(key))
         deleteItems(itemsToDeleteKeys)
 
-        // Fetch updated or new items
+        // Fetch updated or newly created records since last sync
         const items = await collectionApi.findMany({
           params: {
-            // Example of `filter` parameter for your backend
+            // Example shape, adapt to your backend
             filter: {
               updatedAt: {
                 gte: (lastUpdatedAt ?? new Date(0)).toISOString(),
-              }
-            }
+              },
+            },
           },
           fetchPolicy: 'no-cache',
         })
@@ -132,6 +156,17 @@ export default defineRstorePlugin({
 In the above examples, you don't have to use the store APIs to fetch data from your backend. You can use any HTTP client or data fetching library of your choice.
 :::
 
+## Requirements for reliable sync
+
+For a robust offline experience, each collection should have:
+
+- a stable key (`id`, `_id`, or custom `getKey`)
+- a server field usable for incremental sync (for example `updatedAt` or monotonically increasing revision)
+- idempotent mutation endpoints, so replayed requests are safe
+- server responses that return canonical item data after create/update
+
 ## Mutations
 
-While offline, any mutations made to the collections will be queued and synchronized with the server once the connection is restored. The offline plugin handles this automatically, ensuring that your data remains consistent.
+While offline, mutations are queued and replayed when the connection is restored. The plugin handles queue execution automatically.
+
+Conflicts are application-specific. If multiple clients can edit the same records, implement conflict strategy on the backend (for example last-write-wins, merge rules, or version checks) and return canonical records so rstore can converge correctly.
