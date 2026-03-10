@@ -18,7 +18,7 @@ export interface WrappedItemBase<
   /**
    * (Recommended) The form object helps you updating the item.
    */
-  $updateForm: (options?: WrappedItemUpdateFormOptions<TCollection, TCollectionDefaults, TSchema>) => Promise<UpdateFormObject<TCollection, TCollectionDefaults, TSchema>>
+  $updateForm: (options?: WrappedItemUpdateFormOptions<TCollection, TCollectionDefaults, TSchema>) => Promise<WrappedItemUpdateFormResult<TCollection, TCollectionDefaults, TSchema>>
 
   /**
    * Update an item directly. For a more user-friendly way, use `updateForm` instead.
@@ -57,6 +57,23 @@ export interface WrappedItemUpdateFormOptions<
 > {
   // to be extended
 }
+
+export interface WrappedItemUpdateFormResultAugmentation<
+  TCollection extends Collection = Collection,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
+  TSchema extends StoreSchema = StoreSchema,
+> {
+  // to be extended
+}
+
+export type WrappedItemUpdateFormResult<
+  TCollection extends Collection = Collection,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
+  TSchema extends StoreSchema = StoreSchema,
+> = UpdateFormObject<TCollection, TCollectionDefaults, TSchema>
+  & (WrappedItemUpdateFormResultAugmentation<TCollection, TCollectionDefaults, TSchema> extends {
+    formObject: infer TFormObject
+  } ? TFormObject : Record<never, never>)
 
 export interface WrappedItemUpdateOptions<
   TCollection extends Collection = Collection,

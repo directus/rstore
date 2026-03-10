@@ -1,5 +1,6 @@
 import type { UpdateOptions } from '@rstore/core'
 import type { Collection, CollectionDefaults, CustomHookMeta, ResolvedCollectionItem, StandardSchemaV1, StoreSchema } from '@rstore/shared'
+import type { VueUpdateFormObject } from './form'
 import type { WrappedItemMetadata } from './item'
 
 declare module '@rstore/shared' {
@@ -41,6 +42,14 @@ declare module '@rstore/shared' {
     TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
     TSchema extends StoreSchema = StoreSchema,
   > extends Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'> {
+  }
+
+  export interface WrappedItemUpdateFormResultAugmentation<
+    TCollection extends Collection = Collection,
+    TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
+    TSchema extends StoreSchema = StoreSchema,
+  > {
+    formObject: VueUpdateFormObject<TCollection, TCollectionDefaults, TSchema>
   }
 
   export interface WrappedItemBase<
