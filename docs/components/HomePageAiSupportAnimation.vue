@@ -4,7 +4,9 @@ import { TresCanvas } from '@tresjs/core'
 import { BloomPmndrs, EffectComposerPmndrs, FXAAPmndrs, NoisePmndrs, ScanlinePmndrs } from '@tresjs/post-processing'
 import { BlendFunction } from 'postprocessing'
 import { Euler, Matrix4, Quaternion, Vector3 } from 'three'
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
+import { useAnimationVisibility } from './composables/useAnimationVisibility'
+import { useIsMobile } from './composables/useIsMobile'
 
 interface StarStreak {
   id: string
@@ -145,6 +147,9 @@ const enginePulse = ref(1)
 const thrusterScreen = ref({ x: 50, y: 50, visible: 0 })
 const flarePowerSmoothed = ref(0)
 const flareAlphaSmoothed = ref(0)
+const { isMobile } = useIsMobile()
+const sceneRoot = useTemplateRef('sceneRoot')
+const { shouldAnimate } = useAnimationVisibility(sceneRoot)
 
 const thrusterLocalCenter = new Vector3(0, -0.01, -1.0)
 const shipMatrix = new Matrix4()
@@ -251,9 +256,10 @@ function onLoop(context: TresContextWithClock) {
 </script>
 
 <template>
-  <div class="ai-support-scene absolute inset-0">
+  <div ref="sceneRoot" class="ai-support-scene absolute inset-0">
     <ClientOnly>
       <TresCanvas
+        v-if="shouldAnimate"
         class="size-full"
         :alpha="true"
         :antialias="true"
@@ -593,13 +599,14 @@ function onLoop(context: TresContextWithClock) {
               :luminance-smoothing="0.28"
               mipmap-blur
             />
-            <FXAAPmndrs :samples="24" />
+            <FXAAPmndrs v-if="!isMobile" :samples="24" />
             <NoisePmndrs
               premultiply
               :opacity="0.14"
               :blend-function="BlendFunction.SCREEN"
             />
             <ScanlinePmndrs
+              v-if="!isMobile"
               :density="1.25"
               :opacity="0.1"
               :scroll-speed="0.05"

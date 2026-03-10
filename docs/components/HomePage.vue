@@ -377,7 +377,7 @@ onBeforeUnmount(() => {
         </div>
 
         <div class="reveal-up relative flex min-h-full items-center justify-center p-2 lg:p-6" style="animation-delay: 220ms;">
-          <div class="animate-float-a absolute left-0 top-4 z-20 min-w-[8.2rem] rounded-2xl border border-emerald-600/[0.18] bg-white/[0.84] px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-emerald-400/20 dark:bg-[#101412]/90">
+          <div class="animate-float-a absolute left-0 top-4 z-20 min-w-[8.2rem] rounded-2xl border border-emerald-600/[0.18] bg-white/[0.84] px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-emerald-400/20 dark:bg-[#101412]/90 max-lg:hidden">
             <div class="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-[var(--vp-c-text-2)]">
               normalized cache
             </div>
@@ -386,7 +386,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="animate-float-b absolute bottom-24 right-0 z-20 min-w-[8.2rem] rounded-2xl border border-emerald-600/[0.18] bg-white/[0.84] px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-emerald-400/20 dark:bg-[#101412]/90">
+          <div class="animate-float-b absolute bottom-24 right-0 z-20 min-w-[8.2rem] rounded-2xl border border-emerald-600/[0.18] bg-white/[0.84] px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-emerald-400/20 dark:bg-[#101412]/90 max-lg:hidden">
             <div class="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-[var(--vp-c-text-2)]">
               flexible transport
             </div>
@@ -395,7 +395,7 @@ onBeforeUnmount(() => {
             </div>
           </div>
 
-          <div class="animate-float-c absolute bottom-4 right-4 z-20 min-w-[8.2rem] rounded-2xl border border-emerald-600/[0.18] bg-white/[0.84] px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-emerald-400/20 dark:bg-[#101412]/90 md:bottom-auto md:right-[-1rem] md:top-18">
+          <div class="animate-float-c absolute bottom-4 right-4 z-20 min-w-[8.2rem] rounded-2xl border border-emerald-600/[0.18] bg-white/[0.84] px-4 py-3 shadow-[0_14px_40px_rgba(0,0,0,0.08)] backdrop-blur-xl dark:border-emerald-400/20 dark:bg-[#101412]/90 max-lg:hidden md:bottom-auto md:right-[-1rem] md:top-18">
             <div class="font-mono text-[0.68rem] uppercase tracking-[0.18em] text-[var(--vp-c-text-2)]">
               ui state
             </div>

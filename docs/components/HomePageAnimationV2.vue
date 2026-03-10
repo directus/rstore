@@ -4,7 +4,9 @@ import { TresCanvas } from '@tresjs/core'
 import { BloomPmndrs, EffectComposerPmndrs, FXAAPmndrs, NoisePmndrs, ScanlinePmndrs } from '@tresjs/post-processing'
 import { BlendFunction } from 'postprocessing'
 import { CubicBezierCurve3, Vector3 } from 'three'
-import { computed, ref } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
+import { useAnimationVisibility } from './composables/useAnimationVisibility'
+import { useIsMobile } from './composables/useIsMobile'
 
 type NodeKind = 'backend' | 'cache' | 'component' | 'plugin'
 
@@ -206,6 +208,9 @@ const graphTilt = ref(0)
 const coreSpin = ref(0)
 const corePulse = ref(1)
 const lastElapsed = ref(0)
+const { isMobile } = useIsMobile()
+const sceneRoot = useTemplateRef('sceneRoot')
+const { shouldAnimate } = useAnimationVisibility(sceneRoot)
 
 function triggerComponentPulse(componentId: string) {
   // Saturate so repeated hits stack but remain bounded.
@@ -272,9 +277,10 @@ function onLoop({ elapsed: elapsedTime }: TresContextWithClock) {
 </script>
 
 <template>
-  <div class="architecture-v2 absolute inset-0">
+  <div ref="sceneRoot" class="architecture-v2 absolute inset-0">
     <ClientOnly>
       <TresCanvas
+        v-if="shouldAnimate"
         class="size-full"
         :alpha="true"
         :antialias="true"
@@ -552,6 +558,7 @@ function onLoop({ elapsed: elapsedTime }: TresContextWithClock) {
             />
             <!-- FXAA smooths jagged edges -->
             <FXAAPmndrs
+              v-if="!isMobile"
               :samples="24"
             />
             <!-- Subtle sensor-like noise -->
@@ -561,6 +568,7 @@ function onLoop({ elapsed: elapsedTime }: TresContextWithClock) {
             />
             <!-- Moving scanlines for sci-fi texture -->
             <ScanlinePmndrs
+              v-if="!isMobile"
               :density="1.25"
               :opacity="0.1"
               :scroll-speed="0.05"
