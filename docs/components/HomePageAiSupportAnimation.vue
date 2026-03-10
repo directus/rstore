@@ -99,12 +99,6 @@ const engineCloud = Array.from({ length: 56 }, (_, index) => ({
   radius: 0.03 + (index % 4) * 0.012,
 }))
 
-const shockRings = Array.from({ length: 12 }, (_, index) => ({
-  id: `ring-${index}`,
-  phase: index * 0.22,
-  radius: 0.56 + (index % 4) * 0.1,
-}))
-
 const engineSparks = Array.from({ length: 44 }, (_, index) => ({
   id: `spark-${index}`,
   phase: index * 0.19,
@@ -167,7 +161,29 @@ function clamp(value: number, min: number, max: number) {
 const flareSource = computed(() => {
   const x = clamp(thrusterScreen.value.x, 4, 96)
   const y = clamp(thrusterScreen.value.y, 4, 96)
-  return { x, y, power: flarePowerSmoothed.value }
+  const dx = x - 50
+  const dy = y - 50
+
+  // JJ Abrams-style artifacts: place halo ghosts on the axis between
+  // the bright source and screen center, mostly mirrored across center.
+  const haloNearX = clamp(50 - dx * 0.28, -18, 118)
+  const haloNearY = clamp(50 - dy * 0.28, -18, 118)
+  const haloMidX = clamp(50 - dx * 1.1, -42, 142)
+  const haloMidY = clamp(50 - dy * 1.1, -42, 142)
+  const haloFarX = clamp(50 - dx * 1.95, -72, 172)
+  const haloFarY = clamp(50 - dy * 1.95, -72, 172)
+
+  return {
+    x,
+    y,
+    power: flarePowerSmoothed.value,
+    haloNearX,
+    haloNearY,
+    haloMidX,
+    haloMidY,
+    haloFarX,
+    haloFarY,
+  }
 })
 
 const flareRootStyle = computed<Record<string, string>>(() => ({
@@ -175,6 +191,12 @@ const flareRootStyle = computed<Record<string, string>>(() => ({
   '--flare-y': `${flareSource.value.y}%`,
   '--flare-power': `${flareSource.value.power}`,
   '--flare-alpha': `${flareAlphaSmoothed.value}`,
+  '--flare-halo-near-x': `${flareSource.value.haloNearX}%`,
+  '--flare-halo-near-y': `${flareSource.value.haloNearY}%`,
+  '--flare-halo-mid-x': `${flareSource.value.haloMidX}%`,
+  '--flare-halo-mid-y': `${flareSource.value.haloMidY}%`,
+  '--flare-halo-far-x': `${flareSource.value.haloFarX}%`,
+  '--flare-halo-far-y': `${flareSource.value.haloFarY}%`,
 }))
 
 function wrapZ(base: number, speed: number, time: number) {
@@ -529,30 +551,6 @@ function onLoop(context: TresContextWithClock) {
               />
             </TresMesh>
 
-            <!-- Expanding shock rings -->
-            <TresMesh
-              v-for="ring in shockRings"
-              :key="ring.id"
-              :position="[
-                Math.sin(elapsed * 2.2 + ring.phase) * 0.04,
-                Math.cos(elapsed * 2 + ring.phase) * 0.03,
-                -1.44 - ((elapsed * 5.6 + ring.phase) % 2.8) * 1.2,
-              ]"
-              :rotation="[Math.PI / 2, 0, 0]"
-              :scale="[
-                1 + ((elapsed * 5.6 + ring.phase) % 2.8) * 0.3,
-                0.55 + ((elapsed * 5.6 + ring.phase) % 2.8) * 0.12,
-                1 + ((elapsed * 5.6 + ring.phase) % 2.8) * 0.3,
-              ]"
-            >
-              <TresTorusGeometry :args="[ring.radius, 0.024, 10, 56]" />
-              <TresMeshBasicMaterial
-                color="#bcefff"
-                :transparent="true"
-                :opacity="0.12"
-              />
-            </TresMesh>
-
             <!-- Fine spark spray -->
             <TresMesh
               v-for="spark in engineSparks"
@@ -599,14 +597,13 @@ function onLoop(context: TresContextWithClock) {
               :luminance-smoothing="0.28"
               mipmap-blur
             />
-            <FXAAPmndrs v-if="!isMobile" :samples="24" />
+            <FXAAPmndrs v-if="!isMobile" :samples="8" />
             <NoisePmndrs
               premultiply
               :opacity="0.14"
               :blend-function="BlendFunction.SCREEN"
             />
             <ScanlinePmndrs
-              v-if="!isMobile"
               :density="1.25"
               :opacity="0.1"
               :scroll-speed="0.05"
@@ -623,7 +620,15 @@ function onLoop(context: TresContextWithClock) {
     <div class="lensflare-root" :style="flareRootStyle">
       <div class="flare-streak flare-streak-main" />
       <div class="flare-streak flare-streak-thin" />
+      <div class="flare-streak flare-streak-wide" />
+      <div class="flare-streak flare-streak-offset" />
+      <div class="flare-cross flare-cross-horizontal" />
       <div class="flare-halo" />
+      <div class="flare-halo flare-halo-reflect-near" />
+      <div class="flare-halo flare-halo-reflect-mid" />
+      <div class="flare-halo flare-halo-reflect-far" />
+      <div class="flare-ghost flare-ghost-near" />
+      <div class="flare-ghost flare-ghost-far" />
     </div>
   </div>
 </template>
@@ -671,11 +676,11 @@ function onLoop(context: TresContextWithClock) {
     linear-gradient(
       90deg,
       rgb(191 245 255 / 0) 0%,
-      rgb(191 245 255 / 0) calc(var(--flare-x) - 26%),
+      rgb(191 245 255 / 0) calc(var(--flare-x) - 38%),
       rgb(210 249 255 / 0.6) calc(var(--flare-x) - 3%),
       rgb(233 255 255 / 0.95) var(--flare-x),
       rgb(210 249 255 / 0.6) calc(var(--flare-x) + 3%),
-      rgb(191 245 255 / 0) calc(var(--flare-x) + 26%),
+      rgb(191 245 255 / 0) calc(var(--flare-x) + 38%),
       rgb(191 245 255 / 0) 100%
     );
   filter: blur(0.8px);
@@ -690,13 +695,73 @@ function onLoop(context: TresContextWithClock) {
     linear-gradient(
       90deg,
       rgb(147 231 255 / 0) 0%,
-      rgb(147 231 255 / 0) calc(var(--flare-x) - 34%),
+      rgb(147 231 255 / 0) calc(var(--flare-x) - 48%),
       rgb(174 239 255 / 0.7) calc(var(--flare-x) - 4%),
       rgb(230 255 255 / 1) var(--flare-x),
       rgb(174 239 255 / 0.7) calc(var(--flare-x) + 4%),
-      rgb(147 231 255 / 0) calc(var(--flare-x) + 34%),
+      rgb(147 231 255 / 0) calc(var(--flare-x) + 48%),
       rgb(147 231 255 / 0) 100%
     );
+}
+
+.flare-streak-wide {
+  top: calc(var(--flare-y) - 1px);
+  height: 7px;
+  opacity: calc(0.05 + var(--flare-power) * 0.24);
+  transform: translateY(-50%);
+  background:
+    linear-gradient(
+      90deg,
+      rgb(167 236 255 / 0) 0%,
+      rgb(167 236 255 / 0) calc(var(--flare-x) - 58%),
+      rgb(190 243 255 / 0.2) calc(var(--flare-x) - 24%),
+      rgb(218 252 255 / 0.45) var(--flare-x),
+      rgb(190 243 255 / 0.2) calc(var(--flare-x) + 24%),
+      rgb(167 236 255 / 0) calc(var(--flare-x) + 58%),
+      rgb(167 236 255 / 0) 100%
+    );
+  filter: blur(2.4px);
+}
+
+.flare-streak-offset {
+  top: calc(var(--flare-y) - 14px);
+  height: 2px;
+  opacity: calc(0.04 + var(--flare-power) * 0.2);
+  transform: translateY(-50%) skewX(-20deg);
+  background:
+    linear-gradient(
+      90deg,
+      rgb(173 242 255 / 0) 0%,
+      rgb(173 242 255 / 0) calc(var(--flare-x) - 42%),
+      rgb(206 249 255 / 0.55) calc(var(--flare-x) - 6%),
+      rgb(236 255 255 / 0.82) var(--flare-x),
+      rgb(206 249 255 / 0.55) calc(var(--flare-x) + 6%),
+      rgb(173 242 255 / 0) calc(var(--flare-x) + 42%),
+      rgb(173 242 255 / 0) 100%
+    );
+  filter: blur(1.6px);
+}
+
+.flare-cross {
+  position: absolute;
+  left: var(--flare-x);
+  top: var(--flare-y);
+  transform: translate(-50%, -50%);
+  border-radius: 999px;
+}
+
+.flare-cross-horizontal {
+  width: 440px;
+  height: 2px;
+  opacity: calc(0.06 + var(--flare-power) * 0.23);
+  background:
+    linear-gradient(
+      90deg,
+      rgb(168 238 255 / 0) 0%,
+      rgb(168 238 255 / 0.5) 50%,
+      rgb(168 238 255 / 0) 100%
+    );
+  filter: blur(0.8px);
 }
 
 .flare-halo {
@@ -710,5 +775,84 @@ function onLoop(context: TresContextWithClock) {
   opacity: calc(0.08 + var(--flare-power) * 0.26);
   background:
     radial-gradient(circle at 50% 50%, rgb(129 214 255 / 0.3) 0%, rgb(129 214 255 / 0.12) 35%, rgb(129 214 255 / 0) 72%);
+}
+
+.flare-halo-reflect-near {
+  left: var(--flare-halo-near-x);
+  top: var(--flare-halo-near-y);
+  width: 108px;
+  height: 108px;
+  opacity: calc(0.13 + var(--flare-power) * 0.14);
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      rgb(190 243 255 / 0.42) 0%,
+      rgb(190 243 255 / 0.2) 28%,
+      rgb(190 243 255 / 0.06) 56%,
+      rgb(190 243 255 / 0) 100%
+    );
+  filter: blur(1px);
+}
+
+.flare-halo-reflect-mid {
+  left: var(--flare-halo-mid-x);
+  top: var(--flare-halo-mid-y);
+  width: 190px;
+  height: 190px;
+  opacity: calc(0.122 + var(--flare-power) * 0.105);
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      rgb(172 236 255 / 0.3) 0%,
+      rgb(172 236 255 / 0.15) 32%,
+      rgb(172 236 255 / 0.05) 60%,
+      rgb(172 236 255 / 0) 100%
+    );
+  filter: blur(1.4px);
+}
+
+.flare-halo-reflect-far {
+  left: var(--flare-halo-far-x);
+  top: var(--flare-halo-far-y);
+  width: 268px;
+  height: 220px;
+  opacity: calc(0.117 + var(--flare-power) * 0.082);
+  background:
+    radial-gradient(
+      ellipse at 50% 50%,
+      rgb(153 229 255 / 0.26) 0%,
+      rgb(153 229 255 / 0.12) 36%,
+      rgb(153 229 255 / 0.04) 64%,
+      rgb(153 229 255 / 0) 100%
+    );
+  filter: blur(1.7px);
+}
+
+.flare-ghost {
+  position: absolute;
+  border-radius: 999px;
+  transform: translate(-50%, -50%);
+}
+
+.flare-ghost-near {
+  left: calc(var(--flare-x) - 52px);
+  top: calc(var(--flare-y) + 16px);
+  width: 78px;
+  height: 78px;
+  opacity: calc(0.03 + var(--flare-power) * 0.12);
+  background:
+    radial-gradient(circle at 50% 50%, rgb(162 233 255 / 0.24) 0%, rgb(162 233 255 / 0.06) 54%, rgb(162 233 255 / 0) 100%);
+  filter: blur(0.6px);
+}
+
+.flare-ghost-far {
+  left: calc(var(--flare-x) + 88px);
+  top: calc(var(--flare-y) - 26px);
+  width: 48px;
+  height: 48px;
+  opacity: calc(0.02 + var(--flare-power) * 0.1);
+  background:
+    radial-gradient(circle at 50% 50%, rgb(183 241 255 / 0.26) 0%, rgb(183 241 255 / 0.08) 50%, rgb(183 241 255 / 0) 100%);
+  filter: blur(0.4px);
 }
 </style>

@@ -283,7 +283,6 @@ function onLoop({ elapsed: elapsedTime }: TresContextWithClock) {
         v-if="shouldAnimate"
         class="size-full"
         :alpha="true"
-        :antialias="true"
         clear-color="#00000000"
         @loop="onLoop"
       >
@@ -559,7 +558,7 @@ function onLoop({ elapsed: elapsedTime }: TresContextWithClock) {
             <!-- FXAA smooths jagged edges -->
             <FXAAPmndrs
               v-if="!isMobile"
-              :samples="24"
+              :samples="8"
             />
             <!-- Subtle sensor-like noise -->
             <NoisePmndrs
@@ -568,7 +567,6 @@ function onLoop({ elapsed: elapsedTime }: TresContextWithClock) {
             />
             <!-- Moving scanlines for sci-fi texture -->
             <ScanlinePmndrs
-              v-if="!isMobile"
               :density="1.25"
               :opacity="0.1"
               :scroll-speed="0.05"

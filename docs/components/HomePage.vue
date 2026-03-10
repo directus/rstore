@@ -13,24 +13,24 @@ const setupCards = [
     title: 'Vue',
     href: '/guide/getting-started#vue',
     eyebrow: 'Vanilla setup',
-    description: 'Create the store yourself and wire plugins intentionally for a predictable, framework-agnostic data layer.',
-    accent: 'Best for teams migrating from ad-hoc API composables to a scalable model.',
+    description: 'Set up the store yourself and add only the plugins you need.',
+    accent: 'A good fit if you want full control and minimal magic.',
     logo: '/vue.svg',
   },
   {
     title: 'Nuxt',
     href: '/guide/getting-started#nuxt',
     eyebrow: 'Filesystem-driven',
-    description: 'Auto-register collections and plugins from directories, then call a typed `useStore()` across your app.',
-    accent: 'Best for teams that want Nuxt conventions, SSR integration, and fast onboarding.',
+    description: 'Auto-load collections and plugins from folders, then use one typed `useStore()` across your app.',
+    accent: 'Great when you want Nuxt conventions and quick onboarding.',
     logo: '/nuxt.svg',
   },
   {
     title: 'Nuxt + Drizzle',
-    href: '/guide/getting-started#nuxt-drizzle',
+    href: '/plugins/nuxt-drizzle',
     eyebrow: 'Auto-generated backend',
-    description: 'Generate collections, endpoints, and client plumbing from your Drizzle schema with minimal manual wiring.',
-    accent: 'Best for full-stack teams shipping SQL-backed products at pace.',
+    description: 'Generate collections and endpoints from your Drizzle schema with very little manual setup.',
+    accent: 'Useful for full-stack teams building on SQL.',
     logo: '/drizzle-logo.png',
   },
 ]
@@ -39,62 +39,62 @@ const coreFeatures = [
   {
     icon: 'lucide:database',
     title: 'Single Source of Truth',
-    details: 'The reactive normalized cache keeps every module aligned with the latest known state.',
+    details: 'One reactive normalized cache keeps your app state in sync.',
   },
   {
     icon: 'lucide:zap',
     title: 'Local-first Cache',
-    details: 'Reads resolve on the client to keep updates, syncs, offline, and realtime operations smooth.',
+    details: 'Reads happen locally first, so screens stay responsive.',
   },
   {
     icon: 'lucide:rocket',
     title: 'Fast Mutations',
-    details: `Create, update, and delete flows update the UI instantly, without waiting on the server.`,
+    details: 'Create, update, and delete actions update the UI right away.',
   },
   {
     icon: 'lucide:file-pen-line',
     title: 'Form Handling',
-    details: 'Create form objects that manage data, validation, submission, errors, and more.',
+    details: 'Form objects handle values, validation, submit state, and errors.',
   },
   {
     icon: 'lucide:file-search',
     title: 'TypeScript Support',
-    details: 'Use full type safety and autocomplete for every query and mutation route.',
+    details: 'Strong types and autocomplete for queries and mutations.',
   },
   {
     icon: 'lucide:git-merge',
     title: 'Data Federation',
-    details: 'Merge data from multiple sources into one unified store graph.',
+    details: 'Pull data from different sources into one store graph.',
   },
   {
     icon: 'lucide:bell-ring',
     title: 'Live Subscriptions',
-    details: 'Connect WebSockets or other realtime sources for continuous live updates.',
+    details: 'Connect WebSockets or other realtime sources for live updates.',
   },
   {
     icon: 'lucide:wifi-off',
     title: 'Offline Support',
-    details: 'Built-in offline-first support with automatic synchronization when back online.',
+    details: 'Keep working offline and sync automatically when connection returns.',
   },
   {
     icon: 'lucide:puzzle',
     title: 'Plugin System',
-    details: 'Fetch any data from any source with a flexible, extensible plugin system.',
+    details: 'Use plugins to connect the store to any data source.',
   },
 ]
 
 const aiSupportPillars = [
   {
     title: 'Predictable APIs',
-    details: 'Collections, queries, forms, and plugins follow consistent patterns, so AI-generated code is easier to review and trust.',
+    details: 'Collections, queries, forms, and plugins follow the same patterns, so AI output is easier to review.',
   },
   {
     title: 'Clear project structure',
-    details: 'Schema-based conventions give agents enough context to edit multiple files without guessing where things belong.',
+    details: 'Schema conventions give agents enough context to edit multiple files without random guesswork.',
   },
   {
     title: 'Practical AI workflow',
-    details: 'Use AI for repetitive setup and migrations while your team keeps control of architecture and final decisions.',
+    details: 'Use AI for repetitive setup and migrations while your team keeps architecture decisions in-house.',
   },
 ]
 
@@ -102,30 +102,30 @@ const docsJumpCards = [
   {
     icon: 'lucide:rocket',
     title: 'Launch in minutes',
-    description: 'Go from zero to a running store setup with copy-paste snippets and framework-specific steps.',
+    description: 'Start from scratch with short setup steps and copy-paste snippets.',
     href: '/guide/getting-started',
-    cta: 'Open Getting Started',
+    cta: 'Open setup guide',
   },
   {
     icon: 'lucide:database-zap',
     title: 'Master your data flows',
-    description: 'Learn query, mutation, forms, cache, and realtime patterns that keep your UI consistently fast.',
+    description: 'Learn the core query, mutation, form, cache, and realtime patterns.',
     href: '/guide/data/query',
-    cta: 'Explore Data APIs',
+    cta: 'Browse data APIs',
   },
   {
     icon: 'lucide:puzzle',
     title: 'Plug in any backend',
-    description: 'Use plugins and hooks to connect REST, WebSockets, SQL pipelines, or custom transports cleanly.',
+    description: 'Use plugins and hooks to connect REST, WebSockets, SQL pipelines, or custom transports.',
     href: '/guide/plugin/setup',
-    cta: 'See Plugin Guide',
+    cta: 'Open plugin guide',
   },
   {
     icon: 'lucide:route',
     title: 'Upgrade without turbulence',
-    description: 'Follow migration playbooks and version notes to evolve your stack without losing momentum.',
+    description: 'Follow migration notes to upgrade without breaking your pace.',
     href: '/guide/migration/v0_8',
-    cta: 'Read Migration Notes',
+    cta: 'Read migration notes',
   },
 ]
 
@@ -133,7 +133,7 @@ const coreCapabilities = [
   {
     title: 'Reactive queries',
     eyebrow: 'Read from one cache graph',
-    description: 'Colocate reads in component code and keep them reactive while still passing backend params explicitly.',
+    description: 'Keep reads close to components, stay reactive, and pass backend params explicitly.',
     filename: 'TodoList.vue',
     language: 'vue',
     icon: 'lucide:search',
@@ -159,7 +159,7 @@ const { data: todos, loading, refresh } = await store.todos.query(q => q.many({
   {
     title: 'Optimistic mutations',
     eyebrow: 'Instant updates',
-    description: 'Mutations update the normalized cache directly, so the UI reflects successful writes without extra sync systems.',
+    description: 'Mutations update the normalized cache directly, so the UI updates without extra sync plumbing.',
     filename: 'TodoItem.vue',
     language: 'vue',
     icon: 'lucide:zap',
@@ -187,7 +187,7 @@ async function toggle() {
   {
     title: 'Form objects',
     eyebrow: 'Validation and submission state included',
-    description: 'Create form state from the store instead of building separate loading, validation, and reset logic by hand.',
+    description: 'Create form state from the store instead of hand-writing loading, validation, and reset logic.',
     filename: 'TodoCreateForm.vue',
     language: 'vue',
     icon: 'lucide:file-pen',
@@ -215,7 +215,7 @@ const createTodo = store.todos.createForm({
   {
     title: 'Plugin-based transport',
     eyebrow: 'Write generic fetching logic for multiple collections',
-    description: 'Move repeated transport logic into plugins so collections and component code stay focused on data shape and usage.',
+    description: 'Move repeated transport logic into plugins so collections and components stay focused on data.',
     filename: 'app/rstore/plugins/api.ts',
     language: 'ts',
     icon: 'lucide:puzzle',
@@ -236,7 +236,7 @@ const createTodo = store.todos.createForm({
   {
     title: 'Live data',
     eyebrow: 'Realtime and transport-agnostic',
-    description: 'Use subscriptions and live queries on top of the same collections and cache instead of introducing separate state systems. Thanks to the plugin system this works with any transport that supports streaming data, from WebSockets to server-sent events.',
+    description: 'Use subscriptions and live queries on top of the same cache, with any streaming transport from WebSockets to server-sent events.',
     filename: 'MessagesPage.vue',
     language: 'vue',
     icon: 'lucide:satellite-dish',
@@ -345,32 +345,31 @@ onBeforeUnmount(() => {
 
         <div class="relative z-10 flex flex-col justify-center gap-5 p-2 lg:p-6">
           <div class="reveal-up font-mono text-xs tracking-[0.18em] text-emerald-600 dark:text-emerald-400" style="animation-delay: 40ms;">
-            LOCAL-FIRST DATA LAYER FOR VUE AND NUXT
+            A PRACTICAL DATA LAYER FOR VUE AND NUXT
           </div>
 
           <h1 class="reveal-up m-0 max-w-[13ch] text-[clamp(2rem,7vw,4.5rem)] font-black leading-[0.95] tracking-[-0.06em] text-balance lg:max-w-[15ch]" style="animation-delay: 110ms;">
-            Ship data-driven UX that feels instant,
-            <span class="inline-block bg-[linear-gradient(115deg,var(--vp-c-brand-1),#00b184_62%,#89ffd3)] bg-clip-text text-transparent pb-2">without fighting your state layer.</span>
+            Build fast, data-heavy UIs
+            <span class="inline-block bg-[linear-gradient(115deg,var(--vp-c-brand-1),#00b184_62%,#89ffd3)] bg-clip-text text-transparent pb-2">without wrestling state management.</span>
           </h1>
 
           <p class="reveal-up m-0 max-w-[60ch] text-[1.08rem] leading-7 text-[var(--vp-c-text-2)]" style="animation-delay: 180ms;">
-            rstore combines a local-first normalized cache, typed query and mutation APIs,
-            and a plugin transport pipeline so teams can ship realtime, offline,
-            and multi-source apps with confidence and ease.
+            rstore gives you a local-first normalized cache, typed query and mutation APIs,
+            and plugin-based transport so realtime, offline, and multi-source apps are simpler to build.
           </p>
 
           <div class="reveal-up flex flex-col flex-wrap gap-3 pt-1 sm:flex-row" style="animation-delay: 250ms;">
             <div class="reveal-up" style="animation-delay: 300ms;">
               <VPButton
                 href="/guide/getting-started"
-                text="Start Building"
+                text="Get Started"
               />
             </div>
             <div class="reveal-up" style="animation-delay: 360ms;">
               <VPButton
                 theme="alt"
                 href="/guide/learn-more"
-                text="Why Choose rstore"
+                text="See How It Works"
               />
             </div>
           </div>
@@ -422,7 +421,7 @@ onBeforeUnmount(() => {
             CORE FEATURES
           </div>
           <h2 class="reveal-up m-0 text-balance text-[clamp(1.85rem,3vw,2.6rem)] font-extrabold leading-[1.05] tracking-[-0.04em]" style="animation-delay: 660ms;">
-            The capabilities teams rely on to ship faster with less risk.
+            What you get out of the box.
           </h2>
         </div>
 
@@ -444,11 +443,11 @@ onBeforeUnmount(() => {
               PICK YOUR STACK
             </div>
             <h2 class="m-0 text-balance text-[clamp(1.85rem,3vw,2.6rem)] font-extrabold leading-[1.05] tracking-[-0.04em]">
-              Choose the fastest adoption path for your team.
+              Pick the setup that matches how your team works.
             </h2>
           </div>
           <a href="/guide/getting-started" class="font-bold text-emerald-600 hover:underline dark:text-emerald-400 flex items-center gap-1">
-            Open the guide
+            Read setup options
             <Icon icon="lucide:arrow-right" />
           </a>
         </div>
@@ -489,7 +488,7 @@ onBeforeUnmount(() => {
             </div>
 
             <div class="relative z-10 mt-auto font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
-              Go to quickstart
+              View setup
               <Icon icon="lucide:arrow-right" />
             </div>
           </a>
@@ -507,7 +506,7 @@ onBeforeUnmount(() => {
             CORE CAPABILITIES
           </div>
           <h2 class="m-0 text-balance text-[clamp(1.85rem,3vw,2.6rem)] font-extrabold leading-[1.05] tracking-[-0.04em]">
-            See how rstore handles the complex data needs of modern apps with simple, reusable APIs.
+            Common data problems, handled with small, reusable APIs.
           </h2>
         </div>
 
@@ -603,11 +602,11 @@ onBeforeUnmount(() => {
               </span>
             </div>
             <h2 class="m-0 mt-2 text-balance text-[clamp(1.9rem,3.1vw,2.7rem)] font-extrabold leading-[1.04] tracking-[-0.04em] text-white">
-              Built-in agent skills for rstore workflows, with architecture-aware guidance.
+              AI tools can work with your rstore codebase without guessing.
             </h2>
             <p class="mb-0 mt-4 max-w-[65ch] leading-7 text-slate-300">
-              rstore ships with dedicated skill packs so AI tools can reason about your data model,
-              follow package conventions, and generate changes that stay aligned with your architecture.
+              rstore includes skill packs that help AI tools understand your data model and project conventions,
+              so generated changes are easier to trust.
             </p>
 
             <div class="mt-5 max-w-[420px] overflow-hidden rounded-2xl border border-cyan-200/25 bg-[linear-gradient(180deg,rgba(7,20,44,0.94),rgba(2,8,22,0.98))] shadow-[0_14px_36px_rgba(0,0,0,0.35)]">
@@ -666,16 +665,16 @@ onBeforeUnmount(() => {
               NAVIGATION BEACON
             </div>
             <h2 class="m-0 mt-1 text-balance text-[clamp(1.85rem,3vw,2.6rem)] font-extrabold leading-[1.05] tracking-[-0.04em]">
-              Jump into the docs and start shipping faster.
+              Pick a docs path and get moving.
             </h2>
             <p class="mb-0 mt-3 text-[1.02rem] leading-7 text-[var(--vp-c-text-2)]">
-              Choose your mission track: whether you're looking for a quick setup guide, in-depth architectural rationale, or detailed API references, we've got you covered.
+              Start with setup, go deeper into architecture, or jump straight to API details.
             </p>
           </div>
 
           <VPButton
             href="/guide/getting-started"
-            text="Enter Documentation"
+            text="Open Docs"
           />
         </div>
 
