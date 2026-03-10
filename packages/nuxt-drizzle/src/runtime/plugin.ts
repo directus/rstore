@@ -170,12 +170,16 @@ export default definePlugin({
     })
 
     hook('updateItem', async (payload) => {
+      const body = { ...payload.item } as Record<string, any>
+      const primaryKeys = payload.collection.meta?.primaryKeys?.length
+        ? payload.collection.meta.primaryKeys
+        : ['id']
+      for (const key of primaryKeys) {
+        delete body[key]
+      }
       const result: any = await requestFetch(`${apiPath}/${payload.collection.name}/${payload.key}`, {
         method: 'PATCH',
-        body: SuperJSON.stringify({
-          ...payload.item,
-          id: undefined,
-        }),
+        body: SuperJSON.stringify(body),
       })
       payload.setResult(result)
     })

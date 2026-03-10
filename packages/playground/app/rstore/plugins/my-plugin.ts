@@ -136,12 +136,16 @@ export default defineRstorePlugin({
 
     hook('updateItem', async (payload) => {
       if (payload.collection.meta?.path) {
+        const body = { ...payload.item } as Record<string, any>
+        const primaryKeys = payload.collection.meta?.primaryKeys?.length
+          ? payload.collection.meta.primaryKeys
+          : ['id']
+        for (const key of primaryKeys) {
+          delete body[key]
+        }
         const result = await $fetch(`/api/rest/${payload.collection.meta.path}/${payload.key}`, {
           method: 'PATCH',
-          body: {
-            ...payload.item,
-            id: undefined,
-          },
+          body,
         })
         payload.setResult(result)
       }
