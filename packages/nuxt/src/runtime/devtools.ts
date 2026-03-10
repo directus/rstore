@@ -1,11 +1,16 @@
+import type { RstoreDevtoolsClient, RstoreDevtoolsStats, StoreHistoryItem, StoreSubscriptionItem } from '@rstore/devtools'
 import type { ResolvedModule } from '@rstore/shared'
 import type { ShallowRef } from 'vue'
-
-import type { StoreHistoryItem, StoreSubscriptionItem } from '../../client/utils/types'
 import { useNuxtApp, useState } from '#imports'
 import { definePlugin } from '@rstore/vue'
 import { createEventHook } from '@vueuse/core'
 import { isRef, markRaw, shallowRef, triggerRef, watch } from 'vue'
+
+declare global {
+  interface Window {
+    __RSTORE_DEVTOOLS__?: RstoreDevtoolsClient
+  }
+}
 
 function useStoreStats() {
   return useState('$rstore-devtools-stats', () => ({
@@ -30,6 +35,21 @@ function convertFunctionsToString(obj: Record<string, any> | undefined) {
   return result
 }
 
+function on(eventHook: { on: (callback: () => void) => { off: () => void } | (() => void) } | undefined, callback: () => void) {
+  const result = eventHook?.on(callback)
+  if (!result) {
+    return
+  }
+
+  if (typeof result === 'function') {
+    return result
+  }
+
+  return () => {
+    result.off()
+  }
+}
+
 export const devtoolsPlugin = definePlugin({
   name: 'rstore-devtools',
 
@@ -45,10 +65,22 @@ export const devtoolsPlugin = definePlugin({
 
     const nuxtApp = useNuxtApp()
 
+    if (import.meta.client) {
+      window.__RSTORE_DEVTOOLS__ = {
+        getStore: () => nuxtApp.$rstore,
+        getStats: () => nuxtApp.$rstoreDevtoolsStats?.(),
+        clearStats: () => nuxtApp.$rstoreDevtoolsStatsClear?.(),
+        onCacheUpdated: callback => on(nuxtApp.$rstoreCacheUpdated, callback),
+        onHistoryUpdated: callback => on(nuxtApp.$rstoreHistoryUpdated, callback),
+        onSubscriptionsUpdated: callback => on(nuxtApp.$rstoreSubscriptionsUpdated, callback),
+        onModulesUpdated: callback => on(nuxtApp.$rstoreModulesUpdated, callback),
+      }
+    }
+
     // Cache
 
     if (import.meta.client) {
-      const cacheUpdated = nuxtApp.$rstoreCacheUpdated = createEventHook()
+      const cacheUpdated = nuxtApp.$rstoreCacheUpdated = createEventHook<void>()
       hook('afterCacheWrite', () => {
         cacheUpdated.trigger()
       })
@@ -75,7 +107,7 @@ export const devtoolsPlugin = definePlugin({
 
     nuxtApp.$rstoreDevtoolsStats = () => storeStats.value
 
-    const historyUpdated = nuxtApp.$rstoreHistoryUpdated = createEventHook()
+    const historyUpdated = nuxtApp.$rstoreHistoryUpdated = createEventHook<void>()
 
     nuxtApp.$rstoreDevtoolsStatsClear = () => {
       storeStats.value.history = []
@@ -169,7 +201,7 @@ export const devtoolsPlugin = definePlugin({
 
     // Subscriptions
 
-    const subscriptionsUpdated = nuxtApp.$rstoreSubscriptionsUpdated = createEventHook()
+    const subscriptionsUpdated = nuxtApp.$rstoreSubscriptionsUpdated = createEventHook<void>()
 
     hook('subscribe', (payload) => {
       storeStats.value.subscriptions.push(markRaw({
@@ -193,7 +225,7 @@ export const devtoolsPlugin = definePlugin({
     // Modules
 
     if (import.meta.client) {
-      const modulesUpdated = nuxtApp.$rstoreModulesUpdated = createEventHook()
+      const modulesUpdated = nuxtApp.$rstoreModulesUpdated = createEventHook<void>()
 
       let modules: ShallowRef<Map<string, ResolvedModule<any, any>>> | undefined
 
@@ -251,6 +283,17 @@ export const devtoolsPlugin = definePlugin({
     }
   },
 })
+
+declare module '#app' {
+  interface NuxtApp {
+    $rstoreModulesUpdated: ReturnType<typeof createEventHook>
+    $rstoreCacheUpdated: ReturnType<typeof createEventHook>
+    $rstoreHistoryUpdated: ReturnType<typeof createEventHook>
+    $rstoreSubscriptionsUpdated: ReturnType<typeof createEventHook>
+    $rstoreDevtoolsStats: () => RstoreDevtoolsStats
+    $rstoreDevtoolsStatsClear: () => void
+  }
+}
 
 declare module '@rstore/vue' {
   export interface CustomHookMeta {

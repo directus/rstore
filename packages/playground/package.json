@@ -9,32 +9,33 @@
     "dev:prepare": "nuxi prepare"
   },
   "dependencies": {
-    "@nuxt/kit": "^4.0.0",
+    "@nuxt/kit": "catalog:",
+    "@rstore/devtools": "workspace:^",
     "@rstore/nuxt": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
-    "@vueuse/core": "^14.0.0",
-    "shiki": "^3.1.0"
+    "@vueuse/core": "catalog:",
+    "shiki": "catalog:"
   },
   "devDependencies": {
-    "@faker-js/faker": "^9.4.0",
-    "@nuxt/devtools": "^2.0.0",
-    "@nuxt/devtools-kit": "^2.2.1",
-    "@nuxt/eslint-config": "^1.0.1",
-    "@nuxt/module-builder": "^0.8.4",
+    "@faker-js/faker": "catalog:",
+    "@nuxt/devtools": "catalog:",
+    "@nuxt/devtools-kit": "catalog:",
+    "@nuxt/eslint-config": "catalog:",
+    "@nuxt/module-builder": "catalog:",
     "@nuxt/schema": "catalog:",
-    "@nuxt/test-utils": "^3.15.4",
+    "@nuxt/test-utils": "catalog:",
     "@nuxt/ui": "catalog:",
     "@types/node": "catalog:",
-    "@vueuse/core": "^14.0.0",
-    "@vueuse/nuxt": "^14.0.0",
-    "changelogen": "^0.5.7",
-    "eslint": "^9.20.0",
+    "@vueuse/core": "catalog:",
+    "@vueuse/nuxt": "catalog:",
+    "changelogen": "catalog:",
+    "eslint": "catalog:",
     "nuxt": "catalog:",
-    "nuxt-auth-utils": "0.5.18",
+    "nuxt-auth-utils": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "vue-tsc": "catalog:",
-    "zod": "^3.24.2"
+    "zod": "catalog:"
   }
 }

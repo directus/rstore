@@ -5,6 +5,8 @@ dist
 .eslintcache
 .nuxt
 .output
+auto-imports.d.ts
+components.d.ts
 
 # Vitepress
 docs/.vitepress/dist

@@ -1,0 +1,15 @@
+@import "tailwindcss" theme(static);
+@import "@nuxt/ui";
+
+@utility border-default {
+  @apply border-neutral-100 dark:border-neutral-800;
+}
+
+body {
+  /* Match the surrounding Nuxt DevTools shell. */
+  @apply bg-white dark:bg-[rgb(21,21,21)];
+}
+
+.dark {
+  --ui-bg: rgb(21, 21, 21);
+}

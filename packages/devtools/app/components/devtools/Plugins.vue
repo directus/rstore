@@ -1,0 +1,50 @@
+<script lang="ts" setup>
+import { useLocalStorage } from '@vueuse/core'
+import { computed } from 'vue'
+
+import { useStorePlugins } from '../../composables/plugins'
+import Empty from '../Empty.vue'
+import DevtoolsPluginItem from './PluginItem.vue'
+
+const plugins = useStorePlugins()
+const search = useLocalStorage('rstore-search-plugins', '')
+
+const filteredPlugins = computed(() => {
+  return plugins.value.filter((plugin) => {
+    return plugin.name.toLowerCase().includes(search.value.toLowerCase())
+  })
+})
+</script>
+
+<template>
+  <Empty
+    v-if="!plugins.length"
+    icon="lucide:puzzle"
+    title="No registered plugins"
+    class="h-full"
+  />
+
+  <div v-else class="flex flex-col h-full">
+    <div class="p-1">
+      <UInput
+        v-model="search"
+        icon="lucide:search"
+        placeholder="Search"
+        size="xs"
+        autofocus
+        class="w-full"
+      />
+    </div>
+
+    <div class="flex-1 overflow-auto min-h-0 flex flex-col p-1 gap-1">
+      <DevtoolsPluginItem
+        v-for="plugin in filteredPlugins"
+        :key="plugin.name"
+        :plugin
+        :index="plugins.indexOf(plugin)"
+      />
+
+      <div class="flex-none h-1" />
+    </div>
+  </div>
+</template>

@@ -40,7 +40,7 @@
   },
   "devDependencies": {
     "typescript": "catalog:",
-    "unbuild": "^3.2.0",
+    "unbuild": "catalog:",
     "vitest": "catalog:"
   }
 }

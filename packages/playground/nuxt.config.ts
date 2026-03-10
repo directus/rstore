@@ -31,7 +31,7 @@ export default defineNuxtConfig({
           {
             command: 'npx',
             args: ['nuxi', 'dev', '--port', '3300'],
-            cwd: resolve(__dirname, '../nuxt/client'),
+            cwd: resolve(__dirname, '../devtools'),
           },
           {
             id: 'rstore:client',

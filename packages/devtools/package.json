@@ -1,0 +1,62 @@
+{
+  "name": "@rstore/devtools",
+  "type": "module",
+  "version": "0.8.4",
+  "description": "Nuxt app and iframe component for rstore devtools",
+  "repository": {
+    "url": "https://github.com/Akryum/rstore.git",
+    "type": "git",
+    "directory": "packages/devtools"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
+      }
+    },
+    "./vite": {
+      "import": {
+        "types": "./dist/vite.d.ts",
+        "default": "./dist/vite.mjs"
+      }
+    }
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild && nuxi generate",
+    "dev": "nuxi dev --port 3300",
+    "dev:prepare": "nuxi prepare && unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs && printf \"export * from '../src/vite'\" > ./dist/vite.mjs",
+    "test:types": "nuxi prepare && vue-tsc --noEmit -p tsconfig.nuxt.json"
+  },
+  "peerDependencies": {
+    "vue": "^3.5.21"
+  },
+  "dependencies": {
+    "sirv": "catalog:"
+  },
+  "devDependencies": {
+    "@nuxt/devtools-kit": "catalog:",
+    "@nuxt/ui": "catalog:",
+    "@rstore/shared": "workspace:^",
+    "@rstore/vue": "workspace:^",
+    "@types/node": "catalog:",
+    "@vueuse/core": "catalog:",
+    "@vueuse/nuxt": "catalog:",
+    "nuxt": "catalog:",
+    "shiki": "catalog:",
+    "typescript": "catalog:",
+    "unbuild": "catalog:",
+    "vue": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}

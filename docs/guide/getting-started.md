@@ -264,6 +264,7 @@ Open Nuxt DevTools and inspect the `rstore` tab to see collections, cache state,
 
 ### 4. Next steps
 
+- Embed the Devtools UI in your app with [Devtools](./devtools.md)
 - Learn Nuxt-specific helpers in [Plugins](./plugin/setup.md)
 - Explore [live subscriptions](./data/live.md) and [offline support](./data/offline.md)
 - Read about [federation](./schema/federation.md) if you have multiple data sources

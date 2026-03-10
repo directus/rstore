@@ -36,12 +36,12 @@
     "test:types": "tsc --noEmit"
   },
   "dependencies": {
-    "@standard-schema/spec": "^1.0.0",
-    "klona": "^2.0.6"
+    "@standard-schema/spec": "catalog:",
+    "klona": "catalog:"
   },
   "devDependencies": {
     "typescript": "catalog:",
-    "unbuild": "^3.2.0",
+    "unbuild": "catalog:",
     "vitest": "catalog:"
   }
 }

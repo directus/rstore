@@ -8,17 +8,17 @@
     "dev:prepare": "nuxt prepare"
   },
   "dependencies": {
-    "@libsql/client": "^0.14.0",
+    "@libsql/client": "catalog:",
     "@rstore/nuxt-directus": "workspace:*",
-    "@vueuse/core": "^14.0.0",
-    "@vueuse/nuxt": "^14.0.0",
-    "drizzle-orm": "^0.40.0"
+    "@vueuse/core": "catalog:",
+    "@vueuse/nuxt": "catalog:",
+    "drizzle-orm": "catalog:"
   },
   "devDependencies": {
-    "@iconify-json/lucide": "^1.2.22",
-    "@iconify-json/simple-icons": "^1.2.19",
+    "@iconify-json/lucide": "catalog:",
+    "@iconify-json/simple-icons": "catalog:",
     "@nuxt/ui": "catalog:",
-    "drizzle-kit": "^0.30.5",
+    "drizzle-kit": "catalog:",
     "nuxt": "catalog:"
   }
 }

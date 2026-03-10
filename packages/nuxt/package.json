@@ -14,7 +14,7 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/types.d.ts",
+      "types": "./dist/module.d.ts",
       "import": "./dist/module.mjs",
       "require": "./dist/module.cjs"
     },
@@ -24,42 +24,43 @@
     }
   },
   "main": "./dist/module.cjs",
-  "types": "./dist/types.d.ts",
+  "types": "./dist/module.d.ts",
   "files": [
     "dist",
     "skills"
   ],
   "scripts": {
-    "build": "nuxi prepare playground && nuxt-module-build build && npm run client:build",
+    "build": "pnpm run client:build && nuxi prepare playground && nuxt-module-build build",
     "dev": "pnpm run build",
     "dev:prepare": "nuxt prepare && pnpm run client:prepare",
     "dev:playground": "nuxt dev ../playground",
-    "client:build": "nuxi generate client",
-    "client:dev": "nuxi dev client --port 3300",
-    "client:prepare": "nuxi prepare client",
+    "client:build": "pnpm --filter @rstore/devtools build",
+    "client:dev": "pnpm --filter @rstore/devtools dev",
+    "client:prepare": "pnpm --filter @rstore/devtools dev:prepare",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "test:types": "vue-tsc --noEmit && cd client && vue-tsc --noEmit"
+    "test:types": "pnpm --filter @rstore/devtools test:types && vue-tsc --noEmit"
   },
   "dependencies": {
-    "@nuxt/devtools-kit": "^2.2.1",
-    "@nuxt/kit": "^4.0.0",
+    "@nuxt/devtools-kit": "catalog:",
+    "@nuxt/kit": "catalog:",
+    "@rstore/devtools": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
-    "sirv": "^3.0.1"
+    "sirv": "catalog:"
   },
   "devDependencies": {
-    "@iconify-json/lucide": "^1.2.28",
-    "@nuxt/devtools": "^2.0.0",
-    "@nuxt/module-builder": "^0.8.4",
+    "@iconify-json/lucide": "catalog:",
+    "@nuxt/devtools": "catalog:",
+    "@nuxt/module-builder": "catalog:",
     "@nuxt/schema": "catalog:",
-    "@nuxt/test-utils": "^3.15.4",
+    "@nuxt/test-utils": "catalog:",
     "@nuxt/ui": "catalog:",
     "@types/node": "catalog:",
-    "@vueuse/core": "^14.0.0",
-    "@vueuse/nuxt": "^14.0.0",
+    "@vueuse/core": "catalog:",
+    "@vueuse/nuxt": "catalog:",
     "nuxt": "catalog:",
-    "shiki": "^3.1.0",
+    "shiki": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:",
     "vue-tsc": "catalog:"

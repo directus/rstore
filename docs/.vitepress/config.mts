@@ -68,6 +68,7 @@ export default defineConfig({
             { text: 'Hooks', link: '/guide/plugin/hooks' },
           ],
         },
+        { text: 'Devtools', link: '/guide/devtools' },
         {
           text: 'Migration',
           items: [
