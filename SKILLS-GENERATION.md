@@ -74,7 +74,7 @@ Each generated `SKILL.md` should include:
 
 1. YAML frontmatter:
    - `name`
-   - `description` (single line, long enough to trigger correctly)
+   - `description` (single line, intent-first trigger text)
 2. Title and one-line summary.
 3. Documentation map table with docs URLs and/or shipped skill reference links.
 4. Core concepts table (API or module primitives and what they do).
@@ -112,9 +112,26 @@ Each reference file should:
 - Include only APIs/patterns that exist in current docs.
 - Mark deprecations only when they are documented.
 - Keep context lean: move deep detail to docs and skill references instead of embedding long prose.
-- For wrapper skills (`@rstore/nuxt`, `@rstore/nuxt-drizzle`), include explicit references to the base `@rstore/vue` skill.
+- For wrapper skills, include explicit package-skill references:
+  - `@rstore/nuxt` must reference the `rstore-vue` skill.
+  - `@rstore/nuxt-drizzle` must reference both `rstore-nuxt` and `rstore-vue`.
+- Never use cross-package relative paths (`../`) inside `SKILL.md`; reference other skills by skill name.
 - Never reference local source/test files from `SKILL.md` or `references/*.md` files.
 - Do not generate or update `agents/openai.yaml` for this workflow.
+
+### Frontmatter description rules (trigger quality)
+
+The `description` field is the primary trigger signal used by AI agents. Write it for natural user intent matching, not for API catalog completeness.
+
+- Start with the user goal/outcome (`fetch data`, `update records`, `set up integration`, `debug hydration`) and then mention package-specific cues.
+- Start with explicit intent language such as `Use for ...`, `Use when ...`, `set up`, `fix`, `debug`, `migrate`, `integrate`, `extend`.
+- Include both broad task phrases and concrete package cues (for example: `Nuxt module setup`, `SSR hydration`, `Drizzle filters`, `query/liveQuery`, `createForm`).
+- Prefer user-language synonyms over only internal API names.
+- Keep it on one line and avoid parenthetical API dumps.
+- Keep wrapper boundaries clear:
+  - `rstore-nuxt`: Nuxt module/runtime integration concerns; explicitly reference the `rstore-vue` skill by name.
+  - `rstore-nuxt-drizzle`: Drizzle-backed generation/API/realtime/offline concerns; explicitly reference both `rstore-nuxt` and `rstore-vue` by name.
+  - `rstore-vue`: base store/query/form/plugin/module behavior.
 
 ## Generation workflow
 
@@ -151,7 +168,8 @@ Checklist:
 - [ ] `references/index.md` exists and links to all `references/api-*.md` files.
 - [ ] Each `api-*.md` file documents exactly one API/config/hook element.
 - [ ] `SKILL.md` contains a reference table (`Topic`, `Description`, `Reference`) covering all skill references.
-- [ ] Wrapper skills reference `packages/vue/skills/rstore-vue/SKILL.md`.
+- [ ] `rstore-nuxt` references the `rstore-vue` skill by name (no cross-package relative paths).
+- [ ] `rstore-nuxt-drizzle` references both `rstore-nuxt` and `rstore-vue` by name (no cross-package relative paths).
 - [ ] No source/test file paths are referenced from skill files.
 
 ### 4. Record generation metadata

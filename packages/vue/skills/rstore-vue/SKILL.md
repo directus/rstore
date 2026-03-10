@@ -1,6 +1,6 @@
 ---
 name: rstore-vue
-description: Build or refactor Vue code with `@rstore/vue` stores, collections, queries, forms, plugins, modules, and the underlying `@rstore/core` / `@rstore/shared` semantics exposed through the Vue package. Use when creating or changing `withItemType().defineCollection`, `defineRelations`, `createStore`, `RstorePlugin`, `useStore`, collection methods (`peek*`, `find*`, `query`, `liveQuery`, `subscribe`), mutation forms (`createForm`, `updateForm`, `createFormObject`), or reusable store-scoped logic with `defineModule`.
+description: Use when the goal is handling app data in Vue with `@rstore/vue`: fetch items/lists, keep queries reactive or live, create/update/delete records with forms, manage cache consistency, and debug store/query/subscription behavior across collections.
 ---
 
 # Rstore Vue

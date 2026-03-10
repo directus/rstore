@@ -1,6 +1,6 @@
 ---
 name: rstore-nuxt
-description: Integrate or extend `@rstore/nuxt` in Nuxt apps, layers, or Nuxt modules. Use when configuring `rstore` in `nuxt.config`, scanning collections and plugins from `rstore/` directories, relying on generated `#build` templates, using auto-imported rstore helpers, handling SSR payload cache hydration, or injecting additional collection/plugin imports through `@rstore/nuxt/api`.
+description: Use when the goal is making rstore work end-to-end in a Nuxt app: configure module setup, auto-register collections/plugins, ensure SSR cache hydration works, fix generated template or auto-import issues, and extend integration from other Nuxt modules; pair with the `rstore-vue` skill for collection/query/form behavior.
 ---
 
 # Rstore Nuxt
@@ -17,6 +17,7 @@ Use this skill together with the `@rstore/vue` skill for collection/query/form s
 | Query and mutation model | [https://rstore.akryum.dev/guide/data/query](https://rstore.akryum.dev/guide/data/query), [https://rstore.akryum.dev/guide/data/mutation](https://rstore.akryum.dev/guide/data/mutation) |
 | Cache and live updates | [https://rstore.akryum.dev/guide/data/cache](https://rstore.akryum.dev/guide/data/cache), [https://rstore.akryum.dev/guide/data/live](https://rstore.akryum.dev/guide/data/live) |
 | Plugin extension model | [https://rstore.akryum.dev/guide/plugin/setup](https://rstore.akryum.dev/guide/plugin/setup), [https://rstore.akryum.dev/guide/plugin/hooks](https://rstore.akryum.dev/guide/plugin/hooks) |
+| Related package skills | `rstore-vue` skill (`@rstore/vue`) |
 | Skill-local API references | [./references/index.md](./references/index.md) |
 
 ## Core concepts
@@ -61,7 +62,7 @@ rstore/
 4. Use `useStore()` and auto-imports from `#imports` in app code, not ad hoc store singletons.
 5. For cross-module extension, call `addCollectionImport` / `addPluginImport` from module setup.
 6. Validate generated template output when debugging scan/injection issues.
-7. For behavior inside collection APIs (`find*`, `query`, forms, hooks), follow [../../../vue/skills/rstore-vue/SKILL.md](../../../vue/skills/rstore-vue/SKILL.md).
+7. For behavior inside collection APIs (`find*`, `query`, forms, hooks), use the `rstore-vue` skill.
 
 ## Rely on the generated runtime
 
@@ -101,7 +102,7 @@ rstore/
 | useStore (#imports) | Nuxt runtime store accessor | [api-use-store](./references/api-use-store.md) |
 | SSR cache hydration ($srstore) | Payload cache serialization/hydration | [api-cache-hydration](./references/api-cache-hydration.md) |
 | Devtools route (/__rstore) | Custom devtools UI route wiring | [api-devtools-route](./references/api-devtools-route.md) |
-| Base @rstore/vue skill | Underlying collection/query/form semantics | [rstore-vue-skill](../../../vue/skills/rstore-vue/SKILL.md) |
+| Base @rstore/vue skill | Underlying collection/query/form semantics | `rstore-vue` skill |
 
 ## Further reading
 

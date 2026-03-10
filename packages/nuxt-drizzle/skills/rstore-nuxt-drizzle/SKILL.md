@@ -1,12 +1,12 @@
 ---
 name: rstore-nuxt-drizzle
-description: Build or refactor `@rstore/nuxt-drizzle` integrations that combine Nuxt, rstore, and Drizzle ORM. Use when configuring `rstoreDrizzle`, generating collections from Drizzle schema exports, wiring `drizzleImport`, customizing generated REST/WS paths, using `findOptions.where` plus drizzle params, enabling realtime/offline behavior, or extending server behavior through `rstoreDrizzleHooks`, `hooksForTable`, and `allowTables`.
+description: Use when the goal is exposing Drizzle-backed data through rstore in Nuxt: generate collections and API routes from schema, fetch/filter/paginate data, support create/update/delete flows, enable realtime or offline sync, and enforce table-level server access rules; pair with `rstore-nuxt` for Nuxt integration and `rstore-vue` for collection/query/form behavior.
 ---
 
 # Rstore Nuxt Drizzle
 
 Generate rstore collections and API/runtime behavior from Drizzle schema metadata, then add realtime/offline and hook-based server controls as needed.
-Use this skill with the `@rstore/vue` skill for underlying collection/query/form semantics.
+Use this skill with the `@rstore/nuxt` skill for Nuxt module/runtime behavior and with the `@rstore/vue` skill for underlying collection/query/form semantics.
 
 ## Documentation map
 
@@ -18,6 +18,7 @@ Use this skill with the `@rstore/vue` skill for underlying collection/query/form
 | Realtime subscriptions | [https://rstore.akryum.dev/guide/data/live](https://rstore.akryum.dev/guide/data/live) |
 | Offline behavior | [https://rstore.akryum.dev/guide/data/offline](https://rstore.akryum.dev/guide/data/offline) |
 | Plugin hooks and extension points | [https://rstore.akryum.dev/guide/plugin/hooks](https://rstore.akryum.dev/guide/plugin/hooks) |
+| Related package skills | `rstore-nuxt` skill (`@rstore/nuxt`), `rstore-vue` skill (`@rstore/vue`) |
 | Skill-local API references | [./references/index.md](./references/index.md) |
 
 ## Core concepts
@@ -65,7 +66,8 @@ export function useDrizzle() {
 4. Query through rstore collection APIs using `findOptions.where` and supported drizzle params.
 5. Enable `ws` and/or `offline` only when required by product behavior.
 6. Add server-side restrictions/transforms via hook APIs (`hooksForTable`, `allowTables`, `rstoreDrizzleHooks`).
-7. For non-drizzle-specific store/query/form behavior, follow [../../../vue/skills/rstore-vue/SKILL.md](../../../vue/skills/rstore-vue/SKILL.md).
+7. For Nuxt module/runtime integration behavior, use the `rstore-nuxt` skill.
+8. For non-drizzle-specific store/query/form behavior, use the `rstore-vue` skill.
 
 ## Query and cache conventions
 
@@ -125,7 +127,8 @@ export function useDrizzle() {
 | rstoreDrizzleHooks | Global server/realtime hook bus | [api-rstore-drizzle-hooks](./references/api-rstore-drizzle-hooks.md) |
 | hooksForTable | Table-scoped hook registration helper | [api-hooks-for-table](./references/api-hooks-for-table.md) |
 | allowTables | Collection allow-list access control | [api-allow-tables](./references/api-allow-tables.md) |
-| Base @rstore/vue skill | Underlying collection/query/form semantics | [rstore-vue-skill](../../../vue/skills/rstore-vue/SKILL.md) |
+| Base @rstore/nuxt skill | Nuxt module/runtime integration semantics | `rstore-nuxt` skill |
+| Base @rstore/vue skill | Underlying collection/query/form semantics | `rstore-vue` skill |
 
 ## Further reading
 
@@ -133,3 +136,5 @@ export function useDrizzle() {
 - Query docs: [https://rstore.akryum.dev/guide/data/query](https://rstore.akryum.dev/guide/data/query)
 - Live docs: [https://rstore.akryum.dev/guide/data/live](https://rstore.akryum.dev/guide/data/live)
 - Offline docs: [https://rstore.akryum.dev/guide/data/offline](https://rstore.akryum.dev/guide/data/offline)
+- @rstore/nuxt skill: `rstore-nuxt`
+- @rstore/vue skill: `rstore-vue`
