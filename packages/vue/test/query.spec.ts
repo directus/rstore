@@ -630,6 +630,69 @@ describe('query', () => {
       expect(query.pages.value[1]?.data[1]?.text).toBe('New Message')
     })
 
+    it('should preserve fetch response order with responseRefs', async () => {
+      const store = await createStore({
+        schema: [
+          {
+            name: 'messages',
+            hooks: {
+              fetchMany: ({ pageIndex }) => {
+                switch (pageIndex) {
+                  case 0:
+                    return [
+                      { id: 'message2', text: 'Message 2' },
+                      { id: 'message1', text: 'Message 1' },
+                    ]
+                  case 1:
+                    return [
+                      { id: 'message4', text: 'Message 4' },
+                      { id: 'message3', text: 'Message 3' },
+                    ]
+                  default:
+                    return []
+                }
+              },
+            },
+          },
+        ],
+        plugins: [],
+      })
+
+      const query = await store.messages.query(q => q.many({
+        pageIndex: 0,
+        pageSize: 2,
+        resultMode: 'responseRefs',
+        fetchPolicy: 'fetch-only',
+      }))
+
+      expect(query.data.value.map(item => item.id)).toEqual(['message2', 'message1'])
+      expect(query.pages.value[0]?.data.map(item => item.id)).toEqual(['message2', 'message1'])
+
+      await query.fetchMore({
+        pageIndex: 1,
+      })
+
+      expect(query.data.value.map(item => item.id)).toEqual(['message2', 'message1', 'message4', 'message3'])
+      expect(query.pages.value[1]?.data.map(item => item.id)).toEqual(['message4', 'message3'])
+
+      store.$cache.writeItem({
+        collection: store.$collections[0]!,
+        key: 'message1',
+        item: { id: 'message1', text: 'Updated Message 1' },
+      })
+
+      expect(query.data.value.map(item => item.text)).toEqual(['Message 2', 'Updated Message 1', 'Message 4', 'Message 3'])
+
+      store.$cache.writeItem({
+        collection: store.$collections[0]!,
+        key: 'message5',
+        item: { id: 'message5', text: 'Message 5' },
+      })
+
+      expect(query.data.value.map(item => item.id)).toEqual(['message2', 'message1', 'message4', 'message3'])
+      expect(query.pages.value[1]?.data.map(item => item.id)).toEqual(['message4', 'message3'])
+    })
+
     it('should load pages with cache-and-fetch and gc', async () => {
       const fetchMessages = (pageIndex?: number) => {
         return [

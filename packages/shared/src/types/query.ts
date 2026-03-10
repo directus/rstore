@@ -43,6 +43,8 @@ export interface FindOptions<
  */
 export type FetchPolicy = 'cache-first' | 'cache-and-fetch' | 'fetch-only' | 'cache-only' | 'no-cache'
 
+export type QueryResultMode = 'computed' | 'responseRefs'
+
 export type FindOptionsInclude<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -139,6 +141,17 @@ export interface FindOptionsBase<
    * Size of the page in the pagination.
    */
   pageSize?: number
+
+  /**
+   * How the reactive query result list should be produced.
+   *
+   * `computed` computes the result from the cache using the query options.
+   *
+   * `responseRefs` keeps the fetched response order by storing list results as refs and mapping them back to cached items.
+   *
+   * @default 'computed'
+   */
+  resultMode?: QueryResultMode
 
   /**
    * Experimental: Enable garbage collection for items that are not referenced by any query or other item.

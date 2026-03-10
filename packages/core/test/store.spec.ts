@@ -211,6 +211,7 @@ describe('createStoreCore', () => {
       const resolved = store.$resolveFindOptions(collection, {}, true, {})
 
       expect(resolved.fetchPolicy).toBe(defaultFetchPolicy)
+      expect(resolved.resultMode).toBe('computed')
     })
 
     it('should usee the default find options from the store', async () => {
@@ -226,6 +227,7 @@ describe('createStoreCore', () => {
       const resolved = store.$resolveFindOptions(collection, {}, true, {})
 
       expect(resolved.fetchPolicy).toBe('fetch-only')
+      expect(resolved.resultMode).toBe('computed')
     })
 
     it('should override default find options with provided options', async () => {
@@ -235,6 +237,7 @@ describe('createStoreCore', () => {
       options.findDefaults = {
         pageSize: 25,
         fetchPolicy: 'fetch-only',
+        resultMode: 'responseRefs',
       }
       const store = await createStoreCore(options)
       const collection = store.$collections.find(c => c.name === 'messages')!
@@ -243,6 +246,7 @@ describe('createStoreCore', () => {
 
       expect(resolved.fetchPolicy).toBe('cache-and-fetch')
       expect(resolved.pageSize).toBe(25)
+      expect(resolved.resultMode).toBe('responseRefs')
     })
 
     it('should call resolveFindOptions hook', async () => {

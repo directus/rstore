@@ -21,6 +21,7 @@ export interface CreateStoreCoreOptions<
 }
 
 const resolvedFindOptionsMarker = Symbol('resolvedFindOptions')
+const defaultResultMode = 'computed'
 
 export async function createStoreCore<
   TSchema extends StoreSchema = StoreSchema,
@@ -48,6 +49,7 @@ export async function createStoreCore<
         ...store.$findDefaults,
         ...options,
         fetchPolicy: options.fetchPolicy ?? store.$findDefaults.fetchPolicy ?? defaultFetchPolicy,
+        resultMode: options.resultMode ?? store.$findDefaults.resultMode ?? defaultResultMode,
       }
       store.$hooks.callHookSync('resolveFindOptions', {
         store: store as unknown as GlobalStoreType,

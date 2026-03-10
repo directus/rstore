@@ -151,7 +151,9 @@ export function createQuery<
     return typeof result === 'object' && 'enabled' in result && result.enabled === false
   }
 
-  let { fetchPolicy } = store.$resolveFindOptions(getCollection(), getOptions() ?? {}, many, meta.value)
+  const initialResolvedOptions = store.$resolveFindOptions(getCollection(), getOptions() ?? {}, many, meta.value)
+  let { fetchPolicy } = initialResolvedOptions
+  let { resultMode } = initialResolvedOptions
 
   const queryTrackingEnabled = !store.$isServer && fetchPolicy !== 'no-cache' && (
     store.$experimentalGarbageCollection
@@ -220,7 +222,7 @@ export function createQuery<
 
   // @TODO include nested relations in no-cache results
   const cached = computed(() => {
-    if (fetchPolicy !== 'no-cache') {
+    if (fetchPolicy !== 'no-cache' && resultMode !== 'responseRefs') {
       const options = getOptions()
       return cacheMethod(options, meta.value) ?? null
     }
@@ -376,8 +378,8 @@ export function createQuery<
    * Mark consecutive pages as computed when possible to compute the pages slices from the cache instead of a fixed set of refs.
    */
   function markPagesAsComputed() {
-    const options = getOptions()
-    if (options?.fetchPolicy === 'no-cache' || options?.pageSize == null) {
+    const resolvedOptions = store.$resolveFindOptions(getCollection(), getOptions() ?? {}, many, meta.value)
+    if (fetchPolicy === 'no-cache' || resultMode !== 'computed' || resolvedOptions.pageSize == null) {
       return
     }
     for (let i = 0; i < pages.value.length; i++) {
@@ -443,9 +445,11 @@ export function createQuery<
 
         const resolvedOptions = store.$resolveFindOptions(getCollection(), finalOptions, many, meta.value)
         const currentFetchPolicy = finalOptions.fetchPolicy = resolvedOptions.fetchPolicy
+        const currentResultMode = finalOptions.resultMode = resolvedOptions.resultMode
 
         if (page.main) {
           fetchPolicy = currentFetchPolicy
+          resultMode = currentResultMode
         }
 
         // If fetchPolicy is `cache-and-fetch`, fetch in parallel

@@ -5,7 +5,7 @@ import type { CustomHookMeta } from './hooks'
 import type { ResolvedModule } from './module'
 import type { MutationOperation, MutationSpecialProps } from './mutation'
 import type { RegisteredPlugin } from './plugin'
-import type { FetchPolicy, FindOptions } from './query'
+import type { FetchPolicy, FindOptions, QueryResultMode } from './query'
 
 export interface StoreCore<
   TSchema extends StoreSchema,
@@ -22,6 +22,7 @@ export interface StoreCore<
    */
   $resolveFindOptions: (collection: ResolvedCollection, options: Partial<FindOptions<any, any, any>>, many: boolean, meta: CustomHookMeta) => FindOptions<any, any, any> & {
     fetchPolicy: FetchPolicy
+    resultMode: QueryResultMode
   }
   /**
    * @private

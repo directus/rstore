@@ -271,6 +271,8 @@ All the first consecutive pages data will be reactively computed from the cache,
 
 For example, if you fetch the pages 0 and 1, their respective `data` properties will be computed from the cache using `pageIndex` and `pageSize`. If you then fetch the page 3, its `data` property will also be computed from the cache, but the items will only be looked up by their keys stored in the page result and not dynamically from `pageIndex` and `pageSize`.
 
+If you need the full query result to preserve the exact order returned by the backend, use `resultMode: 'responseRefs'`. In that mode, rstore keeps the fetched list as refs and maps those refs back to cached items, so updates and deletes still stay reactive without recomputing the list from cache order.
+
 ::: tip
 If you are using cursor-based pagination instead of index-based, you still need to pass the `pageIndex` and `pageSize` options so the pages are correctly stored in the `pages` ref and the `page.data` properties are correctly computed from the cache. In addition, you can pass your own custom parameters such as the cursor to the query options (see [Customizing Find Options Types](#customizing-find-options-types)).
 :::
