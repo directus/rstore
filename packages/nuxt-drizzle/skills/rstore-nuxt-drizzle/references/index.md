@@ -25,3 +25,4 @@
 | `rstoreDrizzleHooks` | [./api-rstore-drizzle-hooks.md](./api-rstore-drizzle-hooks.md) |
 | `hooksForTable` | [./api-hooks-for-table.md](./api-hooks-for-table.md) |
 | `allowTables` | [./api-allow-tables.md](./api-allow-tables.md) |
+| `publishRstoreDrizzleRealtimeUpdate` | [./api-publish-rstore-drizzle-realtime-update.md](./api-publish-rstore-drizzle-realtime-update.md) |

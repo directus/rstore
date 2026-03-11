@@ -528,10 +528,20 @@ ${collections.map((collection, index) => {
         as: 'setRstoreDrizzlePubSub',
       })
 
+      addServerImports({
+        name: 'publishRstoreDrizzleRealtimeUpdate',
+        from: resolve('./runtime/server/utils/realtime'),
+      })
+
       addServerImports([
         'RstoreDrizzlePubSubChannels',
         'RstoreDrizzlePubSub',
       ].map(name => ({ from: resolve('./runtime/server/utils/pubsub'), name })))
+
+      addServerImports([
+        'RstoreDrizzleRealtimeUpdateType',
+        'PublishRstoreDrizzleRealtimeUpdateOptions',
+      ].map(name => ({ from: resolve('./runtime/server/utils/realtime'), name })))
     }
 
     // Offline support

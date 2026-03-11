@@ -264,6 +264,33 @@ export default defineNitroPlugin(() => {
 })
 ```
 
+If you run direct Drizzle queries outside the generated rstore endpoints, publish realtime updates manually so `liveQuery` subscribers stay in sync:
+
+```ts
+// server/api/todos/bulk-toggle.post.ts
+export default defineEventHandler(async () => {
+  const db = useDrizzle()
+
+  const updatedTodos = await db
+    .update(tables.todos)
+    .set({ completed: true })
+    .where(eq(tables.todos.completed, false))
+    .returning()
+
+  for (const todo of updatedTodos) {
+    publishRstoreDrizzleRealtimeUpdate({
+      collection: tables.todos, // table or collection name both work
+      type: 'updated',
+      record: todo,
+      // optional: key can be inferred from the record primary key(s)
+      // key: todo.id,
+    })
+  }
+
+  return { updated: updatedTodos.length }
+})
+```
+
 ## Offline Mode <Badge text="New in v0.8" />
 
 Turn on the offline mode by setting the `rstoreDrizzle.offline` option in your Nuxt config:

@@ -1,6 +1,6 @@
 import { defineNitroPlugin } from 'nitropack/runtime'
 import { rstoreDrizzleHooks } from '../utils/hooks'
-import { getPubSub } from '../utils/pubsub'
+import { publishRstoreDrizzleRealtimeUpdate } from '../utils/realtime'
 
 export default defineNitroPlugin(() => {
   // function applyRealtimeFilterHooks<TType extends 'created' | 'updated' | 'deleted'>(payload: Pick<RstoreDrizzleRealtimeFilterPayload<any, TType>, 'collection' | 'key' | 'record' | 'type'>): Promise<boolean> {
@@ -19,16 +19,15 @@ export default defineNitroPlugin(() => {
   // }
 
   rstoreDrizzleHooks.hook('index.post.after', async ({ collection, result }) => {
-    getPubSub().publish('update', {
+    publishRstoreDrizzleRealtimeUpdate({
       type: 'created',
       collection,
-      key: undefined,
       record: result,
     })
   })
 
   rstoreDrizzleHooks.hook('item.patch.after', async ({ collection, key, result }) => {
-    getPubSub().publish('update', {
+    publishRstoreDrizzleRealtimeUpdate({
       type: 'updated',
       collection,
       key,
@@ -37,7 +36,7 @@ export default defineNitroPlugin(() => {
   })
 
   rstoreDrizzleHooks.hook('item.delete.after', async ({ collection, key, result }) => {
-    getPubSub().publish('update', {
+    publishRstoreDrizzleRealtimeUpdate({
       type: 'deleted',
       collection,
       key,
