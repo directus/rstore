@@ -35,6 +35,7 @@ export {
 } from './store'
 
 export type {
+  CreateStoreOptions,
   VueStore,
 } from './store'
 

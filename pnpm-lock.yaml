@@ -304,6 +304,9 @@ importers:
       '@rstore/vue':
         specifier: workspace:^
         version: link:../vue
+      serialize-javascript:
+        specifier: ^6.0.2
+        version: 6.0.2
       sirv:
         specifier: ^3.0.1
         version: 3.0.2

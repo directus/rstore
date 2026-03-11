@@ -1,15 +1,39 @@
+import type { CreateStoreOptions } from '@rstore/vue'
 import fs from 'node:fs'
 import { addImports, addPlugin, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, resolveFiles } from '@nuxt/kit'
+import serialize from 'serialize-javascript'
 import { setupDevToolsUI } from './devtools'
 
 declare module '@nuxt/schema' {
+  export interface NuxtConfig {
+    rstore?: ModuleOptions
+  }
+
   export interface NuxtOptions {
+    rstore?: ModuleOptions
+    _rstoreCollectionImports?: Set<string>
+    _rstorePluginImports?: Set<string>
+  }
+}
+
+declare module 'nuxt/schema' {
+  export interface NuxtConfig {
+    rstore?: ModuleOptions
+  }
+
+  export interface NuxtOptions {
+    rstore?: ModuleOptions
     _rstoreCollectionImports?: Set<string>
     _rstorePluginImports?: Set<string>
   }
 }
 
 // Module options TypeScript interface definition
+export interface ModuleStoreOptions extends Pick<
+  CreateStoreOptions,
+  'collectionDefaults' | 'findDefaults' | 'syncImmediately' | 'experimentalGarbageCollection' | 'cacheStaggering'
+> {}
+
 export interface ModuleOptions {
   /**
    * Directories to scan for store files
@@ -19,9 +43,29 @@ export interface ModuleOptions {
   rstoreDirs?: string[]
 
   /**
-   * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
+   * Options passed directly to `createStore()`.
+   */
+  store?: ModuleStoreOptions
+
+  /**
+   * @deprecated Use `store.experimentalGarbageCollection` instead.
    */
   experimentalGarbageCollection?: boolean
+}
+
+export function resolveStoreOptions(options: ModuleOptions): ModuleStoreOptions {
+  const storeOptions: ModuleStoreOptions = {
+    ...options.store,
+  }
+
+  const experimentalGarbageCollection = options.store?.experimentalGarbageCollection
+    ?? options.experimentalGarbageCollection
+
+  if (experimentalGarbageCollection !== undefined) {
+    storeOptions.experimentalGarbageCollection = experimentalGarbageCollection
+  }
+
+  return storeOptions
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -101,12 +145,13 @@ export default defineNuxtModule<ModuleOptions>({
       return files
     }
 
-    addTemplate({
-      filename: '$restore-options.ts',
-      getContents: () => `export default ${JSON.stringify({ experimentalGarbageCollection: options.experimentalGarbageCollection || false })}`,
+    const optionsTemplate = addTemplate({
+      filename: '$rstore-options.ts',
+      getContents: () => `export default ${serialize(resolveStoreOptions(options))}`,
+      write: true,
     })
 
-    addTemplate({
+    const collectionTemplate = addTemplate({
       filename: '$rstore-collection.ts',
       getContents: async () => {
         const files = await resolveCollectionFiles()
@@ -119,13 +164,17 @@ export default [
       write: true,
     })
 
-    addTemplate({
+    const pluginsTemplate = addTemplate({
       filename: '$rstore-plugins.ts',
       getContents: async () => {
         const files = await resolvePluginFiles()
         return files.map((file, index) => `export { default as Plugin_${index} } from '${file}'`).join('\n')
       },
     })
+
+    nuxt.options.alias['#rstore-options'] = optionsTemplate.dst
+    nuxt.options.alias['#rstore-collection'] = collectionTemplate.dst
+    nuxt.options.alias['#rstore-plugins'] = pluginsTemplate.dst
 
     addTypeTemplate({
       filename: 'types/rstore.d.ts',

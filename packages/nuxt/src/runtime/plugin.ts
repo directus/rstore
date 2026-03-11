@@ -1,12 +1,12 @@
 import type { Plugin, StoreSchema } from '@rstore/shared'
 
-// @ts-expect-error virtual file
-import options from '#build/$restore-options'
-// @ts-expect-error virtual file
-import _schema from '#build/$rstore-collection'
-// @ts-expect-error virtual file
-import * as _plugins from '#build/$rstore-plugins'
 import { defineNuxtPlugin } from '#imports'
+// @ts-expect-error virtual file
+import _schema from '#rstore-collection'
+// @ts-expect-error virtual file
+import options from '#rstore-options'
+// @ts-expect-error virtual file
+import * as _plugins from '#rstore-plugins'
 
 import { createStore, RstorePlugin } from '@rstore/vue'
 import { markRaw } from 'vue'

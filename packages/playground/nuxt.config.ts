@@ -64,6 +64,8 @@ export default defineNuxtConfig({
   },
 
   rstore: {
-    experimentalGarbageCollection: true,
+    store: {
+      experimentalGarbageCollection: true,
+    },
   },
 })
