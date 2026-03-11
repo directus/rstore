@@ -83,6 +83,19 @@ const coreFeatures = [
   },
 ]
 
+const testimonials = [
+  {
+    quote: `It's cool.`,
+    name: 'Rijk van Zanten',
+    image: '/testimonials/rijk.webp',
+  },
+  {
+    quote: `I've used it before.`,
+    name: 'Hannes Küttner',
+    image: '/testimonials/hannes.jpg',
+  },
+]
+
 const aiSupportPillars = [
   {
     title: 'Predictable APIs',
@@ -429,6 +442,48 @@ onBeforeUnmount(() => {
           :features="coreFeatures"
           class="relative z-10"
         />
+      </section>
+
+      <section class="relative overflow-hidden rounded-[28px] border border-emerald-600/[0.15] bg-white/[0.78] p-5 shadow-[0_26px_80px_rgba(5,24,11,0.08),inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl sm:p-7 dark:border-emerald-400/15 dark:bg-[linear-gradient(145deg,rgba(18,23,21,0.98),rgba(9,13,11,0.96))] dark:shadow-[0_30px_90px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] flex gap-12">
+        <div
+          class="pointer-events-none absolute inset-0"
+          style="background: linear-gradient(135deg, rgb(0 255 98 / 0.08), transparent 38%);"
+        />
+
+        <div class="relative z-10 mb-5 flex flex-col gap-2">
+          <div class="reveal-up font-mono text-xs uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400" style="animation-delay: 590ms;">
+            TESTIMONIAL
+          </div>
+          <h2 class="reveal-up m-0 text-balance text-[clamp(1.85rem,3vw,2.6rem)] font-extrabold leading-[1.05] tracking-[-0.04em]" style="animation-delay: 660ms;">
+            What people are saying.
+          </h2>
+        </div>
+
+        <article
+          v-for="(testimonial, index) in testimonials"
+          :key="testimonial.name"
+          class="reveal-up relative z-10 overflow-hidden rounded-[24px] border border-emerald-600/[0.16] bg-white/[0.72] p-6 dark:border-emerald-400/20 dark:bg-[#121815]/[0.88]"
+          :style="{ animationDelay: `${740 + index * 65}ms` }"
+        >
+          <div class="pointer-events-none absolute inset-0" style="background: linear-gradient(135deg, rgb(0 255 98 / 0.08), transparent 48%);" />
+
+          <div class="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
+            <div class="max-w-[42rem]">
+              <p class="m-0 text-[clamp(1.2rem,3vw,2rem)] font-black leading-[1.05] tracking-[-0.04em] text-[var(--vp-c-text-1)]">
+                "{{ testimonial.quote }}"
+              </p>
+              <p class="mb-0 mt-4 font-mono text-xs uppercase tracking-[0.18em] text-emerald-600 dark:text-emerald-400">
+                {{ testimonial.name }}
+              </p>
+            </div>
+
+            <img
+              :src="testimonial.image"
+              :alt="testimonial.name"
+              class="h-24 w-24 shrink-0 rounded-full border border-emerald-600/[0.16] object-cover shadow-[0_18px_40px_rgba(0,0,0,0.12)] dark:border-emerald-400/20"
+            >
+          </div>
+        </article>
       </section>
 
       <section class="relative overflow-hidden rounded-[28px] border border-emerald-600/[0.15] bg-white/[0.78] p-5 shadow-[0_26px_80px_rgba(5,24,11,0.08),inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl sm:p-7 dark:border-emerald-400/15 dark:bg-[linear-gradient(145deg,rgba(18,23,21,0.98),rgba(9,13,11,0.96))] dark:shadow-[0_30px_90px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)]">
