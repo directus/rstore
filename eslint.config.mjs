@@ -12,6 +12,7 @@ export default antfu({
       allowAllPropertiesOnSameLine: false,
     }],
     'no-console': 'error',
+    'pnpm/json-enforce-catalog': 'off',
   },
 }, {
   files: [

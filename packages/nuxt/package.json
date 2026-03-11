@@ -42,12 +42,12 @@
     "test:types": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@nuxt/devtools-kit": "catalog:",
-    "@nuxt/kit": "catalog:",
+    "@nuxt/devtools-kit": "^2.2.1",
+    "@nuxt/kit": "^4.0.0",
     "@rstore/devtools": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
-    "sirv": "catalog:"
+    "sirv": "^3.0.1"
   },
   "devDependencies": {
     "@iconify-json/lucide": "catalog:",

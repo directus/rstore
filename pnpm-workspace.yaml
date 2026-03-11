@@ -25,7 +25,6 @@ catalog:
   '@nuxt/ui': ^3.3.3
   '@nuxthub/core': ^0.8.18
   '@playwright/test': ^1.58.2
-  '@standard-schema/spec': ^1.0.0
   '@tailwindcss/vite': 4.0.7
   '@tresjs/core': ^5.6.0
   '@tresjs/post-processing': ^3.5.0
@@ -38,10 +37,8 @@ catalog:
   drizzle-kit: ^0.30.5
   drizzle-orm: ^0.40.0
   eslint: ^9.20.0
-  fast-equals: ^5.3.3
   h3: ^1.15.1
   jiti: ^2.4.2
-  klona: ^2.0.6
   lint-staged: ^15.4.3
   lucia: ^3.2.2
   nitropack: latest
@@ -51,7 +48,6 @@ catalog:
   pathe: ^2.0.3
   shiki: ^3.1.0
   simple-git-hooks: ^2.11.1
-  sirv: ^3.0.1
   superjson: ^2.2.3
   tailwindcss: 4.0.7
   three: ^0.183.2
