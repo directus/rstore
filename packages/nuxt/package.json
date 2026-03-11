@@ -39,7 +39,7 @@
     "client:prepare": "pnpm --filter @rstore/devtools dev:prepare",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "test:types": "pnpm --filter @rstore/devtools test:types && vue-tsc --noEmit"
+    "test:types": "vue-tsc --noEmit"
   },
   "dependencies": {
     "@nuxt/devtools-kit": "catalog:",

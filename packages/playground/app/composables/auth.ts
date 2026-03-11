@@ -33,14 +33,17 @@ export const useAuth = defineRstoreModule('auth', ({ store, defineState, defineM
   }
 
   const login = defineMutation(async (email: string, password: string) => {
-    const result = await $fetch('/api/auth/login', {
+    await $fetch('/api/auth/login', {
       method: 'POST',
       body: {
         email,
         password,
       },
     })
-    state.currentUserKey = result.userId
+
+    // Fetch and cache the logged user immediately so UI depending on `currentUser`
+    // updates without waiting for a full page reload.
+    await initCurrentUser()
   })
 
   const logout = defineMutation(async () => {
