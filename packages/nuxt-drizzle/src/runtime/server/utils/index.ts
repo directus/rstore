@@ -135,6 +135,7 @@ export function getDrizzleCondition(table: Table, condition: RstoreDrizzleCondit
         return drizzle[condition.operator](table[condition.field as keyof typeof table] as Column ?? drizzle.sql`${condition.field}`.as(condition.field), condition.value)
       }
       else {
+        // @ts-expect-error drizzle typing issue?
         return drizzle[condition.operator]<typeof condition.value>(table[condition.field as keyof typeof table] as Column ?? drizzle.sql`${condition.field}`.as(condition.field), condition.value)
       }
     }
