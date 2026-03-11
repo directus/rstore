@@ -15,6 +15,7 @@
     "@nuxt/kit": "catalog:",
     "@rstore/devtools": "workspace:^",
     "@rstore/nuxt": "workspace:^",
+    "@rstore/nuxt-multiplayer": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
     "@vueuse/core": "catalog:",

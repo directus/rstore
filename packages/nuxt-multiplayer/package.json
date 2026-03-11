@@ -1,0 +1,54 @@
+{
+  "name": "@rstore/nuxt-multiplayer",
+  "type": "module",
+  "version": "0.8.4",
+  "description": "Nuxt UI multiplayer helpers for rstore collaborative editing flows.",
+  "license": "MIT",
+  "repository": {
+    "url": "https://github.com/Akryum/rstore.git",
+    "type": "git",
+    "directory": "packages/nuxt-multiplayer"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/module.mjs",
+      "require": "./dist/module.cjs"
+    }
+  },
+  "main": "./dist/module.cjs",
+  "types": "./dist/types.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "nuxi prepare ../playground && nuxt-module-build build",
+    "dev": "pnpm run build",
+    "dev:prepare": "nuxi prepare ../playground",
+    "dev:playground": "nuxi dev ../playground",
+    "dev:build": "nuxi build ../playground",
+    "test:types": "vue-tsc --noEmit"
+  },
+  "peerDependencies": {
+    "@nuxt/ui": "^3.0.0"
+  },
+  "dependencies": {
+    "@nuxt/kit": "^4.0.0",
+    "@vueuse/core": "^14.0.0"
+  },
+  "devDependencies": {
+    "@nuxt/devtools": "catalog:",
+    "@nuxt/module-builder": "catalog:",
+    "@nuxt/schema": "catalog:",
+    "@nuxt/test-utils": "catalog:",
+    "@nuxt/ui": "catalog:",
+    "@types/node": "catalog:",
+    "nuxt": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:",
+    "vue-tsc": "catalog:"
+  }
+}

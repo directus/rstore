@@ -11,18 +11,6 @@ const store = useStore()
 // Load the document into an update form
 const form = await store.CollabDocument!.updateForm(props.id)
 
-// Set up collab sync via WebSocket
-const {
-  userName,
-  userColor,
-  peers,
-  remoteUpdates,
-  joinRoom,
-  broadcastChanges,
-  broadcastFocus,
-  broadcastCursor,
-} = useCollabSync(props.id)
-
 type TextField = 'title' | 'body'
 type MaybeElementRef<T> = T | Ref<T>
 
@@ -40,71 +28,51 @@ const titleInputRef = ref<InputComponentRef | null>(null)
 const bodyTextareaRef = ref<TextareaComponentRef | null>(null)
 const titleInputEl = computed(() => titleInputRef.value ? resolveElementRef(titleInputRef.value.inputRef) : null)
 const bodyTextareaEl = computed(() => bodyTextareaRef.value ? resolveElementRef(bodyTextareaRef.value.textareaRef) : null)
-const activePresenceField = ref<string | null>(null)
-let pendingBlurTimer: ReturnType<typeof setTimeout> | null = null
 
-// Join the room when mounted
-onMounted(() => {
-  joinRoom()
+const channel = useRstoreMultiplayerChannel<{
+  title?: string
+  body?: string
+  status?: 'draft' | 'published'
+}, TextField | 'status'>({
+  roomId: `collab:${props.id}`,
 })
 
-// When the form changes, broadcast the new values to peers
-let suppressBroadcast = false
-
-form.$onChange((changes) => {
-  if (suppressBroadcast)
-    return
-  const fields: Record<string, any> = {}
-  for (const [key, value] of Object.entries(changes)) {
-    if (value) {
-      fields[key] = value[0] // newValue
-    }
-  }
-  if (Object.keys(fields).length > 0) {
-    broadcastChanges(fields)
-  }
+const titleField = useRstoreMultiplayerTextField({
+  field: 'title',
+  channel,
 })
 
-// Broadcast current form state for all tracked fields (used after undo/redo)
-function broadcastCurrentState() {
-  const fields: Record<string, any> = {}
-  for (const key of ['title', 'body', 'status'] as const) {
-    fields[key] = (form as any)[key]
-  }
-  broadcastChanges(fields)
-}
+const bodyField = useRstoreMultiplayerTextField({
+  field: 'body',
+  channel,
+})
 
-function undoAndSync() {
-  suppressBroadcast = true
-  form.$opLog.undo()
-  suppressBroadcast = false
-  broadcastCurrentState()
-}
+const statusField = useRstoreMultiplayerField({
+  field: 'status',
+  channel,
+})
 
-function redoAndSync() {
-  suppressBroadcast = true
-  form.$opLog.redo()
-  suppressBroadcast = false
-  broadcastCurrentState()
-}
-
-// When we receive remote updates, rebase the form
-watch(remoteUpdates, (updates) => {
-  if (!updates)
-    return
-  // Build the new base data by merging current cache data with remote changes
-  const currentItem = store.CollabDocument!.peekFirst(props.id)
-  if (currentItem) {
-    const newBase = { ...currentItem, ...updates }
-    // Also apply changes to the cache so the underlying data is up-to-date
+const {
+  undoAndSync,
+  redoAndSync,
+} = useRstoreMultiplayerForm({
+  form,
+  channel,
+  trackedFields: ['title', 'body', 'status'],
+  getBaseValue: () => store.CollabDocument!.peekFirst(props.id),
+  setBaseValue: (value) => {
     const collection = store.$collections.find(c => c.name === 'CollabDocument')!
     store.$cache.writeItem({
       collection,
       key: props.id,
-      item: newBase,
+      item: value,
     })
-    form.$rebase(newBase, Object.keys(updates) as (keyof typeof newBase)[])
-  }
+  },
+})
+
+// Join the room when mounted
+onMounted(() => {
+  channel.joinRoom()
 })
 
 // Conflict handling
@@ -113,78 +81,13 @@ form.$onConflict((conflicts) => {
   console.log('Conflicts detected:', conflicts)
 })
 
-// Track which field has focus
-function onFieldFocus(field: string) {
-  clearPendingBlur()
-  activePresenceField.value = field
-  broadcastFocus(field)
-}
-
-function onFieldBlur(field: string) {
-  clearPendingBlur()
-  pendingBlurTimer = setTimeout(() => {
-    pendingBlurTimer = null
-
-    if (activePresenceField.value !== field) {
-      return
-    }
-
-    if (!document.hasFocus()) {
-      return
-    }
-
-    activePresenceField.value = null
-    broadcastFocus(undefined)
-  }, 0)
-}
-
-function onTextFieldFocus(field: TextField, event: FocusEvent) {
-  onFieldFocus(field)
-  updateTextCursor(field, event)
-}
-
-function onTextCursorEvent(field: TextField, event: Event) {
-  updateTextCursor(field, event)
-}
-
-function updateTextCursor(field: TextField, event: Event) {
-  const target = event.target
-  if (!(target instanceof HTMLInputElement) && !(target instanceof HTMLTextAreaElement)) {
-    return
-  }
-
-  const start = target.selectionStart ?? 0
-  const end = target.selectionEnd ?? start
-
-  broadcastCursor(field, {
-    start,
-    end,
-    direction: normalizeSelectionDirection(target.selectionDirection),
-  })
-}
-
-function normalizeSelectionDirection(direction: string | null): 'forward' | 'backward' | 'none' {
-  if (direction === 'forward' || direction === 'backward') {
-    return direction
-  }
-
-  return 'none'
-}
-
 function resolveElementRef<T>(value: MaybeElementRef<T>) {
   return isRef(value) ? value.value : value
 }
 
-function clearPendingBlur() {
-  if (pendingBlurTimer != null) {
-    clearTimeout(pendingBlurTimer)
-    pendingBlurTimer = null
-  }
-}
-
 // Get peers editing a specific field
 function peersOnField(field: string) {
-  return peers.value.filter(peer => peer.field === field)
+  return channel.peers.value.filter(peer => peer.field === field)
 }
 
 const toast = useToast()
@@ -196,41 +99,16 @@ form.$onSuccess(() => {
     color: 'success',
   })
 })
-
-onUnmounted(() => {
-  clearPendingBlur()
-})
 </script>
 
 <template>
   <div class="flex flex-col gap-4">
     <!-- Presence indicators -->
-    <div class="flex items-center gap-2 flex-wrap">
-      <div class="flex items-center gap-1">
-        <div
-          class="w-3 h-3 rounded-full border-2"
-          :style="{ backgroundColor: userColor,
-                    borderColor: userColor }"
-        />
-        <span class="text-xs font-medium">{{ userName }} (you)</span>
-      </div>
-      <div
-        v-for="peer in peers"
-        :key="peer.userId"
-        class="flex items-center gap-1"
-      >
-        <div
-          class="w-3 h-3 rounded-full border-2"
-          :style="{ backgroundColor: peer.userColor,
-                    borderColor: peer.userColor }"
-        />
-        <span class="text-xs font-medium">{{ peer.userName }}</span>
-        <span v-if="peer.field" class="text-xs opacity-50">(editing {{ peer.field }})</span>
-      </div>
-      <div v-if="peers.length === 0" class="text-xs opacity-40 ml-2">
-        No other editors — open this page in another tab!
-      </div>
-    </div>
+    <RstoreMultiplayerPresenceList
+      :user="channel.user"
+      :peers="channel.peers"
+      empty-label="No other editors — open this page in another tab!"
+    />
 
     <USeparator />
 
@@ -291,28 +169,28 @@ onUnmounted(() => {
             placeholder="Document title"
             size="lg"
             class="w-full"
-            @focus="onTextFieldFocus('title', $event)"
-            @blur="onFieldBlur('title')"
-            @click="onTextCursorEvent('title', $event)"
-            @input="onTextCursorEvent('title', $event)"
-            @keyup="onTextCursorEvent('title', $event)"
-            @select="onTextCursorEvent('title', $event)"
+            @focus="titleField.onFocus"
+            @blur="titleField.onBlur"
+            @click="titleField.onCursorEvent"
+            @input="titleField.onCursorEvent"
+            @keyup="titleField.onCursorEvent"
+            @select="titleField.onCursorEvent"
           />
-          <CollabTextCursorOverlay
+          <RstoreMultiplayerTextCursorOverlay
             field="title"
-            :peers="peers"
+            :peers="channel.peers"
             :container="titleFieldRef"
             :target="titleInputEl"
           />
           <div
             v-for="peer in peersOnField('title')"
-            :key="peer.userId"
+            :key="peer.id"
             class="absolute -top-2 -right-2"
           >
             <div
               class="w-4 h-4 rounded-full border-2 border-white dark:border-gray-900"
-              :style="{ backgroundColor: peer.userColor }"
-              :title="`${peer.userName} is editing`"
+              :style="{ backgroundColor: peer.color }"
+              :title="`${peer.name} is editing`"
             />
           </div>
         </div>
@@ -329,28 +207,28 @@ onUnmounted(() => {
             placeholder="Write your content here..."
             :rows="10"
             class="w-full"
-            @focus="onTextFieldFocus('body', $event)"
-            @blur="onFieldBlur('body')"
-            @click="onTextCursorEvent('body', $event)"
-            @input="onTextCursorEvent('body', $event)"
-            @keyup="onTextCursorEvent('body', $event)"
-            @select="onTextCursorEvent('body', $event)"
+            @focus="bodyField.onFocus"
+            @blur="bodyField.onBlur"
+            @click="bodyField.onCursorEvent"
+            @input="bodyField.onCursorEvent"
+            @keyup="bodyField.onCursorEvent"
+            @select="bodyField.onCursorEvent"
           />
-          <CollabTextCursorOverlay
+          <RstoreMultiplayerTextCursorOverlay
             field="body"
-            :peers="peers"
+            :peers="channel.peers"
             :container="bodyFieldRef"
             :target="bodyTextareaEl"
           />
           <div
             v-for="peer in peersOnField('body')"
-            :key="peer.userId"
+            :key="peer.id"
             class="absolute -top-2 -right-2"
           >
             <div
               class="w-4 h-4 rounded-full border-2 border-white dark:border-gray-900"
-              :style="{ backgroundColor: peer.userColor }"
-              :title="`${peer.userName} is editing`"
+              :style="{ backgroundColor: peer.color }"
+              :title="`${peer.name} is editing`"
             />
           </div>
         </div>
@@ -369,8 +247,8 @@ onUnmounted(() => {
               value: 'published' },
           ]"
           class="w-48"
-          @focus="onFieldFocus('status')"
-          @blur="onFieldBlur('status')"
+          @focus="statusField.onFocus"
+          @blur="statusField.onBlur"
         />
       </UFormField>
 

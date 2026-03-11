@@ -12,6 +12,7 @@ export default defineNuxtConfig({
 
   modules: [
     '../nuxt/src/module',
+    '../nuxt-multiplayer/src/module',
     '@nuxt/ui',
     '@vueuse/nuxt',
     'nuxt-auth-utils',

@@ -1,11 +1,13 @@
 <script lang="ts" setup>
-import type { CollabPeer } from '~~/app/composables/collabSync'
-import { getTextCursorLayout, getTextSelectionLayouts } from '~~/app/utils/textCursor'
+import type { MaybeRefOrGetter } from 'vue'
+import type { MultiplayerPeer } from '../types'
+import { computed, onMounted, onUnmounted, ref, toValue, watch } from 'vue'
+import { getTextCursorLayout, getTextSelectionLayouts } from '../utils/textCursor'
 
 const props = defineProps<{
   container: HTMLElement | null
   target: HTMLInputElement | HTMLTextAreaElement | null
-  peers: CollabPeer[]
+  peers: MaybeRefOrGetter<MultiplayerPeer[]>
   field: string
 }>()
 
@@ -58,17 +60,26 @@ const cursors = computed(() => {
     return []
   }
 
-  return props.peers.flatMap((peer) => {
+  const peers = toValue(props.peers) ?? []
+
+  return peers.flatMap((peer) => {
+    if (!peer) {
+      return []
+    }
+
     if (peer.field !== props.field || !peer.cursor) {
       return []
     }
 
     const selectionStart = Math.min(peer.cursor.start, peer.cursor.end)
     const selectionEnd = Math.max(peer.cursor.start, peer.cursor.end)
-    const cursorIndex = peer.cursor.direction === 'backward'
-      ? peer.cursor.start
-      : peer.cursor.end
-    const layout = getTextCursorLayout(container, target, cursorIndex)
+    const layout = getTextCursorLayout(
+      container,
+      target,
+      peer.cursor.direction === 'backward'
+        ? peer.cursor.start
+        : peer.cursor.end,
+    )
     const selectionRects = getTextSelectionLayouts(container, target, selectionStart, selectionEnd)
       .filter(rect => rect.visible)
     const selectionText = selectionEnd > selectionStart
@@ -90,10 +101,9 @@ const cursors = computed(() => {
     }
 
     return [{
-      userId: peer.userId,
-      userName: peer.userName,
-      userColor: peer.userColor,
-      selectionLength: selectionEnd - selectionStart,
+      userId: peer.id,
+      userName: peer.name,
+      userColor: peer.color,
       selectionRects,
       selectionText: selectionText.length > 160
         ? `${selectionText.slice(0, 160)}...`
@@ -150,9 +160,7 @@ const cursors = computed(() => {
             </div>
           </template>
 
-          <div
-            class="relative pointer-events-auto"
-          >
+          <div class="relative pointer-events-auto">
             <div
               v-if="cursor.caret"
               class="absolute left-0 top-0 h-full w-0.5 rounded-full shadow-sm"
@@ -162,7 +170,7 @@ const cursors = computed(() => {
               }"
             />
             <div
-              class="absolute left-0 top-0 h-2 w-2 rounded-full -translate-x-[3px]"
+              class="absolute -left-[3px] top-0 h-2 w-2 rounded-full"
               :style="{
                 backgroundColor: cursor.userColor,
                 opacity: cursor.caret ? 1 : 0,
