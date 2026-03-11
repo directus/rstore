@@ -1,4 +1,4 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 import { unwrapItem } from '../item'
 import { isKeyDefined } from '../key'
@@ -15,6 +15,11 @@ export interface UpdateOptions<
   key?: string | number | null
   skipCache?: boolean
   optimistic?: boolean | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
+  /**
+   * Form operations (op log) from a form submission.
+   * Passed through to plugin hooks so they can handle relational edits.
+   */
+  formOperations?: FormOperation<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>[]
 }
 
 export async function updateItem<
@@ -28,6 +33,7 @@ export async function updateItem<
   key,
   skipCache,
   optimistic = true,
+  formOperations,
 }: UpdateOptions<TCollection, TCollectionDefaults, TSchema>): Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> {
   const meta: CustomHookMeta = {}
 
@@ -66,6 +72,7 @@ export async function updateItem<
     setItem: (newItem) => {
       item = newItem as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
     },
+    formOperations: formOperations as FormOperation[],
   })
 
   let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null = skipCache
@@ -119,6 +126,7 @@ export async function updateItem<
         }
       },
       abort,
+      formOperations: formOperations as FormOperation[],
     })
 
     await store.$hooks.callHook('afterMutation', {
@@ -132,6 +140,7 @@ export async function updateItem<
       setResult: (newResult) => {
         result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
       },
+      formOperations: formOperations as FormOperation[],
     })
 
     if (result) {

@@ -1,5 +1,6 @@
 export * from './cache.js'
 export * from './collection.js'
+export * from './crdt.js'
 export * from './fetchPolicy.js'
 export * from './item.js'
 export * from './key.js'

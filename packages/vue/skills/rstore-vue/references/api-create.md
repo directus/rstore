@@ -18,6 +18,7 @@ await store.todos.create({ title: 'New' })
 
 - Runs plugin mutation hooks.
 - Updates cache with mutation result.
+- Accepts `options.formOperations` for advanced plugin-driven relation workflows.
 
 ## Requirements
 

@@ -62,6 +62,8 @@ catalog:
   vue: ^3.5.21
   vue-tsc: ^3.0.6
   wrangler: ^3.114.1
+  y-protocols: ^1.0.0
+  yjs: ^13.6.24
   zod: ^3.24.2
 onlyBuiltDependencies:
   - '@parcel/watcher'

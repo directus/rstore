@@ -167,9 +167,49 @@ hook('createItem', (payload) => {
     payload.item, // The data for the item to create
     payload.getResult, // A function to get the result of the query
     payload.setResult, // A function to update the result of the query
+    payload.formOperations, // Form op log (only present when mutation comes from a form)
   )
 })
 ```
+
+#### Handling relational edits from forms
+
+When a mutation originates from a form object (`createForm` or `updateForm`), the `formOperations` array contains the full operation log from the form — including relational `connect`, `disconnect`, and `set` operations. Plugins can use this to handle relational edits (e.g. updating junction tables, managing foreign keys on related collections).
+
+```ts
+hook('createItem', async (payload) => {
+  // Create the main item first
+  const result = await $fetch(`/api/${payload.collection.name}`, {
+    method: 'POST',
+    body: payload.item,
+  })
+  payload.setResult(result)
+
+  // Then process relational edits from the form
+  if (payload.formOperations) {
+    for (const op of payload.formOperations) {
+      if (op.type === 'connect') {
+        // Handle connecting a related item
+        await $fetch(`/api/${payload.collection.name}/${result.id}/relations/${String(op.field)}`, {
+          method: 'POST',
+          body: op.newValue,
+        })
+      }
+      else if (op.type === 'disconnect') {
+        // Handle disconnecting a related item
+        await $fetch(`/api/${payload.collection.name}/${result.id}/relations/${String(op.field)}`, {
+          method: 'DELETE',
+          body: op.oldValue,
+        })
+      }
+    }
+  }
+})
+```
+
+::: tip
+`formOperations` is `undefined` when the mutation does not come from a form (e.g. when using `store.MyCollection.create()` directly).
+:::
 
 ::: warning Auto-abort remaining callbacks
 If a non-null result is set with `setResult`, the remaining callbacks for this hook will not be called by default. This is useful in case you have multiple plugins that can fetch the same collections (for example, one local and one remote). The first plugin to set a non-null result will abort the remaining callbacks.
@@ -245,7 +285,44 @@ hook('updateItem', (payload) => {
     payload.item, // The data for the item to update
     payload.getResult, // A function to get the result of the query
     payload.setResult, // A function to update the result of the query
+    payload.formOperations, // Form op log (only present when mutation comes from a form)
   )
+})
+```
+
+#### Handling relational edits from forms
+
+Just like [`createItem`](#createitem), `updateItem` receives `formOperations` when the mutation originates from a form. This is particularly useful for `updateForm`, where the user may connect or disconnect related items.
+
+```ts
+hook('updateItem', async (payload) => {
+  // Update the main item
+  const result = await $fetch(`/api/${payload.collection.name}/${payload.key}`, {
+    method: 'PATCH',
+    body: payload.item,
+  })
+  payload.setResult(result)
+
+  // Process relational edits from the form
+  if (payload.formOperations) {
+    const relationOps = payload.formOperations.filter(
+      op => op.type === 'connect' || op.type === 'disconnect',
+    )
+    for (const op of relationOps) {
+      if (op.type === 'connect') {
+        await $fetch(`/api/${payload.collection.name}/${payload.key}/relations/${String(op.field)}`, {
+          method: 'POST',
+          body: op.newValue,
+        })
+      }
+      else if (op.type === 'disconnect') {
+        await $fetch(`/api/${payload.collection.name}/${payload.key}/relations/${String(op.field)}`, {
+          method: 'DELETE',
+          body: op.oldValue,
+        })
+      }
+    }
+  }
 })
 ```
 
@@ -411,6 +488,48 @@ You can prevent this behavior by setting `abort: false` to the second argument o
 payload.setResult(cache.get(payload.key), { abort: false })
 ```
 :::
+
+## Cache lifecycle
+
+### afterCacheWrite
+
+This hook is called after cache writes and deletes.
+
+```ts
+hook('afterCacheWrite', (payload) => {
+  console.log(
+    payload.store, // The store instance
+    payload.meta,
+    payload.collection, // Collection affected
+    payload.operation, // 'write' | 'delete'
+    payload.key, // Item key when applicable
+    payload.result, // Result array when applicable
+    payload.marker, // Marker when write came from marker-based query
+  )
+})
+```
+
+Use this hook for side effects such as analytics, logging, or external cache invalidation.
+
+### cacheConflict
+
+This hook is called when cache-level CRDT merge detects field conflicts on an item.
+
+```ts
+hook('cacheConflict', (payload) => {
+  console.log(
+    payload.collection.name,
+    payload.key,
+    payload.conflicts, // Array<{ field, localValue, remoteValue, ... }>
+  )
+})
+```
+
+Typical uses:
+
+- Log conflict telemetry.
+- Trigger custom conflict resolution workflows.
+- Surface collaboration warnings in your UI layer.
 
 ## Fetching relations
 

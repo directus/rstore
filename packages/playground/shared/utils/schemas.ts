@@ -14,6 +14,11 @@ export const createValidationSchemas = {
   todos: z.object({
     text: z.string().nonempty(),
   }),
+  collabDocuments: z.object({
+    title: z.string().nonempty(),
+    body: z.string(),
+    status: z.enum(['draft', 'published']).default('draft'),
+  }),
 } as const
 
 export type CreateValidationSchemas = { [T in keyof typeof createValidationSchemas]: z.infer<typeof createValidationSchemas[T]> }
@@ -30,6 +35,11 @@ export const updateValidationSchemas = {
   todos: z.object({
     text: z.string().nonempty(),
     completed: z.boolean(),
+  }).partial(),
+  collabDocuments: z.object({
+    title: z.string().nonempty(),
+    body: z.string(),
+    status: z.enum(['draft', 'published']),
   }).partial(),
 } as const
 

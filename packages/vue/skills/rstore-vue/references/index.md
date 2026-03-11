@@ -20,6 +20,7 @@
 | `defineModule` | [./api-define-module.md](./api-define-module.md) |
 | `createFormObject` | [./api-create-form-object.md](./api-create-form-object.md) |
 | `createFormObjectWithChangeDetection` | [./api-create-form-object-with-change-detection.md](./api-create-form-object-with-change-detection.md) |
+| `optimizeOpLog` | [./api-optimize-op-log.md](./api-optimize-op-log.md) |
 | `useQueryTracking` | [./api-use-query-tracking.md](./api-use-query-tracking.md) |
 | `store.$wrapMutation` | [./api-wrap-mutation.md](./api-wrap-mutation.md) |
 | `peekFirst` | [./api-peek-first.md](./api-peek-first.md) |

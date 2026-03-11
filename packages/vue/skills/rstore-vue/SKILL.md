@@ -18,6 +18,7 @@ Build typed, cache-first Vue data flows with `@rstore/vue`, including core engin
 | Mutations and forms | [https://rstore.akryum.dev/guide/data/mutation](https://rstore.akryum.dev/guide/data/mutation), [https://rstore.akryum.dev/guide/data/form](https://rstore.akryum.dev/guide/data/form) |
 | Cache and modules | [https://rstore.akryum.dev/guide/data/cache](https://rstore.akryum.dev/guide/data/cache), [https://rstore.akryum.dev/guide/data/module](https://rstore.akryum.dev/guide/data/module) |
 | Plugin setup and hooks | [https://rstore.akryum.dev/guide/plugin/setup](https://rstore.akryum.dev/guide/plugin/setup), [https://rstore.akryum.dev/guide/plugin/hooks](https://rstore.akryum.dev/guide/plugin/hooks) |
+| Collaboration plugin (Yjs) | [https://rstore.akryum.dev/plugins/yjs](https://rstore.akryum.dev/plugins/yjs) |
 | Skill-local API references | [./references/index.md](./references/index.md) |
 
 ## Core concepts
@@ -80,6 +81,8 @@ app.use(RstorePlugin, { store })
 Notes:
 
 - `createFormObject` supports `validateOnSubmit`, `transformData`, `resetOnSuccess`, `$changedProps`, and `$valid`.
+- Form objects expose `$opLog` for undo/redo and optimized form operations.
+- Use `$rebase`, `$conflicts`, and `$resolveConflict` for collaborative editing flows.
 - `$save()` and `$onSaved()` are deprecated compatibility aliases. Prefer `$submit()` and `$onSuccess()`.
 
 ## Modules and plugins
@@ -118,6 +121,7 @@ Notes:
 | defineModule | Store-scoped module authoring API | [api-define-module](./references/api-define-module.md) |
 | createFormObject | Low-level form object API | [api-create-form-object](./references/api-create-form-object.md) |
 | createFormObjectWithChangeDetection | Deprecated alias for createFormObject | [api-create-form-object-with-change-detection](./references/api-create-form-object-with-change-detection.md) |
+| optimizeOpLog | Utility to optimize form operation logs | [api-optimize-op-log](./references/api-optimize-op-log.md) |
 | useQueryTracking | Query membership/dirty-item tracking | [api-use-query-tracking](./references/api-use-query-tracking.md) |
 | store.$wrapMutation | Wrap custom mutations in store mutation lifecycle | [api-wrap-mutation](./references/api-wrap-mutation.md) |
 | peekFirst | Cache-only first-item read | [api-peek-first](./references/api-peek-first.md) |
@@ -145,3 +149,4 @@ Notes:
 - Mutation docs: [https://rstore.akryum.dev/guide/data/mutation](https://rstore.akryum.dev/guide/data/mutation)
 - Form docs: [https://rstore.akryum.dev/guide/data/form](https://rstore.akryum.dev/guide/data/form)
 - Plugin hook docs: [https://rstore.akryum.dev/guide/plugin/hooks](https://rstore.akryum.dev/guide/plugin/hooks)
+- Yjs plugin docs: [https://rstore.akryum.dev/plugins/yjs](https://rstore.akryum.dev/plugins/yjs)

@@ -69,3 +69,12 @@ export interface Author {
   name: string
   birthDate: Date
 }
+
+export interface CollabDocument {
+  id: string
+  title: string
+  body: string
+  status: 'draft' | 'published'
+  createdAt: Date
+  updatedAt?: Date
+}

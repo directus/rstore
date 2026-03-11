@@ -10,6 +10,7 @@ export interface Db {
   dataFields: DataField[]
   authors: Author[]
   books: Book[]
+  collabDocuments: CollabDocument[]
 }
 
 const authors = generateAuthors(1000)
@@ -122,6 +123,29 @@ export const db: Db = {
   ],
   authors,
   books,
+  collabDocuments: [
+    {
+      id: 'doc1',
+      title: 'Getting Started with rstore',
+      body: 'rstore is a reactive data store for Vue and Nuxt applications. It provides a powerful way to manage your application state with built-in support for caching, real-time updates, and form handling.',
+      status: 'published',
+      createdAt: new Date(),
+    },
+    {
+      id: 'doc2',
+      title: 'Collaborative Editing Guide',
+      body: 'This document demonstrates how to use form objects with $rebase for real-time collaborative editing. Multiple users can edit the same document simultaneously.',
+      status: 'draft',
+      createdAt: new Date(),
+    },
+    {
+      id: 'doc3',
+      title: 'Meeting Notes',
+      body: 'Discuss project roadmap and upcoming features. Review pull requests and assign tasks for the next sprint.',
+      status: 'draft',
+      createdAt: new Date(),
+    },
+  ],
 }
 
 function generateAuthors(count: number): Author[] {

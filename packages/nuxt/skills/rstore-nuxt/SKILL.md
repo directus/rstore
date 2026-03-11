@@ -17,6 +17,7 @@ Use this skill together with the `@rstore/vue` skill for collection/query/form s
 | Query and mutation model | [https://rstore.akryum.dev/guide/data/query](https://rstore.akryum.dev/guide/data/query), [https://rstore.akryum.dev/guide/data/mutation](https://rstore.akryum.dev/guide/data/mutation) |
 | Cache and live updates | [https://rstore.akryum.dev/guide/data/cache](https://rstore.akryum.dev/guide/data/cache), [https://rstore.akryum.dev/guide/data/live](https://rstore.akryum.dev/guide/data/live) |
 | Plugin extension model | [https://rstore.akryum.dev/guide/plugin/setup](https://rstore.akryum.dev/guide/plugin/setup), [https://rstore.akryum.dev/guide/plugin/hooks](https://rstore.akryum.dev/guide/plugin/hooks) |
+| Collaboration plugin (Yjs) | [https://rstore.akryum.dev/plugins/yjs](https://rstore.akryum.dev/plugins/yjs) |
 | Related package skills | `rstore-vue` skill (`@rstore/vue`) |
 | Skill-local API references | [./references/index.md](./references/index.md) |
 
@@ -110,3 +111,4 @@ rstore/
 - Query docs: [https://rstore.akryum.dev/guide/data/query](https://rstore.akryum.dev/guide/data/query)
 - Cache docs: [https://rstore.akryum.dev/guide/data/cache](https://rstore.akryum.dev/guide/data/cache)
 - Plugin hook docs: [https://rstore.akryum.dev/guide/plugin/hooks](https://rstore.akryum.dev/guide/plugin/hooks)
+- Yjs plugin docs: [https://rstore.akryum.dev/plugins/yjs](https://rstore.akryum.dev/plugins/yjs)

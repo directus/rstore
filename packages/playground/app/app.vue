@@ -126,6 +126,12 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
                 },
               ],
             },
+            {
+              label: 'Collab',
+              icon: 'lucide:file-edit',
+              active: $route.path.startsWith('/collab'),
+              to: '/collab',
+            },
           ]"
           content-orientation="vertical"
         />

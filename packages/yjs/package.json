@@ -1,0 +1,53 @@
+{
+  "name": "@rstore/yjs",
+  "type": "module",
+  "version": "0.8.3",
+  "description": "Rstore plugin for realtime collaboration using Yjs.",
+  "repository": {
+    "url": "https://github.com/Akryum/rstore.git",
+    "type": "git",
+    "directory": "packages/yjs"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",
+    "test:types": "tsc --noEmit"
+  },
+  "peerDependencies": {
+    "y-protocols": "^1.0.0",
+    "yjs": "^13.0.0"
+  },
+  "dependencies": {
+    "@rstore/core": "workspace:^",
+    "@rstore/shared": "workspace:^"
+  },
+  "devDependencies": {
+    "typescript": "catalog:",
+    "unbuild": "catalog:",
+    "vitest": "catalog:",
+    "y-protocols": "catalog:",
+    "yjs": "catalog:"
+  }
+}

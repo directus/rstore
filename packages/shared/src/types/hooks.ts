@@ -1,4 +1,6 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from './collection'
+import type { FieldConflict } from './crdt'
+import type { FormOperation } from './formOperation'
 import type { GlobalStoreType } from './global'
 import type { CacheLayer } from './layer'
 import type { ResolvedModule } from './module'
@@ -242,6 +244,14 @@ export interface HookDefinitions<
       modifyItem: <TItem extends ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>, TPath extends Path<TItem>> (path: TPath, value: PathValue<TItem, TPath>) => void
       setItem: (item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>) => void
       mutation: 'create' | 'update' | 'delete'
+      /**
+       * Form operations (op log) from a form submission. Only present when the mutation
+       * originates from a form object (`createForm` or `updateForm`).
+       *
+       * Plugins can use this to handle relational edits such as connect/disconnect
+       * operations on relation fields (e.g. updating junction tables, managing foreign keys).
+       */
+      formOperations?: FormOperation[]
     },
   ) => Awaitable<void>
 
@@ -257,6 +267,14 @@ export interface HookDefinitions<
       mutation: 'create' | 'update' | 'delete'
       getResult: () => ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined
       setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => void
+      /**
+       * Form operations (op log) from a form submission. Only present when the mutation
+       * originates from a form object (`createForm` or `updateForm`).
+       *
+       * Plugins can use this to handle relational edits such as connect/disconnect
+       * operations on relation fields (e.g. updating junction tables, managing foreign keys).
+       */
+      formOperations?: FormOperation[]
     },
   ) => Awaitable<void>
 
@@ -306,6 +324,14 @@ export interface HookDefinitions<
        * Don't call the remaining hooks in the queue.
        */
       abort: () => void
+      /**
+       * Form operations (op log) from a form submission. Only present when the mutation
+       * originates from a form object (`createForm` or `updateForm`).
+       *
+       * Plugins can use this to handle relational edits such as connect/disconnect
+       * operations on relation fields (e.g. updating junction tables, managing foreign keys).
+       */
+      formOperations?: FormOperation[]
     },
   ) => Awaitable<void>
 
@@ -347,6 +373,14 @@ export interface HookDefinitions<
        * Don't call the remaining hooks in the queue.
        */
       abort: () => void
+      /**
+       * Form operations (op log) from a form submission. Only present when the mutation
+       * originates from a form object (`createForm` or `updateForm`).
+       *
+       * Plugins can use this to handle relational edits such as connect/disconnect
+       * operations on relation fields (e.g. updating junction tables, managing foreign keys).
+       */
+      formOperations?: FormOperation[]
     },
   ) => Awaitable<void>
 
@@ -417,6 +451,22 @@ export interface HookDefinitions<
       result?: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       marker?: string
       operation: 'write' | 'delete'
+    },
+  ) => void
+
+  /**
+   * Called when a CRDT field-level merge detects conflicts
+   * (two concurrent modifications to the same field with the same timestamp).
+   */
+  cacheConflict: <
+    TCollection extends Collection,
+  > (
+    payload: {
+      store: GlobalStoreType
+      meta: CustomHookMeta
+      collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+      key: string | number
+      conflicts: FieldConflict[]
     },
   ) => void
 

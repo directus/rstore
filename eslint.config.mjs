@@ -17,6 +17,7 @@ export default antfu({
   files: [
     'docs/**/*',
     'scripts/**/*.js',
+    '**/*.md',
   ],
   rules: {
     'no-console': 'off',

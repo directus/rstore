@@ -21,6 +21,8 @@ await form.$submit()
 ## Behavior
 
 - Exposes `$submit`, `$reset`, `$loading`, `$error`, `$valid`, `$changedProps`.
+- Exposes `$opLog` (undo/redo, optimized operation access).
+- Supports collaborative rebasing via `$rebase`, `$conflicts`, and `$resolveConflict`.
 - Supports `validateOnSubmit`, `transformData`, `resetOnSuccess`.
 
 ## Requirements

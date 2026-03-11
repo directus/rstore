@@ -166,7 +166,7 @@ export interface VueCollectionApi<
    */
   create: (
     item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
-    createOptions?: Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
+    createOptions?: Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'formOperations'>,
   ) => Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
   /**
@@ -202,7 +202,7 @@ export interface VueCollectionApi<
    */
   update: (
     item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
-    updateOptions?: Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'key' | 'optimistic'>,
+    updateOptions?: Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'key' | 'optimistic' | 'formOperations'>,
   ) => Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
   /**
@@ -547,12 +547,15 @@ export function createCollectionApi<
       >({
         defaultValues: formOptions?.defaultValues,
         schema: formOptions?.schema ?? getCollection().formSchema.create,
-        submit: data => api.create(data, {
+        submit: (data, { formOperations }) => api.create(data, {
           optimistic: formOptions?.optimistic,
+          formOperations,
         }),
         resetOnSuccess: formOptions?.resetOnSuccess,
         validateOnSubmit: formOptions?.validateOnSubmit,
         transformData: formOptions?.transformData,
+        collection: getCollection(),
+        store,
       }) as TReturn
     },
 
@@ -608,12 +611,15 @@ export function createCollectionApi<
           }
           return data
         },
-        submit: data => api.update(data, {
+        submit: (data, { formOperations }) => api.update(data, {
           key: getCollection().getKey(initialData),
           optimistic: formOptions?.optimistic,
+          formOperations,
         }),
         resetOnSuccess: formOptions?.resetOnSuccess,
         validateOnSubmit: formOptions?.validateOnSubmit,
+        collection: getCollection(),
+        store,
       })
       return form
     },
@@ -621,7 +627,7 @@ export function createCollectionApi<
     delete: (keyOrItem, options) => {
       const collection = getCollection()
 
-      let key: string | number | number
+      let key: string | number
       if (typeof keyOrItem !== 'string' && typeof keyOrItem !== 'number') {
         const result = collection.getKey(keyOrItem)
         if (!isKeyDefined(result)) {
