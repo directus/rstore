@@ -1,6 +1,6 @@
 ---
 name: rstore-nuxt-drizzle
-description: Use when the goal is exposing Drizzle-backed data through rstore in Nuxt: generate collections and API routes from schema, fetch/filter/paginate data, support create/update/delete flows, enable realtime or offline sync, and enforce table-level server access rules; pair with `rstore-nuxt` for Nuxt integration and `rstore-vue` for collection/query/form behavior.
+description: "Use when the goal is exposing Drizzle-backed data through rstore in Nuxt: generate collections and API routes from schema, fetch/filter/paginate data, support create/update/delete flows, enable realtime or offline sync, and enforce table-level server access rules; pair with `rstore-nuxt` for Nuxt integration and `rstore-vue` for collection/query/form behavior."
 ---
 
 # Rstore Nuxt Drizzle
@@ -72,7 +72,9 @@ export function useDrizzle() {
 ## Query and cache conventions
 
 - Prefer `findOptions.where` over the deprecated `params.where`.
-- Use `params.limit`, `offset`, `with`, `columns`, `orderBy`, and `keys` to shape Drizzle-backed queries.
+- Use `findOptions.include` for relation loading; relation include objects support `where`, `orderBy`, `columns`, `limit`, and nested `include`.
+- Use `params.limit`, `offset`, `columns`, `orderBy`, and `keys` to shape Drizzle-backed queries.
+- Use `params.with` only as a low-level Drizzle override; when both are provided, `params.with` takes precedence over `findOptions.include`.
 - Query params and request bodies are serialized with `SuperJSON`, so keep them serializable.
 - The runtime plugin parses `createdAt` and `updatedAt` string values into `Date` objects through collection defaults.
 - `fetchRelations` translates included relations into follow-up equality queries against the generated target collections.
@@ -115,11 +117,12 @@ export function useDrizzle() {
 | rstoreDrizzle.ws.apiPath | Override websocket endpoint path | [api-ws-api-path](./references/api-ws-api-path.md) |
 | rstoreDrizzle.offline | Enable offline sync integration | [api-offline](./references/api-offline.md) |
 | rstoreDrizzle.offline.serializeDateValue | Customize offline sync date serialization | [api-offline-serialize-date-value](./references/api-offline-serialize-date-value.md) |
+| findOptions.include | Primary relation include option | [api-find-options-include](./references/api-find-options-include.md) |
 | findOptions.where | Primary drizzle filter option | [api-find-options-where](./references/api-find-options-where.md) |
 | params.where (deprecated) | Legacy filter location | [api-params-where](./references/api-params-where.md) |
 | params.limit | Limit rows in list queries | [api-params-limit](./references/api-params-limit.md) |
 | params.offset | Offset rows in list queries | [api-params-offset](./references/api-params-offset.md) |
-| params.with | Relation include shape for Drizzle | [api-params-with](./references/api-params-with.md) |
+| params.with | Low-level Drizzle relation override | [api-params-with](./references/api-params-with.md) |
 | params.columns | Selected column projection | [api-params-columns](./references/api-params-columns.md) |
 | params.orderBy | Sort order format and behavior | [api-params-order-by](./references/api-params-order-by.md) |
 | params.keys | Key-constrained list fetches | [api-params-keys](./references/api-params-keys.md) |
@@ -127,6 +130,7 @@ export function useDrizzle() {
 | rstoreDrizzleHooks | Global server/realtime hook bus | [api-rstore-drizzle-hooks](./references/api-rstore-drizzle-hooks.md) |
 | hooksForTable | Table-scoped hook registration helper | [api-hooks-for-table](./references/api-hooks-for-table.md) |
 | allowTables | Collection allow-list access control | [api-allow-tables](./references/api-allow-tables.md) |
+| publishRstoreDrizzleRealtimeUpdate | Publish manual realtime updates for direct Drizzle writes | [api-publish-rstore-drizzle-realtime-update](./references/api-publish-rstore-drizzle-realtime-update.md) |
 | Base @rstore/nuxt skill | Nuxt module/runtime integration semantics | `rstore-nuxt` skill |
 | Base @rstore/vue skill | Underlying collection/query/form semantics | `rstore-vue` skill |
 

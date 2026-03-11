@@ -6,7 +6,7 @@
 
 ## Surface
 
-Passes relational include shape to drizzle relational query builder.
+Low-level Drizzle relation config override for list/item reads.
 
 ## Syntax
 
@@ -23,8 +23,9 @@ await store.posts.findMany({
 
 ## Behavior
 
-- Forwarded to server query builder as `q.with`.
-- Treated as opaque shape by this module and interpreted by Drizzle.
+- Forwarded directly to server query builder as `q.with`.
+- Treated as opaque by this module and interpreted by Drizzle.
+- Takes precedence over `findOptions.include` when both are provided.
 
 ## Requirements
 
@@ -32,4 +33,4 @@ await store.posts.findMany({
 
 ## Pitfalls
 
-1. Invalid relation names fail at query execution time.
+1. This bypasses include conversion guardrails; invalid relation shapes fail at Drizzle execution time.

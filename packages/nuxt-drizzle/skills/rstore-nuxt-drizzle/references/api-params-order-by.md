@@ -21,6 +21,7 @@ await store.todos.findMany({
 ## Behavior
 
 - Server parses `field.direction` (`asc` or `desc`) into drizzle order clauses.
+- Relation include objects reuse the same parser for nested `include.<relation>.orderBy`.
 - Cache filter hook applies equivalent sort to cached arrays.
 
 ## Requirements

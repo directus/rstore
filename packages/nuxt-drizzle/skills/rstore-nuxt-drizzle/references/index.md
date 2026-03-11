@@ -13,6 +13,7 @@
 | `rstoreDrizzle.ws.apiPath` | [./api-ws-api-path.md](./api-ws-api-path.md) |
 | `rstoreDrizzle.offline` | [./api-offline.md](./api-offline.md) |
 | `rstoreDrizzle.offline.serializeDateValue` | [./api-offline-serialize-date-value.md](./api-offline-serialize-date-value.md) |
+| `findOptions.include` | [./api-find-options-include.md](./api-find-options-include.md) |
 | `findOptions.where` | [./api-find-options-where.md](./api-find-options-where.md) |
 | `params.where` (deprecated) | [./api-params-where.md](./api-params-where.md) |
 | `params.limit` | [./api-params-limit.md](./api-params-limit.md) |

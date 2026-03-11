@@ -29,7 +29,6 @@ declare module '@rstore/vue' {
 
     limit?: number
     offset?: number
-    with?: DrizzleWith
     columns?: DrizzleColumns
     orderBy?: DrizzleOrderBy
 
@@ -38,17 +37,21 @@ declare module '@rstore/vue' {
      */
     keys?: Array<string | number>
   }
+
+  export interface CustomIncludeOption<
+    TCollection extends Collection,
+    TCollectionDefaults extends CollectionDefaults,
+    TSchema extends StoreSchema,
+  > {
+    where?: RstoreDrizzleCondition
+    columns?: DrizzleColumns
+    orderBy?: DrizzleOrderBy
+    limit?: number
+  }
 }
 
 // @TODO typed columns
 type DrizzleColumns = Record<string, boolean>
-
-// @TODO typed `with` relations
-type DrizzleWith = Record<string, boolean | {
-  with?: DrizzleWith
-  columns?: DrizzleColumns
-  limit?: number
-}>
 
 // @TODO typed order by
 type DrizzleOrderBy = Array<`${string}.${'asc' | 'desc'}`>

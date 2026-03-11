@@ -202,6 +202,40 @@ const { data: users } = await store.users.query(q => q.many({
 </script>
 ```
 
+You can also pass relation-level query options (`where`, `orderBy`, `columns`, `limit`) and nested includes:
+
+```vue
+<script lang="ts" setup>
+const store = useStore()
+
+const { data: users } = await store.users.query(q => q.many({
+  include: {
+    posts: {
+      where: eq('published', true),
+      orderBy: ['createdAt.desc'],
+      limit: 5,
+      columns: {
+        id: true,
+        title: true,
+      },
+      include: {
+        comments: {
+          where: eq('approved', true),
+          limit: 3,
+        },
+      },
+    },
+  },
+}))
+</script>
+```
+
+The legacy nested map shape is still supported (`include: { posts: { comments: true } }`).
+
+::: info
+`params.with` is still available as a low-level Drizzle override. If both `include` and `params.with` are set, `params.with` takes precedence.
+:::
+
 ## Allowing tables
 
 By default, all tables in your Drizzle schema are exposed through the API. You can restrict the tables that are exposed by using the `allowTables` function.

@@ -3,7 +3,7 @@ import type { Column, Table } from 'drizzle-orm'
 import type { PgDatabase } from 'drizzle-orm/pg-core'
 import type { RstoreDrizzleCondition } from '../../utils/types'
 // @ts-expect-error virtual file
-import { collectionMetas, dialect, tables, useDrizzles } from '$rstore-drizzle-server-utils.js'
+import { collectionMetas, collectionRelations, dialect, tables, useDrizzles } from '$rstore-drizzle-server-utils.js'
 import * as drizzle from 'drizzle-orm'
 import { createError } from 'h3'
 
@@ -14,6 +14,7 @@ export interface RstoreDrizzleQueryParams {
   limit?: number
   offset?: number
   orderBy?: string | string[]
+  include?: any
   with?: any
   columns?: any
   keys?: Array<string | number>
@@ -35,6 +36,82 @@ export function getDrizzleTableFromCollection(collectionName: string) {
     tableKey,
     primaryKeys: primaryKeys ?? ['id'],
   }
+}
+
+function isRecord(value: unknown): value is Record<string, any> {
+  return value != null && typeof value === 'object'
+}
+
+export function getDrizzleCollectionRelations(collectionName: string) {
+  return (collectionRelations as Record<string, Record<string, any>>)[collectionName] ?? {}
+}
+
+export function getDrizzleOrderBy(table: Table, orderByData: string | string[]) {
+  const list = typeof orderByData === 'string' ? [orderByData] : orderByData as Array<`${string}.${'asc' | 'desc'}`>
+  return list.map((rawOrderBy) => {
+    const parts = rawOrderBy.split('.')
+    if (parts.length !== 2) {
+      throw createError({
+        statusCode: 400,
+        statusMessage: 'Invalid orderBy',
+      })
+    }
+    const [columnName, order] = parts
+    const operator = order === 'asc' ? drizzle.asc : drizzle.desc
+    return operator((table as any)[columnName!] ?? drizzle.sql`${columnName}`.as(columnName!))
+  })
+}
+
+export function convertIncludeToDrizzleWith(collectionName: string, include: unknown): Record<string, any> | undefined {
+  if (!isRecord(include)) {
+    return undefined
+  }
+
+  const relations = getDrizzleCollectionRelations(collectionName)
+  const result: Record<string, any> = {}
+
+  for (const relationKey in include) {
+    const relationInclude = include[relationKey]
+    if (!relationInclude || !(relationKey in relations)) {
+      continue
+    }
+
+    const relation = relations[relationKey]
+    const targetCollectionName = relation?.to ? Object.keys(relation.to)[0] : undefined
+
+    if (relationInclude === true || !isRecord(relationInclude)) {
+      result[relationKey] = true
+      continue
+    }
+
+    const nestedInclude = 'include' in relationInclude ? relationInclude.include : relationInclude
+    const relationWith: Record<string, any> = {}
+
+    if (targetCollectionName) {
+      const { table } = getDrizzleTableFromCollection(targetCollectionName)
+      if ('where' in relationInclude && relationInclude.where != null) {
+        relationWith.where = getDrizzleCondition(table, relationInclude.where)
+      }
+      if ('orderBy' in relationInclude && relationInclude.orderBy != null) {
+        relationWith.orderBy = getDrizzleOrderBy(table, relationInclude.orderBy)
+      }
+      const nestedWith = convertIncludeToDrizzleWith(targetCollectionName, nestedInclude)
+      if (nestedWith && Object.keys(nestedWith).length) {
+        relationWith.with = nestedWith
+      }
+    }
+
+    if ('columns' in relationInclude && relationInclude.columns != null) {
+      relationWith.columns = relationInclude.columns
+    }
+    if ('limit' in relationInclude && relationInclude.limit != null) {
+      relationWith.limit = relationInclude.limit
+    }
+
+    result[relationKey] = Object.keys(relationWith).length ? relationWith : true
+  }
+
+  return Object.keys(result).length ? result : undefined
 }
 
 export function getDrizzleCollectionNameFromTable(table: Table) {

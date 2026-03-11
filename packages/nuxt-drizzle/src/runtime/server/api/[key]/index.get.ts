@@ -4,7 +4,7 @@ import type { RstoreDrizzleMeta, RstoreDrizzleTransformQuery } from '../../utils
 import { and } from 'drizzle-orm'
 import { defineEventHandler, getQuery, getRouterParams } from 'h3'
 import SuperJSON from 'superjson'
-import { getDrizzleKeyWhere, getDrizzleTableFromCollection, rstoreUseDrizzle } from '../../utils'
+import { convertIncludeToDrizzleWith, getDrizzleKeyWhere, getDrizzleTableFromCollection, rstoreUseDrizzle } from '../../utils'
 import { rstoreDrizzleHooks } from '../../utils/hooks'
 
 export default defineEventHandler(async (event) => {
@@ -39,12 +39,13 @@ export default defineEventHandler(async (event) => {
   }
 
   const dbQuery = rstoreUseDrizzle().query as unknown as Record<string, RelationalQueryBuilder<any, any>>
+  const withRelations = query.with ?? convertIncludeToDrizzleWith(collectionName, query.include)
   let result: any = await dbQuery[collectionName]!.findFirst({
     where: and(
       getDrizzleKeyWhere(key, primaryKeys, table),
       ...whereConditions,
     ),
-    with: query.with,
+    with: withRelations,
     columns: query.columns,
     extras,
   })
