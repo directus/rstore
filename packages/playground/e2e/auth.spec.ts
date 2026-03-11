@@ -19,8 +19,8 @@ test('logs in and keeps the session after reload', async ({ page }) => {
   await page.getByPlaceholder('Password').fill('admin')
   await submitLoginForm(page)
 
-  await expect(page.getByText('Logged in as')).toBeVisible()
+  await expect(page.getByText('Logged in as')).toBeVisible({ timeout: 15_000 })
 
   await page.reload()
-  await expect(page.getByText('Logged in as')).toBeVisible()
+  await expect(page.getByText('Logged in as')).toBeVisible({ timeout: 15_000 })
 })

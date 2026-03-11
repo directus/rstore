@@ -14,5 +14,8 @@ export async function openLoginPopover(page: Page) {
 export async function submitLoginForm(page: Page) {
   const emailInput = page.getByPlaceholder('Email')
   const form = emailInput.locator('xpath=ancestor::form[1]')
-  await form.getByRole('button', { name: 'Login', exact: true }).click()
+  await Promise.all([
+    page.waitForResponse(response => response.url().includes('/api/auth/login') && response.request().method() === 'POST'),
+    form.getByRole('button', { name: 'Login', exact: true }).click(),
+  ])
 }
