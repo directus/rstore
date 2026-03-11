@@ -17,7 +17,8 @@
       "import": {
         "types": "./dist/index.d.ts",
         "default": "./dist/index.mjs"
-      }
+      },
+      "default": "./dist/index.mjs"
     },
     "./vite": {
       "import": {
