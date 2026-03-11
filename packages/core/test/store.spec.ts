@@ -211,6 +211,7 @@ describe('createStoreCore', () => {
       const resolved = store.$resolveFindOptions(collection, {}, true, {})
 
       expect(resolved.fetchPolicy).toBe(defaultFetchPolicy)
+      expect(resolved.fetchOptions.autoRefresh).toBe('manual')
       expect(resolved.resultMode).toBe('computed')
     })
 
@@ -247,6 +248,29 @@ describe('createStoreCore', () => {
       expect(resolved.fetchPolicy).toBe('cache-and-fetch')
       expect(resolved.pageSize).toBe(25)
       expect(resolved.resultMode).toBe('responseRefs')
+    })
+
+    it('should merge fetch options with defaults', async () => {
+      options.schema = [
+        { name: 'messages' },
+      ]
+      options.findDefaults = {
+        fetchOptions: {
+          autoRefresh: 'windowFocus',
+        },
+      }
+      const store = await createStoreCore(options)
+      const collection = store.$collections.find(c => c.name === 'messages')!
+
+      const resolved = store.$resolveFindOptions(collection, {}, true, {})
+      const overridden = store.$resolveFindOptions(collection, {
+        fetchOptions: {
+          autoRefresh: 'manual',
+        },
+      }, true, {})
+
+      expect(resolved.fetchOptions.autoRefresh).toBe('windowFocus')
+      expect(overridden.fetchOptions.autoRefresh).toBe('manual')
     })
 
     it('should call resolveFindOptions hook', async () => {

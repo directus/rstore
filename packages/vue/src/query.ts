@@ -4,9 +4,11 @@ import type { VueCachePrivate } from './cache'
 import type { VueStore } from './store'
 import { isKeyDefined } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
+import { tryOnScopeDispose } from '@vueuse/core'
 import { deepEqual } from 'fast-equals'
 import { klona } from 'klona'
 import { computed, getCurrentInstance, onServerPrefetch, ref, shallowReactive, shallowRef, toValue, watch } from 'vue'
+import { onWindowFocus } from './swr'
 import { useQueryTracking } from './tracking'
 
 export interface VueQueryReturn<
@@ -149,6 +151,11 @@ export function createQuery<
   function isDisabled() {
     const result = toValue(options)
     return typeof result === 'object' && 'enabled' in result && result.enabled === false
+  }
+
+  function getAutoRefresh() {
+    const resolvedOptions = store.$resolveFindOptions(getCollection(), getOptions() ?? {}, many, meta.value)
+    return resolvedOptions.fetchOptions.autoRefresh
   }
 
   const initialResolvedOptions = store.$resolveFindOptions(getCollection(), getOptions() ?? {}, many, meta.value)
@@ -532,6 +539,24 @@ export function createQuery<
 
     meta.value = newMeta
   }
+
+  let stopAutoRefresh: (() => void) | undefined
+  watch(getAutoRefresh, (autoRefresh) => {
+    stopAutoRefresh?.()
+    stopAutoRefresh = undefined
+
+    if (autoRefresh === 'windowFocus') {
+      stopAutoRefresh = onWindowFocus(() => {
+        refresh()
+      })
+    }
+  }, {
+    immediate: true,
+  })
+
+  tryOnScopeDispose(() => {
+    stopAutoRefresh?.()
+  })
 
   // Auto load on options change
   let previousOptions = klona(toValue(options))

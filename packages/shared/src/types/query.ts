@@ -56,6 +56,21 @@ export type FetchPolicy = 'cache-first' | 'cache-and-fetch' | 'fetch-only' | 'ca
 
 export type QueryResultMode = 'computed' | 'responseRefs'
 
+export type QueryAutoRefresh = 'manual' | 'windowFocus'
+
+export interface QueryFetchOptions {
+  /**
+   * Automatically refresh the query after specific events.
+   *
+   * `manual` keeps the current behavior and only refreshes when `refresh()` is called.
+   *
+   * `windowFocus` refreshes the query when the browser window regains focus.
+   *
+   * @default 'manual'
+   */
+  autoRefresh?: QueryAutoRefresh
+}
+
 export type FindOptionsInclude<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -175,6 +190,11 @@ export interface FindOptionsBase<
    * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
    */
   experimentalGarbageCollection?: boolean
+
+  /**
+   * Additional options controlling how fetching is refreshed over time.
+   */
+  fetchOptions?: QueryFetchOptions
 
   meta?: CustomHookMeta
 }

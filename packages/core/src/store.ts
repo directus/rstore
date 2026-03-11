@@ -1,4 +1,4 @@
-import type { Cache, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, Hooks, MutationSpecialProps, Plugin, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import type { Cache, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, Hooks, MutationSpecialProps, Plugin, QueryFetchOptions, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { get, set } from '@rstore/shared'
 import { builtinCollectionHooksPlugin } from './builtin/collectionHooks'
 import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollectionOppositeRelations, resolveCollections } from './collection'
@@ -45,10 +45,16 @@ export async function createStoreCore<
       if ((options as any)[resolvedFindOptionsMarker]) {
         return options as any
       }
+      const resolvedFetchOptions: QueryFetchOptions = {
+        ...store.$findDefaults.fetchOptions,
+        ...options.fetchOptions,
+        autoRefresh: options.fetchOptions?.autoRefresh ?? store.$findDefaults.fetchOptions?.autoRefresh ?? 'manual',
+      }
       const resolvedOptions: FindOptions<any, any, any> = {
         ...store.$findDefaults,
         ...options,
         fetchPolicy: options.fetchPolicy ?? store.$findDefaults.fetchPolicy ?? defaultFetchPolicy,
+        fetchOptions: resolvedFetchOptions,
         resultMode: options.resultMode ?? store.$findDefaults.resultMode ?? defaultResultMode,
       }
       store.$hooks.callHookSync('resolveFindOptions', {

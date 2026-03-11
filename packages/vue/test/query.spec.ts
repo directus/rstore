@@ -1,9 +1,13 @@
 import { until } from '@vueuse/core'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
 import { createStore } from '../src/store'
 
 describe('query', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
   describe('cache-first', () => {
     describe('fetchFirst', () => {
       it('should load item from network if not in cache', async () => {
@@ -301,6 +305,64 @@ describe('query', () => {
     await query.refresh()
 
     expect(query.data.value?.text).toBe('refreshed')
+  })
+
+  it('should refresh data on window focus when enabled', async () => {
+    const focusListeners = new Set<() => void>()
+    const fakeWindow = {
+      addEventListener: (event: string, listener: () => void) => {
+        if (event === 'focus') {
+          focusListeners.add(listener)
+        }
+      },
+      removeEventListener: (event: string, listener: () => void) => {
+        if (event === 'focus') {
+          focusListeners.delete(listener)
+        }
+      },
+      dispatchEvent: (event: Event | { type: string }) => {
+        if (event.type === 'focus') {
+          for (const listener of focusListeners) {
+            listener()
+          }
+        }
+        return true
+      },
+      localStorage: {
+        getItem: () => null,
+        setItem: () => undefined,
+      },
+    } as unknown as Window
+
+    vi.stubGlobal('window', fakeWindow)
+
+    let data = { id: 'foo', text: 'initial' }
+    const store = await createStore({
+      schema: [
+        {
+          name: 'messages',
+          hooks: {
+            fetchFirst: () => data,
+          },
+        },
+      ],
+      plugins: [],
+      syncImmediately: false,
+    })
+
+    const query = await store.messages.query(q => q.first({
+      key: 'foo',
+      fetchOptions: {
+        autoRefresh: 'windowFocus',
+      },
+    }))
+
+    expect(query.data.value?.text).toBe('initial')
+
+    data = { id: 'foo', text: 'focused' }
+    fakeWindow.dispatchEvent({ type: 'focus' } as Event)
+
+    await until(() => query.data.value?.text === 'focused').toBe(true)
   })
 
   it('should refresh data when options change', async () => {
