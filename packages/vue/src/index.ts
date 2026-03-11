@@ -1,6 +1,11 @@
 import './types'
 
 export {
+  cacheWriteEventHook,
+  realtimeReconnectEventHook,
+} from './events'
+
+export {
   createFormObject,
   createFormObjectWithChangeDetection,
   optimizeOpLog,

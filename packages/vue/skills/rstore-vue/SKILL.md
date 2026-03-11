@@ -32,6 +32,7 @@ Build typed, cache-first Vue data flows with `@rstore/vue`, including core engin
 | `RstorePlugin` / `setActiveStore` | Injects store into Vue or non-component/test contexts |
 | `store.<collection>` and `store.$collection(name)` | Entry point for read/write/query/form operations |
 | `query` / `liveQuery` | Reactive queries with loading/error/meta/pagination semantics |
+| `realtimeReconnectEventHook` | Shared reconnect signal used by realtime transports; `liveQuery` refreshes when it fires |
 | `useQueryTracking` | Tracks query membership and filters dirty cached items in reactive flows |
 | `createForm` / `updateForm` / `createFormObject` | Mutation and validation workflow with submit/reset/change tracking |
 | `definePlugin({ ... })` | Extends fetch/cache/mutation/subscribe/sync behavior via hooks |
@@ -90,6 +91,7 @@ Notes:
 - `defineModule(name, cb)` caches module instances in `store.$modulesCache`.
 - `defineModule` requires injection context or an explicit/active store.
 - `definePlugin({ name, category, scopeId?, setup })` is the extension point for fetch/cache/mutation/subscription/sync hooks.
+- `realtimeReconnectEventHook` should be triggered by realtime plugins only after transport recovery; `liveQuery` refreshes automatically when it fires.
 - `addCollectionDefaults(...)` is the right place for shared field parsing/default behavior.
 - Keep plugin behavior keyed by store/scope instead of global mutable state.
 
@@ -130,6 +132,7 @@ Notes:
 | findMany | Async list read | [api-find-many](./references/api-find-many.md) |
 | query | Reactive query object API | [api-query](./references/api-query.md) |
 | liveQuery | Query + subscription lifecycle | [api-live-query](./references/api-live-query.md) |
+| realtimeReconnectEventHook | Shared reconnect event hook for realtime transports | [api-realtime-reconnect-event-hook](./references/api-realtime-reconnect-event-hook.md) |
 | subscribe | Subscription API for updates | [api-subscribe](./references/api-subscribe.md) |
 | create | Single-item create mutation | [api-create](./references/api-create.md) |
 | createMany | Batch create mutation | [api-create-many](./references/api-create-many.md) |

@@ -281,6 +281,8 @@ const { data: todos } = await store.todos.liveQuery(q => q.many())
 </script>
 ```
 
+When the websocket reconnects, the runtime plugin re-sends active subscriptions and then triggers `realtimeReconnectEventHook` from `@rstore/vue`. Existing `liveQuery` instances listen to that hook and call `refresh()`, which helps recover updates missed while the client was disconnected.
+
 By default the module uses an in-memory Pub/Sub implementation. You can provide a custom one (for example Redis) by calling `setRstoreDrizzlePubSub` in a Nitro plugin:
 
 ```ts

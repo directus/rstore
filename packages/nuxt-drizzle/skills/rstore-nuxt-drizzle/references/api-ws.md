@@ -21,6 +21,7 @@ rstoreDrizzle: {
 - Enables Nitro experimental websocket support.
 - Registers realtime websocket server handler and publish hooks.
 - Adds the realtime runtime plugin to store subscriptions.
+- On reconnect, replays active subscriptions and triggers `realtimeReconnectEventHook` from `@rstore/vue` so `liveQuery` can refresh.
 
 ## Requirements
 

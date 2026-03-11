@@ -29,6 +29,7 @@
 | `findMany` | [./api-find-many.md](./api-find-many.md) |
 | `query` | [./api-query.md](./api-query.md) |
 | `liveQuery` | [./api-live-query.md](./api-live-query.md) |
+| `realtimeReconnectEventHook` | [./api-realtime-reconnect-event-hook.md](./api-realtime-reconnect-event-hook.md) |
 | `subscribe` | [./api-subscribe.md](./api-subscribe.md) |
 | `create` | [./api-create.md](./api-create.md) |
 | `createMany` | [./api-create-many.md](./api-create-many.md) |

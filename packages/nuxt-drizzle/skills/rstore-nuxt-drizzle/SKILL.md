@@ -84,6 +84,7 @@ export function useDrizzle() {
 
 - `ws: true` (or object form) enables websocket handler registration and client subscription plugin wiring.
 - Realtime subscriptions are keyed by collection, key, and `where`; exact filter shape impacts topic reuse.
+- On websocket reconnect, the runtime re-sends active subscriptions and triggers `realtimeReconnectEventHook`, which makes `liveQuery` refresh.
 - `offline` enables offline plugin generation and sync config wiring.
 - Offline sync expects stable keys and usable `updatedAt` comparison values.
 - `offline.serializeDateValue` exists for non-default date comparison serialization.

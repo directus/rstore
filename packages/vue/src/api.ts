@@ -8,6 +8,7 @@ import { createItem, createMany, deleteItem, deleteMany, findFirst, findMany, is
 import { pickNonSpecialProps } from '@rstore/shared'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { ref, toValue, watch } from 'vue'
+import { realtimeReconnectEventHook } from './events'
 import { createFormObject } from './form'
 import { createQuery } from './query'
 
@@ -478,6 +479,13 @@ export function createCollectionApi<
     })
     if (meta) {
       Object.assign(query.meta.value, meta)
+    }
+
+    // Auto refresh on reconnect
+    if (isLive) {
+      realtimeReconnectEventHook.on(() => {
+        query.refresh()
+      })
     }
 
     if (onInvalidate) {

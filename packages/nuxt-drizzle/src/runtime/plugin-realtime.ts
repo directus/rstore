@@ -1,7 +1,7 @@
 import type { SubscriptionMessage, SubscriptionUpdateMessage } from './utils/realtime'
 // @ts-expect-error virtual module
 import { wsApiPath } from '#build/$rstore-drizzle-config.js'
-import { definePlugin } from '@rstore/vue'
+import { definePlugin, realtimeReconnectEventHook } from '@rstore/vue'
 import { useWebSocket } from '@vueuse/core'
 import { watch } from 'vue'
 import { getSubscriptionId } from './utils/realtime'
@@ -25,6 +25,8 @@ export default definePlugin({
         },
         autoReconnect: true,
       })
+
+      let connectCount = 0
 
       hook('subscribe', ({ collection, key, findOptions }) => {
         const where = findOptions?.where
@@ -117,11 +119,18 @@ export default definePlugin({
           }
         }
         else if (status === 'OPEN') {
+          connectCount++
+
           // Resubscribe to all topics
           for (const [, message] of messages) {
             ws.send(JSON.stringify({
               subscription: message,
             }), false)
+          }
+
+          // Call reconnect hook
+          if (connectCount > 1) {
+            realtimeReconnectEventHook.trigger()
           }
         }
       })

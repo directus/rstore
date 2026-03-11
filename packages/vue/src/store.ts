@@ -7,6 +7,7 @@ import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
 import { reactive, ref, toValue, watch } from 'vue'
 import { createCollectionApi } from './api'
 import { createCache } from './cache'
+import { cacheWriteEventHook } from './events'
 
 export interface CreateStoreOptions<
   TSchema extends StoreSchema = StoreSchema,
@@ -107,6 +108,10 @@ export async function createStore<
 
       store.$hooks.hook('afterCacheReset', async () => {
         await cacheResetEvent.trigger()
+      })
+
+      store.$hooks.hook('afterCacheWrite', (payload) => {
+        cacheWriteEventHook.trigger(payload)
       })
 
       store.$syncState = reactive(store.$syncState)

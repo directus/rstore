@@ -17,6 +17,7 @@ const q = await store.todos.liveQuery(b => b.many())
 ## Behavior
 
 - Builds on query behavior and manages subscription updates.
+- Refreshes when `realtimeReconnectEventHook` is triggered after realtime transport recovery.
 
 ## Requirements
 
