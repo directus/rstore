@@ -2,7 +2,6 @@ import type { CreateManyOptions, CreateOptions, DeleteManyOptions, DeleteOptions
 import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StandardSchemaV1, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { CreateFormObjectOptions, VueCreateFormObject, VueUpdateFormObject } from './form'
-import type { VueLiveQueryReturn } from './live'
 import type { VueQueryReturn } from './query'
 import type { VueStore } from './store'
 import { createItem, createMany, deleteItem, deleteMany, findFirst, findMany, isKeyDefined, peekFirst, peekMany, subscribe, unsubscribe, updateItem, updateMany } from '@rstore/core'
@@ -89,13 +88,7 @@ export type LiveQueryResult<
   TSchema extends StoreSchema,
   TItem extends WrappedItem<TCollection, TCollectionDefaults, TSchema>,
   TOptions extends FindOptions<TCollection, TCollectionDefaults, TSchema> & { '~type': QueryType },
-> = HybridPromise<
-  TOptions extends { '~type': 'first' }
-    ? VueLiveQueryReturn<TCollection, TCollectionDefaults, TSchema, TItem | null>
-    : TOptions extends { '~type': 'many' }
-      ? VueLiveQueryReturn<TCollection, TCollectionDefaults, TSchema, Array<TItem>>
-      : never
->
+> = QueryResult<TCollection, TCollectionDefaults, TSchema, TItem, TOptions>
 
 export interface VueCollectionApi<
   TCollection extends Collection,
