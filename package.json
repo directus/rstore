@@ -40,6 +40,7 @@
     "lint-staged": "catalog:",
     "npm-run-all2": "catalog:",
     "pathe": "catalog:",
+    "shiki": "catalog:",
     "simple-git-hooks": "catalog:",
     "tailwindcss": "catalog:",
     "three": "catalog:",
