@@ -20,7 +20,7 @@ const store = await createStore({
 ## Behavior
 
 - Wraps core store with Vue proxies and collection APIs.
-- Supports optional `experimentalGarbageCollection`, `findDefaults`, `syncImmediately`.
+- Supports optional `cacheStaggering`, `experimentalGarbageCollection`, `findDefaults`, `syncImmediately`.
 
 ## Requirements
 

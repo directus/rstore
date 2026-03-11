@@ -41,6 +41,14 @@ export interface CreateStoreOptions<
    * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
    */
   experimentalGarbageCollection?: boolean
+  /**
+   * Maximum number of items written to the cache every 10ms.
+   *
+   * Set to `0` to disable staggering.
+   *
+   * @default 0
+   */
+  cacheStaggering?: number
 }
 
 export type VueStoreCollectionApiProxy<
@@ -78,6 +86,7 @@ export async function createStore<
     plugins: options.plugins,
     cache: createCache({
       getStore: () => storeProxy,
+      cacheStaggering: options.cacheStaggering,
     }),
     hooks: createHooks(),
     findDefaults: options.findDefaults,

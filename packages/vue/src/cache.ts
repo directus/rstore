@@ -8,11 +8,13 @@ import { computed, markRaw, ref, shallowRef, toValue } from 'vue'
 import { wrapItem } from './item'
 
 type QueuedOperation
-  = | { type: 'writeItem', args: Parameters<Cache['writeItem']> }
-    | { type: 'writeItems', args: Parameters<Cache['writeItems']> }
-    | { type: 'deleteItem', args: Parameters<Cache['deleteItem']> }
-    | { type: 'addLayer', args: Parameters<Cache['addLayer']> }
-    | { type: 'removeLayer', args: Parameters<Cache['removeLayer']> }
+  = | { type: 'writeItem', params: Parameters<Cache['writeItem']>[0] }
+    | { type: 'writeItems', params: Parameters<Cache['writeItems']>[0], index: number }
+    | { type: 'deleteItem', params: Parameters<Cache['deleteItem']>[0] }
+    | { type: 'addLayer', layer: Parameters<Cache['addLayer']>[0] }
+    | { type: 'removeLayer', layerId: Parameters<Cache['removeLayer']>[0] }
+    | { type: 'setState', state: CustomCacheState }
+    | { type: 'clear' }
 
 interface InternalCacheState {
   markers: Record<string, boolean>
@@ -38,6 +40,7 @@ export interface CreateCacheOptions<
   TCollectionDefaults extends CollectionDefaults,
 > {
   getStore: () => VueStore<TSchema, TCollectionDefaults>
+  cacheStaggering?: number
 }
 
 export function createCache<
@@ -45,7 +48,9 @@ export function createCache<
   TCollectionDefaults extends CollectionDefaults,
 >({
   getStore,
+  cacheStaggering: rawCacheStaggering = 0,
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): Cache {
+  const cacheStaggering = Math.max(0, Math.floor(rawCacheStaggering))
   const state: InternalCacheState = {
     markers: {},
     collections: {},
@@ -67,6 +72,9 @@ export function createCache<
 
   const collectionStateCache = new Map<string, Record<string | number, any>>()
   const collectionStateCacheReactivityMarker = new Map<string, Ref<number>>()
+  let isFlushingQueue = false
+  let staggeringBudget = cacheStaggering
+  let staggeringResetTimer: ReturnType<typeof setTimeout> | undefined
 
   function ensureCollectionStateCacheReactivityMarker(collectionName: string) {
     let marker = collectionStateCacheReactivityMarker.get(collectionName)
@@ -361,6 +369,394 @@ export function createCache<
     }
   }
 
+  function scheduleStaggeringBudgetReset() {
+    if (!cacheStaggering || staggeringResetTimer) {
+      return
+    }
+    staggeringResetTimer = setTimeout(() => {
+      staggeringResetTimer = undefined
+      staggeringBudget = cacheStaggering
+      if (!state.paused) {
+        flushQueuedOperations()
+      }
+    }, 10)
+  }
+
+  function canProcessQueuedWrite() {
+    if (!cacheStaggering) {
+      return true
+    }
+    if (staggeringBudget > 0) {
+      return true
+    }
+    scheduleStaggeringBudgetReset()
+    return false
+  }
+
+  function consumeQueuedWrite() {
+    if (!cacheStaggering) {
+      return
+    }
+    scheduleStaggeringBudgetReset()
+    staggeringBudget = Math.max(0, staggeringBudget - 1)
+  }
+
+  function enqueueOperation(operation: QueuedOperation) {
+    state.queue.push(operation)
+    if (!state.paused) {
+      flushQueuedOperations()
+    }
+  }
+
+  function writeItemForRelationNow({
+    parentCollection,
+    relationKey,
+    relation,
+    childItem,
+    meta,
+  }: Parameters<Cache['writeItemForRelation']>[0]) {
+    const store = getStore()
+    const possibleCollections = Object.keys(relation.to)
+    const nestedItemCollection = store.$getCollection(childItem, possibleCollections)
+    if (!nestedItemCollection) {
+      throw new Error(`Could not determine type for relation ${parentCollection.name}.${String(relationKey)}`)
+    }
+    const nestedKey = nestedItemCollection.getKey(childItem)
+    if (!isKeyDefined(nestedKey)) {
+      throw new Error(`Could not determine key for relation ${parentCollection.name}.${String(relationKey)}`)
+    }
+
+    writeItemNow({
+      collection: nestedItemCollection,
+      key: nestedKey,
+      item: childItem,
+      meta,
+    })
+  }
+
+  function writeItemNow(params: Parameters<Cache['writeItem']>[0]) {
+    const { collection, key, item, marker, fromWriteItems, meta } = params
+    invalidateCollectionStateCache(collection.name)
+
+    const collectionState = ensureCollectionRef(collection.name).value
+    const isFrozen = Object.isFrozen(item)
+    if (isFrozen) {
+      collectionState[key] = item
+    }
+    else {
+      const rawData = pickNonSpecialProps(item, true)
+
+      // Handle relations
+      const data = {} as Record<string, any>
+      for (const field in rawData) {
+        if (field in collection.relations) {
+          const relation = collection.relations[field]
+          const rawItem = rawData[field]
+
+          // TODO: figure out deletions
+          if (!rawItem || !relation) {
+            continue
+          }
+
+          if (relation.many && !Array.isArray(rawItem)) {
+            throw new Error(`Expected array for relation ${collection.name}.${field}`)
+          }
+          else if (!relation.many && Array.isArray(rawItem)) {
+            throw new Error(`Expected object for relation ${collection.name}.${field}`)
+          }
+
+          if (Array.isArray(rawItem)) {
+            for (const nestedItem of rawItem as any[]) {
+              writeItemForRelationNow({
+                parentCollection: collection,
+                relationKey: field,
+                relation,
+                childItem: nestedItem,
+                meta,
+              })
+            }
+          }
+          else if (rawItem) {
+            writeItemForRelationNow({
+              parentCollection: collection,
+              relationKey: field,
+              relation,
+              childItem: rawItem,
+              meta,
+            })
+          }
+        }
+        else {
+          data[field] = rawData[field]
+        }
+      }
+
+      const existing = collectionState[key]
+
+      updateItemIndexes(collection, key, existing, data)
+
+      if (!existing) {
+        // Disable deep reactivity tracking inside the `data` object
+        collectionState[key] = shallowRef(markRaw(data))
+
+        // Store field timestamps if provided
+        if (params.fieldTimestamps) {
+          let collectionTs = state.fieldTimestamps.get(collection.name)
+          if (!collectionTs) {
+            collectionTs = new Map()
+            state.fieldTimestamps.set(collection.name, collectionTs)
+          }
+          collectionTs.set(key, { ...params.fieldTimestamps })
+        }
+      }
+      else if (params.fieldTimestamps) {
+        // CRDT field-level LWW merge
+        let collectionTs = state.fieldTimestamps.get(collection.name)
+        if (!collectionTs) {
+          collectionTs = new Map()
+          state.fieldTimestamps.set(collection.name, collectionTs)
+        }
+        const localTimestamps = collectionTs.get(key) ?? {}
+        const { merged, mergedTimestamps, conflicts } = mergeItemFields(
+          existing,
+          data,
+          localTimestamps,
+          params.fieldTimestamps,
+        )
+        collectionTs.set(key, mergedTimestamps)
+        collectionState[key] = markRaw(merged)
+
+        // Emit conflict hook if there are conflicts
+        if (conflicts.length > 0) {
+          const store = getStore()
+          store.$hooks.callHookSync('cacheConflict', {
+            store,
+            meta: {},
+            collection,
+            key,
+            conflicts,
+          })
+        }
+      }
+      else {
+        collectionState[key] = markRaw({
+          ...existing,
+          ...data,
+        })
+      }
+    }
+    if (marker) {
+      mark(marker)
+    }
+
+    if (meta?.$queryTracking) {
+      meta.$queryTracking.items[collection.name] ??= new Set()
+      meta.$queryTracking.items[collection.name]!.add(key)
+    }
+
+    if (!fromWriteItems) {
+      const store = getStore()
+      store.$hooks.callHookSync('afterCacheWrite', {
+        store,
+        meta: {},
+        collection,
+        key,
+        result: [item],
+        marker,
+        operation: 'write',
+      })
+    }
+  }
+
+  function setStateNow(value: CustomCacheState) {
+    // Process incoming state
+
+    // Markers
+    state.markers = value.markers || {}
+
+    // Collections
+
+    const newCollectionsState: Record<string, Ref<Record<string | number, any>>> = {}
+    for (const collectionName in value.collections) {
+      const collection = getStore().$collections.find(c => c.name === collectionName)
+      if (!collection) {
+        continue
+      }
+      const incomingCollectionState = value.collections[collectionName as keyof typeof value.collections] as Record<string | number, any>
+      const collectionState = newCollectionsState[collectionName] = ref<Record<string | number, any>>({})
+      for (const key in incomingCollectionState) {
+        const item = incomingCollectionState[key]
+        if (item) {
+          const existing = collectionState.value[key]
+          collectionState.value[key] = Object.isFrozen(item) ? item : shallowRef(item)
+          updateItemIndexes(collection, key, existing, item)
+        }
+      }
+    }
+    state.collections = newCollectionsState
+
+    // Modules
+
+    const newModulesState: Record<string, Ref<any>> = {}
+    for (const moduleKey in value.modules) {
+      newModulesState[moduleKey] = ref(value.modules[moduleKey])
+    }
+    state.modules = newModulesState
+
+    wrappedItems.clear()
+    wrappedItemsMetadata.clear()
+    collectionStateCache.clear()
+
+    const store = getStore()
+    store.$hooks.callHookSync('afterCacheReset', {
+      store,
+      meta: {},
+    })
+
+    // Query Meta
+    state.queryMeta = value.queryMeta || {}
+  }
+
+  function clearNow() {
+    state.markers = {}
+    for (const collectionName in state.collections) {
+      state.collections[collectionName]!.value = {}
+    }
+    for (const moduleKey in state.modules) {
+      state.modules[moduleKey]!.value = {}
+    }
+    wrappedItems.clear()
+    wrappedItemsMetadata.clear()
+    collectionStateCache.clear()
+    state.collectionIndexes.clear()
+    state.fieldTimestamps.clear()
+
+    const store = getStore()
+    store.$hooks.callHookSync('afterCacheReset', {
+      store,
+      meta: {},
+    })
+  }
+
+  function addLayerNow(layer: CacheLayer) {
+    const collection = getStore().$collections.find(c => c.name === layer.collectionName)
+    if (!collection) {
+      throw new Error(`Collection not found for layer: ${layer.collectionName}`)
+    }
+
+    removeLayer(layer.id)
+
+    // Update indexes
+    const queuedIndexUpdates: Array<[string | number, any, any]> = []
+    for (const key in layer.state) {
+      const existing = getStateForCollection(collection.name)[key]
+      const newData = layer.state[key]
+      queuedIndexUpdates.push([key, existing, newData])
+    }
+
+    const collectionLayersRef = ensureLayersForCollection(layer.collectionName)
+    collectionLayersRef.value = [...collectionLayersRef.value, layer]
+    layerIdToCollectionName[layer.id] = layer.collectionName
+
+    invalidateCollectionStateCache(layer.collectionName)
+
+    // Update indexes after adding the layer
+    for (const [key, existing, newData] of queuedIndexUpdates) {
+      updateItemIndexes(collection, key, existing, newData)
+    }
+
+    const store = getStore()
+    store.$hooks.callHookSync('cacheLayerAdd', {
+      store,
+      layer,
+    })
+  }
+
+  function flushQueuedOperations() {
+    if (isFlushingQueue || state.paused) {
+      return
+    }
+
+    isFlushingQueue = true
+    try {
+      while (state.queue.length) {
+        const operation = state.queue[0]!
+        switch (operation.type) {
+          case 'writeItem':
+            if (!canProcessQueuedWrite()) {
+              return
+            }
+            writeItemNow(operation.params)
+            consumeQueuedWrite()
+            state.queue.shift()
+            break
+          case 'writeItems':
+            while (operation.index < operation.params.items.length) {
+              if (!canProcessQueuedWrite()) {
+                return
+              }
+              const { key, value: item } = operation.params.items[operation.index]!
+              writeItemNow({
+                collection: operation.params.collection,
+                key,
+                item,
+                meta: operation.params.meta,
+                fromWriteItems: true,
+              })
+              operation.index++
+              consumeQueuedWrite()
+            }
+            if (operation.params.marker) {
+              mark(operation.params.marker)
+            }
+            {
+              const store = getStore()
+              store.$hooks.callHookSync('afterCacheWrite', {
+                store,
+                meta: {},
+                collection: operation.params.collection,
+                result: operation.params.items,
+                marker: operation.params.marker,
+                operation: 'write',
+              })
+            }
+            state.queue.shift()
+            break
+          case 'deleteItem':
+            {
+              const { collection, key } = operation.params
+              const collectionTs = state.fieldTimestamps.get(collection.name)
+              if (collectionTs) {
+                collectionTs.delete(key)
+              }
+              deleteItem(collection, key)
+            }
+            state.queue.shift()
+            break
+          case 'addLayer':
+            addLayerNow(operation.layer)
+            state.queue.shift()
+            break
+          case 'removeLayer':
+            removeLayer(operation.layerId)
+            state.queue.shift()
+            break
+          case 'setState':
+            setStateNow(operation.state)
+            state.queue.shift()
+            break
+          case 'clear':
+            clearNow()
+            state.queue.shift()
+            break
+        }
+      }
+    }
+    finally {
+      isFlushingQueue = false
+    }
+  }
+
   return {
     wrapItem({ collection, item, noCache }) {
       return getWrappedItem(collection, item, noCache)!
@@ -408,176 +804,10 @@ export function createCache<
       return result
     },
     writeItem(params) {
-      if (state.paused) {
-        state.queue.push({ type: 'writeItem', args: [params] })
-        return
-      }
-      const { collection, key, item, marker, fromWriteItems, meta } = params
-      invalidateCollectionStateCache(collection.name)
-
-      const collectionState = ensureCollectionRef(collection.name).value
-      const isFrozen = Object.isFrozen(item)
-      if (isFrozen) {
-        collectionState[key] = item
-      }
-      else {
-        const rawData = pickNonSpecialProps(item, true)
-
-        // Handle relations
-        const data = {} as Record<string, any>
-        for (const field in rawData) {
-          if (field in collection.relations) {
-            const relation = collection.relations[field]
-            const rawItem = rawData[field]
-
-            // TODO: figure out deletions
-            if (!rawItem || !relation) {
-              continue
-            }
-
-            if (relation.many && !Array.isArray(rawItem)) {
-              throw new Error(`Expected array for relation ${collection.name}.${field}`)
-            }
-            else if (!relation.many && Array.isArray(rawItem)) {
-              throw new Error(`Expected object for relation ${collection.name}.${field}`)
-            }
-
-            if (Array.isArray(rawItem)) {
-              for (const nestedItem of rawItem as any[]) {
-                this.writeItemForRelation({
-                  parentCollection: collection,
-                  relationKey: field,
-                  relation,
-                  childItem: nestedItem,
-                  meta,
-                })
-              }
-            }
-            else if (rawItem) {
-              this.writeItemForRelation({
-                parentCollection: collection,
-                relationKey: field,
-                relation,
-                childItem: rawItem,
-                meta,
-              })
-            }
-            else {
-              // TODO: figure out deletions
-              // // If to-one relation is null, we delete the existing item
-              // const existingItem = this.readItem({ collection, key })
-              // if (existingItem) {
-              //   const childItem: WrappedItemBase<Collection, CollectionDefaults, StoreSchema> = existingItem[field]
-              //   const nestedItemCollection = getStore().$getCollection(childItem, [childItem.$collection])
-              //   const nestedKey = nestedItemCollection?.getKey(childItem)
-              //   if (nestedItemCollection && nestedKey) {
-              //     this.deleteItem({ collection: nestedItemCollection, key: nestedKey })
-              //   }
-              // }
-            }
-          }
-          else {
-            data[field] = rawData[field]
-          }
-        }
-
-        const existing = collectionState[key]
-
-        updateItemIndexes(collection, key, existing, data)
-
-        if (!existing) {
-          // Disable deep reactivity tracking inside the `data` object
-          collectionState[key] = shallowRef(markRaw(data))
-
-          // Store field timestamps if provided
-          if (params.fieldTimestamps) {
-            let collectionTs = state.fieldTimestamps.get(collection.name)
-            if (!collectionTs) {
-              collectionTs = new Map()
-              state.fieldTimestamps.set(collection.name, collectionTs)
-            }
-            collectionTs.set(key, { ...params.fieldTimestamps })
-          }
-        }
-        else if (params.fieldTimestamps) {
-          // CRDT field-level LWW merge
-          let collectionTs = state.fieldTimestamps.get(collection.name)
-          if (!collectionTs) {
-            collectionTs = new Map()
-            state.fieldTimestamps.set(collection.name, collectionTs)
-          }
-          const localTimestamps = collectionTs.get(key) ?? {}
-          const { merged, mergedTimestamps, conflicts } = mergeItemFields(
-            existing,
-            data,
-            localTimestamps,
-            params.fieldTimestamps,
-          )
-          collectionTs.set(key, mergedTimestamps)
-          collectionState[key] = markRaw(merged)
-
-          // Emit conflict hook if there are conflicts
-          if (conflicts.length > 0) {
-            const store = getStore()
-            store.$hooks.callHookSync('cacheConflict', {
-              store,
-              meta: {},
-              collection,
-              key,
-              conflicts,
-            })
-          }
-        }
-        else {
-          collectionState[key] = markRaw({
-            ...existing,
-            ...data,
-          })
-        }
-      }
-      if (marker) {
-        mark(marker)
-      }
-
-      if (meta?.$queryTracking) {
-        meta.$queryTracking.items[collection.name] ??= new Set()
-        meta.$queryTracking.items[collection.name]!.add(key)
-      }
-
-      if (!fromWriteItems) {
-        const store = getStore()
-        store.$hooks.callHookSync('afterCacheWrite', {
-          store,
-          meta: {},
-          collection,
-          key,
-          result: [item],
-          marker,
-          operation: 'write',
-        })
-      }
+      enqueueOperation({ type: 'writeItem', params })
     },
     writeItems(params) {
-      if (state.paused) {
-        state.queue.push({ type: 'writeItems', args: [params] })
-        return
-      }
-      const { collection, items, marker, meta } = params
-      for (const { key, value: item } of items) {
-        this.writeItem({ collection, key, item, meta, fromWriteItems: true })
-      }
-      if (marker) {
-        mark(marker)
-      }
-      const store = getStore()
-      store.$hooks.callHookSync('afterCacheWrite', {
-        store,
-        meta: {},
-        collection,
-        result: items,
-        marker,
-        operation: 'write',
-      })
+      enqueueOperation({ type: 'writeItems', params, index: 0 })
     },
     writeItemForRelation({ parentCollection, relationKey, relation, childItem, meta }) {
       const store = getStore()
@@ -599,17 +829,7 @@ export function createCache<
       })
     },
     deleteItem(params) {
-      if (state.paused) {
-        state.queue.push({ type: 'deleteItem', args: [params] })
-        return
-      }
-      const { collection, key } = params
-      // Clean up field timestamps
-      const collectionTs = state.fieldTimestamps.get(collection.name)
-      if (collectionTs) {
-        collectionTs.delete(key)
-      }
-      deleteItem(collection, key)
+      enqueueOperation({ type: 'deleteItem', params })
     },
     readFieldTimestamps({ collectionName, key }) {
       return state.fieldTimestamps.get(collectionName)?.get(key)
@@ -655,72 +875,10 @@ export function createCache<
       return result
     },
     setState(value) {
-      // Process incoming state
-
-      // Markers
-      state.markers = value.markers || {}
-
-      // Collections
-
-      const newCollectionsState: Record<string, Ref<Record<string | number, any>>> = {}
-      for (const collectionName in value.collections) {
-        const collection = getStore().$collections.find(c => c.name === collectionName)
-        if (!collection) {
-          continue
-        }
-        const incomingCollectionState = value.collections[collectionName as keyof typeof value.collections] as Record<string | number, any>
-        const collectionState = newCollectionsState[collectionName] = ref<Record<string | number, any>>({})
-        for (const key in incomingCollectionState) {
-          const item = incomingCollectionState[key]
-          if (item) {
-            const existing = collectionState.value[key]
-            collectionState.value[key] = Object.isFrozen(item) ? item : shallowRef(item)
-            updateItemIndexes(collection, key, existing, item)
-          }
-        }
-      }
-      state.collections = newCollectionsState
-
-      // Modules
-
-      const newModulesState: Record<string, Ref<any>> = {}
-      for (const moduleKey in value.modules) {
-        newModulesState[moduleKey] = ref(value.modules[moduleKey])
-      }
-      state.modules = newModulesState
-
-      wrappedItems.clear()
-      wrappedItemsMetadata.clear()
-      collectionStateCache.clear()
-
-      const store = getStore()
-      store.$hooks.callHookSync('afterCacheReset', {
-        store,
-        meta: {},
-      })
-
-      // Query Meta
-      state.queryMeta = value.queryMeta || {}
+      enqueueOperation({ type: 'setState', state: value })
     },
     clear() {
-      state.markers = {}
-      for (const collectionName in state.collections) {
-        state.collections[collectionName]!.value = {}
-      }
-      for (const moduleKey in state.modules) {
-        state.modules[moduleKey]!.value = {}
-      }
-      wrappedItems.clear()
-      wrappedItemsMetadata.clear()
-      collectionStateCache.clear()
-      state.collectionIndexes.clear()
-      state.fieldTimestamps.clear()
-
-      const store = getStore()
-      store.$hooks.callHookSync('afterCacheReset', {
-        store,
-        meta: {},
-      })
+      enqueueOperation({ type: 'clear' })
     },
     clearCollection({ collection }) {
       invalidateCollectionStateCache(collection.name)
@@ -751,41 +909,7 @@ export function createCache<
       }
     },
     addLayer(layer) {
-      if (state.paused) {
-        state.queue.push({ type: 'addLayer', args: [layer] })
-        return
-      }
-      const collection = getStore().$collections.find(c => c.name === layer.collectionName)
-      if (!collection) {
-        throw new Error(`Collection not found for layer: ${layer.collectionName}`)
-      }
-
-      removeLayer(layer.id)
-
-      // Update indexes
-      const queuedIndexUpdates: Array<[string | number, any, any]> = []
-      for (const key in layer.state) {
-        const existing = getStateForCollection(collection.name)[key]
-        const newData = layer.state[key]
-        queuedIndexUpdates.push([key, existing, newData])
-      }
-
-      const collectionLayersRef = ensureLayersForCollection(layer.collectionName)
-      collectionLayersRef.value = [...collectionLayersRef.value, layer]
-      layerIdToCollectionName[layer.id] = layer.collectionName
-
-      invalidateCollectionStateCache(layer.collectionName)
-
-      // Update indexes after adding the layer
-      for (const [key, existing, newData] of queuedIndexUpdates) {
-        updateItemIndexes(collection, key, existing, newData)
-      }
-
-      const store = getStore()
-      store.$hooks.callHookSync('cacheLayerAdd', {
-        store,
-        layer,
-      })
+      enqueueOperation({ type: 'addLayer', layer })
     },
     getLayer(layerId) {
       const collectionName = layerIdToCollectionName[layerId]
@@ -796,38 +920,14 @@ export function createCache<
       return collectionLayers.value.find(l => l.id === layerId)
     },
     removeLayer(layerId) {
-      if (state.paused) {
-        state.queue.push({ type: 'removeLayer', args: [layerId] })
-        return
-      }
-      removeLayer(layerId)
+      enqueueOperation({ type: 'removeLayer', layerId })
     },
     pause() {
       state.paused = true
     },
     resume() {
       state.paused = false
-      const queue = state.queue
-      state.queue = []
-      for (const operation of queue) {
-        switch (operation.type) {
-          case 'writeItem':
-            this.writeItem(...operation.args)
-            break
-          case 'writeItems':
-            this.writeItems(...operation.args)
-            break
-          case 'deleteItem':
-            this.deleteItem(...operation.args)
-            break
-          case 'addLayer':
-            this.addLayer(...operation.args)
-            break
-          case 'removeLayer':
-            this.removeLayer(...operation.args)
-            break
-        }
-      }
+      flushQueuedOperations()
     },
     _private: {
       state,
