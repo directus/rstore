@@ -5,7 +5,7 @@ on:
   pull_request:
 
 jobs:
-  ci:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - name: Set alternate npm integrity keys
@@ -19,8 +19,71 @@ jobs:
           cache: pnpm
       - run: pnpm install
       - run: pnpm lint
+
+  typecheck:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set alternate npm integrity keys
+        run: |
+          echo COREPACK_INTEGRITY_KEYS="$(curl https://registry.npmjs.org/-/npm/v1/keys | jq -c '{npm: .keys}')" >> $GITHUB_ENV
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: pnpm
+      - run: pnpm install
       - run: pnpm build
       - run: pnpm test:types
+
+  unit-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set alternate npm integrity keys
+        run: |
+          echo COREPACK_INTEGRITY_KEYS="$(curl https://registry.npmjs.org/-/npm/v1/keys | jq -c '{npm: .keys}')" >> $GITHUB_ENV
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm build
       - run: pnpm test
+
+  e2e:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set alternate npm integrity keys
+        run: |
+          echo COREPACK_INTEGRITY_KEYS="$(curl https://registry.npmjs.org/-/npm/v1/keys | jq -c '{npm: .keys}')" >> $GITHUB_ENV
+      - uses: actions/checkout@v4
+      - run: corepack enable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 23
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm build
       - run: pnpm -C packages/playground exec playwright install --with-deps chromium
       - run: pnpm test:e2e
+
+  ci:
+    runs-on: ubuntu-latest
+    if: ${{ always() }}
+    needs:
+      - lint
+      - typecheck
+      - unit-test
+      - e2e
+    steps:
+      - name: Ensure all CI jobs succeeded
+        run: |
+          if [[ "${{ needs.lint.result }}" != "success" \
+            || "${{ needs.typecheck.result }}" != "success" \
+            || "${{ needs.unit-test.result }}" != "success" \
+            || "${{ needs.e2e.result }}" != "success" ]]; then
+            echo "One or more CI jobs failed."
+            exit 1
+          fi
