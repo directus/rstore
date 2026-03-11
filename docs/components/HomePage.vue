@@ -90,7 +90,7 @@ const testimonials = [
     image: '/testimonials/rijk.webp',
   },
   {
-    quote: `I've used it before.`,
+    quote: `I've used it before!`,
     name: 'Hannes Küttner',
     image: '/testimonials/hannes.jpg',
   },
@@ -444,7 +444,7 @@ onBeforeUnmount(() => {
         />
       </section>
 
-      <section class="relative overflow-hidden rounded-[28px] border border-violet-600/[0.18] bg-white/[0.78] p-5 shadow-[0_26px_80px_rgba(5,24,11,0.08),inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl sm:p-7 dark:border-violet-400/20 dark:bg-[linear-gradient(145deg,rgba(23,18,28,0.98),rgba(13,9,18,0.96))] dark:shadow-[0_30px_90px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] flex gap-12">
+      <section class="relative overflow-hidden rounded-[28px] border border-violet-600/[0.18] bg-white/[0.78] p-5 shadow-[0_26px_80px_rgba(5,24,11,0.08),inset_0_1px_0_rgba(255,255,255,0.7)] backdrop-blur-xl sm:p-7 dark:border-violet-400/20 dark:bg-[linear-gradient(145deg,rgba(23,18,28,0.98),rgba(13,9,18,0.96))] dark:shadow-[0_30px_90px_rgba(0,0,0,0.34),inset_0_1px_0_rgba(255,255,255,0.04)] flex max-md:flex-col gap-2 md:gap-12">
         <div
           class="pointer-events-none absolute inset-0"
           style="background: linear-gradient(135deg, rgb(168 85 247 / 0.16), transparent 38%);"
