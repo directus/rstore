@@ -6,6 +6,7 @@ export default defineConfig({
       '**/node_modules/**',
       'packages/nuxt',
       'packages/nuxt-*',
+      '**/e2e/**',
     ],
   },
 })

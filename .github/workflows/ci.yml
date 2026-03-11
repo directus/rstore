@@ -22,3 +22,5 @@ jobs:
       - run: pnpm build
       - run: pnpm test:types
       - run: pnpm test
+      - run: pnpm -C packages/playground exec playwright install --with-deps chromium
+      - run: pnpm test:e2e

@@ -36,7 +36,8 @@
     "build": "unbuild && nuxi generate",
     "dev": "nuxi dev --port 3300",
     "dev:prepare": "nuxi prepare && unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs && printf \"export * from '../src/vite'\" > ./dist/vite.mjs",
-    "test:types": "nuxi prepare && vue-tsc --noEmit -p tsconfig.nuxt.json"
+    "test:types": "nuxi prepare && vue-tsc --noEmit -p tsconfig.nuxt.json",
+    "prepare": "nuxt prepare"
   },
   "peerDependencies": {
     "vue": "^3.5.21"

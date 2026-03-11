@@ -7,6 +7,8 @@ dist
 .output
 auto-imports.d.ts
 components.d.ts
+playwright-report
+test-results
 
 # Vitepress
 docs/.vitepress/dist

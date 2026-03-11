@@ -16,6 +16,7 @@
     "dev": "pnpm run -r --filter \"@rstore/*\" --filter \"!@rstore/devtools\" dev",
     "lint": "eslint --cache .",
     "test": "vitest run",
+    "test:e2e": "pnpm run -r --filter ./packages/playground --filter ./packages/playground-drizzle test:e2e",
     "test:dev": "vitest",
     "test:types": "pnpm run --parallel -r test:types",
     "copy-readme": "echo ./packages/* | xargs -n 1 cp README.md",

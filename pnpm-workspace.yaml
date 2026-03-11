@@ -24,6 +24,7 @@ catalog:
   '@nuxt/test-utils': ^3.15.4
   '@nuxt/ui': ^3.3.3
   '@nuxthub/core': ^0.8.18
+  '@playwright/test': ^1.58.2
   '@standard-schema/spec': ^1.0.0
   '@tailwindcss/vite': 4.0.7
   '@tresjs/core': ^5.6.0
