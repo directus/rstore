@@ -21,6 +21,17 @@ export interface CustomSortOption<
   TSchema extends StoreSchema,
 > {}
 
+export interface CustomIncludeOption<
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+> {
+  /**
+   * Nested relation includes for this included relation.
+   */
+  include?: FindOptionsInclude<TCollection, TCollectionDefaults, TSchema>
+}
+
 export interface FindOptions<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -77,7 +88,9 @@ export type FindOptionsIncludeItem<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
-> = boolean | FindOptionsInclude<TCollection, TCollectionDefaults, TSchema>
+> = boolean
+  | FindOptionsInclude<TCollection, TCollectionDefaults, TSchema>
+  | CustomIncludeOption<TCollection, TCollectionDefaults, TSchema>
 
 export interface FindOptionsBase<
   TCollection extends Collection,
@@ -98,6 +111,11 @@ export interface FindOptionsBase<
   sort?: ((a: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>, b: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>) => number) | CustomSortOption<TCollection, TCollectionDefaults, TSchema>
   /**
    * Include the related items.
+   *
+   * Each relation can be either:
+   * - `true` / `false`
+   * - a nested include object
+   * - a custom include object extended through module augmentation
    */
   include?: FindOptionsInclude<TCollection, TCollectionDefaults, TSchema>
   /**

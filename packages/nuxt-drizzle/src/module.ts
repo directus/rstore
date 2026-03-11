@@ -431,8 +431,10 @@ export default defineNuxtModule<ModuleOptions>({
         jiti.cache = {}
         const collections = await getCollectionsFromDrizzleSchema()
         const collectionMetas: Record<string, CustomCollectionMeta | undefined> = {}
+        const collectionRelations: Record<string, any> = {}
         for (const collection of collections) {
           collectionMetas[collection.name] = collection.meta
+          collectionRelations[collection.name] = collection.relations ?? {}
         }
 
         return `import * as schema from '${drizzleSchemaPath}'
@@ -440,6 +442,7 @@ import { ${options.drizzleImport?.name ?? 'useDrizzle'} as _drizzleDefault } fro
 
 export const tables = schema
 export const collectionMetas = ${JSON.stringify(collectionMetas, null, 2)}
+export const collectionRelations = ${JSON.stringify(collectionRelations, null, 2)}
 export const dialect = '${drizzleConfig.dialect}'
 export const useDrizzles = {
   default: _drizzleDefault,

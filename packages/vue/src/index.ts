@@ -53,6 +53,7 @@ export type {
   CustomCollectionMeta,
   CustomFilterOption,
   CustomHookMeta,
+  CustomIncludeOption,
   CustomParams,
   CustomPluginMeta,
   CustomSortOption,

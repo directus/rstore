@@ -1,16 +1,11 @@
 import type { RelationalQueryBuilder } from 'drizzle-orm/pg-core/query-builders/query'
 import type { RstoreDrizzleQueryParams } from '../utils'
 import type { RstoreDrizzleMeta, RstoreDrizzleTransformQuery } from '../utils/hooks'
-import { and, asc, desc, or, sql } from 'drizzle-orm'
+import { and, or } from 'drizzle-orm'
 import { createError, eventHandler, getQuery, getRouterParams } from 'h3'
 import SuperJSON from 'superjson'
-import { getDrizzleCondition, getDrizzleKeyWhere, getDrizzleTableFromCollection, rstoreUseDrizzle } from '../utils'
+import { convertIncludeToDrizzleWith, getDrizzleCondition, getDrizzleKeyWhere, getDrizzleOrderBy, getDrizzleTableFromCollection, rstoreUseDrizzle } from '../utils'
 import { rstoreDrizzleHooks } from '../utils/hooks'
-
-const orderByOperators = {
-  asc,
-  desc,
-}
 
 export default eventHandler(async (event) => {
   const meta: RstoreDrizzleMeta = {}
@@ -78,8 +73,9 @@ export default eventHandler(async (event) => {
     q.offset = query.offset
   }
 
-  if (query.with) {
-    q.with = query.with
+  const withRelations = query.with ?? convertIncludeToDrizzleWith(collectionName, query.include)
+  if (withRelations) {
+    q.with = withRelations
   }
 
   if (query.columns) {
@@ -89,21 +85,7 @@ export default eventHandler(async (event) => {
   q.extras = extras
 
   if (query.orderBy) {
-    const orderByData = typeof query.orderBy === 'string' ? [query.orderBy] : query.orderBy as Array<`${string}.${string}.${'asc' | 'desc'}`>
-    const orderBy = []
-    for (const rawOrderBy of orderByData) {
-      const parts = rawOrderBy.split('.')
-      if (parts.length !== 2) {
-        throw createError({
-          statusCode: 400,
-          statusMessage: 'Invalid orderBy',
-        })
-      }
-      const [columnName, order] = parts
-      const operator = orderByOperators[order as 'asc' | 'desc']
-      orderBy.push(operator((table as any)[columnName!] ?? sql`${columnName}`.as(columnName!)))
-    }
-    q.orderBy = orderBy
+    q.orderBy = getDrizzleOrderBy(table, query.orderBy)
   }
 
   let result = await dbQuery[collectionName]!.findMany(q)

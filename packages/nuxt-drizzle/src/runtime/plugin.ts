@@ -39,7 +39,10 @@ export default definePlugin({
     hook('fetchFirst', async (payload) => {
       if (payload.key) {
         const result = await requestFetch(`${apiPath}/${payload.collection.name}/${payload.key}`, {
-          query: { superjson: SuperJSON.stringify(payload.findOptions?.params) },
+          query: { superjson: SuperJSON.stringify({
+            ...payload.findOptions?.params,
+            include: payload.findOptions?.include,
+          }) },
         })
         if (result) {
           payload.setResult(result)
@@ -54,6 +57,7 @@ export default definePlugin({
             where: payload.findOptions?.where,
             ...payload.findOptions?.params,
             limit: 1,
+            include: payload.findOptions?.include,
           }) },
         })
         payload.setResult(result?.[0])
@@ -64,6 +68,7 @@ export default definePlugin({
       const options = {
         where: payload.findOptions?.where,
         ...payload.findOptions?.params,
+        include: payload.findOptions?.include,
       }
 
       if (payload.findOptions?.pageIndex != null && payload.findOptions?.pageSize != null) {

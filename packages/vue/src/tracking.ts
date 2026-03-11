@@ -4,6 +4,27 @@ import type { VueStore } from './store'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { computed, nextTick, ref, toValue } from 'vue'
 
+function resolveNestedInclude(
+  relations: Record<string, unknown>,
+  include: unknown,
+): FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> | undefined {
+  if (!include || include === true || typeof include !== 'object') {
+    return undefined
+  }
+
+  const maybeInclude = include as Record<string, unknown>
+  if ('include' in maybeInclude) {
+    const nestedInclude = maybeInclude.include
+    return nestedInclude && typeof nestedInclude === 'object'
+      ? nestedInclude as FindOptionsInclude<Collection, CollectionDefaults, StoreSchema>
+      : undefined
+  }
+
+  return Object.keys(maybeInclude).some(key => key in relations)
+    ? maybeInclude as FindOptionsInclude<Collection, CollectionDefaults, StoreSchema>
+    : undefined
+}
+
 export interface UseQueryTrackingOptions<TResult> {
   store: VueStore
   cached: MaybeRefOrGetter<TResult>
@@ -161,7 +182,11 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     return obj
   }
 
-  function addToQueryTracking(qt: HookMetaQueryTracking, item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>, include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema>) {
+  function addToQueryTracking(
+    qt: HookMetaQueryTracking,
+    item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>,
+    include?: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema>,
+  ) {
     if (!item.$collection) {
       return
     }
@@ -176,17 +201,20 @@ export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResu
     }
     set.add(itemKey)
     for (const relationName in collection.relations) {
-      if (include?.[relationName] && include[relationName] !== false) {
+      const relationInclude = include?.[relationName]
+      if (relationInclude && relationInclude !== false) {
         const value = item[relationName as keyof typeof item] as unknown as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | Array<WrappedItemBase<Collection, CollectionDefaults, StoreSchema>>
         if (Array.isArray(value)) {
           for (const relatedItem of value) {
             if (relatedItem) {
-              addToQueryTracking(qt, relatedItem, include[relationName])
+              const relatedCollection = relatedItem.$collection ? store.$collections.find(c => c.name === relatedItem.$collection) : null
+              addToQueryTracking(qt, relatedItem, relatedCollection ? resolveNestedInclude(relatedCollection.relations, relationInclude) : undefined)
             }
           }
         }
         else if (value != null) {
-          addToQueryTracking(qt, value, include[relationName])
+          const relatedCollection = value.$collection ? store.$collections.find(c => c.name === value.$collection) : null
+          addToQueryTracking(qt, value, relatedCollection ? resolveNestedInclude(relatedCollection.relations, relationInclude) : undefined)
         }
       }
     }
