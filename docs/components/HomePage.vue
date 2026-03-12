@@ -85,15 +85,20 @@ const coreFeatures = [
 
 const testimonials = [
   {
+    quote: `Surprisingly easy to use!`,
+    name: 'Marc Backes',
+    image: '/testimonials/marc.jpg',
+  },
+  {
     quote: `It's cool.`,
     name: 'Rijk van Zanten',
     image: '/testimonials/rijk.webp',
   },
-  {
-    quote: `I've used it before!`,
-    name: 'Hannes Küttner',
-    image: '/testimonials/hannes.jpg',
-  },
+  // {
+  //   quote: `I've used it before!`,
+  //   name: 'Hannes Küttner',
+  //   image: '/testimonials/hannes.jpg',
+  // },
 ]
 
 const aiSupportPillars = [
@@ -455,14 +460,15 @@ onBeforeUnmount(() => {
             TESTIMONIAL
           </div>
           <h2 class="reveal-up m-0 text-balance text-[clamp(1.85rem,3vw,2.6rem)] font-extrabold leading-[1.05] tracking-[-0.04em]" style="animation-delay: 660ms;">
-            What people are saying.
+            What people are saying
           </h2>
+          <p>Please let us know what you think!</p>
         </div>
 
         <article
           v-for="(testimonial, index) in testimonials"
           :key="testimonial.name"
-          class="reveal-up relative z-10 overflow-hidden rounded-[24px] border border-violet-600/[0.18] bg-white/[0.72] p-6 dark:border-violet-400/25 dark:bg-[#17121c]/[0.9]"
+          class="reveal-up relative z-10 overflow-hidden rounded-[24px] border border-violet-600/[0.18] bg-white/[0.72] p-6 dark:border-violet-400/25 dark:bg-[#17121c]/[0.9] flex-1 min-w-0"
           :style="{ animationDelay: `${740 + index * 65}ms` }"
         >
           <div class="pointer-events-none absolute inset-0" style="background: linear-gradient(135deg, rgb(168 85 247 / 0.14), transparent 48%);" />
