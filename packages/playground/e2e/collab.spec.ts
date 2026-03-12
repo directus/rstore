@@ -42,9 +42,14 @@ test('syncs presence and content updates between two collab editors', async ({ p
 test('keeps the focused caret position when another editor inserts text before it', async ({ page, browser }) => {
   const editorUrl = '/collab/doc1'
   await page.goto(editorUrl)
+  await expect(page).toHaveURL(/\/collab\/doc1$/)
 
   const secondEditor = await browser.newPage()
   await secondEditor.goto(editorUrl)
+  await expect(secondEditor).toHaveURL(/\/collab\/doc1$/)
+
+  await expect(page.getByText(/No other editors/)).toHaveCount(0)
+  await expect(secondEditor.getByText(/No other editors/)).toHaveCount(0)
 
   const firstEditorBody = page.getByPlaceholder('Write your content here...')
   const secondEditorBody = secondEditor.getByPlaceholder('Write your content here...')
