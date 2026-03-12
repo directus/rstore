@@ -12,13 +12,6 @@ rstore is a local-first data store for Vue and Nuxt applications. The core workf
 - Use [`@rstore/nuxt`](#nuxt) for Nuxt auto-registration, typed `useStore()`, SSR integration, and DevTools support.
 - Use [`@rstore/nuxt-drizzle`](#nuxt-drizzle) if you already have a Drizzle schema and want rstore generated from it.
 
-## Before you start
-
-- You need at least one data source strategy: collection-level hooks or plugins (REST, GraphQL, local DB, etc.).
-- `query` / `liveQuery` are designed for Vue `setup()` (they are reactive and also awaitable).
-- If you use TypeScript with Vue (non-Nuxt), keep your schema in one module so `useStore()` augmentation stays easy to maintain.
-- For collaborative realtime editing, use the [`@rstore/yjs` plugin](../plugins/yjs.md).
-
 ## Vue
 
 Use `@rstore/vue` when you want explicit control over store creation and plugin registration.

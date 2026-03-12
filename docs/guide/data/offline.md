@@ -26,17 +26,11 @@ const offlinePlugin = createOfflinePlugin({
 const store = await createStore({
   schema,
   plugins: [
-    // local/cache-style plugins first
     offlinePlugin,
-    // then remote transport plugins
     remoteApiPlugin,
   ],
 })
 ```
-
-::: tip
-Keep plugin order intentional. In most setups, local/offline plugins should run before remote plugins.
-:::
 
 ### 2. Implement collection synchronization
 
