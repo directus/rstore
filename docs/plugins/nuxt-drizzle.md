@@ -57,7 +57,7 @@ Before enabling this module, make sure your app already has:
 :::
 
 ```sh
-npm i @rstore/nuxt-drizzle
+npm i @rstore/nuxt-drizzle drizzle-orm drizzle-kit
 ```
 
 ```ts [nuxt.config.ts]
@@ -67,6 +67,8 @@ export default defineNuxtConfig({
   ],
 })
 ```
+
+Install a DB driver and [setup drizzle with a schema](https://orm.drizzle.team/docs/sql-schema-declaration).
 
 ::: warning Important Notice
 
