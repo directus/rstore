@@ -50,7 +50,7 @@ const currentTab = computed(() => tabs[Number.parseInt(tab.value)] ?? tabs[0]!)
 </script>
 
 <template>
-  <div class="flex flex-col">
+  <div class="flex flex-col h-full min-h-0">
     <div class="flex-none flex items-center gap-1 p-1 pb-0.5">
       <UTabs
         v-model="tab"
@@ -68,7 +68,7 @@ const currentTab = computed(() => tabs[Number.parseInt(tab.value)] ?? tabs[0]!)
       <div id="devtools-toolbar" class="flex-1 flex justify-end items-center gap-2 pr-2" />
     </div>
 
-    <div class="overflow-auto flex-1">
+    <div class="flex-1 min-h-0">
       <template v-if="currentTab.slot === 'cache'">
         <DevtoolsCache />
       </template>

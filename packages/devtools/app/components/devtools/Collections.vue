@@ -7,12 +7,13 @@ import { computed } from 'vue'
 import { useNonNullRstore } from '../../composables/rstore'
 import Empty from '../Empty.vue'
 import DevtoolsCollectionItem from './CollectionItem.vue'
+import DevtoolsVirtualList from './VirtualList.vue'
 
 const store = useNonNullRstore()
 
 const search = useLocalStorage('rstore-search-collections', '')
 
-const filteredTypes = computed(() => {
+const filteredCollections = computed(() => {
   return store.value.$collections.filter((collection) => {
     return collection.name.toLowerCase().includes(search.value.toLowerCase())
   }).sort((a, b) => a.name.localeCompare(b.name)) as ResolvedCollection<Collection, CollectionDefaults, StoreSchema>[]
@@ -20,7 +21,7 @@ const filteredTypes = computed(() => {
 </script>
 
 <template>
-  <div class="flex flex-col h-full">
+  <div class="flex flex-col h-full min-h-0">
     <Empty
       v-if="!store.$collections.length"
       icon="lucide:boxes"
@@ -35,18 +36,28 @@ const filteredTypes = computed(() => {
           icon="lucide:search"
           placeholder="Search"
           size="xs"
-          autofocus
           class="w-full"
         />
       </div>
 
-      <div class="flex-1 overflow-auto min-h-0 flex flex-col p-1 gap-1">
-        <DevtoolsCollectionItem
-          v-for="item in filteredTypes"
-          :key="item.name"
-          :item
-        />
-        <div class="flex-none h-1" />
+      <div class="flex-1 min-h-0">
+        <DevtoolsVirtualList
+          :items="filteredCollections"
+          key-field="name"
+          :min-item-size="72"
+          list-class="p-1"
+          item-class="pb-1"
+        >
+          <template #default="{ item }">
+            <DevtoolsCollectionItem :item="item" />
+          </template>
+
+          <template #empty>
+            <div class="p-4 text-xs italic opacity-50 text-center">
+              No collections match the search.
+            </div>
+          </template>
+        </DevtoolsVirtualList>
       </div>
     </template>
   </div>

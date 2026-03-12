@@ -5,14 +5,19 @@ import { computed } from 'vue'
 import { useStorePlugins } from '../../composables/plugins'
 import Empty from '../Empty.vue'
 import DevtoolsPluginItem from './PluginItem.vue'
+import DevtoolsVirtualList from './VirtualList.vue'
 
 const plugins = useStorePlugins()
 const search = useLocalStorage('rstore-search-plugins', '')
 
 const filteredPlugins = computed(() => {
-  return plugins.value.filter((plugin) => {
-    return plugin.name.toLowerCase().includes(search.value.toLowerCase())
-  })
+  return plugins.value
+    .map((plugin, index) => ({
+      id: plugin.name,
+      plugin,
+      index,
+    }))
+    .filter(({ plugin }) => plugin.name.toLowerCase().includes(search.value.toLowerCase()))
 })
 </script>
 
@@ -31,20 +36,30 @@ const filteredPlugins = computed(() => {
         icon="lucide:search"
         placeholder="Search"
         size="xs"
-        autofocus
         class="w-full"
       />
     </div>
 
-    <div class="flex-1 overflow-auto min-h-0 flex flex-col p-1 gap-1">
-      <DevtoolsPluginItem
-        v-for="plugin in filteredPlugins"
-        :key="plugin.name"
-        :plugin
-        :index="plugins.indexOf(plugin)"
-      />
+    <div class="flex-1 min-h-0">
+      <DevtoolsVirtualList
+        :items="filteredPlugins"
+        :min-item-size="96"
+        list-class="p-1"
+        item-class="pb-1"
+      >
+        <template #default="{ item }">
+          <DevtoolsPluginItem
+            :plugin="item.plugin"
+            :index="item.index"
+          />
+        </template>
 
-      <div class="flex-none h-1" />
+        <template #empty>
+          <div class="p-4 text-xs italic opacity-50 text-center">
+            No plugins match the search.
+          </div>
+        </template>
+      </DevtoolsVirtualList>
     </div>
   </div>
 </template>

@@ -9,6 +9,7 @@ import { useNonNullRstore } from '../../composables/rstore'
 import CodeSnippet from '../CodeSnippet.vue'
 import Empty from '../Empty.vue'
 import DevtoolsCacheCollectionItem from './CacheCollectionItem.vue'
+import DevtoolsVirtualList from './VirtualList.vue'
 
 const store = useNonNullRstore()
 const { cache, layers } = useStoreCache()
@@ -34,7 +35,7 @@ const filteredCollections = computed(() => {
     result = store.value.$collections.filter(collection => collection.name.toLowerCase().includes(cacheCollectionSearch.value.toLowerCase()))
   }
 
-  return result.sort((a, b) => a.name.localeCompare(b.name))
+  return [...result].sort((a, b) => a.name.localeCompare(b.name))
 })
 
 const collectionSearchEl = useTemplateRef('collectionSearchEl')
@@ -48,7 +49,11 @@ const selectedCache = computed(() => {
     return selectedLayer.value.state as Record<string, any>
   }
 
-  return cache.value.collections[selectedCollection.value as keyof typeof cache.value.collections] as Record<string, any>
+  if (!selectedCollection.value) {
+    return {}
+  }
+
+  return cache.value.collections[selectedCollection.value as keyof typeof cache.value.collections] as Record<string, any> ?? {}
 })
 
 const deletedItemsFromLayer = computed(() => {
@@ -109,6 +114,53 @@ const filteredCache = computed(() => {
   return result
 })
 
+const filteredCacheEntries = computed(() => {
+  return Object.entries(filteredCache.value ?? {}).map(([key, value]) => ({
+    id: key,
+    key,
+    value,
+  }))
+})
+
+const cacheRows = computed(() => {
+  const rows: Array<
+    | { id: string, type: 'deleted-header', count: number }
+    | { id: string, type: 'deleted-item', deletedItem: string | number }
+    | { id: string, type: 'cache-item', key: string, value: any }
+  > = []
+
+  if (deletedItemsFromLayer.value?.size) {
+    rows.push({
+      id: 'deleted-header',
+      type: 'deleted-header',
+      count: deletedItemsFromLayer.value.size,
+    })
+
+    for (const deletedItem of deletedItemsFromLayer.value) {
+      rows.push({
+        id: `deleted-${String(deletedItem)}`,
+        type: 'deleted-item',
+        deletedItem,
+      })
+    }
+  }
+
+  for (const entry of filteredCacheEntries.value) {
+    rows.push({
+      id: `item-${entry.id}`,
+      type: 'cache-item',
+      key: entry.key,
+      value: entry.value,
+    })
+  }
+
+  return rows
+})
+
+const hasSelectedCollectionItems = computed(() => {
+  return Boolean(Object.keys(selectedCache.value ?? {}).length || deletedItemsFromLayer.value?.size)
+})
+
 watch(cache, () => {
   forceUpdate.value++
 })
@@ -132,6 +184,18 @@ function selectCollection(collectionName: string) {
   selectedCollection.value = collectionName
 }
 
+function collectionState(collectionName: string) {
+  return selectedLayer.value?.collectionName === collectionName
+    ? { [collectionName]: selectedLayer.value.state }
+    : cache.value.collections
+}
+
+function collectionSelectedLayer(collectionName: string) {
+  return selectedLayer.value?.collectionName === collectionName
+    ? selectedLayer.value
+    : undefined
+}
+
 function clearItemSearchKey() {
   itemSearchKey.value = ''
 }
@@ -144,7 +208,7 @@ watch(selectedCollection, () => {
 </script>
 
 <template>
-  <div class="h-full">
+  <div class="h-full min-h-0">
     <CodeSnippet
       v-if="showRawCache"
       :code="cache"
@@ -153,9 +217,9 @@ watch(selectedCollection, () => {
 
     <div
       v-else
-      class="flex items-stretch h-full"
+      class="flex items-stretch h-full min-h-0"
     >
-      <div class="flex flex-col w-1/4 max-w-60">
+      <div class="flex flex-col w-1/4 max-w-60 min-h-0">
         <div class="p-1">
           <UButtonGroup
             size="sm"
@@ -239,73 +303,89 @@ watch(selectedCollection, () => {
           </UButtonGroup>
         </div>
 
-        <div class="flex flex-col flex-1 overflow-auto p-1 gap-px">
-          <DevtoolsCacheCollectionItem
-            v-for="collection in filteredCollections"
-            :key="collection.name"
-            :collection
-            :selected="isSelectedCollection(collection.name)"
-            :state="selectedLayer?.collectionName === collection.name ? { [collection.name]: selectedLayer.state } : cache.collections"
-            :selected-layer="selectedLayer?.collectionName === collection.name ? selectedLayer : undefined"
-            @click="selectCollection(collection.name)"
-          />
+        <div class="flex-1 min-h-0">
+          <DevtoolsVirtualList
+            :items="filteredCollections"
+            key-field="name"
+            :min-item-size="40"
+            list-class="p-1"
+            item-class="pb-px"
+          >
+            <template #default="{ item }">
+              <DevtoolsCacheCollectionItem
+                :collection="item"
+                :selected="isSelectedCollection(item.name)"
+                :state="collectionState(item.name)"
+                :selected-layer="collectionSelectedLayer(item.name)"
+                @click="selectCollection(item.name)"
+              />
+            </template>
 
-          <div v-if="!filteredCollections.length" class="p-2 text-xs italic opacity-50 text-center">
-            No collections found.
-          </div>
+            <template #empty>
+              <div class="p-2 text-xs italic opacity-50 text-center">
+                No collections found.
+              </div>
+            </template>
+          </DevtoolsVirtualList>
         </div>
       </div>
 
-      <div v-if="selectedCollection" class="overflow-auto flex-1">
+      <div v-if="selectedCollection" class="flex flex-col flex-1 min-h-0">
         <Empty
-          v-if="!filteredCache || (!Object.keys(selectedCache).length && !deletedItemsFromLayer?.size)"
+          v-if="!hasSelectedCollectionItems"
           icon="lucide:database"
           title="No items for this collection"
           class="h-full"
         />
         <Empty
-          v-else-if="!Object.keys(filteredCache).length && !deletedItemsFromLayer?.size"
+          v-else-if="!cacheRows.length"
           icon="lucide:search"
           title="No items match the search"
           class="h-full"
         />
-        <div v-else class="p-1 gap-1 flex flex-col">
-          <template v-if="deletedItemsFromLayer">
-            <h2 class="text-error font-bold">
-              {{ `${deletedItemsFromLayer.size} item${deletedItemsFromLayer.size > 1 ? 's' : ''} deleted` }}
-            </h2>
-            <div
-              v-for="deletedItem of deletedItemsFromLayer"
-              :key="deletedItem"
-              class="border border-error/50 rounded-lg p-2 font-mono text-xs text-error bg-error/10 flex items-center gap-2"
-            >
-              <UIcon name="lucide:trash" class="size-3.5" />
-              {{ deletedItem }}
-            </div>
-          </template>
-
-          <div
-            v-for="(value, key) in filteredCache"
-            :key="key"
-            class="border rounded-lg group/cache-item"
-            :class="[
-              selectedLayer ? 'border-yellow-500 hover:border-yellow-600' : 'border-default hover:border-muted',
-            ]"
+        <div v-else class="flex-1 min-h-0">
+          <DevtoolsVirtualList
+            :items="cacheRows"
+            :min-item-size="52"
+            list-class="p-1"
+            item-class="pb-1"
           >
-            <div class="font-mono text-xs sticky top-px h-[25px]">
-              <div class="bg-gradient-to-b from-white via-white to-transparent dark:from-[rgb(21,21,21)] dark:via-[rgb(21,21,21)] dark:to-[rgba(21,21,21,0)] via-75% absolute -top-px -left-px -right-px">
-                <div
-                  class="p-2 border-t border-l border-r rounded-t-lg"
-                  :class="[
-                    selectedLayer ? 'border-yellow-500 group-hover/cache-item:border-yellow-600' : 'border-default group-hover/cache-item:border-muted',
-                  ]"
-                >
-                  {{ key }}
-                </div>
+            <template #default="{ item }">
+              <h2 v-if="item.type === 'deleted-header'" class="text-error font-bold">
+                {{ `${item.count} item${item.count > 1 ? 's' : ''} deleted` }}
+              </h2>
+
+              <div
+                v-else-if="item.type === 'deleted-item'"
+                class="border border-error/50 rounded-lg p-2 font-mono text-xs text-error bg-error/10 flex items-center gap-2"
+              >
+                <UIcon name="lucide:trash" class="size-3.5" />
+                {{ item.deletedItem }}
               </div>
-            </div>
-            <CodeSnippet :key="forceUpdate" :code="value" class="text-xs p-2" />
-          </div>
+
+              <div
+                v-else
+                class="border rounded-lg group/cache-item"
+                :class="[
+                  selectedLayer ? 'border-yellow-500 hover:border-yellow-600' : 'border-default hover:border-muted',
+                ]"
+              >
+                <div class="font-mono text-xs sticky top-px h-[25px]">
+                  <div class="bg-gradient-to-b from-white via-white to-transparent dark:from-[rgb(21,21,21)] dark:via-[rgb(21,21,21)] dark:to-[rgba(21,21,21,0)] via-75% absolute -top-px -left-px -right-px">
+                    <div
+                      class="p-2 border-t border-l border-r rounded-t-lg"
+                      :class="[
+                        selectedLayer ? 'border-yellow-500 group-hover/cache-item:border-yellow-600' : 'border-default group-hover/cache-item:border-muted',
+                      ]"
+                    >
+                      {{ item.key }}
+                    </div>
+                  </div>
+                </div>
+                <CodeSnippet :key="forceUpdate" :code="item.value" class="text-xs p-2" />
+              </div>
+            </template>
+          </DevtoolsVirtualList>
         </div>
       </div>
     </div>

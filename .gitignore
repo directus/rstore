@@ -16,3 +16,6 @@ docs/.vitepress/cache
 docs/.vitepress/.temp
 
 .data
+
+# Agent skills from npm packages (managed by skills-npm)
+**/skills/npm-*

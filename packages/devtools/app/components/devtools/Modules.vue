@@ -6,6 +6,7 @@ import { useNonNullRstore } from '../../composables/rstore'
 import { useRstoreDevtoolsClient } from '../../utils/rstore-devtools-plugin'
 import Empty from '../Empty.vue'
 import DevtoolsModuleItem from './ModuleItem.vue'
+import DevtoolsVirtualList from './VirtualList.vue'
 
 const client = useRstoreDevtoolsClient()
 const store = useNonNullRstore()
@@ -14,13 +15,20 @@ const modules = () => store.value.$registeredModules
 
 const search = useLocalStorage('rstore-search-modules', '')
 
+const refreshCount = ref(0)
+
 const filteredModules = computed(() => {
+  // eslint-disable-next-line ts/no-unused-expressions
+  refreshCount.value
+
   return Array.from(modules().entries())
     .filter(([moduleName]) => moduleName.toLowerCase().includes(search.value.toLowerCase()))
     .sort(([a], [b]) => a.localeCompare(b))
+    .map(([moduleName, module]) => ({
+      id: moduleName,
+      module,
+    }))
 })
-
-const refreshCount = ref(0)
 
 function refresh() {
   refreshCount.value++
@@ -50,7 +58,6 @@ if (typeof stop === 'function') {
         icon="lucide:search"
         placeholder="Search"
         size="xs"
-        autofocus
         class="w-full"
       />
 
@@ -63,14 +70,24 @@ if (typeof stop === 'function') {
       />
     </div>
 
-    <div :key="refreshCount" class="flex-1 overflow-auto min-h-0 flex flex-col p-1 gap-1">
-      <DevtoolsModuleItem
-        v-for="[moduleName, module] in filteredModules"
-        :key="moduleName"
-        :module
-      />
+    <div class="flex-1 min-h-0">
+      <DevtoolsVirtualList
+        :key="refreshCount"
+        :items="filteredModules"
+        :min-item-size="96"
+        list-class="p-1"
+        item-class="pb-1"
+      >
+        <template #default="{ item }">
+          <DevtoolsModuleItem :module="item.module" />
+        </template>
 
-      <div class="flex-none h-1" />
+        <template #empty>
+          <div class="p-4 text-xs italic opacity-50 text-center">
+            No modules match the search.
+          </div>
+        </template>
+      </DevtoolsVirtualList>
     </div>
   </div>
 </template>

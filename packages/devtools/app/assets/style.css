@@ -1,5 +1,6 @@
 @import "tailwindcss" theme(static);
 @import "@nuxt/ui";
+@import "vue-virtual-scroller/dist/vue-virtual-scroller.css";
 
 @utility border-default {
   @apply border-neutral-100 dark:border-neutral-800;
@@ -12,4 +13,8 @@ body {
 
 .dark {
   --ui-bg: rgb(21, 21, 21);
+}
+
+.vue-recycle-scroller__item-view {
+  width: 100%;
 }
