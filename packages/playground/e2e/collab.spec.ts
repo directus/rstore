@@ -38,3 +38,48 @@ test('syncs presence and content updates between two collab editors', async ({ p
 
   await secondEditor.close()
 })
+
+test('keeps the focused caret position when another editor inserts text before it', async ({ page, browser }) => {
+  const editorUrl = '/collab/doc1'
+  await page.goto(editorUrl)
+
+  const secondEditor = await browser.newPage()
+  await secondEditor.goto(editorUrl)
+
+  const firstEditorBody = page.getByPlaceholder('Write your content here...')
+  const secondEditorBody = secondEditor.getByPlaceholder('Write your content here...')
+  const baseText = uniqueText('cursor-base')
+
+  await firstEditorBody.fill(baseText)
+  await expect(secondEditorBody).toHaveValue(baseText)
+
+  const cursorIndex = 8
+  await secondEditorBody.evaluate((element, nextCursorIndex) => {
+    const target = element as HTMLTextAreaElement
+    target.focus()
+    target.setSelectionRange(nextCursorIndex, nextCursorIndex, 'none')
+    target.dispatchEvent(new Event('select', { bubbles: true }))
+  }, cursorIndex)
+
+  const prefix = `${uniqueText('prefix')}-`
+  await firstEditorBody.evaluate((element) => {
+    const target = element as HTMLTextAreaElement
+    target.focus()
+    target.setSelectionRange(0, 0, 'none')
+  })
+  await firstEditorBody.type(prefix)
+
+  await expect(secondEditorBody).toHaveValue(`${prefix}${baseText}`)
+  await expect.poll(async () => secondEditorBody.evaluate((element) => {
+    const target = element as HTMLTextAreaElement
+    return {
+      start: target.selectionStart,
+      end: target.selectionEnd,
+    }
+  })).toEqual({
+    start: cursorIndex + prefix.length,
+    end: cursorIndex + prefix.length,
+  })
+
+  await secondEditor.close()
+})

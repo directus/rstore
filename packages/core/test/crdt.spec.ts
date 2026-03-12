@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyTextChanges, createFieldTimestamps, diffFields, diffText, fieldValuesEqual, mergeItemFields, mergeText, touchFields } from '../src/crdt'
+import { applyTextChanges, createFieldTimestamps, diffFields, diffText, fieldValuesEqual, mergeItemFields, mergeText, rebaseTextPosition, rebaseTextRange, touchFields } from '../src/crdt'
 
 describe('mergeItemFields', () => {
   it('should keep local values when local timestamps are newer', () => {
@@ -319,6 +319,50 @@ describe('mergeText', () => {
       remoteChange: {
         index: 6,
       },
+    })
+  })
+})
+
+describe('rebaseTextPosition', () => {
+  it('should shift a caret when text is inserted before it', () => {
+    const previousText = 'Hello world'
+    const nextText = 'Hello brave world'
+
+    expect(rebaseTextPosition(11, diffText(previousText, nextText))).toBe(17)
+  })
+
+  it('should keep left-affinity positions before inserted text at the same index', () => {
+    const changes = diffText('world', 'brave world')
+
+    expect(rebaseTextPosition(0, changes, 'left')).toBe(0)
+    expect(rebaseTextPosition(0, changes, 'right')).toBe(6)
+  })
+})
+
+describe('rebaseTextRange', () => {
+  it('should expand a selection when remote text is inserted inside it', () => {
+    expect(rebaseTextRange(
+      'Hello world',
+      'Hello brave world',
+      { start: 0, end: 11 },
+      {
+        startAffinity: 'left',
+        endAffinity: 'right',
+      },
+    )).toEqual({
+      start: 0,
+      end: 17,
+    })
+  })
+
+  it('should clamp rebased positions inside the next string', () => {
+    expect(rebaseTextRange(
+      'Hello world',
+      'Hello',
+      { start: 6, end: 11 },
+    )).toEqual({
+      start: 5,
+      end: 5,
     })
   })
 })

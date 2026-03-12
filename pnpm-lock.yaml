@@ -469,6 +469,9 @@ importers:
       '@nuxt/kit':
         specifier: ^4.0.0
         version: 4.3.1(magicast@0.5.2)
+      '@rstore/core':
+        specifier: workspace:^
+        version: link:../core
       '@vueuse/core':
         specifier: ^14.0.0
         version: 14.2.1(vue@3.5.30(typescript@5.9.3))

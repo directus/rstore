@@ -59,6 +59,17 @@ const {
   form,
   channel,
   trackedFields: ['title', 'body', 'status'],
+  getTextFieldElement: (field) => {
+    if (field === 'title') {
+      return titleInputEl.value
+    }
+
+    if (field === 'body') {
+      return bodyTextareaEl.value
+    }
+
+    return null
+  },
   getBaseValue: () => store.CollabDocument!.peekFirst(props.id),
   setBaseValue: (value) => {
     const collection = store.$collections.find(c => c.name === 'CollabDocument')!

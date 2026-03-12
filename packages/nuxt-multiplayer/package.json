@@ -37,6 +37,7 @@
   },
   "dependencies": {
     "@nuxt/kit": "^4.0.0",
+    "@rstore/core": "workspace:^",
     "@vueuse/core": "^14.0.0"
   },
   "devDependencies": {

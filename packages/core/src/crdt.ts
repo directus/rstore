@@ -57,6 +57,18 @@ export interface TextMergeResult {
   conflicts: TextMergeConflict[]
 }
 
+export type TextPositionAffinity = 'left' | 'right'
+
+export interface TextRange {
+  start: number
+  end: number
+}
+
+export interface RebaseTextRangeOptions {
+  startAffinity?: TextPositionAffinity
+  endAffinity?: TextPositionAffinity
+}
+
 const MAX_TEXT_DIFF_MATRIX_CELLS = 4_000_000
 
 /**
@@ -312,6 +324,83 @@ export function applyTextChanges(text: string, changes: TextChange[]): string {
 }
 
 /**
+ * Rebase a position through a list of text changes relative to the original
+ * string. Positions can either stick to the left or right side of inserted /
+ * replaced content.
+ */
+export function rebaseTextPosition(
+  position: number,
+  changes: TextChange[],
+  affinity: TextPositionAffinity = 'right',
+): number {
+  const orderedChanges = changes
+    .map((change, order) => ({ change, order }))
+    .sort((a, b) => a.change.index - b.change.index || a.order - b.order)
+
+  let result = Math.max(0, position)
+
+  for (const { change } of orderedChanges) {
+    const start = change.index
+    const end = change.index + change.deleteCount
+    const insertLength = change.insertText.length
+    const replacementEnd = start + insertLength
+
+    if (result < start) {
+      continue
+    }
+
+    if (result > end) {
+      result += insertLength - change.deleteCount
+      continue
+    }
+
+    if (result === start && change.deleteCount === 0) {
+      if (affinity === 'right') {
+        result = replacementEnd
+      }
+      continue
+    }
+
+    result = affinity === 'right'
+      ? replacementEnd
+      : start
+  }
+
+  return Math.max(0, result)
+}
+
+/**
+ * Rebase a text range from `previousText` into `nextText`.
+ */
+export function rebaseTextRange(
+  previousText: string,
+  nextText: string,
+  range: TextRange,
+  options: RebaseTextRangeOptions = {},
+): TextRange {
+  if (previousText === nextText) {
+    return {
+      start: clamp(range.start, 0, nextText.length),
+      end: clamp(range.end, 0, nextText.length),
+    }
+  }
+
+  const changes = diffText(previousText, nextText)
+  return {
+    start: clamp(
+      rebaseTextPosition(range.start, changes, options.startAffinity ?? 'right'),
+      0,
+      nextText.length,
+    ),
+    end: clamp(
+      rebaseTextPosition(range.end, changes, options.endAffinity ?? 'right'),
+      0,
+      nextText.length,
+    ),
+  }
+}
+
+/**
  * Merge concurrent text edits made against the same base string.
  * Non-overlapping edits are merged automatically. Overlapping replacements
  * remain conflicts and must be resolved at the field level.
@@ -421,6 +510,10 @@ function getCommonPrefixLength(a: string, b: string): number {
     index++
   }
   return index
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
 }
 
 function getCommonSuffixLength(a: string, b: string, prefixLength = 0): number {

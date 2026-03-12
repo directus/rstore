@@ -3,6 +3,7 @@ import type { MultiplayerLeaveMessage, MultiplayerMessage, MultiplayerPeer, Mult
 import { useWebSocket } from '@vueuse/core'
 import { useRuntimeConfig } from 'nuxt/app'
 import { computed, onUnmounted, ref, shallowRef, triggerRef, watch } from 'vue'
+import { areMultiplayerTextCursorsEqual, rebaseMultiplayerTextCursor } from '../utils/multiplayerTextCursor'
 
 const DEFAULT_COLORS = [
   '#ef4444',
@@ -37,6 +38,7 @@ export interface RstoreMultiplayerChannel<
   sendUpdate: (update: TUpdate) => void
   setFocusedField: (field?: TField | null) => void
   setTextCursor: (field: TField, cursor: MultiplayerTextCursor) => void
+  rebaseTextCursor: (field: TField, previousValue: string, nextValue: string) => void
   clearFocus: () => void
 }
 
@@ -117,6 +119,43 @@ export function useRstoreMultiplayerChannel<
     sendPresence()
   }
 
+  function rebaseTextCursor(field: TField, previousValue: string, nextValue: string) {
+    if (previousValue === nextValue) {
+      return
+    }
+
+    let didUpdatePeers = false
+
+    if (localField.value === field && localCursor.value) {
+      const rebasedLocalCursor = rebaseMultiplayerTextCursor(localCursor.value, previousValue, nextValue)
+      if (!areMultiplayerTextCursorsEqual(localCursor.value, rebasedLocalCursor)) {
+        localCursor.value = rebasedLocalCursor
+        sendPresence()
+      }
+    }
+
+    for (const [id, peer] of peers.value) {
+      if (peer.field !== field || !peer.cursor) {
+        continue
+      }
+
+      const rebasedPeerCursor = rebaseMultiplayerTextCursor(peer.cursor, previousValue, nextValue)
+      if (areMultiplayerTextCursorsEqual(peer.cursor, rebasedPeerCursor)) {
+        continue
+      }
+
+      peers.value.set(id, {
+        ...peer,
+        cursor: rebasedPeerCursor,
+      })
+      didUpdatePeers = true
+    }
+
+    if (didUpdatePeers) {
+      triggerRef(peers)
+    }
+  }
+
   const stalePeerTimeout = options.stalePeerTimeout ?? 15000
   const cleanupInterval = setInterval(() => {
     const now = Date.now()
@@ -186,6 +225,7 @@ export function useRstoreMultiplayerChannel<
     sendUpdate,
     setFocusedField,
     setTextCursor,
+    rebaseTextCursor,
     clearFocus,
   }
 }

@@ -1,5 +1,7 @@
+import type { MultiplayerTextCursor } from '../types'
 import type { RstoreMultiplayerChannel } from './useRstoreMultiplayerChannel'
-import { onUnmounted, watch } from 'vue'
+import { nextTick, onUnmounted, watch } from 'vue'
+import { rebaseMultiplayerTextCursor } from '../utils/multiplayerTextCursor'
 
 type FormChangeTuple = [newValue: unknown, oldValue: unknown]
 type FormChanges<TData extends Record<string, any>, TField extends keyof TData & string> = Partial<Record<TField, FormChangeTuple | undefined>>
@@ -30,6 +32,7 @@ export interface UseRstoreMultiplayerFormOptions<
     changedFields: TField[]
   }) => void
   trackedFields?: readonly TField[]
+  getTextFieldElement?: (field: TField) => HTMLInputElement | HTMLTextAreaElement | null | undefined
 }
 
 export function useRstoreMultiplayerForm<
@@ -58,7 +61,7 @@ export function useRstoreMultiplayerForm<
     }
   })
 
-  watch(options.channel.remoteUpdate, (update) => {
+  watch(options.channel.remoteUpdate, async (update) => {
     if (!update) {
       return
     }
@@ -73,12 +76,78 @@ export function useRstoreMultiplayerForm<
       ...update,
     }
     const changedFields = Object.keys(update) as TField[]
+    const previousValues = new Map<TField, TData[TField]>()
+    const pendingSelectionRebases: Array<{
+      cursor: MultiplayerTextCursor
+      field: TField
+      nextValue: string
+      previousValue: string
+      target: HTMLInputElement | HTMLTextAreaElement
+    }> = []
+
+    for (const field of changedFields) {
+      previousValues.set(field, options.form[field])
+
+      const previousValue = options.form[field]
+      if (typeof previousValue !== 'string') {
+        continue
+      }
+
+      const target = options.getTextFieldElement?.(field)
+      if (!isFocusedTextField(target)) {
+        continue
+      }
+
+      pendingSelectionRebases.push({
+        field,
+        target,
+        previousValue,
+        nextValue: previousValue,
+        cursor: readTextCursor(target),
+      })
+    }
 
     options.setBaseValue?.(nextBase, {
       update,
       changedFields,
     })
     options.form.$rebase(nextBase, changedFields)
+
+    for (const field of changedFields) {
+      const previousValue = previousValues.get(field)
+      const nextValue = options.form[field]
+
+      if (typeof previousValue === 'string' && typeof nextValue === 'string') {
+        options.channel.rebaseTextCursor(field, previousValue, nextValue)
+
+        const pendingSelection = pendingSelectionRebases.find(item => item.field === field)
+        if (pendingSelection) {
+          pendingSelection.nextValue = nextValue
+        }
+      }
+    }
+
+    if (pendingSelectionRebases.length > 0) {
+      await nextTick()
+
+      for (const pendingSelection of pendingSelectionRebases) {
+        if (!pendingSelection.target.isConnected || !isFocusedTextField(pendingSelection.target)) {
+          continue
+        }
+
+        const rebasedCursor = rebaseMultiplayerTextCursor(
+          pendingSelection.cursor,
+          pendingSelection.previousValue,
+          pendingSelection.nextValue,
+        )
+
+        pendingSelection.target.setSelectionRange(
+          rebasedCursor.start,
+          rebasedCursor.end,
+          rebasedCursor.direction,
+        )
+      }
+    }
   })
 
   function broadcastCurrentState() {
@@ -129,4 +198,31 @@ export function useRstoreMultiplayerForm<
     undoAndSync,
     redoAndSync,
   }
+}
+
+function isFocusedTextField(
+  target: HTMLInputElement | HTMLTextAreaElement | null | undefined,
+): target is HTMLInputElement | HTMLTextAreaElement {
+  return !!target
+    && typeof document !== 'undefined'
+    && document.activeElement === target
+}
+
+function readTextCursor(target: HTMLInputElement | HTMLTextAreaElement): MultiplayerTextCursor {
+  const start = target.selectionStart ?? 0
+  const end = target.selectionEnd ?? start
+
+  return {
+    start,
+    end,
+    direction: normalizeSelectionDirection(target.selectionDirection),
+  }
+}
+
+function normalizeSelectionDirection(direction: string | null): MultiplayerTextCursor['direction'] {
+  if (direction === 'forward' || direction === 'backward') {
+    return direction
+  }
+
+  return 'none'
 }
