@@ -1,0 +1,31 @@
+
+import { withItemType } from '@rstore/vue'
+
+import { memoryBackend } from './backend'
+import type { Todo, User } from './types'
+
+export const TodoCollection = withItemType<Todo>().defineCollection({
+  name: 'Todo',
+  getKey: item => item.id,
+  hooks: {
+    fetchFirst: ({ key }) => key ? memoryBackend.get('todos', String(key)) : undefined,
+    fetchMany: () => memoryBackend.list('todos'),
+    create: ({ item }) => memoryBackend.createTodo(item),
+    update: ({ key, item }) => memoryBackend.updateTodo(String(key), item),
+    delete: ({ key }) => memoryBackend.deleteTodo(String(key)),
+  },
+})
+
+export const UserCollection = withItemType<User>().defineCollection({
+  name: 'User',
+  getKey: item => item.id,
+  hooks: {
+    fetchFirst: ({ key }) => key ? memoryBackend.get('users', String(key)) : undefined,
+    fetchMany: () => memoryBackend.list('users'),
+  },
+})
+
+export const schema = [
+  TodoCollection,
+  UserCollection,
+] as const

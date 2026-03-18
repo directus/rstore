@@ -2,6 +2,7 @@ import type { CreateStoreOptions } from '@rstore/vue'
 import fs from 'node:fs'
 import { addImports, addPlugin, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, resolveFiles } from '@nuxt/kit'
 import serialize from 'serialize-javascript'
+import { resolveNuxtDevtoolsEnabled } from './devtoolsEnabled'
 import { setupDevToolsUI } from './devtools'
 
 declare module '@nuxt/schema' {
@@ -78,6 +79,7 @@ export default defineNuxtModule<ModuleOptions>({
   async setup(options, nuxt) {
     const resolver = createResolver(import.meta.url)
     const { resolve } = resolver
+    const devtoolsEnabled = resolveNuxtDevtoolsEnabled(nuxt.options.devtools)
 
     // Auto imports
     const importsFile = resolve('./runtime/imports')
@@ -172,9 +174,16 @@ export default [
       },
     })
 
+    const devtoolsTemplate = addTemplate({
+      filename: '$rstore-devtools-enabled.ts',
+      getContents: () => `export default ${JSON.stringify(devtoolsEnabled)}\n`,
+      write: true,
+    })
+
     nuxt.options.alias['#rstore-options'] = optionsTemplate.dst
     nuxt.options.alias['#rstore-collection'] = collectionTemplate.dst
     nuxt.options.alias['#rstore-plugins'] = pluginsTemplate.dst
+    nuxt.options.alias['#rstore-devtools-enabled'] = devtoolsTemplate.dst
 
     addTypeTemplate({
       filename: 'types/rstore.d.ts',
@@ -188,6 +197,8 @@ export {}`,
 
     addPlugin(resolve('./runtime/plugin'))
 
-    setupDevToolsUI(nuxt, resolver)
+    if (devtoolsEnabled) {
+      setupDevToolsUI(nuxt, resolver)
+    }
   },
 })

@@ -4,6 +4,8 @@ import { defineNuxtPlugin } from '#imports'
 // @ts-expect-error virtual file
 import _schema from '#rstore-collection'
 // @ts-expect-error virtual file
+import devtoolsEnabled from '#rstore-devtools-enabled'
+// @ts-expect-error virtual file
 import options from '#rstore-options'
 // @ts-expect-error virtual file
 import * as _plugins from '#rstore-plugins'
@@ -21,7 +23,7 @@ export default defineNuxtPlugin({
     const schema = _schema as StoreSchema
 
     // Devtools
-    if (import.meta.dev) {
+    if (import.meta.dev && devtoolsEnabled) {
       const { devtoolsPlugin } = await import('./devtools')
       plugins = [
         ...plugins,

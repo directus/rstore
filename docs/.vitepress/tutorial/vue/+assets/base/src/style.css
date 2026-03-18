@@ -1,0 +1,188 @@
+:root {
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  color: #152423;
+  background:
+    radial-gradient(circle at top left, rgba(0, 181, 132, 0.22), transparent 42%),
+    linear-gradient(180deg, #f6fffb 0%, #eef8f4 100%);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+button {
+  border: 0;
+  border-radius: 999px;
+  background: #0f7b5e;
+  color: white;
+  cursor: pointer;
+  padding: 0.7rem 1rem;
+  transition: transform 0.15s ease, opacity 0.15s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
+input,
+select {
+  width: 100%;
+  border: 1px solid rgba(21, 36, 35, 0.12);
+  border-radius: 16px;
+  background: rgba(255, 255, 255, 0.92);
+  padding: 0.75rem 0.9rem;
+}
+
+#app {
+  padding: 1.25rem;
+}
+
+.tutorial-app {
+  display: grid;
+  gap: 1rem;
+  max-width: 960px;
+  margin: 0 auto;
+}
+
+.hero {
+  background: rgba(255, 255, 255, 0.8);
+  border: 1px solid rgba(21, 36, 35, 0.08);
+  border-radius: 24px;
+  padding: 1.3rem 1.4rem;
+  box-shadow: 0 20px 40px rgba(15, 123, 94, 0.08);
+}
+
+.hero h1,
+.hero h2 {
+  margin: 0;
+}
+
+.hero p {
+  margin: 0.5rem 0 0;
+  color: rgba(21, 36, 35, 0.72);
+}
+
+.surface {
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(21, 36, 35, 0.08);
+  border-radius: 24px;
+  padding: 1rem;
+  box-shadow: 0 18px 35px rgba(15, 123, 94, 0.08);
+}
+
+.toolbar,
+.form-row,
+.stack {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.toolbar,
+.stack {
+  flex-wrap: wrap;
+}
+
+.meta-pill {
+  padding: 0.45rem 0.8rem;
+  border-radius: 999px;
+  background: rgba(15, 123, 94, 0.12);
+  color: #0b664e;
+  font-size: 0.92rem;
+}
+
+.todo-list,
+.summary-list {
+  display: grid;
+  gap: 0.75rem;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.todo-item,
+.summary-item {
+  display: grid;
+  gap: 0.35rem;
+  padding: 0.95rem 1rem;
+  border-radius: 18px;
+  background: rgba(247, 250, 249, 0.96);
+  border: 1px solid rgba(21, 36, 35, 0.08);
+}
+
+.todo-item.done {
+  opacity: 0.65;
+}
+
+.todo-actions {
+  display: flex;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.secondary {
+  background: #dbece6;
+  color: #123b31;
+}
+
+.ghost {
+  background: transparent;
+  color: #0f7b5e;
+  border: 1px solid rgba(15, 123, 94, 0.24);
+}
+
+.split {
+  display: grid;
+  gap: 1rem;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.label {
+  display: grid;
+  gap: 0.45rem;
+  color: rgba(21, 36, 35, 0.78);
+}
+
+.hint {
+  color: rgba(21, 36, 35, 0.62);
+  font-size: 0.92rem;
+}
+
+code {
+  font-family: 'SFMono-Regular', ui-monospace, monospace;
+  background: rgba(15, 123, 94, 0.08);
+  border-radius: 8px;
+  padding: 0.12rem 0.35rem;
+}
+
+@media (max-width: 700px) {
+  #app {
+    padding: 0.75rem;
+  }
+
+  .split {
+    grid-template-columns: 1fr;
+  }
+
+  .form-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "strict": true,
+    "jsx": "preserve",
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": true,
+    "allowJs": true,
+    "plugins": [
+      {
+        "name": "@vue/typescript-plugin"
+      }
+    ],
+    "types": [
+      "vite/client"
+    ],
+    "paths": {
+      "#demo/backend": [
+        "./src/tutorial/backend.ts"
+      ],
+      "#demo/events": [
+        "./src/tutorial/liveEvents.ts"
+      ],
+      "#demo/runtime": [
+        "./src/tutorial/runtime.ts"
+      ]
+    }
+  },
+  "include": [
+    "app/**/*",
+    "server/**/*",
+    "src/**/*",
+    "nuxt.config.ts"
+  ]
+}

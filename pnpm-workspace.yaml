@@ -5,9 +5,14 @@ trustPolicy: no-downgrade
 packages:
   - packages/*
 
+overrides:
+  vite: ^8.0.0
+
 catalog:
   '@akryum/sheep': ^0.5.2
   '@antfu/eslint-config': ^6.2.0
+  '@directus/vue-split-panel': ^0.8.8
+  '@iconify-json/file-icons': ^1.2.2
   '@faker-js/faker': ^9.4.0
   '@iconify-json/lucide': ^1.2.22
   '@iconify-json/simple-icons': ^1.2.19
@@ -29,7 +34,11 @@ catalog:
   '@tresjs/post-processing': ^3.5.0
   '@types/node': ^24.3.1
   '@vueuse/core': ^14.0.0
+  '@vueuse/integrations': ^14.0.0
   '@vueuse/nuxt': ^14.0.0
+  '@webcontainer/api': ^1.6.1
+  '@xterm/addon-fit': ^0.11.0
+  '@xterm/xterm': ^5.5.0
   animejs: ^4.2.2
   arctic: ^3.5.0
   changelogen: ^0.5.7
@@ -38,6 +47,7 @@ catalog:
   eslint: ^9.20.0
   lint-staged: ^15.4.3
   lucia: ^3.2.2
+  monaco-editor: ^0.55.1
   nitropack: latest
   npm-run-all2: ^7.0.2
   nuxt: ^4.1.3
@@ -57,6 +67,7 @@ catalog:
   y-protocols: ^1.0.0
   yjs: ^13.6.24
   zod: ^3.24.2
+
 onlyBuiltDependencies:
   - '@parcel/watcher'
   - '@tailwindcss/oxide'

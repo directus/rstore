@@ -9,6 +9,12 @@ const MARKERS: Record<string, 'add' | 'remove'> = {
   '// [!code --]': 'remove',
 }
 
+const CROSS_ORIGIN_ISOLATION_HEADERS = {
+  'Cross-Origin-Embedder-Policy': 'require-corp',
+  'Cross-Origin-Opener-Policy': 'same-origin',
+  'Cross-Origin-Resource-Policy': 'cross-origin',
+}
+
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
   title: 'rstore',
@@ -20,6 +26,7 @@ export default defineConfig({
 
     nav: [
       { text: 'Guide', link: '/guide/getting-started' },
+      { text: 'Tutorial', link: '/interactive-tutorial' },
       {
         text: 'Plugins',
         items: [
@@ -113,6 +120,17 @@ export default defineConfig({
   vite: {
     plugins: [
       tailwindcss(),
+      {
+        name: 'dev-server-headers',
+        configureServer(server) {
+          server.middlewares.use((_req, res, next) => {
+            Object.entries(CROSS_ORIGIN_ISOLATION_HEADERS).forEach(([key, value]) => {
+              res.setHeader(key, value)
+            })
+            next()
+          })
+        },
+      },
     ],
 
     resolve: {

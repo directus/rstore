@@ -1,5 +1,6 @@
 import serialize from 'serialize-javascript'
 import { describe, expect, it } from 'vitest'
+import { resolveNuxtDevtoolsEnabled } from '../src/devtoolsEnabled'
 import { resolveStoreOptions } from '../src/module'
 
 describe('resolveStoreOptions', () => {
@@ -47,5 +48,27 @@ describe('resolveStoreOptions', () => {
     expect(serialized).toContain('item.id === "fixture"')
     // eslint-disable-next-line no-template-curly-in-string
     expect(serialized).toContain('`fixture:${item.id}`')
+  })
+})
+
+describe('resolveNuxtDevtoolsEnabled', () => {
+  it('defaults to enabled when Nuxt uses its default devtools setting', () => {
+    expect(resolveNuxtDevtoolsEnabled(undefined)).toBe(true)
+  })
+
+  it('disables devtools when Nuxt config sets devtools to false', () => {
+    expect(resolveNuxtDevtoolsEnabled(false)).toBe(false)
+  })
+
+  it('disables devtools when Nuxt config sets devtools.enabled to false', () => {
+    expect(resolveNuxtDevtoolsEnabled({
+      enabled: false,
+    })).toBe(false)
+  })
+
+  it('enables devtools when Nuxt config sets devtools.enabled to true', () => {
+    expect(resolveNuxtDevtoolsEnabled({
+      enabled: true,
+    })).toBe(true)
   })
 })
