@@ -2,19 +2,15 @@
 title: Welcome
 ---
 
-This track covers the same rstore ideas as the Vue version, but through Nuxt’s filesystem conventions. The good news is that you still get a real running app, a preview, and validation. The difference is where the pieces live and how much the Nuxt module can do for you.
+This follows the same core rstore ideas as the Vue app, but through Nuxt’s filesystem conventions and module integration. The point is not only to make the app work. It is to make the data model feel clear enough that the surrounding Nuxt features stay easy to reason about.
 
-## Get your bearings
-
-Most application code in this track lives under `app/`, and the tiny tutorial backend lives under `server/`. That mirrors how a real Nuxt project tends to feel: UI and data conventions on one side, server routes on the other.
+Most application code lives under `app/`, and the tiny in-memory backend lives under `server/`. That is intentionally close to a real Nuxt project: UI, route-driven pages, server handlers, and framework conventions all in one place.
 
 ```ts
 const store = useStore()
 const { data: todos } = await store.Todo.query(q => q.many())
 ```
 
-You will still end up writing code like that. The interesting part is that Nuxt can generate more of the plumbing once the module and collections are in place.
+You still end up writing code like that. The difference is that Nuxt can generate more of the plumbing for you once the module and collections are in place.
 
-## What is different in Nuxt
-
-In plain Vue, you had to create and install the store yourself. In Nuxt, the module can discover files in `app/rstore`, create the store, and expose a typed `useStore()` automatically. The next chapter is where that clicks into place.
+In plain Vue, you create and install the store yourself. In Nuxt, the module can scan `app/rstore`, create the store, expose a typed `useStore()`, integrate with SSR payloads, and wire into Nuxt DevTools. The next steps make that concrete instead of leaving it as magic.

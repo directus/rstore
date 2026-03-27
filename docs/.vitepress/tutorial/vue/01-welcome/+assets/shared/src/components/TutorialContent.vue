@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useStore } from '@rstore/vue'
-import CachePanel from './components/CachePanel.vue'
+import CachePanel from './CachePanel.vue'
 
 const store = useStore()
 const { data: todos } = await store.Todo.query(q => q.many())

@@ -2,9 +2,7 @@
 title: Cache APIs
 ---
 
-The cache is the beating heart of the tutorial, so this last chapter lets you touch it directly. It is a good way to end because it makes every earlier chapter easier to reason about in hindsight.
-
-## Read and write the cache on purpose
+The cache has been underneath every step so far, so it is a good final coding step to touch it directly and make that relationship explicit.
 
 Open `app/components/CachePanel.vue`. The computed read is already showing you the current contents.
 
@@ -12,7 +10,7 @@ Open `app/components/CachePanel.vue`. The computed read is already showing you t
 const cachedTodos = computed(() => store.Todo.peekMany())
 ```
 
-Now finish the two actions: inject one Todo directly into the cache, then clear the whole cache.
+That is a synchronous cache read. No fetching is involved. Now finish the two actions: inject one todo directly into the cache, then clear the whole cache.
 
 ```ts
 store.Todo.writeItem({
@@ -27,6 +25,4 @@ store.$cache.clear()
 
 The page beside the panel should react immediately, because it is reading that same normalized state.
 
-## The lesson underneath the lesson
-
-Queries, mutations, live updates, and relations all worked because they were meeting in one place: the cache. Direct cache APIs are powerful because they let you work at that level on purpose. They also remind you to treat the cache carefully, because it is real application state.
+That is the lesson underneath the lesson. Queries, mutations, relations, and live updates all worked because they met in one place: the cache. There is more to the cache API, including layers, pause/resume, and state hydration, but even this small exercise should make the rest of the app easier to reason about in hindsight.

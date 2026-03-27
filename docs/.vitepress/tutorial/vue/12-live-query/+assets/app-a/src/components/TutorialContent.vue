@@ -1,25 +1,31 @@
 <script setup lang="ts">
 import { useStore } from '@rstore/vue'
+import { simulateRemoteTodo as triggerRemoteTodo } from '../rstore/live'
 
 const store = useStore()
-const { data: todos, loading, refresh } = await store.Todo.query(q => q.many())
+const { data: todos } = await store.Todo.query(q => q.many())
+
+async function simulateRemoteTodo() {
+  triggerRemoteTodo()
+  await new Promise(resolve => window.setTimeout(resolve, 80))
+}
 </script>
 
 <template>
   <main class="tutorial-app">
     <header class="hero">
-      <h1>Chapter : Store Setup</h1>
-      <p>Create the store and install `RstorePlugin` so `useStore()` becomes available to components.</p>
+      <h1>Chapter : Live Query</h1>
+      <p>Use <code>liveQuery()</code> so remote inserts update the rendered list automatically.</p>
     </header>
 
     <section class="surface">
       <div class="toolbar">
-        <button @click="refresh()">
-          Refresh
+        <button @click="simulateRemoteTodo()">
+          Simulate remote todo
         </button>
 
         <span class="meta-pill">
-          {{ loading ? 'Loading the in-memory backend…' : todos.length + ' seeded todos ready' }}
+          {{ todos.length }} live items
         </span>
       </div>
     </section>
@@ -30,10 +36,9 @@ const { data: todos, loading, refresh } = await store.Todo.query(q => q.many())
           v-for="todo in todos"
           :key="todo.id"
           class="todo-item"
-          :class="{ done: todo.completed }"
         >
           <strong>{{ todo.text }}</strong>
-          <span class="hint">Assigned to {{ todo.assigneeId ?? 'nobody yet' }}</span>
+          <span class="hint">{{ todo.completed ? 'Complete' : 'Open' }}</span>
         </li>
       </ul>
     </section>

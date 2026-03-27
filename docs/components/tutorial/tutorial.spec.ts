@@ -1,8 +1,8 @@
 import type { TutorialChapter, TutorialFramework } from './utils/types'
 import { existsSync, readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
-import { describe, expect, it } from 'vitest'
-import * as shared from './steps/shared'
+import { IDBFactory } from 'fake-indexeddb'
+import { afterEach, describe, expect, it } from 'vitest'
 import {
   getTutorialChapterDefinitions,
   tutorialChapterDefinitions,
@@ -11,29 +11,41 @@ import {
   tutorialChapterFoldersByFramework,
   tutorialTracks,
 } from './steps/registry'
+import * as shared from './steps/shared'
 import {
   applyStepCorrections,
   buildTutorialFileTree,
+  composeStepOverlaySnapshot,
   composeStepSnapshot,
   composeVisibleStepSnapshot,
   createLatestRequestController,
   createTutorialSearchSegments,
   createTutorialSearchSnippet,
   detectTutorialSupport,
+  diffLayeredSnapshots,
   diffSnapshots,
   getAdjacentTutorialChapters,
   getDifferingEditableFiles,
   getPrimaryCorrectionFile,
   getTutorialChapterEditorFiles,
   groupTutorialChapters,
+  isTutorialPreviewSessionCurrent,
   mergeTutorialOpenFiles,
   normalizeTutorialGuideSearchText,
+  planTutorialExactSync,
   prioritizeTutorialOpenFiles,
   resetStepFiles,
   resolveTutorialChapterSelectedFile,
   resolveTutorialSelectedFile,
 } from './utils'
-import { getStepSolutionFiles, getStepStarterFiles } from './utils/tutorialAssets'
+import {
+  getFrameworkBaseFiles,
+  getStepRuntimeAssets,
+  getStepSolutionFiles,
+  getStepSolutionOverlayFiles,
+  getStepStarterFiles,
+  getStepStarterOverlayFiles,
+} from './utils/tutorialAssets'
 import { createTutorialDependencyInstallPlan } from './utils/tutorialDependencyInstall'
 import {
   createTutorialFrameworkRecord,
@@ -44,11 +56,19 @@ import {
 import { createVendoredRstorePackageFiles } from './utils/tutorialLocalPackages'
 import { appendTutorialLogMessage, appendTutorialRuntimeOutputChunk } from './utils/tutorialRuntimeLogs'
 import {
+  createTutorialChapterTaskSessionController,
   createTutorialRuntimeSessionController,
+  isTutorialChapterTaskCancellationError,
   isTutorialRuntimeCancellationError,
 } from './utils/tutorialRuntimeSession'
 import { createTutorialServerTracker, getTutorialRuntimeProfile } from './utils/tutorialServerUrls'
-import { getTutorialDependencyCacheSignature } from './utils/webContainerCache'
+import {
+  clearTutorialDependencyCache,
+  getTutorialDependencyCacheRecordKey,
+  getTutorialDependencyCacheSignature,
+  restoreTutorialDependencyCache,
+  saveTutorialDependencyCache,
+} from './utils/webContainerCache'
 
 function routeToDocFile(route: string): string {
   return resolve(process.cwd(), 'docs', `${route.replace(/^\//, '')}.md`)
@@ -64,14 +84,104 @@ function resolveChapter(chapterId: string): TutorialChapter {
   if (!definition)
     throw new Error(`Unknown tutorial chapter: ${chapterId}`)
 
+  const sourceChapterId = definition.playgroundSourceChapterId
+  const sourceRuntimeAssets = getStepRuntimeAssets(sourceChapterId ?? chapterId)
+  const sourceStarterFiles = getStepStarterFiles(sourceChapterId ?? chapterId)
+  const sourceSolutionFiles = getStepSolutionFiles(sourceChapterId ?? chapterId)
+  const editableFiles = sourceChapterId
+    ? getTutorialPlaygroundEditableFiles(sourceSolutionFiles, definition.framework)
+    : definition.editableFiles
+  const runtimeAssets = sourceChapterId
+    ? {
+        frameworkBaseFiles: sourceRuntimeAssets.frameworkBaseFiles,
+        starterOverlayFiles: { ...sourceRuntimeAssets.solutionOverlayFiles },
+        solutionOverlayFiles: { ...sourceRuntimeAssets.solutionOverlayFiles },
+      }
+    : sourceRuntimeAssets
+
   return {
     ...definition,
+    editableFiles,
     folder: tutorialChapterFolders[chapterId],
-    starterFiles: getStepStarterFiles(chapterId),
-    solutionFiles: getStepSolutionFiles(chapterId),
+    runtimeAssets,
+    starterFiles: sourceChapterId ? { ...sourceSolutionFiles } : sourceStarterFiles,
+    solutionFiles: { ...sourceSolutionFiles },
     guideComponent: {} as TutorialChapter['guideComponent'],
     guideSearchText: normalizeTutorialGuideSearchText(readFileSync(routeToTutorialGuide(tutorialChapterFolders[chapterId]), 'utf8')),
   }
+}
+
+function getTutorialPlaygroundEditableFiles(files: Record<string, string>, framework: TutorialFramework) {
+  return Object.keys(files)
+    .filter(filePath => isTutorialPlaygroundFile(filePath, framework))
+    .sort((a, b) => {
+      const rankDiff = getTutorialPlaygroundFileRank(a, framework) - getTutorialPlaygroundFileRank(b, framework)
+      return rankDiff || a.localeCompare(b)
+    })
+}
+
+function isTutorialPlaygroundFile(filePath: string, framework: TutorialFramework) {
+  if (
+    filePath === 'index.html'
+    || filePath === 'package.json'
+    || filePath === 'package-lock.json'
+    || filePath === 'tsconfig.json'
+    || filePath === 'vite.config.ts'
+    || filePath === 'src/env.d.ts'
+    || filePath === 'src/runtimeBanner.ts'
+    || filePath.startsWith('scripts/')
+    || filePath.startsWith('src/tutorial/')
+    || filePath.startsWith('vendor/')
+  ) {
+    return false
+  }
+
+  if (framework === 'vue') {
+    return filePath.startsWith('src/')
+  }
+
+  return (
+    filePath === 'nuxt.config.ts'
+    || filePath === 'src/style.css'
+    || filePath.startsWith('app/')
+    || filePath.startsWith('server/')
+  )
+}
+
+function getTutorialPlaygroundFileRank(filePath: string, framework: TutorialFramework) {
+  if (framework === 'vue') {
+    if (filePath === 'src/components/TutorialContent.vue')
+      return 0
+    if (filePath === 'src/App.vue')
+      return 1
+    if (filePath.startsWith('src/components/'))
+      return 2
+    if (filePath.startsWith('src/rstore/'))
+      return 3
+    if (filePath === 'src/main.ts')
+      return 4
+    if (filePath === 'src/style.css')
+      return 5
+    return 6
+  }
+
+  if (filePath.startsWith('app/pages/'))
+    return 0
+  if (filePath.startsWith('app/components/'))
+    return 1
+  if (filePath.startsWith('app/rstore/'))
+    return 2
+  if (filePath === 'app/app.vue')
+    return 3
+  if (filePath.startsWith('server/'))
+    return 4
+  if (filePath === 'nuxt.config.ts')
+    return 5
+  if (filePath.startsWith('app/plugins/'))
+    return 6
+  if (filePath === 'src/style.css')
+    return 7
+  return 8
 }
 
 function resolveTrackChapters(framework: TutorialFramework) {
@@ -80,6 +190,107 @@ function resolveTrackChapters(framework: TutorialFramework) {
 
 const resolvedVueChapters = resolveTrackChapters('vue')
 const resolvedNuxtChapters = resolveTrackChapters('nuxt')
+const originalIndexedDb = globalThis.indexedDB
+
+afterEach(() => {
+  if (originalIndexedDb) {
+    Object.defineProperty(globalThis, 'indexedDB', {
+      configurable: true,
+      value: originalIndexedDb,
+      writable: true,
+    })
+  }
+  else {
+    Reflect.deleteProperty(globalThis, 'indexedDB')
+  }
+})
+
+function installFakeIndexedDb() {
+  Object.defineProperty(globalThis, 'indexedDB', {
+    configurable: true,
+    value: new IDBFactory(),
+    writable: true,
+  })
+}
+
+function createMockCacheWebContainer(options: {
+  nodeModulesSnapshot?: Uint8Array
+  packageLock?: string | null
+} = {}) {
+  const state = {
+    fsFiles: new Map<string, string>(),
+    mountedSnapshots: [] as Array<{ mountPoint?: string, snapshot: Uint8Array }>,
+    removedPaths: [] as string[],
+  }
+  const exportedSnapshot = options.nodeModulesSnapshot ?? new Uint8Array()
+
+  if (options.packageLock != null) {
+    state.fsFiles.set('package-lock.json', options.packageLock)
+  }
+
+  return {
+    state,
+    webContainer: {
+      export: async () => exportedSnapshot,
+      mount: async (snapshot: Uint8Array, mountOptions?: { mountPoint?: string }) => {
+        state.mountedSnapshots.push({
+          mountPoint: mountOptions?.mountPoint,
+          snapshot,
+        })
+      },
+      fs: {
+        readFile: async (filePath: string) => {
+          if (!state.fsFiles.has(filePath)) {
+            throw new Error(`Missing file: ${filePath}`)
+          }
+
+          return state.fsFiles.get(filePath)!
+        },
+        rm: async (filePath: string) => {
+          state.removedPaths.push(filePath)
+        },
+        writeFile: async (filePath: string, content: string) => {
+          state.fsFiles.set(filePath, content)
+        },
+      },
+    },
+  }
+}
+
+async function writeTutorialDependencyCacheRecord(recordKey: string, record: Record<string, unknown>) {
+  const request = indexedDB.open('rstore-docs-tutorial', 3)
+  const database = await new Promise<IDBDatabase>((resolve, reject) => {
+    request.onupgradeneeded = () => {
+      const db = request.result
+
+      if (db.objectStoreNames.contains('webcontainer-cache')) {
+        db.deleteObjectStore('webcontainer-cache')
+      }
+
+      db.createObjectStore('webcontainer-cache')
+    }
+    request.onsuccess = () => resolve(request.result)
+    request.onerror = () => reject(request.error)
+  })
+
+  try {
+    const transaction = database.transaction('webcontainer-cache', 'readwrite')
+    const store = transaction.objectStore('webcontainer-cache')
+    await new Promise<void>((resolve, reject) => {
+      const putRequest = store.put(record, recordKey)
+      putRequest.onsuccess = () => resolve()
+      putRequest.onerror = () => reject(putRequest.error)
+    })
+    await new Promise<void>((resolve, reject) => {
+      transaction.oncomplete = () => resolve()
+      transaction.onabort = () => reject(transaction.error)
+      transaction.onerror = () => reject(transaction.error)
+    })
+  }
+  finally {
+    database.close()
+  }
+}
 
 describe('interactive tutorial chapters', () => {
   it('validates seeded todo chapters from rendered seeded texts instead of exact counts', () => {
@@ -208,10 +419,12 @@ describe('interactive tutorial chapters', () => {
       'app/rstore/todos.ts',
       'app/rstore/users.ts',
     ])
-    expect(tutorialChapterDefinitionsByFramework.vue).toHaveLength(10)
-    expect(tutorialChapterDefinitionsByFramework.nuxt).toHaveLength(9)
+    expect(resolveChapter('vue-advanced-workflows').title).toBe('Learn Next')
+    expect(resolveChapter('nuxt-advanced-workflows').title).toBe('Learn Next')
+    expect(tutorialChapterDefinitionsByFramework.vue).toHaveLength(14)
+    expect(tutorialChapterDefinitionsByFramework.nuxt).toHaveLength(14)
     expect(tutorialChapterDefinitionsByFramework.vue.some(chapter => chapter.id === 'vue-project-tour')).toBe(false)
-    expect(tutorialChapterDefinitionsByFramework.nuxt.some(chapter => chapter.id === 'nuxt-server-api-routes')).toBe(false)
+    expect(tutorialChapterDefinitionsByFramework.nuxt.some(chapter => chapter.id === 'nuxt-server-api-routes')).toBe(true)
     expect(tutorialChapterDefinitionsByFramework.vue.some(chapter => chapter.id === 'vue-add-collection-hooks')).toBe(false)
     expect(tutorialChapterDefinitionsByFramework.vue.some(chapter => chapter.id === 'vue-query-loading-refresh')).toBe(false)
     expect(tutorialChapterDefinitionsByFramework.vue.some(chapter => chapter.id === 'vue-update-delete-todos')).toBe(false)
@@ -294,8 +507,9 @@ title: Search Demo
     expect(vueTsconfig.include).toContain('src/**/*.vue')
     expect(vueCollectionsStarter['src/rstore/schema.ts']).toContain(`import type { Todo, User } from './types'`)
     expect(vueCollectionsSolution['src/rstore/schema.ts']).toContain(`fetchMany: () => memoryBackend.list('todos')`)
-    expect(vueQueryStarter['src/App.vue']).toContain('No todos are showing yet.')
-    expect(vueQuerySolution['src/App.vue']).toContain('The list, loading badge, and refresh button now all come from one reactive query.')
+    expect(vueQueryStarter['src/App.vue']).toContain('tutorialRuntimeBannerState')
+    expect(vueQueryStarter['src/components/TutorialContent.vue']).toContain('No todos are showing yet.')
+    expect(vueQuerySolution['src/components/TutorialContent.vue']).toContain('The list, loading badge, and refresh button now all come from one reactive query.')
 
     expect(nuxtManifest.dependencies['@rstore/nuxt']).toBe('file:./vendor/@rstore/nuxt')
     expect(nuxtManifest.dependencies.nuxt).toBe('4.4.2')
@@ -317,6 +531,35 @@ title: Search Demo
 
     expect(Object.keys(vueQueryStarter).some(filePath => filePath.includes('+assets'))).toBe(false)
     expect(Object.keys(nuxtQueryStarter).some(filePath => filePath.includes('+assets'))).toBe(false)
+  })
+
+  it('separates framework base files from chapter overlay files while preserving merged snapshots', () => {
+    const vueRuntimeAssets = getStepRuntimeAssets('vue-query-list')
+    const nuxtRuntimeAssets = getStepRuntimeAssets('nuxt-query-page')
+
+    expect(vueRuntimeAssets.frameworkBaseFiles).toEqual(getFrameworkBaseFiles('vue'))
+    expect(vueRuntimeAssets.starterOverlayFiles).toEqual(getStepStarterOverlayFiles('vue-query-list'))
+    expect(vueRuntimeAssets.solutionOverlayFiles).toEqual(getStepSolutionOverlayFiles('vue-query-list'))
+    expect({
+      ...vueRuntimeAssets.frameworkBaseFiles,
+      ...vueRuntimeAssets.starterOverlayFiles,
+    }).toEqual(getStepStarterFiles('vue-query-list'))
+    expect({
+      ...vueRuntimeAssets.frameworkBaseFiles,
+      ...vueRuntimeAssets.solutionOverlayFiles,
+    }).toEqual(getStepSolutionFiles('vue-query-list'))
+
+    expect(nuxtRuntimeAssets.frameworkBaseFiles).toEqual(getFrameworkBaseFiles('nuxt'))
+    expect(nuxtRuntimeAssets.starterOverlayFiles).toEqual(getStepStarterOverlayFiles('nuxt-query-page'))
+    expect(nuxtRuntimeAssets.solutionOverlayFiles).toEqual(getStepSolutionOverlayFiles('nuxt-query-page'))
+    expect({
+      ...nuxtRuntimeAssets.frameworkBaseFiles,
+      ...nuxtRuntimeAssets.starterOverlayFiles,
+    }).toEqual(getStepStarterFiles('nuxt-query-page'))
+    expect({
+      ...nuxtRuntimeAssets.frameworkBaseFiles,
+      ...nuxtRuntimeAssets.solutionOverlayFiles,
+    }).toEqual(getStepSolutionFiles('nuxt-query-page'))
   })
 
   it('prefers npm ci for the Nuxt starter snapshot now that it ships a lockfile', () => {
@@ -483,17 +726,69 @@ title: Search Demo
     expect(pluginStarter['src/rstore/memoryPlugin.ts']).not.toBe(pluginSolution['src/rstore/memoryPlugin.ts'])
   })
 
+  it('uses the last hands-on solution as the unlocked learn-next playground', () => {
+    const vuePlayground = resolveChapter('vue-advanced-workflows')
+    const vueSource = resolveChapter('vue-cache-apis')
+    const nuxtPlayground = resolveChapter('nuxt-advanced-workflows')
+    const nuxtSource = resolveChapter('nuxt-cache-apis')
+
+    expect(vuePlayground.starterFiles['src/components/CachePanel.vue']).toBe(vueSource.solutionFiles['src/components/CachePanel.vue'])
+    expect(vuePlayground.solutionFiles['src/components/CachePanel.vue']).toBe(vueSource.solutionFiles['src/components/CachePanel.vue'])
+    expect(vuePlayground.editableFiles).toEqual([
+      'src/components/TutorialContent.vue',
+      'src/App.vue',
+      'src/components/CachePanel.vue',
+      'src/components/TodoForm.vue',
+      'src/rstore/backend.ts',
+      'src/rstore/index.ts',
+      'src/rstore/live.ts',
+      'src/rstore/memoryPlugin.ts',
+      'src/rstore/relations.ts',
+      'src/rstore/schema.ts',
+      'src/rstore/types.ts',
+      'src/main.ts',
+      'src/style.css',
+    ])
+
+    expect(nuxtPlayground.starterFiles['app/components/CachePanel.vue']).toBe(nuxtSource.solutionFiles['app/components/CachePanel.vue'])
+    expect(nuxtPlayground.solutionFiles['app/components/CachePanel.vue']).toBe(nuxtSource.solutionFiles['app/components/CachePanel.vue'])
+    expect(nuxtPlayground.editableFiles).toEqual([
+      'app/pages/index.vue',
+      'app/components/CachePanel.vue',
+      'app/rstore/live.ts',
+      'app/rstore/todos.ts',
+      'app/rstore/types.ts',
+      'app/rstore/users.ts',
+      'app/app.vue',
+      'server/api/todos/[id].delete.ts',
+      'server/api/todos/[id].get.ts',
+      'server/api/todos/[id].patch.ts',
+      'server/api/todos/index.get.ts',
+      'server/api/todos/index.post.ts',
+      'server/api/users/[id].get.ts',
+      'server/api/users/index.get.ts',
+      'server/utils/tutorial-data.ts',
+      'nuxt.config.ts',
+      'app/plugins/tutorial.client.ts',
+      'src/style.css',
+    ])
+  })
+
   it('maps every framework chapter id to a stable tutorial folder', () => {
     expect(tutorialTracks.vue.runtimePort).toBe(4173)
     expect(tutorialTracks.nuxt.runtimePort).toBe(3000)
     expect(tutorialChapterFolders['vue-welcome']).toBe('vue/01-welcome')
     expect(tutorialChapterFolders['vue-define-collections']).toBe('vue/02-define-collections')
+    expect(tutorialChapterFolders['vue-local-first-mental-model']).toBe('vue/03-local-first-mental-model')
     expect(tutorialChapterFolders['vue-cache-apis']).toBe('vue/13-cache-apis')
+    expect(tutorialChapterFolders['vue-advanced-workflows']).toBe('vue/14-advanced-workflows')
     expect(tutorialChapterFolders['nuxt-welcome']).toBe('nuxt/01-welcome')
+    expect(tutorialChapterFolders['nuxt-server-api-routes']).toBe('nuxt/03-server-api-routes')
     expect(tutorialChapterFolders['nuxt-cache-apis']).toBe('nuxt/13-cache-apis')
-    expect(Object.keys(tutorialChapterFoldersByFramework.vue)).toHaveLength(10)
-    expect(Object.keys(tutorialChapterFoldersByFramework.nuxt)).toHaveLength(9)
-    expect(tutorialChapterFoldersByFramework.nuxt['nuxt-server-api-routes']).toBeUndefined()
+    expect(tutorialChapterFolders['nuxt-advanced-workflows']).toBe('nuxt/14-advanced-workflows')
+    expect(Object.keys(tutorialChapterFoldersByFramework.vue)).toHaveLength(14)
+    expect(Object.keys(tutorialChapterFoldersByFramework.nuxt)).toHaveLength(14)
+    expect(tutorialChapterFoldersByFramework.nuxt['nuxt-server-api-routes']).toBe('nuxt/03-server-api-routes')
   })
 
   it('keeps track metadata complete enough for the fullscreen picker', () => {
@@ -524,33 +819,45 @@ title: Search Demo
     const resetFiles = resetStepFiles(chapter)
 
     expect(Object.keys(resetFiles)).toEqual(chapter.editableFiles)
-    expect(resetFiles['src/App.vue']).toBe(chapter.starterFiles['src/App.vue'])
+    expect(resetFiles['src/components/TutorialContent.vue']).toBe(chapter.starterFiles['src/components/TutorialContent.vue'])
   })
 
   it('builds a full snapshot by overlaying the current editable files', () => {
     const chapter = resolveChapter('vue-query-list')
     const currentFiles = {
-      'src/App.vue': 'changed app content',
+      'src/components/TutorialContent.vue': 'changed app content',
     }
 
     const snapshot = composeStepSnapshot(chapter, currentFiles)
 
-    expect(snapshot['src/App.vue']).toBe('changed app content')
+    expect(snapshot['src/components/TutorialContent.vue']).toBe('changed app content')
     expect(snapshot['src/main.ts']).toBe(chapter.starterFiles['src/main.ts'])
+  })
+
+  it('builds a chapter overlay snapshot without reintroducing framework base files', () => {
+    const chapter = resolveChapter('nuxt-module-setup')
+    const snapshot = composeStepOverlaySnapshot(chapter, {
+      ...resetStepFiles(chapter),
+      'nuxt.config.ts': 'changed nuxt config',
+    })
+
+    expect(snapshot['nuxt.config.ts']).toBe('changed nuxt config')
+    expect(snapshot['app/rstore/todos.ts']).toBe(chapter.runtimeAssets.starterOverlayFiles['app/rstore/todos.ts'])
+    expect(snapshot['package.json']).toBeUndefined()
   })
 
   it('builds a narrowed snapshot for the currently visible files', () => {
     const chapter = resolveChapter('vue-query-list')
     const snapshot = composeVisibleStepSnapshot(chapter, {
-      'src/App.vue': 'changed app content',
+      'src/components/TutorialContent.vue': 'changed app content',
     }, [
-      'src/App.vue',
+      'src/components/TutorialContent.vue',
       'src/main.ts',
       'src/missing.ts',
     ])
 
     expect(snapshot).toEqual({
-      'src/App.vue': 'changed app content',
+      'src/components/TutorialContent.vue': 'changed app content',
       'src/main.ts': chapter.starterFiles['src/main.ts'],
     })
   })
@@ -571,6 +878,85 @@ title: Search Demo
     })
   })
 
+  it('diffs layered snapshots for chapter switches with additions, removals, and base restores', () => {
+    expect(diffLayeredSnapshots({
+      'src/App.vue': 'base app',
+      'src/base-only.ts': 'base only',
+    }, {}, {})).toEqual({
+      writes: {},
+      removals: [],
+    })
+
+    expect(diffLayeredSnapshots({
+      'src/App.vue': 'base app',
+    }, {
+      'src/App.vue': 'chapter one',
+      'src/old.ts': 'old overlay',
+    }, {
+      'src/App.vue': 'chapter two',
+      'src/new.ts': 'new overlay',
+    })).toEqual({
+      writes: {
+        'src/App.vue': 'chapter two',
+        'src/new.ts': 'new overlay',
+      },
+      removals: ['src/old.ts'],
+    })
+
+    expect(diffLayeredSnapshots({
+      'src/App.vue': 'base app',
+    }, {
+      'src/App.vue': 'chapter override',
+    }, {})).toEqual({
+      writes: {
+        'src/App.vue': 'base app',
+      },
+      removals: [],
+    })
+  })
+
+  it('plans an exact project sync that preserves node_modules and prunes removable directories', () => {
+    expect(planTutorialExactSync({
+      'src/App.vue': 'old app',
+      'src/main.ts': 'main',
+    }, {
+      directories: ['.nuxt', 'src', 'src/generated', 'src/generated/cache', 'node_modules'],
+      files: ['.nuxt/server.mjs', 'src/App.vue', 'src/generated/cache.json', 'src/main.ts', 'node_modules/.bin/vite'],
+    }, {
+      'src/App.vue': 'new app',
+      'src/main.ts': 'main',
+      'src/components/Panel.vue': '<template />',
+    }, {
+      preservedRootPaths: ['node_modules'],
+    })).toEqual({
+      writes: {
+        'src/App.vue': 'new app',
+        'src/components/Panel.vue': '<template />',
+      },
+      fileRemovals: [],
+      directoryRemovals: ['.nuxt', 'src/generated'],
+    })
+  })
+
+  it('plans file removals for leftover chapter files that are not under removable directories', () => {
+    expect(planTutorialExactSync({
+      'src/App.vue': 'old app',
+      'src/main.ts': 'main',
+    }, {
+      directories: ['src'],
+      files: ['src/App.vue', 'src/main.ts', 'src/leftover.ts'],
+    }, {
+      'src/App.vue': 'old app',
+      'src/main.ts': 'main',
+    }, {
+      preservedRootPaths: ['node_modules'],
+    })).toEqual({
+      writes: {},
+      fileRemovals: ['src/leftover.ts'],
+      directoryRemovals: [],
+    })
+  })
+
   it('keys the dependency cache off the lockfile and vendored local package files', () => {
     expect(getTutorialDependencyCacheSignature({
       'package.json': '{"dependencies":{"vue":"^3.5.21"}}',
@@ -588,6 +974,117 @@ title: Search Demo
     expect(getTutorialDependencyCacheSignature({
       'src/main.ts': 'console.log("hello")',
     })).toBeNull()
+  })
+
+  it('keeps the dependency signature stable across chapters in the same track', () => {
+    const vueSignatures = new Set(resolvedVueChapters.map(chapter =>
+      getTutorialDependencyCacheSignature(chapter.starterFiles),
+    ))
+    const nuxtSignatures = new Set(resolvedNuxtChapters.map(chapter =>
+      getTutorialDependencyCacheSignature(chapter.starterFiles),
+    ))
+
+    expect(vueSignatures).toEqual(new Set([
+      getTutorialDependencyCacheSignature(getFrameworkBaseFiles('vue')),
+    ]))
+    expect(nuxtSignatures).toEqual(new Set([
+      getTutorialDependencyCacheSignature(getFrameworkBaseFiles('nuxt')),
+    ]))
+  })
+
+  it('keeps read-only overview chapters on the framework base snapshot', () => {
+    const vueOverview = resolveChapter('vue-local-first-mental-model')
+    const nuxtOverview = resolveChapter('nuxt-runtime-model')
+
+    expect(vueOverview.editableFiles).toEqual([])
+    expect(vueOverview.validationAction).toBeUndefined()
+    expect(vueOverview.starterFiles).toEqual(getFrameworkBaseFiles('vue'))
+    expect(nuxtOverview.editableFiles).toEqual([])
+    expect(nuxtOverview.validationAction).toBeUndefined()
+    expect(nuxtOverview.starterFiles).toEqual(getFrameworkBaseFiles('nuxt'))
+  })
+
+  it('stores dependency cache entries per signature and restores them independently', async () => {
+    installFakeIndexedDb()
+    const signatureA = 'signature-a'
+    const signatureB = 'signature-b'
+    const snapshotA = new Uint8Array([1, 2, 3])
+    const snapshotB = new Uint8Array([4, 5, 6])
+    const sourceA = createMockCacheWebContainer({
+      nodeModulesSnapshot: snapshotA,
+      packageLock: 'lock-a',
+    })
+    const sourceB = createMockCacheWebContainer({
+      nodeModulesSnapshot: snapshotB,
+      packageLock: 'lock-b',
+    })
+
+    await saveTutorialDependencyCache(sourceA.webContainer as any, signatureA)
+    await saveTutorialDependencyCache(sourceB.webContainer as any, signatureB)
+
+    const restoreA = createMockCacheWebContainer()
+    const restoreB = createMockCacheWebContainer()
+
+    await expect(restoreTutorialDependencyCache(restoreA.webContainer as any, signatureA)).resolves.toBe('hit')
+    await expect(restoreTutorialDependencyCache(restoreB.webContainer as any, signatureB)).resolves.toBe('hit')
+    expect(restoreA.state.mountedSnapshots).toEqual([
+      {
+        mountPoint: 'node_modules',
+        snapshot: snapshotA,
+      },
+    ])
+    expect(restoreB.state.mountedSnapshots).toEqual([
+      {
+        mountPoint: 'node_modules',
+        snapshot: snapshotB,
+      },
+    ])
+    expect(restoreA.state.fsFiles.get('package-lock.json')).toBe('lock-a')
+    expect(restoreB.state.fsFiles.get('package-lock.json')).toBe('lock-b')
+
+    await clearTutorialDependencyCache(signatureA)
+
+    const restoreAfterClearA = createMockCacheWebContainer()
+    const restoreAfterClearB = createMockCacheWebContainer()
+    await expect(restoreTutorialDependencyCache(restoreAfterClearA.webContainer as any, signatureA)).resolves.toBe('miss')
+    await expect(restoreTutorialDependencyCache(restoreAfterClearB.webContainer as any, signatureB)).resolves.toBe('hit')
+  })
+
+  it('invalidates only the stale dependency cache record that failed to restore', async () => {
+    installFakeIndexedDb()
+    const staleSignature = 'stale-signature'
+    const healthySignature = 'healthy-signature'
+    const healthySnapshot = new Uint8Array([9, 9, 9])
+
+    await writeTutorialDependencyCacheRecord(getTutorialDependencyCacheRecordKey(staleSignature), {
+      compression: 'gzip',
+      dependencySignature: staleSignature,
+      nodeModulesSnapshot: new Uint8Array([1, 2, 3]),
+      packageLock: 'stale-lock',
+      savedAt: Date.now(),
+      version: 3,
+    })
+    await writeTutorialDependencyCacheRecord(getTutorialDependencyCacheRecordKey(healthySignature), {
+      compression: 'none',
+      dependencySignature: healthySignature,
+      nodeModulesSnapshot: healthySnapshot,
+      packageLock: 'healthy-lock',
+      savedAt: Date.now(),
+      version: 3,
+    })
+
+    const staleRestore = createMockCacheWebContainer()
+    const healthyRestore = createMockCacheWebContainer()
+
+    await expect(restoreTutorialDependencyCache(staleRestore.webContainer as any, staleSignature)).resolves.toBe('stale')
+    expect(staleRestore.state.removedPaths).toEqual(['node_modules'])
+    await expect(restoreTutorialDependencyCache(healthyRestore.webContainer as any, healthySignature)).resolves.toBe('hit')
+    expect(healthyRestore.state.mountedSnapshots).toEqual([
+      {
+        mountPoint: 'node_modules',
+        snapshot: healthySnapshot,
+      },
+    ])
   })
 
   it('prefers npm ci when the tutorial snapshot includes a lockfile', () => {
@@ -625,6 +1122,7 @@ title: Search Demo
       'Writing Data',
       'Modeling',
       'Reactivity',
+      'Beyond the Basics',
     ])
     expect(groupTutorialChapters(resolvedNuxtChapters).map(group => group.group)).toEqual([
       'Foundations',
@@ -632,6 +1130,7 @@ title: Search Demo
       'Writing Data',
       'Modeling',
       'Reactivity',
+      'Beyond the Basics',
     ])
   })
 
@@ -689,6 +1188,7 @@ title: Search Demo
 
     expect(getTutorialChapterEditorFiles(chapter)).toEqual([
       'src/components/TodoForm.vue',
+      'src/components/TutorialContent.vue',
       'src/App.vue',
       'src/main.ts',
     ])
@@ -701,6 +1201,16 @@ title: Search Demo
 
     expect(controller.isCurrent(first)).toBe(false)
     expect(controller.isCurrent(second)).toBe(true)
+  })
+
+  it('treats stale preview state updates as outdated when the preview session changes', () => {
+    expect(isTutorialPreviewSessionCurrent('session-b', 'session-a')).toBe(false)
+    expect(isTutorialPreviewSessionCurrent('session-b', 'session-b')).toBe(true)
+  })
+
+  it('treats stale preview request responses as outdated when the preview session changes', () => {
+    expect(isTutorialPreviewSessionCurrent('session-2', 'session-1')).toBe(false)
+    expect(isTutorialPreviewSessionCurrent(null, 'session-2')).toBe(false)
   })
 
   it('invalidates stale runtime sessions and reports cancellation distinctly', () => {
@@ -724,6 +1234,40 @@ title: Search Demo
     expect(() => controller.throwIfStale(second)).not.toThrow()
   })
 
+  it('invalidates stale chapter tasks and keeps only the newest chapter token current', () => {
+    const controller = createTutorialChapterTaskSessionController()
+    const first = controller.issue()
+    const second = controller.issue()
+
+    expect(controller.current).toBe(second)
+    expect(controller.isCurrent(first)).toBe(false)
+    expect(controller.isCurrent(second)).toBe(true)
+    expect(() => controller.throwIfStale(first)).toThrowError('The tutorial chapter task was cancelled.')
+    expect(() => controller.throwIfStale(second)).not.toThrow()
+  })
+
+  it('treats chapter-task cancellation separately from runtime cancellation so dependency installs can continue', () => {
+    const runtimeController = createTutorialRuntimeSessionController()
+    const chapterController = createTutorialChapterTaskSessionController()
+    const runtimeToken = runtimeController.issue()
+    const staleChapterToken = chapterController.issue()
+    const latestChapterToken = chapterController.issue()
+
+    expect(runtimeController.isCurrent(runtimeToken)).toBe(true)
+    expect(() => runtimeController.throwIfStale(runtimeToken)).not.toThrow()
+    expect(chapterController.isCurrent(latestChapterToken)).toBe(true)
+
+    try {
+      chapterController.throwIfStale(staleChapterToken)
+    }
+    catch (error) {
+      expect(isTutorialChapterTaskCancellationError(error)).toBe(true)
+      expect(isTutorialRuntimeCancellationError(error)).toBe(false)
+    }
+
+    expect(() => runtimeController.throwIfStale(runtimeToken)).not.toThrow()
+  })
+
   it('finds the first differing editable file and applies only editable corrections', () => {
     const chapter = resolveChapter('vue-extract-plugin')
     const userFiles = {
@@ -745,18 +1289,18 @@ title: Search Demo
   it('reuses open tabs by file path and surfaces current chapter files first', () => {
     const openFiles = mergeTutorialOpenFiles(
       ['src/rstore/schema.ts', 'src/rstore/memoryPlugin.ts'],
-      ['src/rstore/memoryPlugin.ts', 'src/App.vue'],
+      ['src/rstore/memoryPlugin.ts', 'src/components/TutorialContent.vue'],
     )
 
     expect(openFiles).toEqual([
       'src/rstore/schema.ts',
       'src/rstore/memoryPlugin.ts',
-      'src/App.vue',
+      'src/components/TutorialContent.vue',
     ])
 
-    expect(prioritizeTutorialOpenFiles(openFiles, ['src/rstore/memoryPlugin.ts', 'src/App.vue'])).toEqual([
+    expect(prioritizeTutorialOpenFiles(openFiles, ['src/rstore/memoryPlugin.ts', 'src/components/TutorialContent.vue'])).toEqual([
       'src/rstore/memoryPlugin.ts',
-      'src/App.vue',
+      'src/components/TutorialContent.vue',
       'src/rstore/schema.ts',
     ])
   })
@@ -766,10 +1310,11 @@ title: Search Demo
       'src/rstore/schema.ts',
       'src/rstore/memoryPlugin.ts',
       'src/App.vue',
+      'src/components/TutorialContent.vue',
       'src/components/TodoForm.vue',
     ], [
       'src/rstore/schema.ts',
-      'src/App.vue',
+      'src/components/TutorialContent.vue',
     ], 'src/components/TodoForm.vue')
 
     expect(tree.folderPaths).toEqual([
@@ -792,6 +1337,14 @@ title: Search Demo
             name: 'components',
             path: 'src/components',
             children: [
+              {
+                type: 'file',
+                name: 'TutorialContent.vue',
+                path: 'src/components/TutorialContent.vue',
+                editable: true,
+                icon: 'file-icons:vue',
+                iconClass: 'text-emerald-500 dark:text-emerald-400',
+              },
               {
                 type: 'file',
                 name: 'TodoForm.vue',
@@ -829,7 +1382,7 @@ title: Search Demo
             type: 'file',
             name: 'App.vue',
             path: 'src/App.vue',
-            editable: true,
+            editable: false,
             icon: 'file-icons:vue',
             iconClass: 'text-emerald-500 dark:text-emerald-400',
           },
@@ -841,15 +1394,15 @@ title: Search Demo
   it('keeps a readonly context file selected when it still exists in the editor file set', () => {
     expect(resolveTutorialSelectedFile(
       'src/main.ts',
-      ['src/App.vue', 'src/main.ts'],
-      ['src/App.vue'],
+      ['src/components/TutorialContent.vue', 'src/App.vue', 'src/main.ts'],
+      ['src/components/TutorialContent.vue'],
     )).toBe('src/main.ts')
 
     expect(resolveTutorialSelectedFile(
       'src/missing.ts',
-      ['src/App.vue', 'src/main.ts'],
-      ['src/App.vue'],
-    )).toBe('src/App.vue')
+      ['src/components/TutorialContent.vue', 'src/App.vue', 'src/main.ts'],
+      ['src/components/TutorialContent.vue'],
+    )).toBe('src/components/TutorialContent.vue')
   })
 
   it('resolves the selected file per chapter so chapter switches fall back to the new chapter file', () => {
@@ -860,16 +1413,16 @@ title: Search Demo
     expect(resolveTutorialChapterSelectedFile(
       'vue-query-list',
       selectedFilesByChapter,
-      ['src/App.vue', 'src/main.ts'],
-      ['src/App.vue'],
+      ['src/components/TutorialContent.vue', 'src/App.vue', 'src/main.ts'],
+      ['src/components/TutorialContent.vue'],
     )).toBe('src/main.ts')
 
     expect(resolveTutorialChapterSelectedFile(
       'vue-create-todos',
       selectedFilesByChapter,
-      ['src/App.vue', 'src/components/TodoForm.vue'],
-      ['src/App.vue', 'src/components/TodoForm.vue'],
-    )).toBe('src/App.vue')
+      ['src/components/TutorialContent.vue', 'src/App.vue', 'src/main.ts'],
+      ['src/components/TutorialContent.vue'],
+    )).toBe('src/components/TutorialContent.vue')
   })
 
   it('reports browser support errors for missing SharedArrayBuffer or isolation', () => {

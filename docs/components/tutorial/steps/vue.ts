@@ -1,10 +1,28 @@
 import type { TutorialChapterDefinition, TutorialTrackDefinition } from '../utils/types'
 import * as shared from './shared'
 
+function createReadOnlyChapter(
+  chapter: Omit<TutorialChapterDefinition, 'editableFiles' | 'validator'>,
+  readySummary: string,
+  readyDetails: string[],
+): TutorialChapterDefinition {
+  return {
+    ...chapter,
+    editableFiles: [],
+    validator: (state) => {
+      const bootResult = shared.requireBooted(state, 'The preview has not finished booting yet.')
+      if (bootResult)
+        return bootResult
+
+      return shared.pass(readySummary, readyDetails)
+    },
+  }
+}
+
 export const vueTutorialTrack: TutorialTrackDefinition = {
   framework: 'vue',
   label: 'Vue',
-  description: 'Build an rstore-powered Vue app inside the interactive sandbox.',
+  description: 'Build an rstore-powered Vue app and connect each exercise back to the core guide.',
   imageSrc: '/vue.svg',
   runtimePort: 4173,
 }
@@ -16,7 +34,7 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'welcome',
     folder: 'vue/01-welcome',
     title: 'Welcome',
-    feature: 'Meet the tutorial, the sandbox, and the local-first rstore mental model.',
+    feature: 'Meet the sandbox, the tutorial flow, and the local-first model behind the rest of the guide.',
     group: 'Foundations',
     referenceLinks: [
       { label: 'About rstore', href: '/guide/learn-more' },
@@ -39,11 +57,12 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'define-collections',
     folder: 'vue/02-define-collections',
     title: 'Define Collections',
-    feature: 'Define the typed collections and connect them to the tutorial backend.',
+    feature: 'Describe Todo and User records with typed collections, keys, and collection-local hooks.',
     group: 'Foundations',
     referenceLinks: [
       { label: 'Collection', href: '/guide/schema/collection' },
       { label: 'Getting Started', href: '/guide/getting-started' },
+      { label: 'Relations', href: '/guide/schema/relations' },
     ],
     editableFiles: ['src/rstore/schema.ts'],
     validationAction: 'query-smoke',
@@ -61,17 +80,38 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
       ])
     },
   },
+  createReadOnlyChapter(
+    {
+      id: 'vue-local-first-mental-model',
+      framework: 'vue',
+      slug: 'local-first-mental-model',
+      folder: 'vue/03-local-first-mental-model',
+      title: 'Local-First Mental Model',
+      feature: 'Connect the tutorial app to the guide’s bigger picture: normalized cache, local reads, and transport boundaries.',
+      group: 'Foundations',
+      referenceLinks: [
+        { label: 'About rstore', href: '/guide/learn-more' },
+        { label: 'Querying Data', href: '/guide/data/query' },
+        { label: 'Cache', href: '/guide/data/cache' },
+      ],
+    },
+    'The local-first overview chapter is ready.',
+    [
+      'This chapter is here to ground the hands-on work in the same concepts the guide uses everywhere else.',
+    ],
+  ),
   {
     id: 'vue-create-install-store',
     framework: 'vue',
     slug: 'create-install-store',
     folder: 'vue/04-create-install-store',
     title: 'Create and Install the Store',
-    feature: 'Build the store instance and register the Vue plugin.',
+    feature: 'Turn the schema into a running store and register the Vue plugin so `useStore()` works in components.',
     group: 'Foundations',
     referenceLinks: [
       { label: 'Getting Started', href: '/guide/getting-started' },
       { label: 'Plugin Setup', href: '/guide/plugin/setup' },
+      { label: 'Collection Defaults', href: '/guide/schema/collection-defaults' },
     ],
     editableFiles: ['src/rstore/index.ts'],
     validationAction: 'query-smoke',
@@ -95,20 +135,21 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'query-list',
     folder: 'vue/05-query-list',
     title: 'Query a List',
-    feature: 'Use one reactive query for the list, loading state, and refresh flow.',
+    feature: 'Replace placeholder state with one reactive query that drives the list, loading state, and refresh flow.',
     group: 'Reading Data',
     referenceLinks: [
       { label: 'Querying Data', href: '/guide/data/query' },
-      { label: 'Getting Started', href: '/guide/getting-started' },
+      { label: 'About rstore', href: '/guide/learn-more' },
+      { label: 'Cache', href: '/guide/data/cache' },
     ],
-    editableFiles: ['src/App.vue'],
+    editableFiles: ['src/components/TutorialContent.vue'],
     validationAction: 'query-refresh-smoke',
     validator: (state) => {
-      const storeResult = shared.requireStore('src/App.vue', state)
+      const storeResult = shared.requireStore('src/components/TutorialContent.vue', state)
       if (storeResult)
         return storeResult
 
-      const listResult = shared.requireList(state, 'src/App.vue')
+      const listResult = shared.requireList(state, 'src/components/TutorialContent.vue')
       if (listResult)
         return listResult
 
@@ -119,7 +160,7 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
             'Make sure the component keeps the real query `refresh()` function and exposes its loading state in the template.',
             'The list should still come from `store.Todo.query(...)` instead of local placeholder refs.',
           ],
-          ['src/App.vue'],
+          ['src/components/TutorialContent.vue'],
         )
       }
 
@@ -128,22 +169,43 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
       ])
     },
   },
+  createReadOnlyChapter(
+    {
+      id: 'vue-query-patterns',
+      framework: 'vue',
+      slug: 'query-patterns',
+      folder: 'vue/06-query-patterns',
+      title: 'Query Patterns',
+      feature: 'See how `query`, `find`, and `peek` fit together, and where options like `enabled`, `include`, pagination, and fetch policy belong.',
+      group: 'Reading Data',
+      referenceLinks: [
+        { label: 'Querying Data', href: '/guide/data/query' },
+        { label: 'Relations', href: '/guide/schema/relations' },
+        { label: 'Cache', href: '/guide/data/cache' },
+      ],
+    },
+    'The query patterns chapter is ready.',
+    [
+      'Use this chapter as the bridge between the simple list exercise and the full query surface in the guide.',
+    ],
+  ),
   {
     id: 'vue-create-todos',
     framework: 'vue',
     slug: 'create-todos',
     folder: 'vue/07-create-todos',
     title: 'Create Todos',
-    feature: 'Finish the everyday CRUD loop with create, toggle, and delete handlers.',
+    feature: 'Complete the everyday CRUD loop with create, update, and delete flows that all feed the same query result.',
     group: 'Writing Data',
     referenceLinks: [
       { label: 'Mutation', href: '/guide/data/mutation' },
       { label: 'Querying Data', href: '/guide/data/query' },
+      { label: 'Cache', href: '/guide/data/cache' },
     ],
-    editableFiles: ['src/App.vue'],
+    editableFiles: ['src/components/TutorialContent.vue'],
     validationAction: 'mutation-smoke',
     validator: (state) => {
-      const storeResult = shared.requireStore('src/App.vue', state)
+      const storeResult = shared.requireStore('src/components/TutorialContent.vue', state)
       if (storeResult)
         return storeResult
 
@@ -154,7 +216,7 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
             'Create a new todo through `store.Todo.create(...)`, then keep the list reactive by toggling with `$update(...)` and removing with `store.Todo.delete(...)`.',
             'The same query-driven list should update after all three actions without manual array bookkeeping.',
           ],
-          ['src/App.vue'],
+          ['src/components/TutorialContent.vue'],
         )
       }
 
@@ -163,17 +225,38 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
       ])
     },
   },
+  createReadOnlyChapter(
+    {
+      id: 'vue-mutation-patterns',
+      framework: 'vue',
+      slug: 'mutation-patterns',
+      folder: 'vue/08-mutation-patterns',
+      title: 'Mutation Patterns',
+      feature: 'Place the CRUD exercise inside the wider mutation API: bulk operations, optimistic updates, and cache-driven synchronization.',
+      group: 'Writing Data',
+      referenceLinks: [
+        { label: 'Mutation', href: '/guide/data/mutation' },
+        { label: 'Cache', href: '/guide/data/cache' },
+        { label: 'Plugin Hooks', href: '/guide/plugin/hooks' },
+      ],
+    },
+    'The mutation patterns chapter is ready.',
+    [
+      'This chapter connects the simple CRUD exercise to the broader mutation capabilities documented in the guide.',
+    ],
+  ),
   {
     id: 'vue-form-objects',
     framework: 'vue',
     slug: 'form-objects',
     folder: 'vue/09-form-objects',
     title: 'Form Objects',
-    feature: 'Manage create and update flows with `createForm()` and `updateForm()`.',
+    feature: 'Move form state, validation, reset behavior, and change detection onto the collection with `createForm()` and `updateForm()`.',
     group: 'Writing Data',
     referenceLinks: [
       { label: 'Form Object', href: '/guide/data/form' },
       { label: 'Mutation', href: '/guide/data/mutation' },
+      { label: 'Relations', href: '/guide/schema/relations' },
     ],
     editableFiles: ['src/components/TodoForm.vue'],
     validationAction: 'form-smoke',
@@ -204,11 +287,12 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'relations',
     folder: 'vue/10-relations',
     title: 'Relations',
-    feature: 'Resolve assignees from the normalized cache with a typed relation.',
+    feature: 'Define a typed relation so the UI can resolve related users straight from the normalized cache.',
     group: 'Modeling',
     referenceLinks: [
       { label: 'Relations', href: '/guide/schema/relations' },
       { label: 'Collection', href: '/guide/schema/collection' },
+      { label: 'Form Object', href: '/guide/data/form' },
     ],
     editableFiles: ['src/rstore/relations.ts'],
     validator: (state) => {
@@ -238,11 +322,12 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'extract-plugin',
     folder: 'vue/11-extract-plugin',
     title: 'Extract a Plugin',
-    feature: 'Move repeated transport logic into a reusable rstore plugin.',
+    feature: 'Move repeated fetch and mutation policy out of the collections and into one reusable plugin.',
     group: 'Modeling',
     referenceLinks: [
       { label: 'Plugin Setup', href: '/guide/plugin/setup' },
       { label: 'Plugin Hooks', href: '/guide/plugin/hooks' },
+      { label: 'Collection Defaults', href: '/guide/schema/collection-defaults' },
     ],
     editableFiles: ['src/rstore/schema.ts', 'src/rstore/memoryPlugin.ts'],
     validationAction: 'query-smoke',
@@ -266,16 +351,17 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'live-query',
     folder: 'vue/12-live-query',
     title: 'Live Query',
-    feature: 'Combine `liveQuery()` with plugin subscriptions for remote updates.',
+    feature: 'Combine `liveQuery()` with plugin subscriptions so remote events keep the same cache-backed query fresh.',
     group: 'Reactivity',
     referenceLinks: [
       { label: 'Subscriptions', href: '/guide/data/live' },
       { label: 'Plugin Hooks', href: '/guide/plugin/hooks' },
+      { label: 'Cache', href: '/guide/data/cache' },
     ],
-    editableFiles: ['src/rstore/memoryPlugin.ts', 'src/App.vue'],
+    editableFiles: ['src/components/TutorialContent.vue', 'src/rstore/memoryPlugin.ts'],
     validationAction: 'live-smoke',
     validator: (state) => {
-      const storeResult = shared.requireStore('src/App.vue', state)
+      const storeResult = shared.requireStore('src/components/TutorialContent.vue', state)
       if (storeResult)
         return storeResult
 
@@ -286,7 +372,7 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
             'Swap the list to `liveQuery()` and connect the plugin subscription hooks.',
             'Incoming remote items should write into the cache so the list updates automatically.',
           ],
-          ['src/App.vue', 'src/rstore/memoryPlugin.ts'],
+          ['src/components/TutorialContent.vue', 'src/rstore/memoryPlugin.ts'],
         )
       }
 
@@ -301,11 +387,12 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'cache-apis',
     folder: 'vue/13-cache-apis',
     title: 'Cache APIs',
-    feature: 'Read and write directly against the normalized cache when you need to.',
+    feature: 'Read and write directly against the normalized cache when you need synchronous control over application state.',
     group: 'Reactivity',
     referenceLinks: [
       { label: 'Cache', href: '/guide/data/cache' },
       { label: 'Querying Data', href: '/guide/data/query' },
+      { label: 'Mutation', href: '/guide/data/mutation' },
     ],
     editableFiles: ['src/components/CachePanel.vue'],
     validationAction: 'cache-smoke',
@@ -327,6 +414,33 @@ export const vueTutorialChapters: TutorialChapterDefinition[] = [
 
       return shared.pass('The cache controls are updating the store directly.', [
         'This chapter demonstrates synchronous cache reads, local writes, and full resets.',
+      ])
+    },
+  },
+  {
+    id: 'vue-advanced-workflows',
+    framework: 'vue',
+    slug: 'advanced-workflows',
+    folder: 'vue/14-advanced-workflows',
+    playgroundSourceChapterId: 'vue-cache-apis',
+    title: 'Learn Next',
+    feature: 'Start from the completed tutorial app, explore the unlocked source code, and branch into modules, offline sync, devtools, federation, and collaborative editing.',
+    group: 'Beyond the Basics',
+    referenceLinks: [
+      { label: 'Module', href: '/guide/data/module' },
+      { label: 'Offline', href: '/guide/data/offline' },
+      { label: 'Devtools', href: '/guide/devtools' },
+      { label: 'Federation', href: '/guide/schema/federation' },
+      { label: 'Yjs', href: '/plugins/yjs' },
+    ],
+    editableFiles: [],
+    validator: (state) => {
+      const bootResult = shared.requireBooted(state, 'The preview has not finished booting yet.')
+      if (bootResult)
+        return bootResult
+
+      return shared.pass('The completed Vue tutorial app is unlocked.', [
+        'Use this last chapter as a sandbox: every app file in the editor starts from the finished exercise so you can explore and remix it freely.',
       ])
     },
   },

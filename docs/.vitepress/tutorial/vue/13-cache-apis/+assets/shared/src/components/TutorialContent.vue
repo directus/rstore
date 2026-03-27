@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { useStore } from '@rstore/vue'
-import TodoForm from './components/TodoForm.vue'
+import CachePanel from './CachePanel.vue'
 
 const store = useStore()
 const { data: todos } = await store.Todo.query(q => q.many())
@@ -9,15 +9,15 @@ const { data: todos } = await store.Todo.query(q => q.many())
 <template>
   <main class="tutorial-app">
     <header class="hero">
-      <h1>Chapter : Form Objects</h1>
-      <p>Use <code>createForm()</code> and <code>updateForm()</code> to manage form state without leaving rstore.</p>
+      <h1>Chapter : Cache</h1>
+      <p>Read, write, and clear the normalized cache directly.</p>
     </header>
 
     <section class="split">
-      <TodoForm class="surface" :edit-id="todos[0]?.id ?? null" />
+      <CachePanel class="surface" />
 
       <section class="surface">
-        <h2>Current todos</h2>
+        <h2>Reactive query view</h2>
 
         <ul class="summary-list">
           <li

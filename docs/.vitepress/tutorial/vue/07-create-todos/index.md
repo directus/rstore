@@ -2,9 +2,7 @@
 title: Create Todos
 ---
 
-The page can read data now. Time to make it feel alive. In this chapter you will finish the everyday CRUD loop: add a todo, toggle one, and delete one, all from the same query-driven view.
-
-## Teach the page its actions
+The page can read from the store now, so the next step is to issue intents back into it. This is about using the collection mutation API while letting the same query-driven UI stay in charge of rendering.
 
 Open `src/App.vue` and implement the three handlers the template already calls.
 
@@ -32,8 +30,6 @@ await todo.$update({ completed: !todo.completed })
 await store.Todo.delete(id)
 ```
 
-You can clear the input after create, but you should not need to manually splice arrays or rebuild the list. Let the query react.
+You can clear the input after create, but you should not need to splice arrays, refetch manually, or keep your own mirrored list in sync. The query should react because mutations update the normalized cache underneath it.
 
-## Why the page stays simple
-
-This is the payoff of letting rstore own the data layer. The page issues intents like “create this todo” or “toggle that item,” and the cache keeps the rendered list honest. The UI stays small because it is not pretending to be a database.
+That is the local-first payoff. The component owns intent. rstore owns synchronization.

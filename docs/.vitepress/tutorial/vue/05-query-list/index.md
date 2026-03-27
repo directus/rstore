@@ -2,18 +2,16 @@
 title: Query a List
 ---
 
-This is the first chapter where the page really starts trusting rstore. Instead of pretending to have todo data with local refs, you are going to ask the store for the list and let that query drive the UI.
+This is the first time the page really reads from rstore instead of from temporary local state. `query()` is the default way to bind UI to store data, and this is the smallest useful version of that pattern.
 
-## Turn the page into a real query
-
-Open `src/App.vue`. Replace the placeholder refs with a store query that returns the list, the loading state, and the refresh function in one shot.
+Open `src/App.vue` and replace the placeholder refs with one query that returns the list, loading state, and refresh function together.
 
 ```ts
 const store = useStore()
 const { data: todos, loading, refresh } = await store.Todo.query(q => q.many())
 ```
 
-Once you have that, the template should stop talking to your fake refs and start talking to the query result instead.
+Once the query is in place, the template should stop talking to fake refs and start talking to the query result everywhere.
 
 ```vue
 <button @click="refresh()">
@@ -25,8 +23,6 @@ Once you have that, the template should stop talking to your fake refs and start
 </span>
 ```
 
-If you wire both the toolbar and the list to the query, the whole page becomes one consistent read of store state.
+The key idea is not just “fetch the list.” It is “let one query own the reading path for this screen.” The list, the loading badge, and the refresh button should all point at the same source of truth.
 
-## Why This Stays Simple
-
-The query result is reactive because it is backed by the normalized cache. Later chapters will create, update, delete, and stream records into that cache. When they do, this page should stay fresh without maintaining a second copy of the todo list by hand.
+That stays simple because the query is reading from the normalized cache. Later steps will create, update, delete, and stream items into that cache. The page should not need a second copy of the todo list to keep up.

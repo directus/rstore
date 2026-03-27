@@ -19,7 +19,7 @@ const { data: todos, loading, refresh } = await store.Todo.query(q => q.many())
         </button>
 
         <span class="meta-pill">
-          {{ loading ? 'Loading the in-memory backend…' : todos.length + ' seeded todos ready' }}
+          {{ loading ? 'Loading the in-memory backend…' : `${todos.length} seeded todos ready` }}
         </span>
       </div>
     </section>

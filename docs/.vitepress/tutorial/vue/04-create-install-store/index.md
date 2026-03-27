@@ -2,11 +2,9 @@
 title: Create and Install the Store
 ---
 
-Now the schema knows about your data, but Vue still has no store instance to inject. This chapter is the handoff from “types on disk” to “a running app can call `useStore()`”.
+The schema exists now, but Vue still does not have a store instance. This is the handoff from “the model is defined” to “the app can actually call `useStore()`”.
 
-## Wire the store into Vue
-
-Open `src/rstore/index.ts`. You want `setupRstore()` to create the store and install the plugin on the real app instance.
+Open `src/rstore/index.ts`. `setupRstore()` should create the store from the schema and then register `RstorePlugin` on the real Vue app instance.
 
 ```ts
 const store = await createStore({
@@ -16,8 +14,6 @@ const store = await createStore({
 app.use(RstorePlugin, { store })
 ```
 
-The important move is keeping the created store in a local variable and passing it to `RstorePlugin`. Without that, the components can import the type augmentation, but the runtime app still has nothing to inject.
+Keep the created store in a local variable and pass that value into `RstorePlugin`. Type augmentation alone is not enough. Components need the actual runtime store to be installed.
 
-## Why this matters
-
-rstore separates store creation from framework integration on purpose. `createStore()` builds the data engine. `RstorePlugin` makes it available to Vue components. That split is what lets the same core ideas work across Vue, Nuxt, and other integrations.
+This split is deliberate. `createStore()` builds the data engine. The framework plugin exposes that engine to Vue. Plugins, collection defaults, and other store-wide behavior are configured at the `createStore()` layer, while components stay focused on app behavior.

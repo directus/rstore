@@ -10,14 +10,14 @@ export const queryStep: TutorialStepDefinition = {
     { label: 'Query', href: '/guide/data/query' },
     { label: 'Getting Started', href: '/guide/getting-started' },
   ],
-  editableFiles: ['src/App.vue'],
+  editableFiles: ['src/components/TutorialContent.vue'],
   validationAction: 'query-smoke',
   validator: (state) => {
-    const storeResult = shared.requireStore('src/App.vue', state)
+    const storeResult = shared.requireStore('src/components/TutorialContent.vue', state)
     if (storeResult)
       return storeResult
 
-    const listResult = shared.requireList(state, 'src/App.vue')
+    const listResult = shared.requireList(state, 'src/components/TutorialContent.vue')
     if (listResult)
       return listResult
 

@@ -21,7 +21,7 @@ const emit = defineEmits<{
       </p>
       <h1>Interactive rstore tutorial</h1>
       <p class="lede">
-        Each chapter restores its own files, runs in an in-browser Vue + Vite sandbox, and includes a built-in correction diff when you want to compare your work with the expected solution.
+        Each chapter restores its own files, runs in an in-browser sandbox, and links the hands-on work back to the rest of the rstore guide. Some chapters have you edit code, others pause to explain how the bigger pieces fit together before you move on.
       </p>
     </div>
 

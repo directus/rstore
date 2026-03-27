@@ -2,15 +2,9 @@
 title: Define Collections
 ---
 
-In this chapter you are giving rstore its first real vocabulary: what a Todo is, what a User is, how each record gets a stable key, and which backend hooks should power the collection.
+This is where the app stops being a shell and starts becoming an rstore app. Collections are the unit of modeling: they describe what a record looks like, how to identify it, and which operations exist for it.
 
-## The Schema
-
-The schema is the heart of rstore. It defines the collections that make up your store, and each collection defines some configuration about each data type of your application and their relationships.
-
-## Build the schema
-
-Open `src/rstore/schema.ts`. The starter file already imports the item types and the in-memory backend, so your job is to turn those ingredients into two working collections.
+Open `src/rstore/schema.ts`. The starter file already imports the item types and the in-memory backend. Your job is to turn those pieces into two real collections: one writable `Todo` collection and one readable `User` collection.
 
 ```ts
 export const TodoCollection = withItemType<Todo>().defineCollection({
@@ -23,7 +17,7 @@ export const TodoCollection = withItemType<Todo>().defineCollection({
 })
 ```
 
-Give `TodoCollection` the full set of hooks used by the rest of the tutorial: load one item, load the list, create, update, and delete. Then give `UserCollection` the read hooks it needs so later chapters can resolve assignees.
+For `TodoCollection`, define the full CRUD surface the app needs: fetch one item, fetch many items, create, update, and delete. For `UserCollection`, only the read hooks matter because users are being used as related records, not editable data.
 
 ```ts
 export const schema = [
@@ -32,8 +26,6 @@ export const schema = [
 ] as const
 ```
 
-That final export matters. The store and typed helpers are inferred from that schema tuple.
+That tuple export matters because the store type is inferred from it.
 
-## What to notice
-
-Collections are not just transport configs. They are where record identity, operations, form helpers, and later relations are defined. Once `Todo` and `User` are set up clearly, the rest of the API becomes much easier to use with confidence.
+The important thing to notice is that collections are not just fetch wrappers. They are the place where rstore learns record identity, mutations, form helpers, metadata, and later relations. Once the model is clear here, the rest of the API becomes much easier to trust.

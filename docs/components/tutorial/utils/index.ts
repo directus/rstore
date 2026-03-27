@@ -17,6 +17,17 @@ import type {
 type FileMap = Record<string, string>
 const tutorialSourceExtensions = ['.vue', '.ts', '.js', '.mjs', '.tsx', '.jsx']
 
+export interface TutorialWorkspaceListing {
+  directories: string[]
+  files: string[]
+}
+
+export interface TutorialExactSyncPlan {
+  directoryRemovals: string[]
+  fileRemovals: string[]
+  writes: TutorialSnapshot
+}
+
 export function normalizeFileContent(content: string): string {
   return content.replace(/\r\n/g, '\n').trimEnd()
 }
@@ -54,6 +65,13 @@ export function composeStepSnapshot(chapter: TutorialChapter, userFiles: Tutoria
   return createSnapshot(chapter.starterFiles, pickEditableFiles(userFiles, chapter.editableFiles))
 }
 
+export function composeStepOverlaySnapshot(
+  chapter: Pick<TutorialChapter, 'editableFiles' | 'runtimeAssets'>,
+  userFiles: TutorialSnapshot,
+): TutorialSnapshot {
+  return createSnapshot(chapter.runtimeAssets.starterOverlayFiles, pickEditableFiles(userFiles, chapter.editableFiles))
+}
+
 export function composeVisibleStepSnapshot(chapter: TutorialChapter, userFiles: TutorialSnapshot, filePaths: string[]): TutorialSnapshot {
   return filePaths.reduce<TutorialSnapshot>((result, filePath) => {
     if (filePath in userFiles) {
@@ -86,6 +104,112 @@ export function diffSnapshots(previousSnapshot: TutorialSnapshot, nextSnapshot: 
     writes,
     removals,
   }
+}
+
+export function diffLayeredSnapshots(
+  baseSnapshot: TutorialSnapshot,
+  previousOverlaySnapshot: TutorialSnapshot,
+  nextOverlaySnapshot: TutorialSnapshot,
+) {
+  const writes: TutorialSnapshot = {}
+  const removals: string[] = []
+  const affectedPaths = new Set([
+    ...Object.keys(previousOverlaySnapshot),
+    ...Object.keys(nextOverlaySnapshot),
+  ])
+
+  for (const filePath of affectedPaths) {
+    const previousContents = filePath in previousOverlaySnapshot
+      ? previousOverlaySnapshot[filePath]
+      : baseSnapshot[filePath]
+    const nextContents = filePath in nextOverlaySnapshot
+      ? nextOverlaySnapshot[filePath]
+      : baseSnapshot[filePath]
+
+    if (nextContents == null) {
+      if (previousContents != null) {
+        removals.push(filePath)
+      }
+      continue
+    }
+
+    if (previousContents !== nextContents) {
+      writes[filePath] = nextContents
+    }
+  }
+
+  return {
+    writes,
+    removals,
+  }
+}
+
+export function planTutorialExactSync(
+  currentSnapshot: TutorialSnapshot,
+  workspaceListing: TutorialWorkspaceListing,
+  nextSnapshot: TutorialSnapshot,
+  options: {
+    preservedRootPaths?: string[]
+  } = {},
+): TutorialExactSyncPlan {
+  const preservedRootPaths = [...new Set(options.preservedRootPaths ?? [])].sort()
+  const currentFileSet = new Set(workspaceListing.files)
+  const nextFilePaths = Object.keys(nextSnapshot).sort((a, b) => a.localeCompare(b))
+  const writes = nextFilePaths.reduce<TutorialSnapshot>((result, filePath) => {
+    if (!currentFileSet.has(filePath) || currentSnapshot[filePath] !== nextSnapshot[filePath]) {
+      result[filePath] = nextSnapshot[filePath] ?? ''
+    }
+
+    return result
+  }, {})
+
+  const removableDirectoryCandidates = workspaceListing.directories
+    .filter((directoryPath) => {
+      if (isTutorialPreservedPath(directoryPath, preservedRootPaths)) {
+        return false
+      }
+
+      return !nextFilePaths.some(filePath => filePath.startsWith(`${directoryPath}/`))
+    })
+    .sort((a, b) => a.localeCompare(b))
+
+  const directoryRemovals = removableDirectoryCandidates.filter((directoryPath) => {
+    return !removableDirectoryCandidates.some(candidate =>
+      candidate !== directoryPath
+      && directoryPath.startsWith(`${candidate}/`),
+    )
+  })
+
+  const fileRemovals = workspaceListing.files
+    .filter((filePath) => {
+      if (isTutorialPreservedPath(filePath, preservedRootPaths)) {
+        return false
+      }
+
+      if (filePath in nextSnapshot) {
+        return false
+      }
+
+      return !directoryRemovals.some(directoryPath => filePath.startsWith(`${directoryPath}/`))
+    })
+    .sort((a, b) => a.localeCompare(b))
+
+  return {
+    writes,
+    fileRemovals,
+    directoryRemovals,
+  }
+}
+
+function isTutorialPreservedPath(path: string, preservedRootPaths: string[]) {
+  return preservedRootPaths.some(preservedRootPath =>
+    path === preservedRootPath
+    || path.startsWith(`${preservedRootPath}/`),
+  )
+}
+
+export function isTutorialPreviewSessionCurrent(activeSessionId: string | null, candidateSessionId: unknown) {
+  return typeof activeSessionId === 'string' && candidateSessionId === activeSessionId
 }
 
 export function getDifferingEditableFiles(chapter: TutorialChapter, userFiles: FileMap): string[] {

@@ -11,10 +11,10 @@ export const liveQueryStep: TutorialStepDefinition = {
     { label: 'Plugin Hooks', href: '/guide/plugin/hooks' },
     { label: 'Query', href: '/guide/data/query' },
   ],
-  editableFiles: ['src/rstore/memoryPlugin.ts', 'src/App.vue'],
+  editableFiles: ['src/components/TutorialContent.vue', 'src/rstore/memoryPlugin.ts'],
   validationAction: 'live-smoke',
   validator: (state) => {
-    const storeResult = shared.requireStore('src/App.vue', state)
+    const storeResult = shared.requireStore('src/components/TutorialContent.vue', state)
     if (storeResult)
       return storeResult
 
@@ -25,7 +25,7 @@ export const liveQueryStep: TutorialStepDefinition = {
           'The live query should subscribe through the plugin and write the incoming todo into the cache.',
           'Check both the `liveQuery()` call and the subscription hooks.',
         ],
-        ['src/App.vue', 'src/rstore/memoryPlugin.ts'],
+        ['src/components/TutorialContent.vue', 'src/rstore/memoryPlugin.ts'],
       )
     }
 

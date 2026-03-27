@@ -22,12 +22,21 @@ function getController(): TutorialController {
   return window.__RSTORE_TUTORIAL__
 }
 
+function getPreviewSessionId() {
+  return new URLSearchParams(window.location.search).get('session')
+}
+
+function createPreviewMessage(payload: Record<string, unknown>) {
+  return {
+    source: 'rstore-tutorial-preview',
+    sessionId: getPreviewSessionId(),
+    ...payload,
+  }
+}
+
 function postToParent(payload: Record<string, unknown>) {
   if (window.parent && window.parent !== window) {
-    window.parent.postMessage({
-      source: 'rstore-tutorial-preview',
-      ...payload,
-    }, '*')
+    window.parent.postMessage(createPreviewMessage(payload), '*')
   }
 }
 
@@ -78,19 +87,18 @@ export function initTutorialBridge() {
   window.addEventListener('message', async (event) => {
     const message = event.data
 
-    if (!message || message.source !== 'rstore-docs-tutorial') {
+    if (!message || message.source !== 'rstore-docs-tutorial' || message.sessionId !== getPreviewSessionId()) {
       return
     }
 
     const source = event.source as Window | null
 
     if (message.type === 'get-state') {
-      source?.postMessage({
-        source: 'rstore-tutorial-preview',
+      source?.postMessage(createPreviewMessage({
         type: 'state-response',
         requestId: message.requestId,
         state: getTutorialState(),
-      }, '*')
+      }), '*')
       return
     }
 
@@ -98,37 +106,34 @@ export function initTutorialBridge() {
       const action = controller.actions[message.action]
 
       if (!action) {
-        source?.postMessage({
-          source: 'rstore-tutorial-preview',
+        source?.postMessage(createPreviewMessage({
           type: 'action-response',
           requestId: message.requestId,
           ok: false,
-          error: 'Action "' + message.action + '" is not registered.',
+          error: `Action "${message.action}" is not registered.`,
           state: getTutorialState(),
-        }, '*')
+        }), '*')
         return
       }
 
       try {
         const result = await action()
-        source?.postMessage({
-          source: 'rstore-tutorial-preview',
+        source?.postMessage(createPreviewMessage({
           type: 'action-response',
           requestId: message.requestId,
           ok: true,
           result,
           state: getTutorialState(),
-        }, '*')
+        }), '*')
       }
       catch (error) {
-        source?.postMessage({
-          source: 'rstore-tutorial-preview',
+        source?.postMessage(createPreviewMessage({
           type: 'action-response',
           requestId: message.requestId,
           ok: false,
           error: error instanceof Error ? error.message : String(error),
           state: getTutorialState(),
-        }, '*')
+        }), '*')
       }
     }
   })

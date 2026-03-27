@@ -2,9 +2,7 @@
 title: Cache APIs
 ---
 
-The query API should be your default, but sometimes you need to inspect or patch the cache directly. This last chapter lets you feel that power in a tiny, safe sandbox.
-
-## Work directly with the cache
+The query API should be your default, but every other step has already been relying on the same cache underneath. This final coding step makes that visible on purpose.
 
 Open `src/components/CachePanel.vue`. The computed read is already there:
 
@@ -12,7 +10,7 @@ Open `src/components/CachePanel.vue`. The computed read is already there:
 const cachedTodos = computed(() => store.Todo.peekMany())
 ```
 
-Now fill in the two actions.
+That line is doing a synchronous cache read. No fetching, no loading state, no network. Now fill in the two actions that write directly to the same store state.
 
 ```ts
 store.Todo.writeItem({
@@ -25,8 +23,6 @@ store.Todo.writeItem({
 store.$cache.clear()
 ```
 
-One action should inject a complete Todo record, and the other should wipe the cache so the rest of the app reacts immediately.
+One action injects a complete record. The other wipes the cache. The important observation is that the rest of the app reacts immediately because those views were already reading from the same normalized state.
 
-## What to remember
-
-The cache is not a separate side feature. It is the heart of what your queries are reading. That is why direct cache writes show up instantly, and that is also why you should use them deliberately: they are powerful because they operate on the same normalized state as everything else.
+There is more to the cache API, including layers, pause/resume, and direct state hydration. You do not need all of that here. What matters is understanding that the cache is not a side feature. It is the center of the system you have been using all along.

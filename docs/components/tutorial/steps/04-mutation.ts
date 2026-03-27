@@ -10,10 +10,10 @@ export const mutationStep: TutorialStepDefinition = {
     { label: 'Mutation', href: '/guide/data/mutation' },
     { label: 'Query', href: '/guide/data/query' },
   ],
-  editableFiles: ['src/App.vue'],
+  editableFiles: ['src/components/TutorialContent.vue'],
   validationAction: 'mutation-smoke',
   validator: (state) => {
-    const storeResult = shared.requireStore('src/App.vue', state)
+    const storeResult = shared.requireStore('src/components/TutorialContent.vue', state)
     if (storeResult)
       return storeResult
 
@@ -22,9 +22,9 @@ export const mutationStep: TutorialStepDefinition = {
         'The mutation smoke test did not complete all three operations.',
         [
           'The preview should be able to create a new todo, toggle it, and then delete it again.',
-          'Check the add, toggle, and delete handlers in `App.vue`.',
+          'Check the add, toggle, and delete handlers in `TutorialContent.vue`.',
         ],
-        ['src/App.vue'],
+        ['src/components/TutorialContent.vue'],
       )
     }
 

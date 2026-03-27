@@ -4,7 +4,7 @@ import type { TutorialSnapshot } from './types'
 const CACHE_DB_NAME = 'rstore-docs-tutorial'
 const CACHE_STORE_NAME = 'webcontainer-cache'
 const CACHE_RECORD_KEY = 'dependency-cache'
-const CACHE_VERSION = 2
+const CACHE_VERSION = 3
 
 type TutorialDependencyCacheCompression = 'none' | 'gzip'
 
@@ -78,9 +78,11 @@ async function openCacheDatabase() {
     request.onupgradeneeded = () => {
       const database = request.result
 
-      if (!database.objectStoreNames.contains(CACHE_STORE_NAME)) {
-        database.createObjectStore(CACHE_STORE_NAME)
+      if (database.objectStoreNames.contains(CACHE_STORE_NAME)) {
+        database.deleteObjectStore(CACHE_STORE_NAME)
       }
+
+      database.createObjectStore(CACHE_STORE_NAME)
     }
 
     request.onsuccess = () => {
@@ -93,13 +95,18 @@ async function openCacheDatabase() {
   })
 }
 
-async function readCacheRecord() {
+export function getTutorialDependencyCacheRecordKey(dependencySignature: string) {
+  return `${CACHE_RECORD_KEY}:${dependencySignature}`
+}
+
+async function readCacheRecord(dependencySignature: string) {
   const database = await openCacheDatabase()
 
   try {
     const transaction = database.transaction(CACHE_STORE_NAME, 'readonly')
     const store = transaction.objectStore(CACHE_STORE_NAME)
-    const record = await runRequest(store.get(CACHE_RECORD_KEY) as IDBRequest<TutorialDependencyCacheRecord | undefined>)
+    const recordKey = getTutorialDependencyCacheRecordKey(dependencySignature)
+    const record = await runRequest(store.get(recordKey) as IDBRequest<TutorialDependencyCacheRecord | undefined>)
     await waitForTransaction(transaction)
 
     return record ?? null
@@ -148,7 +155,7 @@ async function decompressSnapshot(
 
   if (compression === 'gzip') {
     if (typeof DecompressionStream !== 'function') {
-      throw new Error('DecompressionStream is not available in this environment.')
+      throw new TypeError('DecompressionStream is not available in this environment.')
     }
 
     return readStreamBytes(
@@ -165,7 +172,8 @@ async function writeCacheRecord(record: TutorialDependencyCacheRecord) {
   try {
     const transaction = database.transaction(CACHE_STORE_NAME, 'readwrite')
     const store = transaction.objectStore(CACHE_STORE_NAME)
-    await runRequest(store.put(record, CACHE_RECORD_KEY))
+    const recordKey = getTutorialDependencyCacheRecordKey(record.dependencySignature)
+    await runRequest(store.put(record, recordKey))
     await waitForTransaction(transaction)
   }
   finally {
@@ -173,7 +181,7 @@ async function writeCacheRecord(record: TutorialDependencyCacheRecord) {
   }
 }
 
-export async function clearTutorialDependencyCache() {
+export async function clearTutorialDependencyCache(dependencySignature?: string) {
   if (!canUseIndexedDb()) {
     return
   }
@@ -183,7 +191,14 @@ export async function clearTutorialDependencyCache() {
   try {
     const transaction = database.transaction(CACHE_STORE_NAME, 'readwrite')
     const store = transaction.objectStore(CACHE_STORE_NAME)
-    await runRequest(store.delete(CACHE_RECORD_KEY))
+
+    if (dependencySignature) {
+      await runRequest(store.delete(getTutorialDependencyCacheRecordKey(dependencySignature)))
+    }
+    else {
+      await runRequest(store.clear())
+    }
+
     await waitForTransaction(transaction)
   }
   finally {
@@ -199,14 +214,14 @@ export async function restoreTutorialDependencyCache(
     return 'unsupported'
   }
 
-  const record = await readCacheRecord()
+  const record = await readCacheRecord(dependencySignature)
 
   if (!record) {
     return 'miss'
   }
 
   if (record.version !== CACHE_VERSION || record.dependencySignature !== dependencySignature) {
-    await clearTutorialDependencyCache().catch(() => null)
+    await clearTutorialDependencyCache(dependencySignature).catch(() => null)
     return 'stale'
   }
 
@@ -228,7 +243,7 @@ export async function restoreTutorialDependencyCache(
   }
   catch {
     await Promise.allSettled([
-      clearTutorialDependencyCache(),
+      clearTutorialDependencyCache(dependencySignature),
       instance.fs.rm('node_modules', {
         recursive: true,
         force: true,

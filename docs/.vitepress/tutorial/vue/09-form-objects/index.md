@@ -2,11 +2,9 @@
 title: Form Objects
 ---
 
-Up to now you have been driving mutations directly. That is useful, but forms usually need more help: field state, validation, submit behavior, change detection, and reset behavior. rstore can bundle that up for you.
+Direct mutations are fine for buttons and tiny handlers. Forms usually need more structure: field state, reset behavior, validation, change detection, loading, and submit lifecycle. The form API keeps that logic attached to the collection instead of rebuilding it in each component.
 
-## Convert the component to form objects
-
-Open `src/components/TodoForm.vue`. Start by replacing the local refs with one create form and, when `editId` exists, one update form.
+Open `src/components/TodoForm.vue`. Replace the local refs with one create form and, when `editId` exists, one update form.
 
 ```ts
 const store = useStore()
@@ -18,6 +16,7 @@ Then bind the template directly to those form objects.
 
 ```vue
 <input v-model="createTodo.text">
+
 <button :disabled="!createTodo.$valid" @click="createTodo.$submit()">
   Save
 </button>
@@ -27,8 +26,6 @@ Then bind the template directly to those form objects.
 </button>
 ```
 
-If you also use `$hasChanges()` for the edit state, the component will stop inventing its own bookkeeping.
+Use `$hasChanges()` for edit-state logic so the component can describe the UI instead of inventing bookkeeping.
 
-## Why This Helps
-
-Form objects keep mutation rules close to the collection schema. That means validation, defaults, submit behavior, and reset behavior all come from the same source of truth. Your component becomes a view over the form, not the place where business rules are reconstructed.
+Form objects can also expose relational editing helpers, operation logs, undo/redo behavior, rebasing, and collaboration-aware conflict handling. You do not need all of that for this todo app, but the core idea should still click: the collection can own form behavior just as naturally as it owns mutations.

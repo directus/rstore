@@ -2,23 +2,21 @@
 title: Welcome
 ---
 
-You are about to build a small todo app while learning the core rstore workflow. Each chapter gives you a real Vue sandbox, a preview, and a validation check, and the point is to do the implementation yourself rather than fill in one tiny gap.
+You are building a small Vue todo app, but the bigger goal is to understand how collections, the normalized cache, plugins, queries, mutations, and forms fit together in one coherent data model.
 
-## Start here
-
-Take one minute to get comfortable with the layout. The editor is where you work, the preview is the running app, and validation is the quick check that the current chapter is really implemented.
+The editor is where you work, the preview is the running app, and validation is the quick check that the current step really hangs together. Some parts of the flow are code-heavy. Some pause to explain a broader piece of the API before you keep building.
 
 ```ts
 const store = useStore()
 const { data: todos } = await store.Todo.query(q => q.many())
 ```
 
-That pattern is where we are headed. By the end of the track, you will know what had to be defined so a line like that feels natural.
+That line is the destination. The rest of the flow is about making each piece of it feel earned.
 
-## How to use the tutorial
+## How to use it
 
-Treat each chapter like a guided exercise, not a scavenger hunt. Read the guide first, glance at the starter file, then implement the idea in your own words. If you get stuck, validate early. The correction view is there to unblock you, not to punish experimentation.
+Move step by step. Read the text first, inspect the starter file, then implement the idea in your own words. If the preview or validation disagrees with you, that is useful feedback, not a trap. The correction view is there when you want to compare your approach with the expected solution.
 
-## What You Will Practice
+## What matters
 
-rstore is local-first and schema-driven. You define what your records look like, how to identify them, and how they travel to and from a backend. Once that foundation is in place, queries, mutations, forms, relations, and cache APIs all build on the same model.
+rstore is local-first and schema-driven. Collections describe your data model. The cache keeps a normalized copy of what the app knows. Queries read from that cache. Mutations, forms, plugins, relations, and live updates all meet there. Everything you build from here keeps returning to that same picture from different angles.

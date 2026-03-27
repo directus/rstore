@@ -2,9 +2,7 @@
 title: Module Setup
 ---
 
-This chapter is the Nuxt payoff chapter. Once the module is enabled and the collections are discoverable, Nuxt can assemble the store for you and expose a typed `useStore()` without a hand-written setup file.
-
-## Turn on the module and define the collections
+This is where the Nuxt integration stops being abstract. Once `@rstore/nuxt` is enabled and your collections are placed where the module can discover them, Nuxt can build the store for you and expose typed helpers automatically.
 
 Start in `nuxt.config.ts` and register `@rstore/nuxt`.
 
@@ -14,7 +12,7 @@ export default defineNuxtConfig({
 })
 ```
 
-Then move into `app/rstore/todos.ts` and `app/rstore/users.ts`. The tutorial backend routes already exist, so your job is to describe those records with real collection definitions.
+Then move into `app/rstore/todos.ts` and `app/rstore/users.ts`. The backend routes already exist. Your job is to describe those records with real collection definitions.
 
 ```ts
 export default RStoreSchema.withItemType<Todo>().defineCollection({
@@ -26,8 +24,6 @@ export default RStoreSchema.withItemType<Todo>().defineCollection({
 })
 ```
 
-Make `Todo` fully readable and writable, and make `User` readable so the relation chapter has something to work with later.
+Make `Todo` fully readable and writable, and make `User` readable so relations have something real to resolve later.
 
-## Why Nuxt feels different here
-
-With the module turned on, `app/rstore` becomes a convention Nuxt understands. You describe the collections, and the module handles store creation, discovery, and typed access. That is why later chapters can jump straight into page and component code.
+What makes this feel different from Vue is that `app/rstore` is now a convention Nuxt understands. You describe the collections. The module handles discovery, store creation, typed access, and the rest of the runtime wiring. That is why the app can jump straight into page and component code.

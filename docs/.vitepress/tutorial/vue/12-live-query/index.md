@@ -2,9 +2,7 @@
 title: Live Query
 ---
 
-A normal query reacts when the cache changes, but it does not subscribe to outside events on its own. In this chapter you will close that loop so simulated remote changes flow into the cache and then into the page.
-
-## Upgrade the page and the plugin
+A normal query reacts when the cache changes, but it does not create a subscription by itself. `liveQuery()` keeps the same cache-backed reading model and adds the subscription piece on top. That is the only new idea here.
 
 In `src/App.vue`, switch the list from `query()` to `liveQuery()`.
 
@@ -21,7 +19,6 @@ hook('subscribe', ({ collection, subscriptionId, store }) => {
   const stop = memoryBackend.subscribe('todos', (event) => {
     if (event.type === 'delete' && event.key) {
       store.$cache.deleteItem({ collection, key: event.key })
-      return
     }
   })
 
@@ -29,8 +26,6 @@ hook('subscribe', ({ collection, subscriptionId, store }) => {
 })
 ```
 
-When the event includes an item, write it into the cache with `store.$cache.writeItem(...)`. When the subscription ends, call the saved stop function and remove it from the map.
+When the event includes an item, write it into the cache with `store.$cache.writeItem(...)`. When it represents a deletion, remove the item from the cache. The component should not grow a second realtime state model.
 
-## Why `liveQuery()` is such a small change
-
-The query API and the cache model stay the same. You are not building a separate real-time system in the component. You are extending the transport layer so it can feed fresh events into the same normalized cache the page already trusts.
+That is why `liveQuery()` is such a small code change for the page. The query API stays familiar because the cache model stays familiar. You are extending the transport layer so outside events can keep feeding the same normalized state the UI already trusts.

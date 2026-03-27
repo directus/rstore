@@ -1,5 +1,4 @@
-import type { TutorialSnapshot } from './types'
-import type { TutorialFramework } from './types'
+import type { TutorialFramework, TutorialRuntimeAssets, TutorialSnapshot } from './types'
 import { tutorialChapterFolders, tutorialChapterFoldersByFramework } from '../steps/registry'
 import { createVendoredRstorePackageFiles } from './tutorialLocalPackages'
 
@@ -54,34 +53,93 @@ const frameworkBaseFiles = Object.fromEntries(
     ]),
 ) as Record<TutorialFramework, TutorialSnapshot>
 
-const starterFilesByStep = Object.fromEntries(
+const starterOverlayFilesByStep = Object.fromEntries(
   Object.entries(tutorialChapterFolders).map(([stepId, folder]) => [
     stepId,
     {
-      ...frameworkBaseFiles[getFrameworkFromFolder(folder)],
       ...createStepSnapshot(folder, sharedAssetModules, 'shared'),
       ...createStepSnapshot(folder, starterAssetModules, 'app-a'),
     },
   ]),
 ) as Record<string, TutorialSnapshot>
 
-const solutionFilesByStep = Object.fromEntries(
+const solutionOverlayFilesByStep = Object.fromEntries(
   Object.entries(tutorialChapterFolders).map(([stepId, folder]) => [
     stepId,
     {
-      ...frameworkBaseFiles[getFrameworkFromFolder(folder)],
       ...createStepSnapshot(folder, sharedAssetModules, 'shared'),
       ...createStepSnapshot(folder, solutionAssetModules, 'app-b'),
     },
   ]),
 ) as Record<string, TutorialSnapshot>
 
+const runtimeAssetsByStep = Object.fromEntries(
+  Object.entries(tutorialChapterFolders).map(([stepId, folder]) => [
+    stepId,
+    {
+      frameworkBaseFiles: frameworkBaseFiles[getFrameworkFromFolder(folder)],
+      starterOverlayFiles: starterOverlayFilesByStep[stepId] ?? {},
+      solutionOverlayFiles: solutionOverlayFilesByStep[stepId] ?? {},
+    } satisfies TutorialRuntimeAssets,
+  ]),
+) as Record<string, TutorialRuntimeAssets>
+
+const starterFilesByStep = Object.fromEntries(
+  Object.entries(runtimeAssetsByStep).map(([stepId, runtimeAssets]) => [
+    stepId,
+    {
+      ...runtimeAssets.frameworkBaseFiles,
+      ...runtimeAssets.starterOverlayFiles,
+    },
+  ]),
+) as Record<string, TutorialSnapshot>
+
+const solutionFilesByStep = Object.fromEntries(
+  Object.entries(runtimeAssetsByStep).map(([stepId, runtimeAssets]) => [
+    stepId,
+    {
+      ...runtimeAssets.frameworkBaseFiles,
+      ...runtimeAssets.solutionOverlayFiles,
+    },
+  ]),
+) as Record<string, TutorialSnapshot>
+
+function getFrameworkBaseFiles(framework: TutorialFramework): TutorialSnapshot {
+  return {
+    ...frameworkBaseFiles[framework],
+  }
+}
+
+function getStepStarterOverlayFiles(stepId: string): TutorialSnapshot {
+  return {
+    ...(starterOverlayFilesByStep[stepId] ?? {}),
+  }
+}
+
+function getStepSolutionOverlayFiles(stepId: string): TutorialSnapshot {
+  return {
+    ...(solutionOverlayFilesByStep[stepId] ?? {}),
+  }
+}
+
 function getStepStarterFiles(stepId: string): TutorialSnapshot {
-  return starterFilesByStep[stepId] ?? {}
+  return {
+    ...(starterFilesByStep[stepId] ?? {}),
+  }
 }
 
 function getStepSolutionFiles(stepId: string): TutorialSnapshot {
-  return solutionFilesByStep[stepId] ?? {}
+  return {
+    ...(solutionFilesByStep[stepId] ?? {}),
+  }
+}
+
+function getStepRuntimeAssets(stepId: string): TutorialRuntimeAssets {
+  return {
+    frameworkBaseFiles: getFrameworkBaseFiles(getFrameworkFromFolder(tutorialChapterFolders[stepId] ?? 'vue')),
+    starterOverlayFiles: getStepStarterOverlayFiles(stepId),
+    solutionOverlayFiles: getStepSolutionOverlayFiles(stepId),
+  }
 }
 
 function getFrameworkFromFolder(folder: string): TutorialFramework {
@@ -89,6 +147,10 @@ function getFrameworkFromFolder(folder: string): TutorialFramework {
 }
 
 export {
+  getFrameworkBaseFiles,
+  getStepRuntimeAssets,
   getStepSolutionFiles,
+  getStepSolutionOverlayFiles,
   getStepStarterFiles,
+  getStepStarterOverlayFiles,
 }

@@ -2,9 +2,7 @@
 title: Create Todos
 ---
 
-Now the page needs to do more than read. In this chapter you will make the list feel interactive by wiring create, toggle, and delete operations through the store.
-
-## Finish the page actions
+The page can read from the store now, so the next step is to issue mutations back into it. Mutations change store state rather than patching the UI by hand, and that distinction starts paying off here.
 
 Open `app/pages/index.vue` and start with the create handler.
 
@@ -32,8 +30,6 @@ await todo.$update({ completed: !todo.completed })
 await store.Todo.delete(id)
 ```
 
-You should only be issuing data operations here. Let the query react instead of manually rebuilding the list.
+The page should only be issuing data operations here. Let the query react instead of rebuilding arrays by hand or forcing a full reload.
 
-## Why the page stays lightweight
-
-This is the same local-first idea you saw in Vue, now with Nuxt’s generated store. The page owns intent, not synchronization. The normalized state lives in rstore, so the page can stay pleasantly boring even after it handles three different mutations.
+This is the same local-first idea, just with Nuxt’s generated store. The page owns intent. rstore owns synchronization.

@@ -1,10 +1,28 @@
 import type { TutorialChapterDefinition, TutorialTrackDefinition } from '../utils/types'
 import * as shared from './shared'
 
+function createReadOnlyChapter(
+  chapter: Omit<TutorialChapterDefinition, 'editableFiles' | 'validator'>,
+  readySummary: string,
+  readyDetails: string[],
+): TutorialChapterDefinition {
+  return {
+    ...chapter,
+    editableFiles: [],
+    validator: (state) => {
+      const bootResult = shared.requireBooted(state, 'The Nuxt sandbox has not finished booting yet.')
+      if (bootResult)
+        return bootResult
+
+      return shared.pass(readySummary, readyDetails)
+    },
+  }
+}
+
 export const nuxtTutorialTrack: TutorialTrackDefinition = {
   framework: 'nuxt',
   label: 'Nuxt',
-  description: 'Learn the Nuxt module workflow with a real Nuxt sandbox.',
+  description: 'Learn the Nuxt module workflow while following the same concepts used across the rest of the docs.',
   imageSrc: '/nuxt.svg',
   runtimePort: 3000,
 }
@@ -16,7 +34,7 @@ export const nuxtTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'welcome',
     folder: 'nuxt/01-welcome',
     title: 'Welcome',
-    feature: 'Meet the Nuxt tutorial track and how rstore fits into filesystem-driven apps.',
+    feature: 'Meet the Nuxt track, the filesystem conventions it uses, and the local-first data model underneath them.',
     group: 'Foundations',
     referenceLinks: [
       { label: 'About rstore', href: '/guide/learn-more' },
@@ -39,11 +57,12 @@ export const nuxtTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'module-setup',
     folder: 'nuxt/02-module-setup',
     title: 'Module Setup',
-    feature: 'Enable the Nuxt module and let it discover your Todo and User collections.',
+    feature: 'Enable `@rstore/nuxt` so Nuxt can discover collections, create the store, and expose typed helpers for you.',
     group: 'Foundations',
     referenceLinks: [
       { label: 'Getting Started', href: '/guide/getting-started' },
       { label: 'Plugin Setup', href: '/guide/plugin/setup' },
+      { label: 'Collection', href: '/guide/schema/collection' },
     ],
     editableFiles: ['nuxt.config.ts', 'app/rstore/todos.ts', 'app/rstore/users.ts'],
     validationAction: 'query-smoke',
@@ -61,17 +80,77 @@ export const nuxtTutorialChapters: TutorialChapterDefinition[] = [
       ])
     },
   },
+  createReadOnlyChapter(
+    {
+      id: 'nuxt-server-api-routes',
+      framework: 'nuxt',
+      slug: 'server-api-routes',
+      folder: 'nuxt/03-server-api-routes',
+      title: 'Server API Routes',
+      feature: 'Understand the tiny in-memory backend that the tutorial collections and plugins talk to.',
+      group: 'Foundations',
+      referenceLinks: [
+        { label: 'Getting Started', href: '/guide/getting-started' },
+        { label: 'Plugin Hooks', href: '/guide/plugin/hooks' },
+      ],
+    },
+    'The server API routes chapter is ready.',
+    [
+      'This chapter makes the tutorial backend explicit so the rest of the Nuxt track feels grounded in a real app shape.',
+    ],
+  ),
+  createReadOnlyChapter(
+    {
+      id: 'nuxt-runtime-model',
+      framework: 'nuxt',
+      slug: 'runtime-model',
+      folder: 'nuxt/04-runtime-model',
+      title: 'Nuxt Runtime Model',
+      feature: 'See how `app/rstore`, auto-imports, SSR payload integration, and Nuxt DevTools fit together once the module is enabled.',
+      group: 'Foundations',
+      referenceLinks: [
+        { label: 'Getting Started', href: '/guide/getting-started' },
+        { label: 'Plugin Setup', href: '/guide/plugin/setup' },
+        { label: 'Devtools', href: '/guide/devtools' },
+      ],
+    },
+    'The Nuxt runtime model chapter is ready.',
+    [
+      'Use this chapter to connect the tutorial conventions to the broader Nuxt integration story in the guide.',
+    ],
+  ),
+  createReadOnlyChapter(
+    {
+      id: 'nuxt-query-patterns',
+      framework: 'nuxt',
+      slug: 'query-patterns',
+      folder: 'nuxt/05-query-patterns',
+      title: 'Query Patterns',
+      feature: 'Place the simple page query inside the wider query API: `first`, `many`, `find`, `peek`, `include`, pagination, and fetch policy.',
+      group: 'Reading Data',
+      referenceLinks: [
+        { label: 'Querying Data', href: '/guide/data/query' },
+        { label: 'Relations', href: '/guide/schema/relations' },
+        { label: 'Cache', href: '/guide/data/cache' },
+      ],
+    },
+    'The query patterns chapter is ready.',
+    [
+      'This chapter is the bridge between the first page query and the full guide coverage of reading data.',
+    ],
+  ),
   {
     id: 'nuxt-query-page',
     framework: 'nuxt',
     slug: 'query-page',
     folder: 'nuxt/06-query-page',
     title: 'Query in a Page',
-    feature: 'Use `useStore()` and `query(q => q.many())` inside a Nuxt page.',
+    feature: 'Use `useStore()` and `query(q => q.many())` in a Nuxt page so the page reads directly from the store.',
     group: 'Reading Data',
     referenceLinks: [
       { label: 'Querying Data', href: '/guide/data/query' },
       { label: 'Getting Started', href: '/guide/getting-started' },
+      { label: 'Cache', href: '/guide/data/cache' },
     ],
     editableFiles: ['app/pages/index.vue'],
     validationAction: 'query-smoke',
@@ -95,11 +174,12 @@ export const nuxtTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'create-todos',
     folder: 'nuxt/07-create-todos',
     title: 'Create Todos',
-    feature: 'Finish the page with create, toggle, and delete handlers.',
+    feature: 'Finish the page with create, update, and delete handlers that all reuse the same query-backed state.',
     group: 'Writing Data',
     referenceLinks: [
       { label: 'Mutation', href: '/guide/data/mutation' },
       { label: 'Querying Data', href: '/guide/data/query' },
+      { label: 'Cache', href: '/guide/data/cache' },
     ],
     editableFiles: ['app/pages/index.vue'],
     validationAction: 'mutation-smoke',
@@ -124,17 +204,38 @@ export const nuxtTutorialChapters: TutorialChapterDefinition[] = [
       ])
     },
   },
+  createReadOnlyChapter(
+    {
+      id: 'nuxt-mutation-patterns',
+      framework: 'nuxt',
+      slug: 'mutation-patterns',
+      folder: 'nuxt/08-mutation-patterns',
+      title: 'Mutation Patterns',
+      feature: 'Connect the page-level CRUD flow to bulk mutations, optimistic updates, and cache-layer behavior.',
+      group: 'Writing Data',
+      referenceLinks: [
+        { label: 'Mutation', href: '/guide/data/mutation' },
+        { label: 'Cache', href: '/guide/data/cache' },
+        { label: 'Plugin Hooks', href: '/guide/plugin/hooks' },
+      ],
+    },
+    'The mutation patterns chapter is ready.',
+    [
+      'This chapter gives the page exercise the same wider context the mutation guide covers.',
+    ],
+  ),
   {
     id: 'nuxt-move-transport-plugin',
     framework: 'nuxt',
     slug: 'move-transport-plugin',
     folder: 'nuxt/09-move-transport-plugin',
     title: 'Move Transport into `app/rstore/plugins`',
-    feature: 'Keep the collection schema focused and move transport logic into a plugin.',
+    feature: 'Keep collection files focused on model shape and move backend transport policy into an rstore plugin.',
     group: 'Modeling',
     referenceLinks: [
       { label: 'Plugin Setup', href: '/guide/plugin/setup' },
       { label: 'Plugin Hooks', href: '/guide/plugin/hooks' },
+      { label: 'Federation', href: '/guide/schema/federation' },
     ],
     editableFiles: ['app/rstore/todos.ts', 'app/rstore/plugins/memory.ts'],
     validationAction: 'query-smoke',
@@ -158,11 +259,12 @@ export const nuxtTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'form-objects',
     folder: 'nuxt/10-form-objects',
     title: 'Form Objects',
-    feature: 'Manage create and update flows with rstore form helpers in Nuxt components.',
+    feature: 'Manage create and update flows with rstore form helpers instead of rebuilding form state in the component.',
     group: 'Writing Data',
     referenceLinks: [
       { label: 'Form Object', href: '/guide/data/form' },
       { label: 'Mutation', href: '/guide/data/mutation' },
+      { label: 'Relations', href: '/guide/schema/relations' },
     ],
     editableFiles: ['app/components/TodoForm.vue'],
     validationAction: 'form-smoke',
@@ -193,11 +295,12 @@ export const nuxtTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'relations',
     folder: 'nuxt/11-relations',
     title: 'Relations',
-    feature: 'Resolve related users from the normalized cache in Nuxt.',
+    feature: 'Define relation mappings so the page can resolve related users from the same normalized cache.',
     group: 'Modeling',
     referenceLinks: [
       { label: 'Relations', href: '/guide/schema/relations' },
       { label: 'Collection', href: '/guide/schema/collection' },
+      { label: 'Form Object', href: '/guide/data/form' },
     ],
     editableFiles: ['app/rstore/relations.ts'],
     validator: (state) => {
@@ -227,11 +330,12 @@ export const nuxtTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'live-query',
     folder: 'nuxt/12-live-query',
     title: 'Live Query',
-    feature: 'Keep the Nuxt page in sync with remote-like updates through `liveQuery()`.',
+    feature: 'Keep the Nuxt page in sync with remote-style updates by combining `liveQuery()` and subscription hooks.',
     group: 'Reactivity',
     referenceLinks: [
       { label: 'Subscriptions', href: '/guide/data/live' },
       { label: 'Plugin Hooks', href: '/guide/plugin/hooks' },
+      { label: 'Cache', href: '/guide/data/cache' },
     ],
     editableFiles: ['app/pages/index.vue', 'app/rstore/plugins/memory.ts'],
     validationAction: 'live-smoke',
@@ -262,11 +366,12 @@ export const nuxtTutorialChapters: TutorialChapterDefinition[] = [
     slug: 'cache-apis',
     folder: 'nuxt/13-cache-apis',
     title: 'Cache APIs',
-    feature: 'Use cache reads and writes directly inside the Nuxt app.',
+    feature: 'Use direct cache reads and writes when you need to work against the same normalized state the page queries rely on.',
     group: 'Reactivity',
     referenceLinks: [
       { label: 'Cache', href: '/guide/data/cache' },
       { label: 'Querying Data', href: '/guide/data/query' },
+      { label: 'Mutation', href: '/guide/data/mutation' },
     ],
     editableFiles: ['app/components/CachePanel.vue'],
     validationAction: 'cache-smoke',
@@ -288,6 +393,33 @@ export const nuxtTutorialChapters: TutorialChapterDefinition[] = [
 
       return shared.pass('The Nuxt cache controls are updating the store directly.', [
         'This chapter demonstrates synchronous reads and local cache writes without leaving the app.',
+      ])
+    },
+  },
+  {
+    id: 'nuxt-advanced-workflows',
+    framework: 'nuxt',
+    slug: 'advanced-workflows',
+    folder: 'nuxt/14-advanced-workflows',
+    playgroundSourceChapterId: 'nuxt-cache-apis',
+    title: 'Learn Next',
+    feature: 'Start from the completed tutorial app, explore the unlocked source code, and branch into offline sync, federation, devtools, Drizzle integration, and collaboration.',
+    group: 'Beyond the Basics',
+    referenceLinks: [
+      { label: 'Offline', href: '/guide/data/offline' },
+      { label: 'Devtools', href: '/guide/devtools' },
+      { label: 'Federation', href: '/guide/schema/federation' },
+      { label: 'Nuxt + Drizzle', href: '/plugins/nuxt-drizzle' },
+      { label: 'Yjs', href: '/plugins/yjs' },
+    ],
+    editableFiles: [],
+    validator: (state) => {
+      const bootResult = shared.requireBooted(state, 'The Nuxt sandbox has not finished booting yet.')
+      if (bootResult)
+        return bootResult
+
+      return shared.pass('The completed Nuxt tutorial app is unlocked.', [
+        'Use this last chapter as a sandbox: every app file in the editor starts from the finished exercise so you can explore and remix it freely.',
       ])
     },
   },

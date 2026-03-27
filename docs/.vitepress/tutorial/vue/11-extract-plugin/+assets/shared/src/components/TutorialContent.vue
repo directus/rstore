@@ -1,31 +1,25 @@
 <script setup lang="ts">
 import { useStore } from '@rstore/vue'
-import { simulateRemoteTodo as triggerRemoteTodo } from './rstore/live'
 
 const store = useStore()
-const { data: todos } = await store.Todo.liveQuery(q => q.many())
-
-async function simulateRemoteTodo() {
-  triggerRemoteTodo()
-  await new Promise(resolve => window.setTimeout(resolve, 80))
-}
+const { data: todos, loading, refresh } = await store.Todo.query(q => q.many())
 </script>
 
 <template>
   <main class="tutorial-app">
     <header class="hero">
-      <h1>Chapter : Live Query</h1>
-      <p>Use <code>liveQuery()</code> so remote inserts update the rendered list automatically.</p>
+      <h1>Chapter : Plugin Setup</h1>
+      <p>Move the transport out of collection hooks and into a reusable memory plugin.</p>
     </header>
 
     <section class="surface">
       <div class="toolbar">
-        <button @click="simulateRemoteTodo()">
-          Simulate remote todo
+        <button @click="refresh()">
+          Refresh
         </button>
 
         <span class="meta-pill">
-          {{ todos.length }} live items
+          {{ loading ? 'Loading the in-memory backend…' : `${todos.length} seeded todos ready` }}
         </span>
       </div>
     </section>
@@ -36,9 +30,10 @@ async function simulateRemoteTodo() {
           v-for="todo in todos"
           :key="todo.id"
           class="todo-item"
+          :class="{ done: todo.completed }"
         >
           <strong>{{ todo.text }}</strong>
-          <span class="hint">{{ todo.completed ? 'Complete' : 'Open' }}</span>
+          <span class="hint">Assigned to {{ todo.assigneeId ?? 'nobody yet' }}</span>
         </li>
       </ul>
     </section>

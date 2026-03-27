@@ -2,9 +2,7 @@
 title: Live Query
 ---
 
-The page already reacts to cache changes. Now you are going to give it a source of fresh events so remote-style updates can flow into that same cache automatically.
-
-## Connect the page to live updates
+The page already reacts to cache changes. `liveQuery()` keeps that same cache-backed reading model and adds a subscription so outside events can keep the data fresh. That is the only conceptual jump here.
 
 In `app/pages/index.vue`, switch the list to `liveQuery()`.
 
@@ -20,7 +18,8 @@ const subscriptions = new Map<string, () => void>()
 hook('subscribe', ({ collection, subscriptionId, store }) => {
   const stop = subscribeToRemoteTodos((item) => {
     const key = collection.getKey(item)
-    if (key == null) return
+    if (key == null)
+      return
 
     store.$cache.writeItem({
       collection,
@@ -35,6 +34,4 @@ hook('subscribe', ({ collection, subscriptionId, store }) => {
 
 Import `subscribeToRemoteTodos` from `../live`, and remember to clean up the saved handler in `hook('unsubscribe', ...)`.
 
-## Why this feels familiar
-
-You are not building a second read model for live data. `liveQuery()` still reads from the normalized cache. The only new idea is that the transport layer can keep feeding that cache when outside events happen.
+The reason this should feel familiar is that you are not building a second realtime state model for the page. `liveQuery()` still reads from the normalized cache. The only new behavior is that the transport layer keeps feeding that cache when outside events happen.

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { FileSystemTree, WebContainer } from '@webcontainer/api'
+import type { DirEnt, FileSystemTree, WebContainer } from '@webcontainer/api'
 import type { TutorialLogEntry } from './utils/tutorialRuntimeLogs'
 import type {
   TutorialChapter,
@@ -32,14 +32,14 @@ import {
   applyStepCorrections,
   composeStepSnapshot,
   composeVisibleStepSnapshot,
-  createLatestRequestController,
   detectTutorialSupport,
-  diffSnapshots,
   getAdjacentTutorialChapters,
   getDifferingEditableFiles,
   getPrimaryCorrectionFile,
   getTutorialChapterEditorFiles,
   groupTutorialChapters,
+  isTutorialPreviewSessionCurrent,
+  planTutorialExactSync,
   resetStepFiles,
   resolveTutorialChapterSelectedFile,
   resolveTutorialSelectedFile,
@@ -55,8 +55,11 @@ import {
   appendTutorialRuntimeOutputChunk,
 } from './utils/tutorialRuntimeLogs'
 import {
+  createTutorialChapterTaskSessionController,
   createTutorialRuntimeSessionController,
+  isTutorialChapterTaskCancellationError,
   isTutorialRuntimeCancellationError,
+  TutorialChapterTaskCancellationError,
 } from './utils/tutorialRuntimeSession'
 import {
   createTutorialServerTracker,
@@ -107,6 +110,7 @@ let nextLogId = 0
 const previewBaseUrl = ref<string | null>(null)
 const languageServerTransport = shallowRef<ReturnType<typeof createTutorialLspProcessTransport> | null>(null)
 const previewRevision = ref(0)
+const previewSessionId = ref<string | null>(null)
 const previewState = ref<TutorialPreviewState>({})
 const correctionOpen = ref(false)
 const correctionFile = ref<string | null>(null)
@@ -120,17 +124,24 @@ const webContainer = shallowRef<WebContainer | null>(null)
 const containerSnapshot = shallowRef<TutorialSnapshot>({})
 const syncedChapterId = ref<string | null>(null)
 
-const requestResolvers = new Map<string, { resolve: (value: any) => void, reject: (reason?: unknown) => void, timeout: number }>()
+const requestResolvers = new Map<string, {
+  resolve: (value: any) => void
+  reject: (reason?: unknown) => void
+  sessionId: string
+  timeout: number
+}>()
 const writeTimers = new Map<string, number>()
 const queuedWrites = new Map<string, string>()
 const pendingWrites = new Map<string, Promise<void>>()
 const processPipes: Array<Promise<void>> = []
 let pendingChapterSyncRequest: { token: number } | null = null
 let chapterSyncPromise: Promise<void> | null = null
-const latestChapterRequest = createLatestRequestController()
+let activeChapterTaskCount = 0
+const latestChapterTask = createTutorialChapterTaskSessionController()
 const latestRuntimeSession = createTutorialRuntimeSessionController()
-const latestSelectedChapterToken = ref(0)
+const latestSelectedChapterToken = ref(latestChapterTask.issue())
 const hasMounted = ref(false)
+const tutorialPreservedRootPaths = ['node_modules', '.nuxt', '.output']
 
 const tutorialChapters = computed(() => getTutorialChapters(selectedFramework.value))
 
@@ -190,7 +201,9 @@ const currentCorrectionSnapshot = computed(() =>
 )
 
 const previewSrc = computed(() =>
-  previewBaseUrl.value ? `${previewBaseUrl.value}?tutorial=${previewRevision.value}` : null,
+  previewBaseUrl.value && previewSessionId.value
+    ? `${previewBaseUrl.value}?tutorial=${previewRevision.value}&session=${encodeURIComponent(previewSessionId.value)}`
+    : null,
 )
 
 const chapterNavigation = computed(() =>
@@ -270,18 +283,25 @@ function setStatusForChapter(chapter: TutorialChapter, nextStatus: TutorialStatu
   if (currentChapter.value.id !== chapter.id)
     return
 
-  if (token != null && !latestChapterRequest.isCurrent(token))
+  if (token != null && !latestChapterTask.isCurrent(token))
     return
 
   setStatus(nextStatus, message)
 }
 
-function isCurrentChapterRequest(token?: number) {
-  return token == null || latestChapterRequest.isCurrent(token)
+function isCurrentChapterTask(token?: number) {
+  return token == null || latestChapterTask.isCurrent(token)
 }
 
 function isCurrentRuntimeSession(token?: number) {
   return token == null || latestRuntimeSession.isCurrent(token)
+}
+
+function throwIfChapterTaskStale(token?: number) {
+  if (token == null)
+    return
+
+  latestChapterTask.throwIfStale(token)
 }
 
 function throwIfRuntimeSessionStale(token?: number) {
@@ -289,6 +309,14 @@ function throwIfRuntimeSessionStale(token?: number) {
     return
 
   latestRuntimeSession.throwIfStale(token)
+}
+
+function startChapterTask() {
+  activeChapterTaskCount += 1
+}
+
+function finishChapterTask() {
+  activeChapterTaskCount = Math.max(0, activeChapterTaskCount - 1)
 }
 
 function appendLogForRuntime(message: string, token?: number) {
@@ -471,10 +499,12 @@ function writeToContainer(filePath: string) {
   return promise
 }
 
-async function flushPendingWrites() {
+async function flushPendingWrites(token?: number) {
+  throwIfChapterTaskStale(token)
   const queuedPaths = [...writeTimers.keys()]
 
   for (const filePath of queuedPaths) {
+    throwIfChapterTaskStale(token)
     const timeout = writeTimers.get(filePath)
     if (timeout) {
       window.clearTimeout(timeout)
@@ -484,10 +514,12 @@ async function flushPendingWrites() {
 
   if (queuedPaths.length) {
     await Promise.all(queuedPaths.map(filePath => writeToContainer(filePath)))
+    throwIfChapterTaskStale(token)
   }
 
   if (pendingWrites.size) {
     await Promise.all([...pendingWrites.values()])
+    throwIfChapterTaskStale(token)
   }
 }
 
@@ -699,20 +731,86 @@ async function persistDependencyCache(instance: WebContainer, dependencySignatur
   }
 }
 
-async function applySnapshotToContainer(snapshot: TutorialSnapshot) {
+async function listContainerWorkspaceEntries(
+  instance: WebContainer,
+  directoryPath = '.',
+  relativeDirectoryPath = '',
+  token?: number,
+): Promise<{ directories: string[], files: string[] }> {
+  throwIfChapterTaskStale(token)
+  const entries = await instance.fs.readdir(directoryPath, {
+    withFileTypes: true,
+  })
+  const directories: string[] = []
+  const files: string[] = []
+
+  for (const entry of entries as DirEnt<string>[]) {
+    throwIfChapterTaskStale(token)
+    const childPath = relativeDirectoryPath
+      ? `${relativeDirectoryPath}/${entry.name}`
+      : entry.name
+
+    if (tutorialPreservedRootPaths.includes(childPath)) {
+      continue
+    }
+
+    if (entry.isDirectory()) {
+      directories.push(childPath)
+      const nestedEntries = await listContainerWorkspaceEntries(instance, childPath, childPath, token)
+      directories.push(...nestedEntries.directories)
+      files.push(...nestedEntries.files)
+      continue
+    }
+
+    if (entry.isFile()) {
+      files.push(childPath)
+    }
+  }
+
+  return {
+    directories,
+    files,
+  }
+}
+
+async function applyProjectSnapshotToContainer(snapshot: TutorialSnapshot, token?: number) {
   if (!webContainer.value)
     return
 
+  throwIfChapterTaskStale(token)
   const instance = webContainer.value
-  const { writes, removals } = diffSnapshots(containerSnapshot.value, snapshot)
+  const workspaceListing = await listContainerWorkspaceEntries(instance, '.', '', token)
+  const {
+    writes,
+    fileRemovals,
+    directoryRemovals,
+  } = planTutorialExactSync(
+    containerSnapshot.value,
+    workspaceListing,
+    snapshot,
+    {
+      preservedRootPaths: tutorialPreservedRootPaths,
+    },
+  )
   const writePaths = Object.keys(writes)
 
-  console.log('[tutorial] apply snapshot diff', {
+  console.log('[tutorial] apply exact snapshot diff', {
     writes: writePaths,
-    removals,
+    fileRemovals,
+    directoryRemovals,
   })
 
-  for (const filePath of removals) {
+  for (const directoryPath of directoryRemovals) {
+    throwIfChapterTaskStale(token)
+    console.log('[tutorial] removing synced directory:', directoryPath)
+    await instance.fs.rm(directoryPath, {
+      force: true,
+      recursive: true,
+    })
+  }
+
+  for (const filePath of fileRemovals) {
+    throwIfChapterTaskStale(token)
     console.log('[tutorial] removing synced file:', filePath)
     await instance.fs.rm(filePath, {
       force: true,
@@ -721,6 +819,7 @@ async function applySnapshotToContainer(snapshot: TutorialSnapshot) {
   }
 
   for (const [filePath, contents] of Object.entries(writes)) {
+    throwIfChapterTaskStale(token)
     const directory = filePath.split('/').slice(0, -1).join('/')
 
     if (directory) {
@@ -733,10 +832,13 @@ async function applySnapshotToContainer(snapshot: TutorialSnapshot) {
     await instance.fs.writeFile(filePath, contents)
   }
 
-  containerSnapshot.value = snapshot
-  console.log('[tutorial] snapshot sync complete', {
+  containerSnapshot.value = {
+    ...snapshot,
+  }
+  console.log('[tutorial] exact snapshot sync complete', {
     syncedCount: writePaths.length,
-    removedCount: removals.length,
+    removedFileCount: fileRemovals.length,
+    removedDirectoryCount: directoryRemovals.length,
   })
 }
 
@@ -744,8 +846,10 @@ function reloadPreview() {
   if (!previewBaseUrl.value)
     return
 
+  cleanupRequests('The preview reloaded.')
   iframeLoaded.value = false
   previewState.value = {}
+  previewSessionId.value = crypto.randomUUID()
   previewRevision.value += 1
 }
 
@@ -757,22 +861,29 @@ async function waitForPreviewState(
   options: {
     timeout?: number
     predicate?: (state: TutorialPreviewState) => boolean
+    previewSessionId?: string
     runtimeToken?: number
+    chapterTaskToken?: number
   } = {},
 ) {
   const {
     timeout = 20000,
     predicate,
+    previewSessionId: targetPreviewSessionId = previewSessionId.value,
     runtimeToken,
+    chapterTaskToken,
   } = options
   const deadline = Date.now() + timeout
   let lastError: unknown = null
 
   while (Date.now() < deadline) {
     throwIfRuntimeSessionStale(runtimeToken)
+    throwIfChapterTaskStale(chapterTaskToken)
 
     try {
-      const state = await requestPreviewState()
+      const state = await requestPreviewState(targetPreviewSessionId ?? undefined, chapterTaskToken)
+      throwIfChapterTaskStale(chapterTaskToken)
+
       if (isCurrentRuntimeSession(runtimeToken)) {
         previewState.value = state
       }
@@ -782,6 +893,10 @@ async function waitForPreviewState(
       }
     }
     catch (error) {
+      if (isTutorialChapterTaskCancellationError(error)) {
+        throw error
+      }
+
       lastError = error
     }
 
@@ -791,12 +906,20 @@ async function waitForPreviewState(
   throw new Error(lastError instanceof Error ? lastError.message : 'The preview did not respond in time.')
 }
 
-function cleanupRequests() {
+function cleanupRequests(reason: Error | string = 'The preview request was cancelled.') {
+  const error = typeof reason === 'string'
+    ? new Error(reason)
+    : reason
+
   for (const { reject, timeout } of requestResolvers.values()) {
     window.clearTimeout(timeout)
-    reject(new Error('The preview request was cancelled.'))
+    reject(error)
   }
   requestResolvers.clear()
+}
+
+function cancelChapterTaskRequests() {
+  cleanupRequests(new TutorialChapterTaskCancellationError())
 }
 
 function clearScheduledWrites() {
@@ -819,6 +942,7 @@ async function stopTutorialRuntime() {
   webContainer.value = null
   containerSnapshot.value = {}
   previewBaseUrl.value = null
+  previewSessionId.value = null
   languageServerTransport.value = null
   previewState.value = {}
   syncedChapterId.value = null
@@ -834,13 +958,20 @@ async function stopTutorialRuntime() {
   }
 }
 
-async function requestPreviewState(): Promise<TutorialPreviewState> {
-  const response = await sendPreviewRequest('get-state')
+async function requestPreviewState(
+  sessionId = previewSessionId.value ?? undefined,
+  token?: number,
+): Promise<TutorialPreviewState> {
+  throwIfChapterTaskStale(token)
+  const response = await sendPreviewRequest('get-state', {}, sessionId)
+  throwIfChapterTaskStale(token)
   return response.state as TutorialPreviewState
 }
 
-async function runPreviewAction(action: string): Promise<TutorialPreviewState> {
+async function runPreviewAction(action: string, token?: number): Promise<TutorialPreviewState> {
+  throwIfChapterTaskStale(token)
   const response = await sendPreviewRequest('run-action', { action })
+  throwIfChapterTaskStale(token)
 
   if (!response.ok) {
     throw new Error(response.error ?? `The preview action "${action}" failed.`)
@@ -849,9 +980,13 @@ async function runPreviewAction(action: string): Promise<TutorialPreviewState> {
   return response.state as TutorialPreviewState
 }
 
-function sendPreviewRequest(type: 'get-state' | 'run-action', payload: Record<string, unknown> = {}) {
+function sendPreviewRequest(type: 'get-state' | 'run-action', payload: Record<string, unknown> = {}, sessionId = previewSessionId.value ?? undefined) {
   if (!previewFrame.value?.contentWindow) {
     return Promise.reject(new Error('The preview iframe is not ready yet.'))
+  }
+
+  if (!sessionId) {
+    return Promise.reject(new Error('The preview session is not ready yet.'))
   }
 
   const requestId = crypto.randomUUID()
@@ -865,11 +1000,13 @@ function sendPreviewRequest(type: 'get-state' | 'run-action', payload: Record<st
     requestResolvers.set(requestId, {
       resolve,
       reject,
+      sessionId,
       timeout,
     })
 
     previewFrame.value?.contentWindow?.postMessage({
       source: 'rstore-docs-tutorial',
+      sessionId,
       type,
       requestId,
       ...payload,
@@ -898,6 +1035,9 @@ function handlePreviewMessage(event: MessageEvent) {
   if (!previewOrigin || event.origin !== previewOrigin)
     return
 
+  if (!isTutorialPreviewSessionCurrent(previewSessionId.value, message.sessionId))
+    return
+
   if (message.type === 'state-updated' && message.state) {
     const state = message.state as TutorialPreviewState
     previewState.value = state
@@ -918,6 +1058,11 @@ function handlePreviewMessage(event: MessageEvent) {
 
   if (message.requestId && requestResolvers.has(message.requestId)) {
     const entry = requestResolvers.get(message.requestId)!
+
+    if (entry.sessionId !== message.sessionId) {
+      return
+    }
+
     requestResolvers.delete(message.requestId)
     window.clearTimeout(entry.timeout)
 
@@ -978,18 +1123,21 @@ async function startTutorial() {
       appendLogForRuntime(`[preview] ${JSON.stringify(message)}`, runtimeToken)
     })
 
-    webContainer.value = instance
+    const runtimeInstance = instance
+    webContainer.value = runtimeInstance
     const initialChapter = currentChapter.value
-    const initialSnapshot = getChapterSnapshot(initialChapter)
+    const baseSnapshot = {
+      ...initialChapter.runtimeAssets.frameworkBaseFiles,
+    }
     console.log('[tutorial] mounting initial snapshot', {
       chapterId: initialChapter.id,
-      fileCount: Object.keys(initialSnapshot).length,
+      fileCount: Object.keys(baseSnapshot).length,
     })
-    await instance.mount(buildFileTree(initialSnapshot))
+    await runtimeInstance.mount(buildFileTree(baseSnapshot))
     throwIfRuntimeSessionStale(runtimeToken)
-    containerSnapshot.value = initialSnapshot
+    containerSnapshot.value = baseSnapshot
 
-    const dependencySignature = getTutorialDependencyCacheSignature(initialSnapshot)
+    const dependencySignature = getTutorialDependencyCacheSignature(baseSnapshot)
     let restoredDependenciesFromCache = false
     let shouldPersistDependencies = false
 
@@ -997,7 +1145,7 @@ async function startTutorial() {
       setStatusForRuntime('installing', 'Restoring cached sandbox dependencies…', runtimeToken)
       appendLogForRuntime('$ restoring cached node_modules', runtimeToken)
 
-      const restoreResult = await restoreTutorialDependencyCache(instance, dependencySignature)
+      const restoreResult = await restoreTutorialDependencyCache(runtimeInstance, dependencySignature)
       throwIfRuntimeSessionStale(runtimeToken)
 
       if (restoreResult === 'hit') {
@@ -1013,7 +1161,7 @@ async function startTutorial() {
     }
 
     if (!restoredDependenciesFromCache) {
-      await installContainerDependencies(instance, initialSnapshot, runtimeToken)
+      await installContainerDependencies(runtimeInstance, baseSnapshot, runtimeToken)
       throwIfRuntimeSessionStale(runtimeToken)
       shouldPersistDependencies = Boolean(dependencySignature)
     }
@@ -1023,9 +1171,9 @@ async function startTutorial() {
     let previewUrl: string
 
     const startServers = async () => {
-      lspProcess = await startLanguageServer(instance, runtimeToken)
+      lspProcess = await startLanguageServer(runtimeInstance, runtimeToken)
       throwIfRuntimeSessionStale(runtimeToken)
-      devProcess = await startPreviewDevServer(instance, runtimeToken)
+      devProcess = await startPreviewDevServer(runtimeInstance, runtimeToken)
       throwIfRuntimeSessionStale(runtimeToken)
       return waitForServerPort(
         serverTracker.waitFor(runtimeProfile.port),
@@ -1035,7 +1183,7 @@ async function startTutorial() {
     }
 
     try {
-      await waitForLanguageServerDependencies(instance, 10000, runtimeToken)
+      await waitForLanguageServerDependencies(runtimeInstance, 10000, runtimeToken)
       previewUrl = await startServers()
       throwIfRuntimeSessionStale(runtimeToken)
     }
@@ -1048,7 +1196,7 @@ async function startTutorial() {
       }
 
       appendLogForRuntime('$ cached dependencies failed to boot; reinstalling packages', runtimeToken)
-      await clearTutorialDependencyCache().catch(() => null)
+      await clearTutorialDependencyCache(dependencySignature ?? undefined).catch(() => null)
       throwIfRuntimeSessionStale(runtimeToken)
 
       languageServerTransport.value = null
@@ -1056,25 +1204,19 @@ async function startTutorial() {
       await stopProcess(devProcess)
       throwIfRuntimeSessionStale(runtimeToken)
 
-      await removeContainerDependencies(instance)
+      await removeContainerDependencies(runtimeInstance)
       throwIfRuntimeSessionStale(runtimeToken)
-      await installContainerDependencies(instance, initialSnapshot, runtimeToken)
+      await installContainerDependencies(runtimeInstance, baseSnapshot, runtimeToken)
       throwIfRuntimeSessionStale(runtimeToken)
       shouldPersistDependencies = Boolean(dependencySignature)
 
       serverTracker = createTutorialServerTracker()
-      await waitForLanguageServerDependencies(instance, 10000, runtimeToken)
+      await waitForLanguageServerDependencies(runtimeInstance, 10000, runtimeToken)
       previewUrl = await startServers()
       throwIfRuntimeSessionStale(runtimeToken)
     }
 
     previewBaseUrl.value = previewUrl
-    reloadPreview()
-    await waitForPreviewState({
-      predicate: isPreviewBooted,
-      runtimeToken,
-    })
-    throwIfRuntimeSessionStale(runtimeToken)
 
     if (lspProcess) {
       languageServerTransport.value = createTutorialLspProcessTransport(lspProcess)
@@ -1082,16 +1224,26 @@ async function startTutorial() {
 
     if (shouldPersistDependencies && dependencySignature) {
       window.setTimeout(() => {
-        void persistDependencyCache(instance, dependencySignature, runtimeToken)
+        void persistDependencyCache(runtimeInstance, dependencySignature, runtimeToken)
       }, 0)
     }
 
-    if (currentChapter.value.id === initialChapter.id) {
-      syncedChapterId.value = initialChapter.id
-      setStatusForRuntime('ready', 'The tutorial is ready. Edit the files, run the preview, and check your work.', runtimeToken)
+    if (pendingChapterSyncRequest && isCurrentChapterTask(pendingChapterSyncRequest.token)) {
+      pendingChapterSyncRequest = null
+    }
+
+    const chapterToSync = currentChapter.value
+    await syncChapterToContainer(chapterToSync, {
+      reload: true,
+      token: latestSelectedChapterToken.value,
+    })
+    throwIfRuntimeSessionStale(runtimeToken)
+
+    if (currentChapter.value.id === chapterToSync.id) {
       await checkChapter({
         reload: false,
-        chapter: initialChapter,
+        chapter: chapterToSync,
+        token: latestSelectedChapterToken.value,
       })
     }
     else {
@@ -1106,13 +1258,21 @@ async function startTutorial() {
         await stopTutorialRuntime()
       }
       else if (instance) {
-        await instance.teardown().catch(() => null)
+        try {
+          instance.teardown()
+        }
+        catch {
+        }
       }
       return
     }
 
     if (instance && !isCurrentRuntimeSession(runtimeToken)) {
-      await instance.teardown().catch(() => null)
+      try {
+        instance.teardown()
+      }
+      catch {
+      }
       return
     }
 
@@ -1128,44 +1288,63 @@ async function syncChapterToContainer(
   if (!webContainer.value)
     return
 
+  const chapterTaskToken = options.token ?? latestSelectedChapterToken.value
+  startChapterTask()
+
   try {
-    const targetSnapshot = getChapterSnapshot(chapter, getFrameworkChapterDrafts(chapter.framework)[chapter.id] ?? {})
+    throwIfChapterTaskStale(chapterTaskToken)
+    const targetProjectSnapshot = getChapterSnapshot(chapter, getFrameworkChapterDrafts(chapter.framework)[chapter.id] ?? {})
     console.log('[tutorial] sync current chapter start', {
       chapterId: chapter.id,
       reload: Boolean(options.reload),
-      targetFileCount: Object.keys(targetSnapshot).length,
+      targetFileCount: Object.keys(targetProjectSnapshot).length,
     })
-    setStatusForChapter(chapter, 'syncing', `Syncing files for “${chapter.title}”…`, options.token)
-    await flushPendingWrites()
-    await applySnapshotToContainer(targetSnapshot)
+    setStatusForChapter(chapter, 'syncing', `Syncing files for “${chapter.title}”…`, chapterTaskToken)
+    await flushPendingWrites(chapterTaskToken)
+    await applyProjectSnapshotToContainer(targetProjectSnapshot, chapterTaskToken)
 
     if (options.reload) {
+      throwIfChapterTaskStale(chapterTaskToken)
       console.log('[tutorial] reloading preview after chapter sync', {
         chapterId: chapter.id,
       })
+      setStatusForChapter(chapter, 'syncing', `Reloading “${chapter.title}”…`, chapterTaskToken)
       reloadPreview()
+      const currentPreviewSessionId = previewSessionId.value
       await waitForPreviewState({
         predicate: isPreviewBooted,
+        previewSessionId: currentPreviewSessionId ?? undefined,
+        chapterTaskToken,
       })
     }
 
-    if (isCurrentChapterRequest(options.token) && currentChapter.value.id === chapter.id) {
+    throwIfChapterTaskStale(chapterTaskToken)
+
+    if (isCurrentChapterTask(chapterTaskToken) && currentChapter.value.id === chapter.id) {
       syncedChapterId.value = chapter.id
     }
 
     console.log('[tutorial] sync current chapter done', {
       chapterId: chapter.id,
     })
-    setStatusForChapter(chapter, 'ready', 'The preview is ready. Edit the files, run the preview, and check your work.', options.token)
+    setStatusForChapter(chapter, 'ready', 'The preview is ready. Edit the files, run the preview, and check your work.', chapterTaskToken)
   }
   catch (error) {
-    setStatusForChapter(chapter, 'error', error instanceof Error ? error.message : String(error), options.token)
+    if (isTutorialChapterTaskCancellationError(error)) {
+      return
+    }
+
+    setStatusForChapter(chapter, 'error', error instanceof Error ? error.message : String(error), chapterTaskToken)
+  }
+  finally {
+    finishChapterTask()
   }
 }
 
 async function checkChapter(options: { reload?: boolean, chapter?: TutorialChapter, token?: number } = {}) {
   const { reload = true } = options
   const chapter = options.chapter ?? currentChapter.value
+  const chapterTaskToken = options.token ?? latestSelectedChapterToken.value
   ensureCurrentChapterState(chapter)
 
   if (!webContainer.value) {
@@ -1176,25 +1355,38 @@ async function checkChapter(options: { reload?: boolean, chapter?: TutorialChapt
     return
   }
 
+  startChapterTask()
+
   try {
-    setStatusForChapter(chapter, 'checking', `Checking “${chapter.title}”…`, options.token)
-    await flushPendingWrites()
+    throwIfChapterTaskStale(chapterTaskToken)
+    setStatusForChapter(chapter, 'checking', `Checking “${chapter.title}”…`, chapterTaskToken)
+    await flushPendingWrites(chapterTaskToken)
 
     if (reload) {
       await syncChapterToContainer(chapter, {
         reload: true,
-        token: options.token,
+        token: chapterTaskToken,
       })
+      throwIfChapterTaskStale(chapterTaskToken)
     }
 
-    await waitForPreviewState({
-      predicate: isPreviewBooted,
-    })
+    let state: TutorialPreviewState
 
-    let state = await requestPreviewState()
+    if (!reload && !chapter.validationAction && chapter.editableFiles.length === 0 && isPreviewBooted(previewState.value)) {
+      state = previewState.value
+    }
+    else {
+      await waitForPreviewState({
+        predicate: isPreviewBooted,
+        previewSessionId: previewSessionId.value ?? undefined,
+        chapterTaskToken,
+      })
+
+      state = await requestPreviewState(previewSessionId.value ?? undefined, chapterTaskToken)
+    }
 
     if (chapter.validationAction) {
-      state = await runPreviewAction(chapter.validationAction)
+      state = await runPreviewAction(chapter.validationAction, chapterTaskToken)
     }
 
     let result = validateStep(chapter, state)
@@ -1203,12 +1395,14 @@ async function checkChapter(options: { reload?: boolean, chapter?: TutorialChapt
       const retryDeadline = Date.now() + 2500
 
       while (Date.now() < retryDeadline && !result.ok) {
+        throwIfChapterTaskStale(chapterTaskToken)
         await new Promise(resolve => window.setTimeout(resolve, 200))
-        state = await requestPreviewState()
+        state = await requestPreviewState(previewSessionId.value ?? undefined, chapterTaskToken)
         result = validateStep(chapter, state)
       }
     }
 
+    throwIfChapterTaskStale(chapterTaskToken)
     setFrameworkValidation(chapter.framework, chapter.id, result)
 
     console.log('Validation result:', result)
@@ -1218,17 +1412,21 @@ async function checkChapter(options: { reload?: boolean, chapter?: TutorialChapt
         chapter.framework,
         [...new Set([...getFrameworkCompletedChapterIds(chapter.framework), chapter.id])],
       )
-      setStatusForChapter(chapter, 'ready', `“${chapter.title}” passed.`, options.token)
+      setStatusForChapter(chapter, 'ready', `“${chapter.title}” passed.`, chapterTaskToken)
     }
     else {
       setFrameworkCompletedChapterIds(
         chapter.framework,
         getFrameworkCompletedChapterIds(chapter.framework).filter(id => id !== chapter.id),
       )
-      setStatusForChapter(chapter, 'ready', `Chapter “${chapter.title}” still needs work.`, options.token)
+      setStatusForChapter(chapter, 'ready', `Chapter “${chapter.title}” still needs work.`, chapterTaskToken)
     }
   }
   catch (error) {
+    if (isTutorialChapterTaskCancellationError(error)) {
+      return
+    }
+
     const result: TutorialValidationResult = {
       ok: false,
       summary: 'The preview could not be validated.',
@@ -1238,15 +1436,22 @@ async function checkChapter(options: { reload?: boolean, chapter?: TutorialChapt
 
     setFrameworkValidation(chapter.framework, chapter.id, result)
 
-    setStatusForChapter(chapter, 'error', result.details[0]!, options.token)
+    setStatusForChapter(chapter, 'error', result.details[0]!, chapterTaskToken)
+  }
+  finally {
+    finishChapterTask()
   }
 }
 
 function queueCurrentChapterSync(token: number) {
-  if (!webContainer.value || ['booting', 'installing', 'starting'].includes(status.value) || !isCurrentChapterRequest(token))
+  if (!webContainer.value || !isCurrentChapterTask(token))
     return
 
   pendingChapterSyncRequest = { token }
+
+  if (['booting', 'installing', 'starting'].includes(status.value)) {
+    return
+  }
 
   if (!chapterSyncPromise) {
     chapterSyncPromise = processQueuedChapterSyncs()
@@ -1258,26 +1463,37 @@ async function processQueuedChapterSyncs() {
     const request = pendingChapterSyncRequest
     pendingChapterSyncRequest = null
 
-    if (!request || !isCurrentChapterRequest(request.token)) {
+    if (!request || !isCurrentChapterTask(request.token)) {
       continue
     }
 
-    while (['syncing', 'checking'].includes(status.value)) {
+    while (true) {
+      const waitingForRuntime = ['booting', 'installing', 'starting'].includes(status.value)
+      const waitingForChapterTask = activeChapterTaskCount > 0
+
+      if (!waitingForRuntime && !waitingForChapterTask) {
+        break
+      }
+
+      if (!isCurrentChapterTask(request.token)) {
+        break
+      }
+
       await new Promise(resolve => window.setTimeout(resolve, 100))
     }
 
-    if (!isCurrentChapterRequest(request.token)) {
+    if (!isCurrentChapterTask(request.token)) {
       continue
     }
 
     const chapter = currentChapter.value
 
     await syncChapterToContainer(chapter, {
-      reload: true,
+      reload: false,
       token: request.token,
     })
 
-    if (!isCurrentChapterRequest(request.token) || currentChapter.value.id !== chapter.id) {
+    if (!isCurrentChapterTask(request.token) || currentChapter.value.id !== chapter.id) {
       continue
     }
 
@@ -1310,7 +1526,7 @@ async function applyCorrections() {
 
   if (webContainer.value) {
     await syncChapterToContainer(chapter, {
-      reload: true,
+      reload: false,
     })
     await checkChapter({
       reload: false,
@@ -1339,7 +1555,8 @@ function selectChapter(index: number) {
   if (index < 0 || index >= tutorialChapters.value.length || index === activeChapterIndex.value)
     return
 
-  latestSelectedChapterToken.value = latestChapterRequest.issue()
+  latestSelectedChapterToken.value = latestChapterTask.issue()
+  cancelChapterTaskRequests()
   syncedChapterId.value = null
   activeChapterIndex.value = index
   queueCurrentChapterSync(latestSelectedChapterToken.value)
@@ -1351,7 +1568,8 @@ async function selectFramework(framework: TutorialFramework) {
 
   latestRuntimeSession.invalidate()
   selectedFramework.value = framework
-  latestSelectedChapterToken.value = latestChapterRequest.issue()
+  latestSelectedChapterToken.value = latestChapterTask.issue()
+  cancelChapterTaskRequests()
   syncedChapterId.value = null
   correctionOpen.value = false
   correctionFile.value = null

@@ -15,6 +15,56 @@ body {
   min-height: 100vh;
 }
 
+#tutorial-runtime-banner {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.95rem 1.25rem;
+  border-bottom: 1px solid rgba(21, 36, 35, 0.08);
+  background: rgba(255, 255, 255, 0.86);
+  backdrop-filter: blur(12px);
+  box-shadow: 0 10px 28px rgba(15, 123, 94, 0.08);
+}
+
+.tutorial-runtime-dot {
+  width: 0.8rem;
+  height: 0.8rem;
+  flex: none;
+  border-radius: 999px;
+  background: #f59e0b;
+  box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.45);
+  animation: tutorial-runtime-pulse 1.8s ease-out infinite;
+}
+
+.tutorial-runtime-copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.tutorial-runtime-copy strong {
+  font-size: 0.92rem;
+  letter-spacing: 0.02em;
+}
+
+.tutorial-runtime-copy span {
+  color: rgba(21, 36, 35, 0.72);
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+#tutorial-runtime-banner[data-state="ready"] .tutorial-runtime-dot {
+  background: #10b981;
+  box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.45);
+}
+
+#tutorial-runtime-banner[data-state="error"] .tutorial-runtime-dot {
+  background: #f43f5e;
+  box-shadow: 0 0 0 0 rgba(244, 63, 94, 0.45);
+}
+
 button,
 input,
 select {
@@ -173,6 +223,11 @@ code {
 }
 
 @media (max-width: 700px) {
+  #tutorial-runtime-banner {
+    align-items: flex-start;
+    padding: 0.85rem 0.9rem;
+  }
+
   #app {
     padding: 0.75rem;
   }
@@ -184,5 +239,19 @@ code {
   .form-row {
     flex-direction: column;
     align-items: stretch;
+  }
+}
+
+@keyframes tutorial-runtime-pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(15, 123, 94, 0.35);
+  }
+
+  70% {
+    box-shadow: 0 0 0 12px rgba(15, 123, 94, 0);
+  }
+
+  100% {
+    box-shadow: 0 0 0 0 rgba(15, 123, 94, 0);
   }
 }

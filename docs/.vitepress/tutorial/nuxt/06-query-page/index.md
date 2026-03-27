@@ -2,9 +2,7 @@
 title: Query in a Page
 ---
 
-Your module and collections are doing their job now, so the page can stop faking data and start trusting the store. This chapter is about reading the todo list the Nuxt way: directly inside the page’s setup.
-
-## Replace the placeholder state
+The module and collections are doing their job now, so the page can stop faking data and start trusting the store. This is the simplest useful example of querying where the data is actually needed, expressed in Nuxt page setup.
 
 Open `app/pages/index.vue` and grab the injected store.
 
@@ -25,6 +23,4 @@ Once you have that query result, the rest of the page should hang off it: the li
 </span>
 ```
 
-## What Nuxt adds here
-
-Notice what you did not have to write. There is no manual store bootstrap in this file. The Nuxt module already made `useStore()` available, so the page can stay focused on reading data instead of wiring infrastructure.
+The interesting part is what this file does not need. There is no hand-written store bootstrap and no local mirror of the todo list. The page describes how it wants to read data, and the Nuxt module plus the normalized cache take care of the infrastructure underneath.

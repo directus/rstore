@@ -2,9 +2,7 @@
 title: Move Transport into app/rstore/plugins
 ---
 
-Your collections work, but the transport code is starting to repeat itself. This chapter is about letting the collection describe the model while a plugin describes how that model talks to the backend.
-
-## Split the responsibilities
+The collection files work, but they are starting to carry transport policy that really belongs somewhere more reusable.
 
 In `app/rstore/todos.ts`, keep the collection focused on identity, metadata, and form schema. The transport should move behind `meta.path`.
 
@@ -23,13 +21,12 @@ Then open `app/rstore/plugins/memory.ts` and use that path to answer fetches and
 ```ts
 hook('fetchMany', async ({ collection, setResult }) => {
   const path = getPath(collection)
-  if (!path) return
+  if (!path)
+    return
   setResult(await $fetch(`/api/${path}`))
 })
 ```
 
 Once the plugin handles create, update, and delete as well, the collection file becomes much easier to scan.
 
-## Why this pattern scales
-
-Schema files should tell you what the data is. Plugins should tell you how the app behaves around that data. When you keep those jobs separate, you can share transport policy across many collections without turning the schema into a tangle of repeated hooks.
+That separation is what makes plugins scale. Collections say what the data is. Plugins say how the app behaves around that data. The same surface can also handle collection defaults, scope-based federation, local-first fallbacks, or more advanced remote adapters.

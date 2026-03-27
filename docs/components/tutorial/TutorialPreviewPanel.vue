@@ -34,10 +34,31 @@ const activeRuntimeTab = ref<'logs' | 'terminal'>('logs')
 
 <template>
   <article class="overflow-hidden rounded-2xl border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950 flex flex-col">
-    <div class="flex flex-col gap-3 border-b border-zinc-200 p-4 sm:flex-row sm:items-start sm:justify-between dark:border-zinc-800">
-      <h2 class="mt-1 text-base font-semibold text-zinc-950 dark:text-zinc-100">
-        {{ listCount }} todos loaded
-      </h2>
+    <div class="flex flex-col gap-3 border-b border-zinc-200 px-4 h-14 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800">
+      <div class="flex flex-wrap items-center gap-2">
+        <span
+          class="inline-flex items-center gap-2 rounded-full px-3 text-xs font-semibold uppercase tracking-[0.16em]"
+          :class="status === 'error'
+            ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
+            : previewSrc
+              ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+              : 'bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300'"
+        >
+          <span
+            class="size-2 rounded-full"
+            :class="status === 'error'
+              ? 'bg-rose-500'
+              : previewSrc
+                ? 'bg-emerald-500'
+                : 'bg-amber-500'"
+          />
+          {{ status === 'error' ? 'Sandbox error' : previewSrc ? 'Sandbox live' : 'Sandbox booting' }}
+        </span>
+
+        <span class="rounded-full bg-zinc-100 px-3 text-xs font-medium text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+          {{ listCount }} todo{{ listCount === 1 ? '' : 's' }} detected
+        </span>
+      </div>
 
       <div class="flex min-w-0 items-center gap-2 self-start sm:self-auto">
         <TutorialStepStatus
@@ -82,9 +103,14 @@ const activeRuntimeTab = ref<'logs' | 'terminal'>('logs')
       v-if="!previewSrc"
       class="grid flex-1 h-full place-items-center p-6 text-center"
     >
-      <div class="grid gap-2">
+      <div class="grid max-w-md gap-3">
+        <div class="mx-auto inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+          <span class="size-2 rounded-full bg-amber-500" />
+          Booting preview
+        </div>
+
         <p class="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-          Preview output will appear here when the sandbox is ready.
+          Preview output will appear here when the sandbox is ready. The tutorial runtime is already starting in the background, even if this chapter does not have much UI yet.
         </p>
         <p
           v-if="lastError"

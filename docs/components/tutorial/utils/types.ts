@@ -78,6 +78,7 @@ export interface TutorialChapterDefinition {
   framework: TutorialFramework
   slug: string
   folder?: string
+  playgroundSourceChapterId?: string
   title: string
   feature: string
   group: TutorialGroup
@@ -87,8 +88,15 @@ export interface TutorialChapterDefinition {
   validator: TutorialValidator
 }
 
+export interface TutorialRuntimeAssets {
+  frameworkBaseFiles: TutorialSnapshot
+  starterOverlayFiles: TutorialSnapshot
+  solutionOverlayFiles: TutorialSnapshot
+}
+
 export interface TutorialChapter extends TutorialChapterDefinition {
   folder: string
+  runtimeAssets: TutorialRuntimeAssets
   starterFiles: TutorialSnapshot
   solutionFiles: TutorialSnapshot
   guideComponent: Component
