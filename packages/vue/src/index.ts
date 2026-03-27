@@ -23,6 +23,7 @@ export {
 } from './module'
 
 export {
+  injectionKey,
   install as RstorePlugin,
   useStore,
 } from './plugin'
