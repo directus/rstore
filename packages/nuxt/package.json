@@ -47,7 +47,7 @@
     "@rstore/devtools": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
-    "serialize-javascript": "^6.0.2",
+    "serialize-javascript": "^7.0.5",
     "sirv": "^3.0.1"
   },
   "devDependencies": {
