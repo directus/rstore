@@ -58,48 +58,47 @@ export const memoryPlugin = definePlugin({
       memoryBackend.delete(path, String(key))
     })
 
-    
-  const subscriptions = new Map<string, () => void>()
+    const subscriptions = new Map<string, () => void>()
 
-  hook('subscribe', ({ collection, subscriptionId, store }) => {
-    const path = getPath(collection)
+    hook('subscribe', ({ collection, subscriptionId, store }) => {
+      const path = getPath(collection)
 
-    if (path !== 'todos') {
-      return
-    }
+      if (path !== 'todos') {
+        return
+      }
 
-    const stop = memoryBackend.subscribe(path, (event) => {
-      if (event.type === 'delete' && event.key) {
-        store.$cache.deleteItem({
+      const stop = memoryBackend.subscribe(path, (event) => {
+        if (event.type === 'delete' && event.key) {
+          store.$cache.deleteItem({
+            collection,
+            key: event.key,
+          })
+          return
+        }
+
+        if (!event.item) {
+          return
+        }
+
+        const key = collection.getKey(event.item)
+
+        if (key == null) {
+          return
+        }
+
+        store.$cache.writeItem({
           collection,
-          key: event.key,
+          key,
+          item: event.item,
         })
-        return
-      }
-
-      if (!event.item) {
-        return
-      }
-
-      const key = collection.getKey(event.item)
-
-      if (key == null) {
-        return
-      }
-
-      store.$cache.writeItem({
-        collection,
-        key,
-        item: event.item,
       })
+
+      subscriptions.set(subscriptionId, stop)
     })
 
-    subscriptions.set(subscriptionId, stop)
-  })
-
-  hook('unsubscribe', ({ subscriptionId }) => {
-    subscriptions.get(subscriptionId)?.()
-    subscriptions.delete(subscriptionId)
-  })
+    hook('unsubscribe', ({ subscriptionId }) => {
+      subscriptions.get(subscriptionId)?.()
+      subscriptions.delete(subscriptionId)
+    })
   },
 })

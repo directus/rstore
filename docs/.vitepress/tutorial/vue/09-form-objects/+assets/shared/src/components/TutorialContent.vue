@@ -7,17 +7,29 @@ const { data: todos } = await store.Todo.query(q => q.many())
 </script>
 
 <template>
-  <main class="tutorial-app">
+  <main class="tutorial-app app-shell">
     <header class="hero">
-      <h1>Chapter : Form Objects</h1>
-      <p>Use <code>createForm()</code> and <code>updateForm()</code> to manage form state without leaving rstore.</p>
+      <div class="panel-header">
+        <div class="hero-head">
+          <p class="eyebrow">Form objects</p>
+          <h1>Draft and edit tasks</h1>
+          <p>Use <code>createForm()</code> and <code>updateForm()</code> to manage editing state without leaving the store workflow.</p>
+        </div>
+
+        <span class="meta-pill">{{ todos.length }} tasks in view</span>
+      </div>
     </header>
 
     <section class="split">
       <TodoForm class="surface" :edit-id="todos[0]?.id ?? null" />
 
       <section class="surface">
-        <h2>Current todos</h2>
+        <div class="panel-header">
+          <div class="stack">
+            <p class="section-label">Preview list</p>
+            <h2>Current tasks</h2>
+          </div>
+        </div>
 
         <ul class="summary-list">
           <li
@@ -25,8 +37,12 @@ const { data: todos } = await store.Todo.query(q => q.many())
             :key="todo.id"
             class="summary-item"
           >
-            <strong>{{ todo.text }}</strong>
-            <span class="hint">{{ todo.completed ? 'Complete' : 'Open' }}</span>
+            <span class="todo-mark" :data-complete="todo.completed ? 'true' : 'false'" />
+
+            <div class="todo-copy">
+              <strong>{{ todo.text }}</strong>
+              <span class="hint">{{ todo.completed ? 'Complete' : 'Open' }}</span>
+            </div>
           </li>
         </ul>
       </section>

@@ -74,6 +74,15 @@ async function clickButton(button: HTMLButtonElement | null) {
   return true
 }
 
+async function clickElement(element: HTMLElement | null) {
+  if (!element)
+    return false
+
+  element.click()
+  await nextUiTick()
+  return true
+}
+
 export function registerTutorialSmokeActions() {
   registerTutorialAction('query-smoke', async () => {
     await nextUiTick()
@@ -109,7 +118,7 @@ export function registerTutorialSmokeActions() {
     let deleted = false
 
     const input = document.querySelector<HTMLInputElement>('.form-row input')
-    const addButton = findButton('Add todo')
+    const addButton = findButton('Add task') ?? findButton('Add todo')
 
     if (input && addButton) {
       setInputValue(input, probeText)
@@ -121,12 +130,13 @@ export function registerTutorialSmokeActions() {
     const todoItem = createdTodo ? getTodoItem(probeText) : null
 
     if (createdTodo && todoItem) {
+      const toggleCheckbox = todoItem.querySelector<HTMLInputElement>('.todo-checkbox')
       const toggleButton = findButton(createdTodo.completed ? 'Mark open' : 'Complete', todoItem)
         ?? findButton('Complete', todoItem)
         ?? findButton('Mark open', todoItem)
       const deleteButton = findButton('Delete', todoItem)
 
-      if (await clickButton(toggleButton)) {
+      if (await clickElement(toggleCheckbox) || await clickButton(toggleButton)) {
         toggled = await waitFor(() => Boolean(memoryBackend.get('todos', createdTodo.id)?.completed))
       }
 
@@ -149,7 +159,7 @@ export function registerTutorialSmokeActions() {
   registerTutorialAction('mutation-create-smoke', async () => {
     const probeText = 'Verify the create chapter'
     const input = document.querySelector<HTMLInputElement>('.form-row input')
-    const addButton = findButton('Add todo')
+    const addButton = findButton('Add task') ?? findButton('Add todo')
     let created = false
 
     if (input && addButton) {
@@ -176,13 +186,19 @@ export function registerTutorialSmokeActions() {
     const todoItem = document.querySelector<HTMLLIElement>('.todo-list li')
 
     if (todoItem) {
+      const todoText = getTodoTexts()[0] ?? ''
+      const todoRecord = memoryBackend.list('todos').find(todo => todo.text === todoText)
+      const beforeCompleted = Boolean(todoRecord?.completed)
+      const toggleCheckbox = todoItem.querySelector<HTMLInputElement>('.todo-checkbox')
       const toggleButton = findButton('Complete', todoItem) ?? findButton('Mark open', todoItem)
       const beforeToggleLabel = getElementText(toggleButton)
-      toggled = await clickButton(toggleButton)
-        ? await waitFor(() => {
-            const nextButton = findButton('Complete', todoItem) ?? findButton('Mark open', todoItem)
-            return Boolean(nextButton) && getElementText(nextButton) !== beforeToggleLabel
-          })
+      toggled = (await clickElement(toggleCheckbox) || await clickButton(toggleButton))
+        ? await waitFor(() => todoRecord
+            ? Boolean(memoryBackend.get('todos', todoRecord.id)?.completed) !== beforeCompleted
+            : (() => {
+                const nextButton = findButton('Complete', todoItem) ?? findButton('Mark open', todoItem)
+                return Boolean(nextButton) && getElementText(nextButton) !== beforeToggleLabel
+              })())
         : false
 
       const deleteButton = findButton('Delete', todoItem)
@@ -260,7 +276,7 @@ export function registerTutorialSmokeActions() {
 
   registerTutorialAction('live-smoke', async () => {
     const before = getTodoCount()
-    const simulateButton = findButton('Simulate remote todo')
+    const simulateButton = findButton('Simulate remote task') ?? findButton('Simulate remote todo')
 
     await clickButton(simulateButton)
     await sleep(120)
@@ -278,25 +294,25 @@ export function registerTutorialSmokeActions() {
   })
 
   registerTutorialAction('cache-smoke', async () => {
-    const injectButton = findButton('Inject cached todo')
+    const injectButton = findButton('Inject task') ?? findButton('Inject cached todo')
     const clearButton = findButton('Clear cache')
-    const initialCount = getTodoCount('.summary-list li')
+    const initialCount = getTodoCount('.summary-list li, .todo-list li')
 
     const clickedInject = await clickButton(injectButton)
     const injected = clickedInject
-      ? await waitFor(() => getTodoCount('.summary-list li') > initialCount)
+      ? await waitFor(() => getTodoCount('.summary-list li, .todo-list li') > initialCount)
       : false
 
     const clickedClear = await clickButton(clearButton)
     const cleared = clickedClear
-      ? await waitFor(() => getTodoCount('.summary-list li') === 0)
+      ? await waitFor(() => getTodoCount('.summary-list li, .todo-list li') === 0)
       : false
 
     setTutorialState({
-      listCount: getTodoCount('.summary-list li'),
-      todoTexts: getTodoTexts('.summary-list li'),
+      listCount: getTodoCount('.summary-list li, .todo-list li'),
+      todoTexts: getTodoTexts('.summary-list li, .todo-list li'),
       cache: {
-        count: getTodoCount('.summary-list li'),
+        count: getTodoCount('.summary-list li, .todo-list li'),
         injected,
         cleared,
       },

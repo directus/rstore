@@ -1,6 +1,6 @@
 import { registerTutorialSmokeActions } from './actions'
-import { getTutorialState, initTutorialBridge, resetTutorialState, setTutorialState } from './bridge'
 import { memoryBackend } from './backend'
+import { getTutorialState, initTutorialBridge, resetTutorialState, setTutorialState } from './bridge'
 
 let stopPreviewStateSync: null | (() => void) = null
 

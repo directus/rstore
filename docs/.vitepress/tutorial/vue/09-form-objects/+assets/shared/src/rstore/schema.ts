@@ -1,8 +1,8 @@
-import { z } from 'zod'
+import type { Todo, User } from './types'
 import { withItemType } from '@rstore/vue'
 
+import { z } from 'zod'
 import { memoryBackend } from './backend'
-import type { Todo, User } from './types'
 
 export const TodoCollection = withItemType<Todo>().defineCollection({
   name: 'Todo',
@@ -15,16 +15,16 @@ export const TodoCollection = withItemType<Todo>().defineCollection({
     delete: ({ key }) => memoryBackend.deleteTodo(String(key)),
   },
   formSchema: {
-      create: z.object({
-        text: z.string().min(1),
-        assigneeId: z.string().nullable().optional(),
-      }),
-      update: z.object({
-        text: z.string().min(1),
-        completed: z.boolean(),
-        assigneeId: z.string().nullable().optional(),
-      }).partial(),
-    },
+    create: z.object({
+      text: z.string().min(1),
+      assigneeId: z.string().nullable().optional(),
+    }),
+    update: z.object({
+      text: z.string().min(1),
+      completed: z.boolean(),
+      assigneeId: z.string().nullable().optional(),
+    }).partial(),
+  },
 })
 
 export const UserCollection = withItemType<User>().defineCollection({
@@ -36,10 +36,8 @@ export const UserCollection = withItemType<User>().defineCollection({
   },
 })
 
-
-
 export const schema = [
   TodoCollection,
   UserCollection,
-  
+
 ] as const

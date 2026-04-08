@@ -1,8 +1,7 @@
+import type { Todo, User } from './types'
 
 import { withItemType } from '@rstore/vue'
-
 import { memoryBackend } from './backend'
-import type { Todo, User } from './types'
 
 export const TodoCollection = withItemType<Todo>().defineCollection({
   name: 'Todo',
@@ -14,7 +13,7 @@ export const TodoCollection = withItemType<Todo>().defineCollection({
     update: ({ key, item }) => memoryBackend.updateTodo(String(key), item),
     delete: ({ key }) => memoryBackend.deleteTodo(String(key)),
   },
-  
+
 })
 
 export const UserCollection = withItemType<User>().defineCollection({
@@ -26,10 +25,8 @@ export const UserCollection = withItemType<User>().defineCollection({
   },
 })
 
-
-
 export const schema = [
   TodoCollection,
   UserCollection,
-  
+
 ] as const

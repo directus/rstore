@@ -41,41 +41,51 @@ async function removeTodo(id: string) {
 </script>
 
 <template>
-  <main class="tutorial-app">
+  <main class="tutorial-app app-shell">
     <header class="hero">
-      <h1>Team tasks</h1>
-      <p>The list can now create, toggle, and remove todos directly through the collection API.</p>
+      <h1>Tasks</h1>
     </header>
 
     <section class="surface">
       <div class="form-row">
         <input
           v-model="inputText"
-          placeholder="Plan the release"
+          placeholder="Add a task"
           @keydown.enter.prevent="addTodo(inputText)"
         >
 
         <button @click="addTodo(inputText)">
-          Add todo
+          Add
         </button>
       </div>
     </section>
 
     <section class="surface">
-      <ul class="todo-list">
+      <div v-if="!todos.length" class="empty-state">
+        No tasks yet.
+      </div>
+
+      <ul v-else class="todo-list">
         <li
           v-for="todo in todos"
           :key="todo.id"
           class="todo-item"
           :class="{ done: todo.completed }"
         >
-          <strong>{{ todo.text }}</strong>
+          <label class="todo-toggle">
+            <input
+              class="todo-checkbox"
+              type="checkbox"
+              :checked="todo.completed"
+              @change="toggleTodo(todo.id)"
+            >
+
+            <div class="todo-copy">
+              <strong>{{ todo.text }}</strong>
+            </div>
+          </label>
 
           <div class="todo-actions">
-            <button class="secondary" @click="toggleTodo(todo.id)">
-              {{ todo.completed ? 'Mark open' : 'Complete' }}
-            </button>
-
             <button class="ghost" @click="removeTodo(todo.id)">
               Delete
             </button>

@@ -509,7 +509,7 @@ title: Search Demo
     expect(vueCollectionsSolution['src/rstore/schema.ts']).toContain(`fetchMany: () => memoryBackend.list('todos')`)
     expect(vueQueryStarter['src/App.vue']).toContain('tutorialRuntimeBannerState')
     expect(vueQueryStarter['src/components/TutorialContent.vue']).toContain('No todos are showing yet.')
-    expect(vueQuerySolution['src/components/TutorialContent.vue']).toContain('The list, loading badge, and refresh button now all come from one reactive query.')
+    expect(vueQuerySolution['src/components/TutorialContent.vue']).toContain('The list, loading badge, and refresh button now all flow from one reactive query result.')
 
     expect(nuxtManifest.dependencies['@rstore/nuxt']).toBe('file:./vendor/@rstore/nuxt')
     expect(nuxtManifest.dependencies.nuxt).toBe('4.4.2')
@@ -523,7 +523,7 @@ title: Search Demo
     expect(nuxtQueryStarter['nuxt.config.ts']).toContain(`modules: ['@rstore/nuxt']`)
     expect(nuxtQueryStarter['nuxt.config.ts']).toContain(`css: ['~~/src/style.css']`)
     expect(nuxtQueryStarter['app/plugins/tutorial.client.ts']).toContain(`from '#demo/runtime'`)
-    expect(nuxtQueryStarter['app/pages/index.vue']).toContain('No todos are showing yet.')
+    expect(nuxtQueryStarter['app/pages/index.vue']).toContain('No tasks are showing yet.')
     expect(nuxtCacheStarter['app/pages/index.vue']).not.toContain(`tutorial/bridge`)
     expect(nuxtQuerySolution['app/pages/index.vue']).toContain('The page now reads, refreshes, and reports loading from one store query.')
     expect(Object.keys(vueQueryStarter).some(filePath => filePath.startsWith('vendor/@rstore/nuxt/'))).toBe(false)

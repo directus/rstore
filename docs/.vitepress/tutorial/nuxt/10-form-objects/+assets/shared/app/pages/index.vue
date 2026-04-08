@@ -4,22 +4,38 @@ const { data: todos } = await store.Todo.query(q => q.many())
 </script>
 
 <template>
-  <main class="tutorial-app">
+  <main class="tutorial-app app-shell">
     <header class="hero">
-      <h1>Nuxt form objects</h1>
-      <p>Use collection form helpers inside a Nuxt component.</p>
+      <div class="panel-header">
+        <div class="hero-head">
+          <p class="eyebrow">Form objects</p>
+          <h1>Draft and edit tasks</h1>
+          <p>Use collection form helpers inside a Nuxt component so form state stays close to the store workflow.</p>
+        </div>
+
+        <span class="meta-pill">{{ todos.length }} tasks in view</span>
+      </div>
     </header>
 
     <section class="split">
       <TodoForm class="surface" :edit-id="todos[0]?.id ?? null" />
 
       <section class="surface">
-        <h2>Current todos</h2>
+        <div class="panel-header">
+          <div class="stack">
+            <p class="section-label">Preview list</p>
+            <h2>Current tasks</h2>
+          </div>
+        </div>
 
         <ul class="summary-list">
           <li v-for="todo in todos" :key="todo.id" class="summary-item">
-            <strong>{{ todo.text }}</strong>
-            <span class="hint">{{ todo.completed ? 'Complete' : 'Open' }}</span>
+            <span class="todo-mark" :data-complete="todo.completed ? 'true' : 'false'" />
+
+            <div class="todo-copy">
+              <strong>{{ todo.text }}</strong>
+              <span class="hint">{{ todo.completed ? 'Complete' : 'Open' }}</span>
+            </div>
           </li>
         </ul>
       </section>

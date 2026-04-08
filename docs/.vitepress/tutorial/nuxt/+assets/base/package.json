@@ -1,7 +1,7 @@
 {
   "name": "rstore-interactive-tutorial",
-  "private": true,
   "type": "module",
+  "private": true,
   "scripts": {
     "dev": "nuxt dev --host 0.0.0.0 --port 3000"
   },
@@ -14,8 +14,8 @@
   "devDependencies": {
     "@vue/language-server": "3.2.5",
     "@vue/typescript-plugin": "3.2.5",
-    "typescript-language-server": "5.1.3",
     "typescript": "5.9.3",
+    "typescript-language-server": "5.1.3",
     "ws": "8.19.0"
   }
 }

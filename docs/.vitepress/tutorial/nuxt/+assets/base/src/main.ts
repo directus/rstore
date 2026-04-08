@@ -11,6 +11,7 @@ function updateRuntimeBanner(state: 'booting' | 'ready' | 'error', title: string
   if (!banner)
     return
 
+  banner.hidden = state === 'ready'
   banner.dataset.state = state
   banner.querySelector<HTMLElement>('[data-role="title"]')!.textContent = title
   banner.querySelector<HTMLElement>('[data-role="detail"]')!.textContent = detail

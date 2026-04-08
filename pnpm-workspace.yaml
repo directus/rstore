@@ -12,8 +12,8 @@ catalog:
   '@akryum/sheep': ^0.5.2
   '@antfu/eslint-config': ^6.2.0
   '@directus/vue-split-panel': ^0.8.8
-  '@iconify-json/file-icons': ^1.2.2
   '@faker-js/faker': ^9.4.0
+  '@iconify-json/file-icons': ^1.2.2
   '@iconify-json/lucide': ^1.2.22
   '@iconify-json/simple-icons': ^1.2.19
   '@iconify/vue': ^5.0.0

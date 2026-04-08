@@ -56,6 +56,7 @@ export function createTutorialLspProcessTransport(process: WebContainerProcess):
             try {
               handleMessage(JSON.parse(line))
             }
+            // eslint-disable-next-line unused-imports/no-unused-vars
             catch (error) {
               console.warn(`[tutorial:lsp] Ignoring non-JSON output from the language server bridge: ${line}`)
             }

@@ -1,21 +1,10 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
     "target": "ES2022",
+    "jsx": "preserve",
+    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "Bundler",
-    "strict": true,
-    "jsx": "preserve",
-    "allowSyntheticDefaultImports": true,
-    "isolatedModules": true,
-    "plugins": [
-      {
-        "name": "@vue/typescript-plugin"
-      }
-    ],
-    "types": [
-      "vite/client"
-    ],
     "paths": {
       "#demo/backend": [
         "./src/tutorial/backend.ts"
@@ -26,7 +15,18 @@
       "#demo/runtime": [
         "./src/tutorial/runtime.ts"
       ]
-    }
+    },
+    "types": [
+      "vite/client"
+    ],
+    "strict": true,
+    "allowSyntheticDefaultImports": true,
+    "isolatedModules": true,
+    "plugins": [
+      {
+        "name": "@vue/typescript-plugin"
+      }
+    ]
   },
   "include": [
     "src/**/*",

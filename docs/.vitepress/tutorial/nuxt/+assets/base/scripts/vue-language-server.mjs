@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module'
 import { dirname } from 'node:path'
+import process from 'node:process'
 
 const require = createRequire(import.meta.url)
 const { createParsedCommandLine, createParsedCommandLineByJson, createVueLanguagePlugin } = requireFrom('@vue/language-core', ['@vue/language-server'])

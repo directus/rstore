@@ -11,20 +11,27 @@ async function simulateRemote() {
 </script>
 
 <template>
-  <main class="tutorial-app">
+  <main class="tutorial-app app-shell">
     <header class="hero">
-      <h1>Nuxt live query</h1>
-      <p>Upgrade the page from a normal query to a live query.</p>
+      <div class="panel-header">
+        <div class="hero-head">
+          <p class="eyebrow">Live updates</p>
+          <h1>Shared inbox</h1>
+          <p>Upgrade the page from a normal query to a live query so remote inserts reach the board automatically.</p>
+        </div>
+
+        <span class="meta-pill">{{ todos.length }} live rows</span>
+      </div>
     </header>
 
     <section class="surface">
       <div class="toolbar">
         <button @click="simulateRemote()">
-          Simulate remote todo
+          Simulate remote task
         </button>
 
         <span class="meta-pill">
-          {{ todos.length }} live items
+          Waiting for live query wiring
         </span>
       </div>
     </section>
@@ -32,8 +39,12 @@ async function simulateRemote() {
     <section class="surface">
       <ul class="todo-list">
         <li v-for="todo in todos" :key="todo.id" class="todo-item">
-          <strong>{{ todo.text }}</strong>
-          <span class="hint">{{ todo.completed ? 'Complete' : 'Open' }}</span>
+          <span class="todo-mark" :data-complete="todo.completed ? 'true' : 'false'" />
+
+          <div class="todo-copy">
+            <strong>{{ todo.text }}</strong>
+            <span class="hint">{{ todo.completed ? 'Complete' : 'Open' }}</span>
+          </div>
         </li>
       </ul>
     </section>

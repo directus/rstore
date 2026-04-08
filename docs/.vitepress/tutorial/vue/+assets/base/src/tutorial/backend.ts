@@ -4,20 +4,17 @@ type CollectionPath = 'todos' | 'users'
 type MutableCollectionPath = 'todos'
 
 interface MemoryBackend {
-  reset(): void
-  list(path: 'todos'): Todo[]
-  list(path: 'users'): User[]
-  get(path: 'todos', key: string): Todo | undefined
-  get(path: 'users', key: string): User | undefined
-  createTodo(input: Partial<Todo>): Todo
-  updateTodo(key: string, patch: Partial<Todo>): Todo
-  deleteTodo(key: string): void
-  create(path: MutableCollectionPath, input: Partial<Todo>): Todo
-  update(path: MutableCollectionPath, key: string, input: Partial<Todo>): Todo
-  delete(path: MutableCollectionPath, key: string): void
-  subscribe(path: 'todos', subscriber: (event: TodoEvent) => void): () => void
-  subscribe(path: 'users', subscriber: (event: TodoEvent) => void): () => void
-  simulateRemoteTodo(): Todo
+  reset: () => void
+  list: ((path: 'todos') => Todo[]) & ((path: 'users') => User[])
+  get: ((path: 'todos', key: string) => Todo | undefined) & ((path: 'users', key: string) => User | undefined)
+  createTodo: (input: Partial<Todo>) => Todo
+  updateTodo: (key: string, patch: Partial<Todo>) => Todo
+  deleteTodo: (key: string) => void
+  create: (path: MutableCollectionPath, input: Partial<Todo>) => Todo
+  update: (path: MutableCollectionPath, key: string, input: Partial<Todo>) => Todo
+  delete: (path: MutableCollectionPath, key: string) => void
+  subscribe: ((path: 'todos', subscriber: (event: TodoEvent) => void) => () => void) & ((path: 'users', subscriber: (event: TodoEvent) => void) => () => void)
+  simulateRemoteTodo: () => Todo
 }
 
 const initialUsers: User[] = [
@@ -112,7 +109,7 @@ export const memoryBackend: MemoryBackend = {
     const todo = state.todos.find(item => item.id === key)
 
     if (!todo) {
-      throw new Error('Todo "' + key + '" was not found.')
+      throw new Error(`Todo "${key}" was not found.`)
     }
 
     Object.assign(todo, patch)
@@ -177,7 +174,7 @@ export const memoryBackend: MemoryBackend = {
   simulateRemoteTodo() {
     const todo: Todo = {
       id: crypto.randomUUID(),
-      text: 'Remote todo ' + String(state.todos.length + 1),
+      text: `Remote todo ${String(state.todos.length + 1)}`,
       completed: false,
       assigneeId: state.users[1]?.id ?? null,
     }

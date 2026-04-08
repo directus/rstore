@@ -1,8 +1,7 @@
+import type { Todo, User } from './types'
 
 import { withItemType } from '@rstore/vue'
-
 import { memoryBackend } from './backend'
-import type { Todo, User } from './types'
 
 export const TodoCollection = withItemType<Todo>().defineCollection({
   name: 'Todo',

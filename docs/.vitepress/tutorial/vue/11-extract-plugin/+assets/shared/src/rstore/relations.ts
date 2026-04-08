@@ -1,5 +1,5 @@
-import { defineRelations } from '@rstore/vue'
 import type { TodoCollection, UserCollection } from './schema'
+import { defineRelations } from '@rstore/vue'
 
 export function defineTodoRelations(todoCollection: typeof TodoCollection, userCollection: typeof UserCollection) {
   return defineRelations(todoCollection, ({ collection }) => ({

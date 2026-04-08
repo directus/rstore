@@ -20,7 +20,11 @@ const shellDetail = computed(() => tutorialRuntimeBannerState.status === 'error'
 
 <template>
   <div class="tutorial-shell">
-    <header class="tutorial-runtime-banner" :data-state="tutorialRuntimeBannerState.status">
+    <header
+      v-if="tutorialRuntimeBannerState.visible"
+      class="tutorial-runtime-banner"
+      :data-state="tutorialRuntimeBannerState.status"
+    >
       <span class="tutorial-runtime-dot" aria-hidden="true" />
       <div class="tutorial-runtime-copy">
         <strong>{{ tutorialRuntimeBannerState.title }}</strong>
@@ -33,19 +37,25 @@ const shellDetail = computed(() => tutorialRuntimeBannerState.status === 'error'
         <TutorialContent />
 
         <template #fallback>
-          <main class="tutorial-app">
+          <main class="tutorial-app app-shell">
             <section class="hero">
-              <h1>{{ shellTitle }}</h1>
-              <p>{{ shellDetail }}</p>
+              <div class="hero-head">
+                <p class="eyebrow">Preview</p>
+                <h1>{{ shellTitle }}</h1>
+                <p>{{ shellDetail }}</p>
+              </div>
             </section>
           </main>
         </template>
       </Suspense>
 
-      <main v-else class="tutorial-app">
+      <main v-else class="tutorial-app app-shell">
         <section class="hero">
-          <h1>{{ shellTitle }}</h1>
-          <p>{{ shellDetail }}</p>
+          <div class="hero-head">
+            <p class="eyebrow">Preview</p>
+            <h1>{{ shellTitle }}</h1>
+            <p>{{ shellDetail }}</p>
+          </div>
         </section>
       </main>
     </div>

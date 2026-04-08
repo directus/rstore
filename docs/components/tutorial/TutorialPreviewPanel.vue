@@ -37,7 +37,7 @@ const activeRuntimeTab = ref<'logs' | 'terminal'>('logs')
     <div class="flex flex-col gap-3 border-b border-zinc-200 px-4 h-14 sm:flex-row sm:items-center sm:justify-between dark:border-zinc-800">
       <div class="flex flex-wrap items-center gap-2">
         <span
-          class="inline-flex items-center gap-2 rounded-full px-3 text-xs font-semibold uppercase tracking-[0.16em]"
+          class="inline-flex items-center gap-2 rounded-full px-1.5 py-0.5 text-xs font-semibold uppercase tracking-[0.16em]"
           :class="status === 'error'
             ? 'bg-rose-100 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300'
             : previewSrc
@@ -55,7 +55,7 @@ const activeRuntimeTab = ref<'logs' | 'terminal'>('logs')
           {{ status === 'error' ? 'Sandbox error' : previewSrc ? 'Sandbox live' : 'Sandbox booting' }}
         </span>
 
-        <span class="rounded-full bg-zinc-100 px-3 text-xs font-medium text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
+        <span class="rounded-full bg-zinc-100 px-1.5 py-0.5 text-xs font-medium text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
           {{ listCount }} todo{{ listCount === 1 ? '' : 's' }} detected
         </span>
       </div>
@@ -104,14 +104,6 @@ const activeRuntimeTab = ref<'logs' | 'terminal'>('logs')
       class="grid flex-1 h-full place-items-center p-6 text-center"
     >
       <div class="grid max-w-md gap-3">
-        <div class="mx-auto inline-flex items-center gap-2 rounded-full bg-zinc-100 px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] text-zinc-600 dark:bg-zinc-900 dark:text-zinc-300">
-          <span class="size-2 rounded-full bg-amber-500" />
-          Booting preview
-        </div>
-
-        <p class="text-sm leading-6 text-zinc-600 dark:text-zinc-300">
-          Preview output will appear here when the sandbox is ready. The tutorial runtime is already starting in the background, even if this chapter does not have much UI yet.
-        </p>
         <p
           v-if="lastError"
           class="font-mono text-xs leading-6 text-rose-600 dark:text-rose-400"

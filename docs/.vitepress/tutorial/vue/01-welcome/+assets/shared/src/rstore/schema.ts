@@ -1,7 +1,7 @@
-import { z } from 'zod'
-import { withItemType } from '@rstore/vue'
-import { defineTodoRelations } from './relations'
 import type { Todo, User } from './types'
+import { withItemType } from '@rstore/vue'
+import { z } from 'zod'
+import { defineTodoRelations } from './relations'
 
 export const TodoCollection = withItemType<Todo>().defineCollection({
   name: 'Todo',

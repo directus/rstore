@@ -1,5 +1,5 @@
-import type { App } from 'vue'
 import type { VueStore } from '@rstore/vue'
+import type { App } from 'vue'
 import { createStore, RstorePlugin } from '@rstore/vue'
 import { schema } from './schema'
 

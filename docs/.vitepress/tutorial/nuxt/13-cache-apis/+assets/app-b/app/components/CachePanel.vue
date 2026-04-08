@@ -18,11 +18,11 @@ function clearCache() {
 
 <template>
   <section class="stack">
-    <h2>Cache controls</h2>
+    <h2>Cache</h2>
 
     <div class="toolbar">
       <button @click="injectCachedTodo()">
-        Inject cached todo
+        Inject task
       </button>
 
       <button class="secondary" @click="clearCache()">
@@ -30,8 +30,8 @@ function clearCache() {
       </button>
     </div>
 
-    <span class="meta-pill">
-      {{ cachedTodos.length }} items visible via <code>peekMany()</code>
-    </span>
+    <p class="hint">
+      {{ cachedTodos.length }} cached items
+    </p>
   </section>
 </template>

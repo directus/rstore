@@ -3,7 +3,7 @@ import { useStore } from '@rstore/vue'
 import { computed } from 'vue'
 
 const store = useStore()
-const cachedTodos = computed(() => store.Todo.peekMany())
+const _cachedTodos = computed(() => store.Todo.peekMany())
 
 function injectCachedTodo() {
 }
@@ -14,11 +14,18 @@ function clearCache() {
 
 <template>
   <section class="stack">
-    <h2>Cache controls</h2>
+    <div class="panel-header">
+      <div class="stack">
+        <p class="section-label">
+          Local cache
+        </p>
+        <h2>Manual cache actions</h2>
+      </div>
+    </div>
 
     <div class="toolbar">
       <button @click="injectCachedTodo()">
-        Inject cached todo
+        Inject task
       </button>
 
       <button class="secondary" @click="clearCache()">

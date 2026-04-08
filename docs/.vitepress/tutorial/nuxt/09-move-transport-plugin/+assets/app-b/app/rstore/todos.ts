@@ -1,5 +1,5 @@
-import { z } from 'zod'
 import type { Todo } from './types'
+import { z } from 'zod'
 
 export default RStoreSchema.withItemType<Todo>().defineCollection({
   name: 'Todo',

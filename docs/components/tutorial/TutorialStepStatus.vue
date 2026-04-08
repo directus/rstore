@@ -2,7 +2,7 @@
 import type { TutorialValidationResult } from './utils/types'
 import { Icon } from '@iconify/vue'
 import { onClickOutside } from '@vueuse/core'
-import { computed, nextTick, ref, useTemplateRef } from 'vue'
+import { computed, ref, useTemplateRef } from 'vue'
 
 type TutorialStatus = 'idle' | 'booting' | 'installing' | 'starting' | 'ready' | 'syncing' | 'checking' | 'error'
 

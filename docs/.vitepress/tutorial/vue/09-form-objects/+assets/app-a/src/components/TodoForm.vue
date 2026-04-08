@@ -10,35 +10,53 @@ const editText = ref('')
 </script>
 
 <template>
-  <section>
-    <h2>Create form</h2>
+  <section class="stack">
+    <div class="stack">
+      <div class="panel-header">
+        <div class="stack">
+          <p class="section-label">New task</p>
+          <h2>Draft before saving</h2>
+        </div>
 
-    <label class="label">
-      <span>Todo text</span>
-      <input v-model="draftText" placeholder="Draft the welcome email">
-    </label>
+        <span class="meta-pill">{{ draftText.trim() ? 'Ready to save' : 'Needs text' }}</span>
+      </div>
 
-    <div class="toolbar">
-      <button class="secondary">
-        Save
-      </button>
+      <label class="label">
+        <span>Task name</span>
+        <input v-model="draftText" placeholder="Draft the welcome email">
+      </label>
+
+      <div class="toolbar">
+        <button class="secondary">
+          Save
+        </button>
+      </div>
     </div>
 
-    <h2>Edit form</h2>
+    <div class="stack">
+      <div class="panel-header">
+        <div class="stack">
+          <p class="section-label">Existing task</p>
+          <h2>Practice editing</h2>
+        </div>
 
-    <label class="label">
-      <span>Existing todo text</span>
-      <input v-model="editText" placeholder="Rename the task">
-    </label>
+        <span class="meta-pill">{{ editText ? 'Unsaved changes' : 'In sync' }}</span>
+      </div>
 
-    <div class="toolbar">
-      <button class="secondary">
-        Reset
-      </button>
+      <label class="label">
+        <span>Task name</span>
+        <input v-model="editText" placeholder="Rename the task">
+      </label>
 
-      <button>
-        Save changes
-      </button>
+      <div class="toolbar">
+        <button class="secondary">
+          Reset
+        </button>
+
+        <button>
+          Save changes
+        </button>
+      </div>
     </div>
   </section>
 </template>

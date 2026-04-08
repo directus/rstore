@@ -6,20 +6,27 @@ const { data: todos, loading, refresh } = await store.Todo.query(q => q.many())
 </script>
 
 <template>
-  <main class="tutorial-app">
+  <main class="tutorial-app app-shell">
     <header class="hero">
-      <h1>Chapter : Store Setup</h1>
-      <p>Create the store and install `RstorePlugin` so `useStore()` becomes available to components.</p>
+      <div class="panel-header">
+        <div class="hero-head">
+          <p class="eyebrow">Store setup</p>
+          <h1>Connected task board</h1>
+          <p>Installing <code>RstorePlugin</code> turns the preview into a real store-driven app shell that every later chapter keeps reusing.</p>
+        </div>
+
+        <span class="meta-pill">{{ todos.length }} seeded tasks</span>
+      </div>
     </header>
 
     <section class="surface">
       <div class="toolbar">
-        <button @click="refresh()">
+        <button class="ghost" @click="refresh()">
           Refresh
         </button>
 
         <span class="meta-pill">
-          {{ loading ? 'Loading the in-memory backend…' : `${todos.length} seeded todos ready` }}
+          {{ loading ? 'Loading the task board…' : 'The store is supplying live tutorial data' }}
         </span>
       </div>
     </section>
@@ -32,8 +39,12 @@ const { data: todos, loading, refresh } = await store.Todo.query(q => q.many())
           class="todo-item"
           :class="{ done: todo.completed }"
         >
-          <strong>{{ todo.text }}</strong>
-          <span class="hint">Assigned to {{ todo.assigneeId ?? 'nobody yet' }}</span>
+          <span class="todo-mark" :data-complete="todo.completed ? 'true' : 'false'" />
+
+          <div class="todo-copy">
+            <strong>{{ todo.text }}</strong>
+            <span class="hint">Assigned to {{ todo.assigneeId ?? 'nobody yet' }}</span>
+          </div>
         </li>
       </ul>
     </section>

@@ -2,8 +2,8 @@ import type { CreateStoreOptions } from '@rstore/vue'
 import fs from 'node:fs'
 import { addImports, addPlugin, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, resolveFiles } from '@nuxt/kit'
 import serialize from 'serialize-javascript'
-import { resolveNuxtDevtoolsEnabled } from './devtoolsEnabled'
 import { setupDevToolsUI } from './devtools'
+import { resolveNuxtDevtoolsEnabled } from './devtoolsEnabled'
 
 declare module '@nuxt/schema' {
   export interface NuxtConfig {

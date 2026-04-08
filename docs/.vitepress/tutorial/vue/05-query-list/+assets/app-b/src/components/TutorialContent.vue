@@ -6,20 +6,27 @@ const { data: todos, loading, refresh } = await store.Todo.query(q => q.many())
 </script>
 
 <template>
-  <main class="tutorial-app">
+  <main class="tutorial-app app-shell">
     <header class="hero">
-      <h1>Todo inbox</h1>
-      <p>The list, loading badge, and refresh button now all come from one reactive query.</p>
+      <div class="panel-header">
+        <div class="hero-head">
+          <p class="eyebrow">Query a list</p>
+          <h1>Inbox</h1>
+          <p>The list, loading badge, and refresh button now all flow from one reactive query result.</p>
+        </div>
+
+        <span class="meta-pill">{{ todos.length }} tasks loaded</span>
+      </div>
     </header>
 
     <section class="surface">
       <div class="toolbar">
-        <button @click="refresh()">
+        <button class="ghost" @click="refresh()">
           Refresh
         </button>
 
         <span class="meta-pill">
-          {{ loading ? 'Refreshing from the memory backend…' : `${todos.length} todos rendered` }}
+          {{ loading ? 'Refreshing from the memory backend…' : 'The board is reading from the shared query state' }}
         </span>
       </div>
     </section>
@@ -32,8 +39,12 @@ const { data: todos, loading, refresh } = await store.Todo.query(q => q.many())
           class="todo-item"
           :class="{ done: todo.completed }"
         >
-          <strong>{{ todo.text }}</strong>
-          <span class="hint">{{ todo.completed ? 'Already complete' : 'Still in progress' }}</span>
+          <span class="todo-mark" :data-complete="todo.completed ? 'true' : 'false'" />
+
+          <div class="todo-copy">
+            <strong>{{ todo.text }}</strong>
+            <span class="hint">{{ todo.completed ? 'Already complete' : 'Still in progress' }}</span>
+          </div>
         </li>
       </ul>
     </section>

@@ -40,7 +40,7 @@ function selectChapter(index: number) {
 </script>
 
 <template>
-  <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+  <header class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between px-3">
     <div class="flex flex-wrap gap-1 items-center">
       <ToolbarButton
         @click="emit('openTrackPicker')"

@@ -12,20 +12,27 @@ async function simulateRemoteTodo() {
 </script>
 
 <template>
-  <main class="tutorial-app">
+  <main class="tutorial-app app-shell">
     <header class="hero">
-      <h1>Chapter : Live Query</h1>
-      <p>Use <code>liveQuery()</code> so remote inserts update the rendered list automatically.</p>
+      <div class="panel-header">
+        <div class="hero-head">
+          <p class="eyebrow">Live updates</p>
+          <h1>Shared inbox</h1>
+          <p>Use <code>liveQuery()</code> so remote inserts land in the board automatically instead of waiting for a manual refresh.</p>
+        </div>
+
+        <span class="meta-pill">{{ todos.length }} live rows</span>
+      </div>
     </header>
 
     <section class="surface">
       <div class="toolbar">
         <button @click="simulateRemoteTodo()">
-          Simulate remote todo
+          Simulate remote task
         </button>
 
         <span class="meta-pill">
-          {{ todos.length }} live items
+          Waiting for live query wiring
         </span>
       </div>
     </section>
@@ -37,8 +44,12 @@ async function simulateRemoteTodo() {
           :key="todo.id"
           class="todo-item"
         >
-          <strong>{{ todo.text }}</strong>
-          <span class="hint">{{ todo.completed ? 'Complete' : 'Open' }}</span>
+          <span class="todo-mark" :data-complete="todo.completed ? 'true' : 'false'" />
+
+          <div class="todo-copy">
+            <strong>{{ todo.text }}</strong>
+            <span class="hint">{{ todo.completed ? 'Complete' : 'Open' }}</span>
+          </div>
         </li>
       </ul>
     </section>

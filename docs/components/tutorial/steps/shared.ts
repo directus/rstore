@@ -65,9 +65,11 @@ function requireBooted(state: TutorialPreviewState, summary: string, details: st
     return null
   }
 
-  return fail(summary, details.length ? details : [
-    'Wait for the sandbox preview to finish booting before checking this chapter.',
-  ])
+  return fail(summary, details.length
+    ? details
+    : [
+        'Wait for the sandbox preview to finish booting before checking this chapter.',
+      ])
 }
 
 export {
