@@ -256,7 +256,11 @@ export default defineNitroPlugin(() => {
 })
 ```
 
-Any table that is not explicitly listed will throw on all API endpoints. `allowTables` can be called multiple times, and the allowed tables will be merged.
+Any table that is not explicitly listed will throw on all API endpoints with the error `Collection "<name>" is not allowed.`. `allowTables` can be called multiple times, and the allowed tables will be merged.
+
+::: warning Maintenance
+Once `allowTables` has been called at least once, the allow-list is active for the rest of the server's lifetime. Every new Drizzle table you later add to the schema must be registered here too — otherwise its generated endpoints will throw at runtime with `Collection "<name>" is not allowed.`. There is no opt-out: you cannot revert to the "all tables exposed" default once the allow-list has been initialized.
+:::
 
 ## Realtime Updates <Badge text="New in v0.8" />
 

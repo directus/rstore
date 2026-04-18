@@ -1,6 +1,6 @@
 ---
 name: rstore-nuxt-drizzle
-description: "Use when the goal is exposing Drizzle-backed data through rstore in Nuxt: generate collections and API routes from schema, fetch/filter/paginate data, support create/update/delete flows, enable realtime or offline sync, and enforce table-level server access rules; pair with `rstore-nuxt` for Nuxt integration and `rstore-vue` for collection/query/form behavior."
+description: "Use when the goal is exposing Drizzle-backed data through rstore in Nuxt: generate collections and API routes from schema, add a new Drizzle table to the rstore API, fix `Collection \"<name>\" is not allowed` errors, fetch/filter/paginate data, support create/update/delete flows, enable realtime or offline sync, and enforce table-level server access rules with `allowTables`; pair with `rstore-nuxt` for Nuxt integration and `rstore-vue` for collection/query/form behavior."
 ---
 
 # Rstore Nuxt Drizzle
@@ -66,8 +66,9 @@ export function useDrizzle() {
 4. Query through rstore collection APIs using `findOptions.where` and supported drizzle params.
 5. Enable `ws` and/or `offline` only when required by product behavior.
 6. Add server-side restrictions/transforms via hook APIs (`hooksForTable`, `allowTables`, `rstoreDrizzleHooks`).
-7. For Nuxt module/runtime integration behavior, use the `rstore-nuxt` skill.
-8. For non-drizzle-specific store/query/form behavior, use the `rstore-vue` skill.
+7. When adding a new Drizzle table to a project that already calls `allowTables`, register the new table in the same `allowTables([...])` list — once initialized the allow-list is permanent and unlisted tables throw `Collection "<name>" is not allowed.`.
+8. For Nuxt module/runtime integration behavior, use the `rstore-nuxt` skill.
+9. For non-drizzle-specific store/query/form behavior, use the `rstore-vue` skill.
 
 ## Query and cache conventions
 
@@ -105,6 +106,7 @@ export function useDrizzle() {
 4. Renaming schema exports renames generated collection names.
 5. Composite keys serialize as `value1::value2`; mismatches here cause lookup/update issues.
 6. `params.where` is deprecated; use `findOptions.where`.
+7. `allowTables` flips the default from "all tables exposed" to "deny by default". After the first call, every new Drizzle table you add to the schema must also be added to `allowTables` — otherwise endpoints throw `Collection "<name>" is not allowed.` at runtime.
 
 ## References
 

@@ -212,6 +212,13 @@ Then:
   - `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/SKILL.md`
   - `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/references/*.md`
 
+### 2026-04-18 incremental update
+
+- Updated `docs/plugins/nuxt-drizzle.md` "Allowing tables" section with maintenance warning.
+- Updated `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/SKILL.md` (description trigger, task workflow step 7, guardrail 7).
+- Updated `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/references/api-allow-tables.md` (behavior, requirements, pitfalls 2-3).
+- Reason: real-world incident where adding a new Drizzle table triggered `Collection "<name>" is not allowed.` because the project already used `allowTables` and the new table wasn't registered. Skill failed to anticipate this maintenance step.
+
 ## Notes
 
 - There is no dedicated generation script in this repository yet.
