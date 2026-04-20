@@ -105,7 +105,7 @@ export default defineConfig({
 
     footer: {
       message: 'Released under the MIT License.',
-      copyright: 'Copyright © 2025-present Guillaume Chau',
+      copyright: 'Copyright © 2025-present Monospace Inc | Maintained by Guillaume Chau and contributors',
     },
   },
 
