@@ -1,4 +1,5 @@
 import type { VueStore } from '@rstore/vue'
+import type { BatchWireOperation, BatchWireResponse } from './utils/batch'
 // @ts-expect-error virtual module
 import { apiPath, dialect } from '#build/$rstore-drizzle-config.js'
 import { useRequestFetch } from '#imports'
@@ -192,6 +193,110 @@ export default definePlugin({
     hook('deleteItem', async (payload) => {
       await requestFetch(`${apiPath}/${payload.collection.name}/${payload.key}`, {
         method: 'DELETE',
+      })
+    })
+
+    /* Batch */
+
+    // Unified batch hook: fold every queued fetch/mutation for this group into
+    // a single POST to /_batch. The server runs each op in parallel and
+    // returns an order-preserving array of per-op results.
+    hook('batch', async (payload) => {
+      const wireOps: BatchWireOperation[] = []
+      const opRefs: Array<typeof payload.operations[number]> = []
+
+      for (const op of payload.operations) {
+        if (op.type === 'fetchFirst') {
+          // Only ops with a primary key are eligible (see "What can be batched").
+          if (op.key == null) {
+            continue
+          }
+          wireOps.push({
+            type: 'fetchFirst',
+            collection: op.collection.name,
+            key: String(op.key),
+            searchQuery: {
+              ...op.findOptions?.params,
+              include: op.findOptions?.include,
+            },
+          })
+          opRefs.push(op)
+        }
+        else if (op.type === 'create') {
+          wireOps.push({
+            type: 'create',
+            collection: op.collection.name,
+            item: op.item as Record<string, any>,
+          })
+          opRefs.push(op)
+        }
+        else if (op.type === 'update') {
+          // Strip primary keys from the patch body to match the single-op PATCH.
+          const item = { ...(op.item as Record<string, any>) }
+          const primaryKeys = op.collection.meta?.primaryKeys?.length
+            ? op.collection.meta.primaryKeys
+            : ['id']
+          for (const k of primaryKeys) {
+            delete item[k]
+          }
+          wireOps.push({
+            type: 'update',
+            collection: op.collection.name,
+            key: String(op.key),
+            item,
+          })
+          opRefs.push(op)
+        }
+        else if (op.type === 'delete') {
+          wireOps.push({
+            type: 'delete',
+            collection: op.collection.name,
+            key: String(op.key),
+          })
+          opRefs.push(op)
+        }
+      }
+
+      if (wireOps.length === 0) {
+        return
+      }
+
+      let response: BatchWireResponse
+      try {
+        const raw = await requestFetch<string>(`${apiPath}/_batch`, {
+          method: 'POST',
+          body: SuperJSON.stringify({ operations: wireOps }),
+          responseType: 'text',
+        })
+        response = SuperJSON.parse(raw) as BatchWireResponse
+      }
+      catch (error) {
+        // Whole-request failure fans out to every op so none hang.
+        for (const op of opRefs) {
+          op.setError(error as Error)
+        }
+        return
+      }
+
+      // Fan results back out. Unresolved ops (fallthrough to tiers below)
+      // would only happen if the server returned fewer items than sent —
+      // we treat that as an error per op for safety.
+      response.results.forEach((entry, i) => {
+        const op = opRefs[i]
+        if (!op) {
+          return
+        }
+        if (entry.ok) {
+          if (op.type === 'delete') {
+            op.setResult(undefined)
+          }
+          else {
+            op.setResult(entry.result ?? undefined)
+          }
+        }
+        else {
+          op.setError(new Error(entry.error))
+        }
       })
     })
   },

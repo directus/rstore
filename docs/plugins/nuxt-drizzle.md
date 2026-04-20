@@ -363,6 +363,27 @@ export default defineNuxtConfig({
 })
 ```
 
+## Batching <Badge text="New in v0.9" />
+
+The module ships with built-in support for rstore's [batching](../guide/data/batching.md) layer. When you enable batching on the store, every eligible `findFirst`-by-key, `create`, `update` and `delete` from the same tick is folded into a single round-trip to a generated `POST {apiPath}/_batch` endpoint. The server dispatches each op in parallel and returns per-op results, so one failing op never blocks its siblings.
+
+```ts
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: [
+    '@rstore/nuxt',
+    '@rstore/nuxt-drizzle',
+  ],
+  rstore: {
+    store: {
+      batching: true, // or an options object — see the batching guide
+    },
+  },
+})
+```
+
+All the usual `before` / `after` hooks (`item.get.before`, `index.post.before`, etc.) still fire per-op inside a batch, so permission checks and query transforms keep working unchanged.
+
 ## Hooks
 
 You can use hooks to run code before or after certain actions on the collections. You can register global hooks for all collections using the `rstoreDrizzleHooks` import, or specific hooks for a given table using the `hooksForTable` function (recommended).

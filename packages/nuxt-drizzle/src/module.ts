@@ -89,6 +89,11 @@ export default defineNuxtModule<ModuleOptions>({
 
     // Add files to nuxt app
     addServerHandler({
+      handler: resolve('./runtime/server/api/_batch.post'),
+      route: `${apiPath}/_batch`,
+      method: 'post',
+    })
+    addServerHandler({
       handler: resolve('./runtime/server/api/index.get'),
       route: `${apiPath}/:collection`,
       method: 'get',

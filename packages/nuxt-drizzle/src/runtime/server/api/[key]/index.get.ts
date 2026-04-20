@@ -1,67 +1,19 @@
-import type { RelationalQueryBuilder } from 'drizzle-orm/pg-core/query-builders/query'
 import type { RstoreDrizzleQueryParamsOne } from '../../utils'
-import type { RstoreDrizzleMeta, RstoreDrizzleTransformQuery } from '../../utils/hooks'
-import { and } from 'drizzle-orm'
 import { defineEventHandler, getQuery, getRouterParams } from 'h3'
 import SuperJSON from 'superjson'
-import { convertIncludeToDrizzleWith, getDrizzleKeyWhere, getDrizzleTableFromCollection, rstoreUseDrizzle } from '../../utils'
-import { rstoreDrizzleHooks } from '../../utils/hooks'
+import { drizzleFindOne } from '../../utils/operations'
 
 export default defineEventHandler(async (event) => {
-  const meta: RstoreDrizzleMeta = {}
-  const transforms: Array<RstoreDrizzleTransformQuery> = []
-
   const params = getRouterParams(event) as { collection: string, key: string }
-  const { collection: collectionName, key } = params
-  const query = (SuperJSON.parse(getQuery(event).superjson as any) ?? {}) as RstoreDrizzleQueryParamsOne
+  const query = getQuery(event)
+  const searchQuery = (SuperJSON.parse(query.superjson as any) ?? {}) as RstoreDrizzleQueryParamsOne
 
-  await rstoreDrizzleHooks.callHook('item.get.before', {
+  return drizzleFindOne({
     event,
-    collection: collectionName,
-    meta,
+    collection: params.collection,
+    key: params.key,
     params,
-    query: query as Record<string, string | string[]>,
-    transformQuery: (transform) => { transforms.push(transform) },
-    key,
+    query,
+    searchQuery,
   })
-
-  const { table, primaryKeys } = getDrizzleTableFromCollection(collectionName)
-
-  const whereConditions: any[] = []
-
-  const extras: Record<string, any> = {}
-
-  for (const transform of transforms) {
-    transform({
-      where: (condition) => { whereConditions.push(condition) },
-      extras: e => Object.assign(extras, e),
-    })
-  }
-
-  const dbQuery = rstoreUseDrizzle().query as unknown as Record<string, RelationalQueryBuilder<any, any>>
-  const withRelations = query.with ?? convertIncludeToDrizzleWith(collectionName, query.include)
-  let result: any = await dbQuery[collectionName]!.findFirst({
-    where: and(
-      getDrizzleKeyWhere(key, primaryKeys, table),
-      ...whereConditions,
-    ),
-    with: withRelations,
-    columns: query.columns,
-    extras,
-  })
-
-  result ??= null
-
-  await rstoreDrizzleHooks.callHook('item.get.after', {
-    event,
-    collection: collectionName,
-    meta,
-    params,
-    query: query as Record<string, string | string[]>,
-    result,
-    setResult: (r) => { result = r },
-    key,
-  })
-
-  return result
 })
