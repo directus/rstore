@@ -1,5 +1,6 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
+import type { BatchCallConfig } from './batch'
 import type { Collection, CollectionByName, CollectionDefaults, CollectionRelation, RelationsByName, ResolvedCollectionItem, StoreSchema } from './collection'
 import type { CustomHookMeta } from './hooks'
 
@@ -197,6 +198,18 @@ export interface FindOptionsBase<
   fetchOptions?: QueryFetchOptions
 
   meta?: CustomHookMeta
+
+  /**
+   * Whether this query should participate in batching.
+   * Only applies when store-level batching is enabled.
+   *
+   * - `false` — opt out of batching
+   * - `true` (or omitted) — join the default group
+   * - `{ group: 'name' }` — join a specific batch group
+   *
+   * @default true
+   */
+  batch?: BatchCallConfig
 }
 
 export type FindFirstOptions<

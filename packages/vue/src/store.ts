@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOptions, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { BatchingConfig, Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOptions, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueCollectionApi } from './api'
 import { createStoreCore, normalizeCollectionRelations, resolveCollection, resolveCollectionOppositeRelations } from '@rstore/core'
@@ -49,6 +49,14 @@ export interface CreateStoreOptions<
    * @default 0
    */
   cacheStaggering?: number
+
+  /**
+   * Enable operation batching. Multiple findFirst/mutation calls in the same tick
+   * will be combined into batch operations.
+   *
+   * Set to `true` for default options, or provide a `BatchOptions` object for fine-grained control.
+   */
+  batching?: BatchingConfig
 }
 
 export type VueStoreCollectionApiProxy<
@@ -92,6 +100,7 @@ export async function createStore<
     findDefaults: options.findDefaults,
     isServer: options.isServer,
     syncImmediately: options.syncImmediately,
+    batching: options.batching,
     transformStore: (store) => {
       const privateStore = store as unknown as PrivateVueStore
 

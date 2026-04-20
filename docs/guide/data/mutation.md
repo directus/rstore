@@ -138,6 +138,10 @@ await store.todos.deleteMany(['id-1', 'id-2'])
 
 It can be useful to batch the delete operations into a single fetch request to your backend. See `deleteMany` in the [plugin hooks](../plugin/hooks.md#deletemany).
 
+## Batching <Badge text="New in v0.9" />
+
+Individual `create` / `update` / `delete` calls that happen in the same tick can also be combined into a single request by a batch-aware plugin, without switching to the `*Many` variants. See [Batching](./batching.md).
+
 ## Optimistic Updates <Badge text="New in v0.7" />
 
 By default, rstore will try to perform optimistic updates when you create, update or delete a record. This means that the record will be updated in the store immediately, without waiting for the server to confirm the change. If an error is thrown during the mutation, the change will be automatically reverted.

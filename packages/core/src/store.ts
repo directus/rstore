@@ -1,5 +1,6 @@
-import type { Cache, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, Hooks, MutationSpecialProps, Plugin, QueryFetchOptions, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import type { BatchingConfig, Cache, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, Hooks, MutationSpecialProps, Plugin, QueryFetchOptions, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { get, set } from '@rstore/shared'
+import { createBatchScheduler } from './batch'
 import { builtinCollectionHooksPlugin } from './builtin/collectionHooks'
 import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollectionOppositeRelations, resolveCollections } from './collection'
 import { defaultFetchPolicy } from './fetchPolicy'
@@ -18,6 +19,12 @@ export interface CreateStoreCoreOptions<
   isServer?: boolean
   transformStore?: (store: StoreCore<TSchema, TCollectionDefaults>) => StoreCore<TSchema, TCollectionDefaults>
   syncImmediately?: boolean
+
+  /**
+   * Enable operation batching. When enabled, multiple operations happening in the
+   * same tick are collected and dispatched as a single batch operation.
+   */
+  batching?: BatchingConfig
 }
 
 const resolvedFindOptionsMarker = Symbol('resolvedFindOptions')
@@ -178,6 +185,12 @@ export async function createStoreCore<
         return new Date(Number(timestamp))
       }
     }
+  }
+
+  // Initialize batch scheduler if batching is enabled
+  if (options.batching) {
+    const batchOpts = typeof options.batching === 'object' ? options.batching : {}
+    store.$batch = createBatchScheduler(store, batchOpts)
   }
 
   for (const item of options.schema) {

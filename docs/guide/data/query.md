@@ -411,6 +411,10 @@ const someUsers = await store.User.findMany({
 })
 ```
 
+## Batching <Badge text="New in v0.9" />
+
+When multiple `findFirst` calls (by key) happen in the same tick, rstore can combine them into a single request through a batch-aware plugin. See [Batching](./batching.md) for setup and plugin hooks.
+
 ## Fetch Policy
 
 The fetch policy determines how the data is fetched from the server. The default fetch policy is `cache-first`, which means that the data is fetched from the cache first and then from the server if not found.

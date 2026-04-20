@@ -1,5 +1,6 @@
 import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, FindOptions, GlobalStoreType, QueryResult, ResolvedCollection, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { dedupePromise } from '@rstore/shared'
+import { resolveBatchCall } from '../batch'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { unwrapItem } from '../item'
@@ -103,25 +104,38 @@ async function _findFirst<
         },
       })
 
-      const abort = store.$hooks.withAbort()
-      await store.$hooks.callHook('fetchFirst', {
-        store: store as unknown as GlobalStoreType,
-        meta,
-        collection,
-        key: findOptions.key,
-        findOptions,
-        getResult: () => result,
-        setResult: (value, options) => {
-          result = value
-          if (result && options?.abort !== false) {
-            abort()
-          }
-        },
-        setMarker: (value) => {
-          marker = value
-        },
-        abort,
-      })
+      // Batching: enqueue into batch scheduler if eligible.
+      // Only key-based findFirst calls can be batched (filter-only queries cannot).
+      // beforeFetch/afterFetch still run so plugins (e.g. query tracking) see the op.
+      const batchCall = resolveBatchCall(findOptions.batch)
+      if (store.$batch && findOptions.key != null && batchCall.enabled) {
+        const batched = await store.$batch.enqueueFetchFirst(collection, findOptions.key, findOptions, meta, batchCall.group) as { item: any, marker: string | undefined }
+        result = batched.item
+        if (batched.marker) {
+          marker = batched.marker
+        }
+      }
+      else {
+        const abort = store.$hooks.withAbort()
+        await store.$hooks.callHook('fetchFirst', {
+          store: store as unknown as GlobalStoreType,
+          meta,
+          collection,
+          key: findOptions.key,
+          findOptions,
+          getResult: () => result,
+          setResult: (value, options) => {
+            result = value
+            if (result && options?.abort !== false) {
+              abort()
+            }
+          },
+          setMarker: (value) => {
+            marker = value
+          },
+          abort,
+        })
+      }
 
       await store.$hooks.callHook('afterFetch', {
         store: store as unknown as GlobalStoreType,

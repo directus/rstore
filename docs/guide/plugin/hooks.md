@@ -489,6 +489,82 @@ payload.setResult(cache.get(payload.key), { abort: false })
 ```
 :::
 
+## Batching <Badge text="New in v0.9" />
+
+These hooks are only invoked when [batching](../data/batching.md) is enabled on the store. They receive the operations queued during a tick so a plugin can combine them into a single request. See the [Batching guide](../data/batching.md) for a full walkthrough.
+
+Each batch hook tier receives **per-operation handles** — individual objects with their own `setResult` / `setError`. A plugin resolves only the ops it owns; unresolved ops automatically fall through to the next tier:
+
+1. `batch` — all fetches and mutations across every collection
+2. `batchFetch` / `batchMutate` — one call per collection (and per mutation type for mutations), with every op still unresolved
+3. The individual `fetchFirst` / `createItem` / `updateItem` / `deleteItem` hooks as a final fallback per remaining op
+
+Every batch operation exposes:
+
+| Property | Description |
+|---|---|
+| `type` | `'fetchFirst'` or `'create' \| 'update' \| 'delete'`. |
+| `collection` | The resolved collection. |
+| `key` | Key of the item (fetches, updates, deletes). |
+| `item` | Input item (creates and updates). |
+| `findOptions` | Resolved find options (fetch ops only). |
+| `meta` | Per-op hook metadata. |
+| `setResult(item, options?)` | Resolve this op. Fetch ops accept `{ marker }` in options. |
+| `setError(error)` | Reject this op without affecting siblings. |
+| `resolved` | `true` once `setResult` or `setError` was called. |
+
+### batch
+
+A single hook that receives every batched fetch and mutation, across every collection. Use this when one request can carry everything (e.g. a GraphQL document).
+
+```ts
+hook('batch', async (payload) => {
+  console.log(
+    payload.store,
+    payload.meta,
+    payload.group, // batch group name (e.g. 'default', 'tenantA')
+    payload.operations, // every op in the batch (fetches + mutations)
+    payload.fetches, // fetch ops only
+    payload.mutations, // mutation ops only
+  )
+})
+```
+
+Call `op.setResult(item)` / `op.setError(error)` on the specific ops this plugin handles. Ops you don't resolve fall through to the next tier automatically.
+
+### batchFetch
+
+Called once per collection when multiple `findFirst`-by-key calls were queued for that collection. Only receives ops still unresolved after the `batch` hook.
+
+```ts
+hook('batchFetch', async (payload) => {
+  console.log(
+    payload.collection,
+    payload.group,
+    payload.operations, // Array of fetch ops with per-op setResult / setError
+  )
+})
+```
+
+Resolve each op with `op.setResult(item)` (passing `undefined` if no row was returned). Ops left unresolved fall back to the individual `fetchFirst` hook.
+
+### batchMutate
+
+Called once per `(collection, mutation type)` group with every mutation op still unresolved after the `batch` hook.
+
+```ts
+hook('batchMutate', async (payload) => {
+  console.log(
+    payload.collection,
+    payload.mutation, // 'create' | 'update' | 'delete'
+    payload.group,
+    payload.operations, // Array of mutation ops with per-op setResult / setError
+  )
+})
+```
+
+For `create` and `update`, resolve each op with `op.setResult(returnedItem)`. For `delete`, `op.setResult(undefined)` is enough to mark the op handled. Unresolved ops fall back to the individual `createItem` / `updateItem` / `deleteItem` hooks.
+
 ## Cache lifecycle
 
 ### afterCacheWrite

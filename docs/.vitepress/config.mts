@@ -57,6 +57,7 @@ export default defineConfig({
             { text: 'Form Object', link: '/guide/data/form' },
             { text: 'Subscriptions', link: '/guide/data/live' },
             { text: 'Cache', link: '/guide/data/cache' },
+            { text: 'Batching', link: '/guide/data/batching' },
             { text: 'Module', link: '/guide/data/module' },
             { text: 'Offline', link: '/guide/data/offline' },
           ],

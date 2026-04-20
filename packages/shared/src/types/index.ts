@@ -1,3 +1,4 @@
+export * from './batch.js'
 export * from './cache.js'
 export * from './collection.js'
 export * from './collectionHooks.js'

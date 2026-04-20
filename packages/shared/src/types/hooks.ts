@@ -7,6 +7,73 @@ import type { ResolvedModule } from './module'
 import type { FindFirstOptions, FindManyOptions, FindOptions } from './query'
 import type { Awaitable, Path, PathValue } from './utils'
 
+/**
+ * Options accepted by `BatchFetchOperation.setResult`.
+ */
+export interface BatchFetchSetResultOptions {
+  /** Optional cache marker to store alongside the item. */
+  marker?: string
+}
+
+/**
+ * A single fetch operation exposed to batch hooks.
+ *
+ * Hooks set the result of a specific op with `setResult(item)` / `setError(err)`.
+ * Unresolved operations fall through to the next hook tier (per-collection, then individual).
+ */
+export interface BatchFetchOperation<
+  TCollection extends Collection = Collection,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
+  TSchema extends StoreSchema = StoreSchema,
+> {
+  readonly type: 'fetchFirst'
+  readonly collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  readonly key: string | number
+  readonly findOptions: FindOptions<TCollection, TCollectionDefaults, TSchema>
+  readonly meta: CustomHookMeta
+  /** Resolve this fetch with the given item (or `undefined` if no row was returned). */
+  setResult: (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined, options?: BatchFetchSetResultOptions) => void
+  /** Reject this fetch with an error. Does not affect sibling operations. */
+  setError: (error: Error) => void
+  /** `true` once `setResult` or `setError` has been called on this op. */
+  readonly resolved: boolean
+}
+
+/**
+ * A single mutation operation exposed to batch hooks.
+ *
+ * Hooks set the result of a specific op with `setResult(item)` / `setError(err)`.
+ * For delete operations, `setResult(undefined)` marks the op as handled.
+ * Unresolved operations fall through to the next hook tier.
+ */
+export interface BatchMutationOperation<
+  TCollection extends Collection = Collection,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
+  TSchema extends StoreSchema = StoreSchema,
+> {
+  readonly type: 'create' | 'update' | 'delete'
+  readonly collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  readonly key?: string | number
+  readonly item?: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
+  readonly meta: CustomHookMeta
+  /** Resolve this mutation with the returned item (or `undefined` for deletes). */
+  setResult: (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined) => void
+  /** Reject this mutation with an error. Does not affect sibling operations. */
+  setError: (error: Error) => void
+  /** `true` once `setResult` or `setError` has been called on this op. */
+  readonly resolved: boolean
+}
+
+/**
+ * Any batch operation (fetch or mutation) in a unified batch.
+ */
+export type BatchOperation<
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
+  TSchema extends StoreSchema = StoreSchema,
+>
+  = | BatchFetchOperation<Collection, TCollectionDefaults, TSchema>
+    | BatchMutationOperation<Collection, TCollectionDefaults, TSchema>
+
 export interface HookMetaQueryTracking {
   items: Record<string, Set<string | number>>
   skipped?: boolean
@@ -578,6 +645,85 @@ export interface HookDefinitions<
        * Delete items from the collection if they no longer exist on remote.
        */
       deleteItems: (keys: Array<string | number>) => void
+    },
+  ) => Awaitable<void>
+
+  /**
+   * Unified batch hook. Called first with ALL collected operations across all collections.
+   * Allows a plugin to combine fetches and mutations into a single HTTP request (e.g. GraphQL).
+   *
+   * Each operation exposes its own `setResult` / `setError`. Call them in any order.
+   * Any operations the hook does **not** resolve automatically fall through to the next
+   * hook tier (per-collection `batchFetch` / `batchMutate`, then individual hooks), so
+   * plugins can selectively handle just the ops they own without blocking the rest.
+   */
+  batch: (
+    payload: {
+      store: GlobalStoreType
+      meta: CustomHookMeta
+      /**
+       * Name of the batch group these entries were enqueued in.
+       * Useful for per-tenant / per-endpoint routing.
+       * Defaults to `'default'` when callers didn't specify a group.
+       */
+      group: string
+      /** All operations in this batch — fetches and mutations mixed together. */
+      operations: Array<BatchOperation<TCollectionDefaults, TSchema>>
+      /** Convenience: fetch-only subset of `operations`. */
+      fetches: Array<BatchFetchOperation<Collection, TCollectionDefaults, TSchema>>
+      /** Convenience: mutation-only subset of `operations`. */
+      mutations: Array<BatchMutationOperation<Collection, TCollectionDefaults, TSchema>>
+    },
+  ) => Awaitable<void>
+
+  /**
+   * Called when multiple `findFirst` calls (by key) for the same collection are batched.
+   * Called for operations not already resolved by the unified `batch` hook.
+   *
+   * Each operation exposes its own `setResult` / `setError`. Unresolved operations
+   * fall through to the individual `fetchFirst` hook.
+   */
+  batchFetch: <
+    TCollection extends Collection,
+  > (
+    payload: {
+      store: GlobalStoreType
+      meta: CustomHookMeta
+      /**
+       * Name of the batch group these entries were enqueued in.
+       * Useful for per-tenant / per-endpoint routing.
+       * Defaults to `'default'` when callers didn't specify a group.
+       */
+      group: string
+      collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+      /** Per-operation handles with `setResult` / `setError`. */
+      operations: Array<BatchFetchOperation<TCollection, TCollectionDefaults, TSchema>>
+    },
+  ) => Awaitable<void>
+
+  /**
+   * Called when multiple individual mutations of the same type on the same collection are batched.
+   * Called for operations not already resolved by the unified `batch` hook.
+   *
+   * Each operation exposes its own `setResult` / `setError`. Unresolved operations
+   * fall through to the individual `createItem` / `updateItem` / `deleteItem` hook.
+   */
+  batchMutate: <
+    TCollection extends Collection,
+  > (
+    payload: {
+      store: GlobalStoreType
+      meta: CustomHookMeta
+      /**
+       * Name of the batch group these entries were enqueued in.
+       * Useful for per-tenant / per-endpoint routing.
+       * Defaults to `'default'` when callers didn't specify a group.
+       */
+      group: string
+      collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+      mutation: 'create' | 'update' | 'delete'
+      /** Per-operation handles with `setResult` / `setError`. */
+      operations: Array<BatchMutationOperation<TCollection, TCollectionDefaults, TSchema>>
     },
   ) => Awaitable<void>
 }

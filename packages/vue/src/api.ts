@@ -167,7 +167,7 @@ export interface VueCollectionApi<
    */
   create: (
     item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
-    createOptions?: Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'formOperations'>,
+    createOptions?: Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'formOperations' | 'batch'>,
   ) => Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
   /**
@@ -203,7 +203,7 @@ export interface VueCollectionApi<
    */
   update: (
     item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
-    updateOptions?: Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'key' | 'optimistic' | 'formOperations'>,
+    updateOptions?: Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'key' | 'optimistic' | 'formOperations' | 'batch'>,
   ) => Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
 
   /**
@@ -248,7 +248,7 @@ export interface VueCollectionApi<
    */
   delete: (
     keyOrItem: string | number | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
-    DeleteOptions?: Pick<DeleteOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
+    DeleteOptions?: Pick<DeleteOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'batch'>,
   ) => Promise<void>
 
   /**

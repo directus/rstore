@@ -1,4 +1,5 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import { resolveBatchCall } from '../batch'
 
 export interface DeleteOptions<
   TCollection extends Collection,
@@ -10,6 +11,18 @@ export interface DeleteOptions<
   key: string | number
   skipCache?: boolean
   optimistic?: boolean
+
+  /**
+   * Whether this mutation should participate in batching.
+   * Only applies when store-level batching is enabled.
+   *
+   * - `false` — opt out of batching
+   * - `true` (or omitted) — join the default group
+   * - `{ group: 'name' }` — join a specific batch group
+   *
+   * @default true
+   */
+  batch?: BatchCallConfig
 }
 
 export async function deleteItem<
@@ -22,6 +35,7 @@ export async function deleteItem<
   key,
   skipCache,
   optimistic = true,
+  batch,
 }: DeleteOptions<TCollection, TCollectionDefaults, TSchema>): Promise<void> {
   const item = store.$cache.readItem({ collection, key })
   if (item?.$layer) {
@@ -58,14 +72,21 @@ export async function deleteItem<
   }
 
   try {
-    const abort = store.$hooks.withAbort()
-    await store.$hooks.callHook('deleteItem', {
-      store: store as unknown as GlobalStoreType,
-      meta,
-      collection,
-      key,
-      abort,
-    })
+    // Batching: enqueue into batch scheduler if eligible
+    const batchCall = resolveBatchCall(batch)
+    if (store.$batch && batchCall.enabled) {
+      await store.$batch.enqueueDelete(collection, key, meta, batchCall.group)
+    }
+    else {
+      const abort = store.$hooks.withAbort()
+      await store.$hooks.callHook('deleteItem', {
+        store: store as unknown as GlobalStoreType,
+        meta,
+        collection,
+        key,
+        abort,
+      })
+    }
 
     await store.$hooks.callHook('afterMutation', {
       store: store as unknown as GlobalStoreType,

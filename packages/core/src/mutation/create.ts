@@ -1,5 +1,6 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
+import { resolveBatchCall } from '../batch'
 import { unwrapItem } from '../item'
 import { isKeyDefined } from '../key'
 
@@ -18,6 +19,18 @@ export interface CreateOptions<
    * Passed through to plugin hooks so they can handle relational edits.
    */
   formOperations?: FormOperation<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>[]
+
+  /**
+   * Whether this mutation should participate in batching.
+   * Only applies when store-level batching is enabled.
+   *
+   * - `false` — opt out of batching
+   * - `true` (or omitted) — join the default group
+   * - `{ group: 'name' }` — join a specific batch group
+   *
+   * @default true
+   */
+  batch?: BatchCallConfig
 }
 
 export async function createItem<
@@ -31,6 +44,7 @@ export async function createItem<
   skipCache,
   optimistic = true,
   formOperations,
+  batch,
 }: CreateOptions<TCollection, TCollectionDefaults, TSchema>): Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> {
   const meta: CustomHookMeta = {}
 
@@ -86,22 +100,29 @@ export async function createItem<
   }
 
   try {
-    const abort = store.$hooks.withAbort()
-    await store.$hooks.callHook('createItem', {
-      store: store as unknown as GlobalStoreType,
-      meta,
-      collection,
-      item,
-      getResult: () => result,
-      setResult: (newResult, options) => {
-        result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
-        if (result && options?.abort !== false) {
-          abort()
-        }
-      },
-      abort,
-      formOperations: formOperations as FormOperation[],
-    })
+    // Batching: enqueue into batch scheduler if eligible
+    const batchCall = resolveBatchCall(batch)
+    if (store.$batch && batchCall.enabled) {
+      result = await store.$batch.enqueueCreate(collection, item, meta, batchCall.group) as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+    }
+    else {
+      const abort = store.$hooks.withAbort()
+      await store.$hooks.callHook('createItem', {
+        store: store as unknown as GlobalStoreType,
+        meta,
+        collection,
+        item,
+        getResult: () => result,
+        setResult: (newResult, options) => {
+          result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+          if (result && options?.abort !== false) {
+            abort()
+          }
+        },
+        abort,
+        formOperations: formOperations as FormOperation[],
+      })
+    }
 
     await store.$hooks.callHook('afterMutation', {
       store: store as unknown as GlobalStoreType,

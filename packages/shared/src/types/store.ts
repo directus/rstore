@@ -7,6 +7,31 @@ import type { MutationOperation, MutationSpecialProps } from './mutation'
 import type { RegisteredPlugin } from './plugin'
 import type { FetchPolicy, FindOptions, QueryFetchOptions, QueryResultMode } from './query'
 
+/**
+ * Interface for the batch scheduler attached to a store.
+ *
+ * Each `enqueue*` accepts an optional `group` name. Operations sharing the same
+ * group are flushed together; different groups have independent queues + timers.
+ */
+export interface BatchScheduler {
+  /** Enqueue a findFirst-by-key operation into the batch */
+  enqueueFetchFirst: (collection: ResolvedCollection, key: string | number, findOptions: FindOptions<any, any, any>, meta: CustomHookMeta, group?: string) => Promise<any>
+  /** Enqueue a create mutation into the batch */
+  enqueueCreate: (collection: ResolvedCollection, item: any, meta: CustomHookMeta, group?: string) => Promise<any>
+  /** Enqueue an update mutation into the batch */
+  enqueueUpdate: (collection: ResolvedCollection, key: string | number, item: any, meta: CustomHookMeta, group?: string) => Promise<any>
+  /** Enqueue a delete mutation into the batch */
+  enqueueDelete: (collection: ResolvedCollection, key: string | number, meta: CustomHookMeta, group?: string) => Promise<void>
+  /** The resolved batching configuration */
+  options: {
+    fetch: boolean
+    mutations: boolean
+    delay: number
+    maxWait: number | undefined
+    maxSize: number
+  }
+}
+
 export interface StoreCore<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
@@ -48,6 +73,12 @@ export interface StoreCore<
    * @private
    */
   $wrapMutation: <TMutation> (mutation: TMutation) => TMutation & MutationSpecialProps
+  /**
+   * Batch scheduler instance. Present when batching is enabled.
+   * @private
+   */
+  $batch?: BatchScheduler
+
   /**
    * Synchronize the store offline storage with remote.
    */
