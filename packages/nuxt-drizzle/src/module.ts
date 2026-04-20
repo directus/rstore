@@ -38,10 +38,57 @@ export interface ModuleOptions {
   apiPath?: string
 
   /**
-   * Enable WebSocket support for real-time updates
+   * Enable WebSocket support for real-time updates.
+   *
+   * Pass `true` to enable with defaults, or an object to customize the
+   * server-side route and/or the client-side endpoint.
    */
   ws?: boolean | {
+    /**
+     * Server-side route where the generated WebSocket handler is registered
+     * (and, by default, the URL the client connects to).
+     *
+     * @default '/api/rstore-realtime/ws'
+     */
     apiPath?: string
+
+    /**
+     * Fully overrides the URL the client uses to connect to the realtime
+     * WebSocket. Useful when the WebSocket is hosted on a different
+     * server (for example a dedicated realtime service).
+     *
+     * Can be an absolute URL (`wss://realtime.example.com/ws`), a
+     * protocol-relative URL (`//realtime.example.com/ws`), or a path
+     * relative to the current origin (`/ws`).
+     *
+     * When set, the server handler is still registered at `apiPath` so
+     * you can keep using the built-in handler during development — point
+     * this option at your external server in production via a runtime
+     * config override if needed.
+     *
+     * @default apiPath
+     */
+    clientEndpoint?: string
+
+    /**
+     * Heartbeat interval in milliseconds. The client sends a `ping` frame
+     * at this rate and expects a `pong` reply to detect dead connections.
+     *
+     * @default 10000
+     */
+    heartbeatInterval?: number
+
+    /**
+     * Auto-reconnect configuration forwarded to `@vueuse/core`'s
+     * `useWebSocket`. Pass `true` for defaults, `false` to disable, or an
+     * object to tune retries and backoff.
+     *
+     * @default true
+     */
+    autoReconnect?: boolean | {
+      retries?: number
+      delay?: number
+    }
   }
 
   /**
@@ -516,6 +563,11 @@ ${collections.map((collection, index) => {
 
     const wsOptions = typeof options.ws === 'object' ? options.ws : {}
     const wsApiPath = wsOptions.apiPath ?? `/api/rstore-realtime/ws`
+    // Client-side endpoint URL — falls back to the server route so same-origin
+    // setups keep working without extra configuration.
+    const wsClientEndpoint = wsOptions.clientEndpoint ?? wsApiPath
+    const wsHeartbeatInterval = wsOptions.heartbeatInterval ?? 10000
+    const wsAutoReconnect = wsOptions.autoReconnect ?? true
 
     if (options.ws) {
       nuxt.options.nitro.experimental ??= {}
@@ -582,6 +634,9 @@ export default createOfflinePlugin({
       filename: '$rstore-drizzle-config.js',
       getContents: () => `export const apiPath = ${JSON.stringify(apiPath)}
 export const wsApiPath = ${JSON.stringify(wsApiPath)}
+export const wsClientEndpoint = ${JSON.stringify(wsClientEndpoint)}
+export const wsHeartbeatInterval = ${JSON.stringify(wsHeartbeatInterval)}
+export const wsAutoReconnect = ${JSON.stringify(wsAutoReconnect)}
 export const dialect = '${drizzleConfig.dialect}'
 export const syncSerializeDateValue = ${offlineOptions?.serializeDateValue ? offlineOptions.serializeDateValue.toString() : 'undefined'}\n`,
     })

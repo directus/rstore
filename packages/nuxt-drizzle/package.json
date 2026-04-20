@@ -17,6 +17,10 @@
       "types": "./dist/types.d.ts",
       "import": "./dist/module.mjs",
       "require": "./dist/module.cjs"
+    },
+    "./realtime": {
+      "types": "./dist/runtime/realtime-protocol.d.ts",
+      "import": "./dist/runtime/realtime-protocol.js"
     }
   },
   "main": "./dist/module.cjs",

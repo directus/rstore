@@ -12,6 +12,12 @@ export interface PublishRstoreDrizzleRealtimeCreatedUpdateOptions<TRecord = any>
   collection: CollectionInput
   type: 'created'
   record: TRecord
+  /**
+   * Optional id of the client that triggered this update. The realtime
+   * handler will skip forwarding the update to the peer whose `clientId`
+   * matches — avoids optimistic-update echo back to the originator.
+   */
+  originClientId?: string
 }
 
 export interface PublishRstoreDrizzleRealtimeChangedUpdateOptions<
@@ -25,6 +31,10 @@ export interface PublishRstoreDrizzleRealtimeChangedUpdateOptions<
    * Primary key value (or composite key array). If omitted, key is inferred from `record` and table primary keys.
    */
   key?: RealtimeKeyInput
+  /**
+   * @see PublishRstoreDrizzleRealtimeCreatedUpdateOptions.originClientId
+   */
+  originClientId?: string
 }
 
 export type PublishRstoreDrizzleRealtimeUpdateOptions<TRecord = any>
@@ -65,6 +75,7 @@ export function publishRstoreDrizzleRealtimeUpdate<TRecord = any>(
     type: options.type,
     record: options.record,
     key: undefined,
+    originClientId: options.originClientId,
   } as RstoreDrizzleRealtimePayload<TRecord>
 
   if (options.type !== 'created') {

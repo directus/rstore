@@ -1,6 +1,11 @@
-import type { RstoreDrizzleRealtimePayload } from './hooks'
+import type { RstoreDrizzleRealtimePayload } from '../../utils/realtime'
 
-interface PubSub<TChannels> {
+/**
+ * Minimal Pub/Sub interface used by the realtime WebSocket handler to fan
+ * out record changes. Swap the default in-memory implementation for a
+ * cross-process one (Redis, NATS, …) by calling {@link setPubSub}.
+ */
+export interface PubSub<TChannels> {
   subscribe: <K extends Extract<keyof TChannels, string>>(
     channel: K,
     callback: (payload: TChannels[K]) => void,
@@ -18,7 +23,14 @@ export interface RstoreDrizzlePubSubChannels {
 
 export type RstoreDrizzlePubSub = PubSub<RstoreDrizzlePubSubChannels>
 
-function createMemoryPubSub(): RstoreDrizzlePubSub {
+/**
+ * Creates an in-memory {@link RstoreDrizzlePubSub} implementation. This is the
+ * default instance and is suitable for a single-process deployment. For
+ * multi-process / multi-node deployments, provide your own implementation
+ * backed by Redis, NATS, Postgres LISTEN/NOTIFY, … and install it with
+ * {@link setPubSub}.
+ */
+export function createMemoryPubSub(): RstoreDrizzlePubSub {
   const subscribers: {
     [K in keyof RstoreDrizzlePubSubChannels]?: Array<(payload: RstoreDrizzlePubSubChannels[K]) => void>
   } = {}

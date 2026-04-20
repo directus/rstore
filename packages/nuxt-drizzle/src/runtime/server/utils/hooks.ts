@@ -3,8 +3,11 @@ import type { Peer } from 'crossws'
 import type { InferSelectModel, Table, TableConfig } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { QueryObject } from 'ufo'
+import type { RstoreDrizzleRealtimePayload } from '../../utils/realtime'
 import { createHooks } from './hookable'
 import { getDrizzleCollectionNameFromTable } from './index'
+
+export type { RstoreDrizzleRealtimePayload } from '../../utils/realtime'
 
 export interface RstoreDrizzleMeta {
 }
@@ -61,13 +64,6 @@ export interface RstoreDrizzleItemBeforeHookPayload extends RstoreDrizzleBeforeH
 
 export interface RstoreDrizzleItemAfterHookPayload<TResult> extends RstoreDrizzleAfterHookPayload<TResult> {
   key: string
-}
-
-export interface RstoreDrizzleRealtimePayload<TResult, TType extends 'created' | 'updated' | 'deleted' = 'created' | 'updated' | 'deleted'> {
-  collection: string
-  record: TResult
-  key: TType extends 'created' ? undefined : string
-  type: TType
 }
 
 export interface RstoreDrizzleRealtimeFilterPayload<TResult, TType extends 'created' | 'updated' | 'deleted' = 'created' | 'updated' | 'deleted'> extends RstoreDrizzleRealtimePayload<TResult, TType> {

@@ -5,8 +5,19 @@ import { apiPath, dialect } from '#build/$rstore-drizzle-config.js'
 import { useRequestFetch } from '#imports'
 import { definePlugin } from '@rstore/vue'
 import SuperJSON from 'superjson'
+import { getRstoreDrizzleClientId, RSTORE_DRIZZLE_CLIENT_ID_HEADER } from './utils/client-id'
 import { and, eq } from './utils/where'
 import { filterWhere } from './where'
+
+/**
+ * Returns a headers object including the per-tab client id header when
+ * running in the browser. The server-side realtime handler uses this id to
+ * skip echoing the resulting update frame back to the originating client.
+ */
+function clientIdHeaders(): Record<string, string> | undefined {
+  const id = getRstoreDrizzleClientId()
+  return id ? { [RSTORE_DRIZZLE_CLIENT_ID_HEADER]: id } : undefined
+}
 
 export default definePlugin({
   name: 'rstore-drizzle',
@@ -171,6 +182,7 @@ export default definePlugin({
       const result: any = await requestFetch(`${apiPath}/${payload.collection.name}`, {
         method: 'POST',
         body: SuperJSON.stringify(payload.item),
+        headers: clientIdHeaders(),
       })
       payload.setResult(result)
     })
@@ -186,6 +198,7 @@ export default definePlugin({
       const result: any = await requestFetch(`${apiPath}/${payload.collection.name}/${payload.key}`, {
         method: 'PATCH',
         body: SuperJSON.stringify(body),
+        headers: clientIdHeaders(),
       })
       payload.setResult(result)
     })
@@ -193,6 +206,7 @@ export default definePlugin({
     hook('deleteItem', async (payload) => {
       await requestFetch(`${apiPath}/${payload.collection.name}/${payload.key}`, {
         method: 'DELETE',
+        headers: clientIdHeaders(),
       })
     })
 
@@ -267,6 +281,7 @@ export default definePlugin({
           method: 'POST',
           body: SuperJSON.stringify({ operations: wireOps }),
           responseType: 'text',
+          headers: clientIdHeaders(),
         })
         response = SuperJSON.parse(raw) as BatchWireResponse
       }

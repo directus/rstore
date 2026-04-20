@@ -1,9 +1,10 @@
 import type { SubscriptionMessage, SubscriptionUpdateMessage } from './utils/realtime'
 // @ts-expect-error virtual module
-import { wsApiPath } from '#build/$rstore-drizzle-config.js'
+import { wsAutoReconnect, wsClientEndpoint, wsHeartbeatInterval } from '#build/$rstore-drizzle-config.js'
 import { definePlugin, realtimeReconnectEventHook } from '@rstore/vue'
 import { useWebSocket } from '@vueuse/core'
 import { watch } from 'vue'
+import { getRstoreDrizzleClientId } from './utils/client-id'
 import { getSubscriptionId } from './utils/realtime'
 
 export default definePlugin({
@@ -16,14 +17,20 @@ export default definePlugin({
 
   setup({ hook }) {
     if (import.meta.client) {
+      const clientId = getRstoreDrizzleClientId()
+
+      // Local ref-count per subscription id — a given (collection, key, where)
+      // is only sent to the server once, regardless of how many components
+      // subscribe to it locally. The matching `unsubscribe` is only emitted
+      // when the last subscriber is torn down.
       const countPerTopic: Record<string, number> = {}
       const messages = new Map<string, SubscriptionMessage>()
 
-      const ws = useWebSocket(wsApiPath, {
+      const ws = useWebSocket(wsClientEndpoint, {
         heartbeat: {
-          interval: 10000,
+          interval: wsHeartbeatInterval,
         },
-        autoReconnect: true,
+        autoReconnect: wsAutoReconnect,
       })
 
       let connectCount = 0
@@ -56,8 +63,14 @@ export default definePlugin({
           where,
         }
         const subscriptionId = getSubscriptionId(message)
-        countPerTopic[subscriptionId] ??= 1
-        countPerTopic[subscriptionId]--
+        const current = countPerTopic[subscriptionId] ?? 0
+        // Guard against decrementing below zero — a stray unsubscribe without
+        // a matching subscribe would otherwise send a spurious unsubscribe
+        // frame and corrupt the counter.
+        if (current <= 0) {
+          return
+        }
+        countPerTopic[subscriptionId] = current - 1
         if (countPerTopic[subscriptionId] === 0) {
           ws.send(JSON.stringify({
             subscription: message,
@@ -67,8 +80,8 @@ export default definePlugin({
       })
 
       hook('init', ({ store }) => {
-        watch(ws.data, async (data: string) => {
-          if (data === 'pong') {
+        watch(ws.data, async (data) => {
+          if (typeof data !== 'string' || data === 'pong') {
             return
           }
           try {
@@ -112,23 +125,26 @@ export default definePlugin({
       })
 
       watch(ws.status, (status) => {
-        if (status === 'CLOSED') {
-          // Reset counts on reconnect
-          for (const key in countPerTopic) {
-            countPerTopic[key] = 0
-          }
-        }
-        else if (status === 'OPEN') {
+        if (status === 'OPEN') {
           connectCount++
 
-          // Resubscribe to all topics
+          // Announce our clientId first so the server can tag us for
+          // skip-self echo suppression before any mutation echoes arrive.
+          if (clientId) {
+            ws.send(JSON.stringify({ init: { clientId } }), false)
+          }
+
+          // Resubscribe to all active topics. On first open this replays
+          // subscriptions issued while CONNECTING; on reconnect it restores
+          // subscriptions across a transient disconnect.
           for (const [, message] of messages) {
             ws.send(JSON.stringify({
               subscription: message,
             }), false)
           }
 
-          // Call reconnect hook
+          // Notify live queries to refresh so updates missed while offline
+          // are recovered. Only fire on true reconnects (skip first open).
           if (connectCount > 1) {
             realtimeReconnectEventHook.trigger()
           }
