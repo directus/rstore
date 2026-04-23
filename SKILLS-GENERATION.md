@@ -132,6 +132,10 @@ The `description` field is the primary trigger signal used by AI agents. Write i
   - `rstore-nuxt`: Nuxt module/runtime integration concerns; explicitly reference the `rstore-vue` skill by name.
   - `rstore-nuxt-drizzle`: Drizzle-backed generation/API/realtime/offline concerns; explicitly reference both `rstore-nuxt` and `rstore-vue` by name.
   - `rstore-vue`: base store/query/form/plugin/module behavior.
+- Include **anti-pattern triggers**: phrases agents type when they are about to reimplement something rstore already provides. The skill should fire *before* the redundant code is written.
+  - `rstore-nuxt-drizzle`: `server/api`, `Nitro defineEventHandler`, `H3 handler`, `custom REST/CRUD endpoint`, `write an endpoint for <table>`.
+  - `rstore-nuxt`: `custom server route`, `Nitro handler`, `useFetch`/`$fetch` for collection data, `ad hoc fetch composable`.
+  - `rstore-vue`: `custom fetch composable`, `ad hoc fetch ref`, `bespoke cache layer`.
 
 ## Generation workflow
 
@@ -218,6 +222,15 @@ Then:
 - Updated `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/SKILL.md` (description trigger, task workflow step 7, guardrail 7).
 - Updated `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/references/api-allow-tables.md` (behavior, requirements, pitfalls 2-3).
 - Reason: real-world incident where adding a new Drizzle table triggered `Collection "<name>" is not allowed.` because the project already used `allowTables` and the new table wasn't registered. Skill failed to anticipate this maintenance step.
+
+### 2026-04-23 incremental update
+
+- Updated frontmatter `description` in all three skill `SKILL.md` files (`rstore-vue`, `rstore-nuxt`, `rstore-nuxt-drizzle`) with **anti-pattern triggers** so the skills fire when an agent is about to hand-write a `server/api` route, `defineEventHandler`, H3 handler, `useFetch`/`$fetch` composable, or bespoke fetch/cache layer — instead of only when the agent already thinks in terms of rstore.
+- Added a new section "When you are tempted to write a custom endpoint" to `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/SKILL.md`, covering the four cases: plain CRUD (use generated endpoints + `hooksForTable`), row-level access control (`allowTables` + `transformQuery`), bulk/direct Drizzle writes (keep the route, but call `publishRstoreDrizzleRealtimeUpdate`), and non-CRUD RPC (custom route is fine).
+- Added guardrail 8 in `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/SKILL.md` against hand-written CRUD routes for tables already exposed by the generated `apiPath`.
+- Added a task-workflow note in `packages/nuxt/skills/rstore-nuxt/SKILL.md` (step 4) steering away from `server/api` and `useFetch` composables for collection data.
+- Added the **anti-pattern triggers** rule to the "Frontmatter description rules (trigger quality)" section above, so future regenerations preserve the behavior.
+- Reason: agents working in rstore-powered projects were discovering rstore skills only when they already intended to use rstore. When the intent was phrased as "write an endpoint" or "add a server route", none of the skill descriptions matched and the agent reinvented what `@rstore/nuxt-drizzle` already generates.
 
 ## Dependency skill sync (for skills-npm consumers)
 

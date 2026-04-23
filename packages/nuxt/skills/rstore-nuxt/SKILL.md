@@ -1,6 +1,6 @@
 ---
 name: rstore-nuxt
-description: Use when the goal is making rstore work end-to-end in a Nuxt app: configure module setup, auto-register collections/plugins, ensure SSR cache hydration works, fix generated template or auto-import issues, and extend integration from other Nuxt modules; pair with the `rstore-vue` skill for collection/query/form behavior.
+description: "Use when wiring rstore into a Nuxt app end-to-end — module setup, auto-registered collections/plugins, SSR cache hydration, generated template/auto-import issues, and cross-module extension; also use before adding a custom `server/api` route, Nitro handler, or ad hoc `useFetch`/`$fetch` composable for collection data in an rstore-powered Nuxt app — prefer rstore collection APIs (`find*`, `query`, `liveQuery`) and plugin hooks over hand-rolled endpoints or fetch refs; pair with the `rstore-vue` skill for collection/query/form behavior."
 ---
 
 # Rstore Nuxt
@@ -60,7 +60,7 @@ rstore/
 1. Register `@rstore/nuxt` in `modules`.
 2. Keep collections and plugin files inside configured `rstoreDirs`.
 3. Ensure collection files export `default` or named `const` values intended for schema assembly.
-4. Use `useStore()` and auto-imports from `#imports` in app code, not ad hoc store singletons.
+4. Use `useStore()` and auto-imports from `#imports` in app code, not ad hoc store singletons. Before adding a `server/api/*.ts` handler, a `defineEventHandler`, or a `useFetch`/`$fetch` composable for collection data, check whether a collection API (`find*`, `query`, `liveQuery`) or a plugin hook already covers it — if the data is Drizzle-backed, see the `rstore-nuxt-drizzle` skill for the generated endpoint + hook story.
 5. For cross-module extension, call `addCollectionImport` / `addPluginImport` from module setup.
 6. Validate generated template output when debugging scan/injection issues.
 7. For behavior inside collection APIs (`find*`, `query`, forms, hooks), use the `rstore-vue` skill.

@@ -1,6 +1,6 @@
 ---
 name: rstore-nuxt-drizzle
-description: "Use when the goal is exposing Drizzle-backed data through rstore in Nuxt: generate collections and API routes from schema, add a new Drizzle table to the rstore API, fix `Collection \"<name>\" is not allowed` errors, fetch/filter/paginate data, support create/update/delete flows, enable realtime or offline sync, and enforce table-level server access rules with `allowTables`; pair with `rstore-nuxt` for Nuxt integration and `rstore-vue` for collection/query/form behavior."
+description: "Use when exposing Drizzle-backed data in Nuxt, OR before writing a custom `server/api` route, Nitro `defineEventHandler`, H3 handler, or REST/CRUD endpoint that reads or writes a Drizzle table — prefer the module's generated endpoints, `allowTables`, `hooksForTable`, and `publishRstoreDrizzleRealtimeUpdate` over hand-rolled routes; also covers generating collections/API routes from schema, adding a new Drizzle table to the rstore API, fixing `Collection \"<name>\" is not allowed` errors, fetch/filter/paginate, create/update/delete, realtime, offline, and table-level access control; pair with `rstore-nuxt` for Nuxt integration and `rstore-vue` for collection/query/form behavior."
 ---
 
 # Rstore Nuxt Drizzle
@@ -70,6 +70,15 @@ export function useDrizzle() {
 8. For Nuxt module/runtime integration behavior, use the `rstore-nuxt` skill.
 9. For non-drizzle-specific store/query/form behavior, use the `rstore-vue` skill.
 
+## When you are tempted to write a custom endpoint
+
+Before adding a `server/api/*.ts` handler, a `defineEventHandler`, or any custom REST route that touches a Drizzle table, decide which case applies:
+
+- **Plain CRUD for an existing Drizzle table** → stop. Use the generated endpoints under `apiPath`. Add logic via `hooksForTable(table, { 'item.beforeCreate': ... })` or the matching `*.before` / `*.after` hook — don't fork into a parallel route.
+- **Row-level access control, tenant scoping, soft-delete filters** → use `allowTables([...])` plus `hooksForTable` with `*.before` hooks calling `transformQuery(({ where, extras }) => ...)`. A custom route would bypass both guards.
+- **Bulk or direct Drizzle write the generated endpoints cannot express** (multi-table transaction, raw SQL, migration-style script) → a custom route is fine, but **call `publishRstoreDrizzleRealtimeUpdate`** after the write so `liveQuery` subscribers stay in sync. See the Nuxt + Drizzle docs section on "Publishing realtime updates from direct Drizzle queries".
+- **Non-CRUD RPC** (trigger an external workflow, send an email, compute a derived value) → custom route is appropriate; it is outside rstore's scope.
+
 ## Query and cache conventions
 
 - Prefer `findOptions.where` over the deprecated `params.where`.
@@ -107,6 +116,7 @@ export function useDrizzle() {
 5. Composite keys serialize as `value1::value2`; mismatches here cause lookup/update issues.
 6. `params.where` is deprecated; use `findOptions.where`.
 7. `allowTables` flips the default from "all tables exposed" to "deny by default". After the first call, every new Drizzle table you add to the schema must also be added to `allowTables` — otherwise endpoints throw `Collection "<name>" is not allowed.` at runtime.
+8. Do not hand-write `server/api/<table>/*` CRUD routes for tables already exposed by the generated `apiPath`. Duplicate code paths drift, bypass `allowTables` / `hooksForTable`, and miss realtime publishing — extend behavior through hooks or use `publishRstoreDrizzleRealtimeUpdate` from a justified custom route.
 
 ## References
 

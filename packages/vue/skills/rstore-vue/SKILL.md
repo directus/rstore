@@ -1,6 +1,6 @@
 ---
 name: rstore-vue
-description: Use when the goal is handling app data in Vue with `@rstore/vue`: fetch items/lists, keep queries reactive or live, create/update/delete records with forms, manage cache consistency, and debug store/query/subscription behavior across collections.
+description: "Use when handling app data in Vue with `@rstore/vue` — fetch items/lists, keep queries reactive or live, create/update/delete records with forms, manage cache consistency, and debug store/query/subscription behavior across collections; also use before writing a custom fetch composable, ad hoc fetch ref, or bespoke cache layer for collection data — prefer `find*`, `query`, `liveQuery`, `createForm`, and `definePlugin` hooks over hand-rolled fetching/caching."
 ---
 
 # Rstore Vue
