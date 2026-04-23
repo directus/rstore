@@ -219,7 +219,37 @@ Then:
 - Updated `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/references/api-allow-tables.md` (behavior, requirements, pitfalls 2-3).
 - Reason: real-world incident where adding a new Drizzle table triggered `Collection "<name>" is not allowed.` because the project already used `allowTables` and the new table wasn't registered. Skill failed to anticipate this maintenance step.
 
+## Dependency skill sync (for skills-npm consumers)
+
+`skills-npm` scans the consumer project's top-level `node_modules` for
+packages that ship a `skills/` folder. It does **not** walk transitive
+deps. If a user installs only `@rstore/nuxt-drizzle`, skills-npm will
+not discover `@rstore/nuxt` or `@rstore/vue` skills unless those skill
+folders are physically present inside `@rstore/nuxt-drizzle/skills/`.
+
+To fix that, `scripts/sync-dep-skills.mjs` copies each transitive
+`@rstore/*` workspace dep's `skills/<skill-name>/` directories into
+the consumer package's `skills/` directory. The script is wired into
+each wrapper package's `prepack` script so copies are materialized at
+publish time.
+
+Canonical skill folders (one per package) are committed:
+
+- `packages/vue/skills/rstore-vue`
+- `packages/nuxt/skills/rstore-nuxt`
+- `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle`
+
+Copied skill folders are gitignored via per-directory `.gitignore`
+files that allowlist only the canonical folder name.
+
+To run the sync manually (local debugging or before testing with
+skills-npm from a local install):
+
+```bash
+pnpm run sync-skills
+```
+
 ## Notes
 
-- There is no dedicated generation script in this repository yet.
-- Generation is currently a documented manual process with reproducible inspection commands.
+- Skill content generation (`SKILL.md`, `references/*.md`) is a documented manual process with reproducible inspection commands.
+- Dependency skill copies are generated automatically via `prepack`; do not commit them.

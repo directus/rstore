@@ -37,7 +37,8 @@
     "dev:build": "nuxi build playground",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "test:types": "vue-tsc --noEmit"
+    "test:types": "vue-tsc --noEmit",
+    "prepack": "node ../../scripts/sync-dep-skills.mjs ."
   },
   "peerDependencies": {
     "drizzle-orm": "*"

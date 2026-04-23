@@ -39,7 +39,8 @@
     "client:prepare": "pnpm --filter @rstore/devtools dev:prepare",
     "test": "vitest run",
     "test:watch": "vitest watch",
-    "test:types": "vue-tsc --noEmit"
+    "test:types": "vue-tsc --noEmit",
+    "prepack": "node ../../scripts/sync-dep-skills.mjs ."
   },
   "dependencies": {
     "@nuxt/devtools-kit": "^2.2.1",
