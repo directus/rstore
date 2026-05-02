@@ -6,7 +6,7 @@ services:
       POSTGRES_USER: directus
       POSTGRES_PASSWORD: directus
     healthcheck:
-      test: ['CMD-SHELL', 'pg_isready -U directus -d directus']
+      test: [CMD-SHELL, pg_isready -U directus -d directus]
       interval: 2s
       timeout: 5s
       retries: 30
@@ -16,7 +16,7 @@ services:
   directus:
     image: directus/directus:11.16
     ports:
-      - '8056:8055'
+      - 8056:8055
     depends_on:
       database:
         condition: service_healthy
@@ -35,7 +35,7 @@ services:
       CORS_ENABLED: 'true'
       CORS_ORIGIN: 'true'
     healthcheck:
-      test: ['CMD', 'node', '-e', 'fetch("http://127.0.0.1:8055/server/health").then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))']
+      test: [CMD, node, -e, 'fetch("http://127.0.0.1:8055/server/health").then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))']
       interval: 2s
       timeout: 5s
       retries: 60

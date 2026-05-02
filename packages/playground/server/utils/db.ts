@@ -145,6 +145,13 @@ export const db: Db = {
       status: 'draft',
       createdAt: new Date(),
     },
+    {
+      id: 'doc4',
+      title: 'Release Checklist',
+      body: 'Track final review items before publishing the next collaborative editing update.',
+      status: 'draft',
+      createdAt: new Date(),
+    },
   ],
 }
 

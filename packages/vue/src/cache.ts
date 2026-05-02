@@ -58,6 +58,10 @@ export interface CreateCacheOptions<
     /** Drop tombstones older than this many ms. Defaults to 86_400_000 (24h). */
     ttlMs?: number
   }
+  /**
+   * Whether this cache belongs to a server-side store instance.
+   */
+  isServer?: boolean
 }
 
 export function createCache<
@@ -67,6 +71,7 @@ export function createCache<
   getStore,
   cacheStaggering: rawCacheStaggering = 0,
   tombstoneGc = {},
+  isServer = (import.meta as unknown as { server?: boolean }).server === true,
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): Cache {
   const cacheStaggering = Math.max(0, Math.floor(rawCacheStaggering))
   const state: InternalCacheState = {
@@ -85,7 +90,7 @@ export function createCache<
   // Auto-GC keeps the tombstone store from growing unboundedly in long-lived
   // clients. Skipped during SSR / when explicitly disabled.
   let stopTombstoneGc: (() => void) | undefined
-  const canScheduleTombstoneGc = (import.meta as unknown as { client?: boolean }).client === true && typeof setInterval !== 'undefined'
+  const canScheduleTombstoneGc = !isServer && typeof setInterval !== 'undefined'
   if (tombstoneGc !== false && canScheduleTombstoneGc) {
     stopTombstoneGc = scheduleTombstoneGc(state.tombstones, {
       intervalMs: tombstoneGc.intervalMs ?? 60_000,

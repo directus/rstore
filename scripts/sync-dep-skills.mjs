@@ -22,7 +22,7 @@ const WORKSPACE_SCOPE = '@rstore/'
 /**
  * Read and parse a JSON file.
  * @param {string} filePath
- * @returns {Promise<any>}
+ * @returns {Promise<any>} Parsed JSON payload.
  */
 async function readJson(filePath) {
   return JSON.parse(await fs.readFile(filePath, 'utf8'))
@@ -34,7 +34,7 @@ async function readJson(filePath) {
  * Returns null if the dep is not installed.
  * @param {string} depName
  * @param {string} fromDir
- * @returns {Promise<string | null>}
+ * @returns {Promise<string | null>} Absolute dependency directory, or null when missing.
  */
 async function resolveDepDir(depName, fromDir) {
   const linkPath = path.join(fromDir, 'node_modules', ...depName.split('/'))
@@ -51,7 +51,7 @@ async function resolveDepDir(depName, fromDir) {
  * `@rstore/*` package reachable through `dependencies`.
  * @param {string} pkgDir
  * @param {Map<string, string>} out name -> absolute package dir
- * @returns {Promise<Map<string, string>>}
+ * @returns {Promise<Map<string, string>>} Collected package names mapped to package directories.
  */
 async function collectRstoreDeps(pkgDir, out = new Map()) {
   const pkg = await readJson(path.join(pkgDir, 'package.json'))
@@ -166,7 +166,7 @@ async function syncDepSkills(targetDir) {
  * target package's copy always wins.
  * @param {string} _skillDir
  * @param {string} pkgName
- * @returns {Promise<boolean>}
+ * @returns {Promise<boolean>} Whether the skill folder appears to belong to the package.
  */
 async function isOwnSkill(_skillDir, pkgName) {
   const unscoped = pkgName.replace(/^@[^/]+\//, '')

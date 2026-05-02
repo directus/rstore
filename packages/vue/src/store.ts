@@ -107,6 +107,7 @@ export async function createStore<
       getStore: () => storeProxy,
       cacheStaggering: options.cacheStaggering,
       tombstoneGc: options.tombstoneGc,
+      isServer: options.isServer,
     }),
     hooks: createHooks(),
     findDefaults: options.findDefaults,
