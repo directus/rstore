@@ -1,293 +1,172 @@
-/* eslint-disable eqeqeq */
+import type { DirectusFilterContext, DirectusFilterEvaluation, DirectusQueryEvaluation } from './filter-types'
+import { evaluateOperator, paginateItems, sortItems } from './filter-operators'
+import { supported, unsupported } from './filter-types'
+import { readItemValue, resolveFilterValue } from './filter-values'
 
-import type { QueryFilter } from '@directus/sdk'
-import type { ResolvedCollection } from '@rstore/shared'
-import type { VueStore } from '@rstore/vue'
+const GEOMETRY_OPERATORS = new Set([
+  '_intersects',
+  '_nintersects',
+  '_intersects_bbox',
+  '_nintersects_bbox',
+])
 
-const DYNAMIC_VARIABLES = {
-  $CURRENT_USER: () => {
-    // TODO: get current user
-    throw new Error('Not implemented')
-  },
-  $CURRENT_ROLE: () => {
-    // TODO: get current role
-    throw new Error('Not implemented')
-  },
-  $NOW: () => new Date(),
-}
+const RELATION_OPERATORS = new Set(['_some', '_none'])
 
-const FUNCTION_PARAMETERS = {
-  year: (date: Date) => date.getFullYear(),
-  month: (date: Date) => date.getMonth() + 1,
-  week: (date: Date) => {
-    const startDate = new Date(date.getFullYear(), 0, 1)
-    const days = Math.floor((date.valueOf() - startDate.valueOf()) / (1000 * 60 * 60 * 24))
-    return Math.ceil((days + startDate.getDay() + 1) / 7)
-  },
-  day: (date: Date) => date.getDate(),
-  weekday: (date: Date) => date.getDay(),
-  hour: (date: Date) => date.getHours(),
-  minute: (date: Date) => date.getMinutes(),
-  second: (date: Date) => date.getSeconds(),
-  count: (value: any) => {
-    if (Array.isArray(value)) {
-      return value.length
-    }
-    else if (typeof value === 'object') {
-      return Object.keys(value).length
-    }
-    return 0
-  },
-}
-
-export function filterItem(store: VueStore, collection: ResolvedCollection, item: any, filter: QueryFilter<any, any>): boolean {
-  // TODO relation filter
-  // TODO user-related dynamic variables
-  // TODO $FOLLOW
+/**
+ * Evaluates a Directus filter against a single local cache item.
+ */
+export function evaluateDirectusFilter(
+  item: Record<string, any>,
+  filter: Record<string, any> | undefined,
+  context: DirectusFilterContext = {},
+): DirectusFilterEvaluation {
+  if (!filter || !Object.keys(filter).length) {
+    return supported(true)
+  }
 
   for (const key in filter) {
-    const filterValue = (filter as any)[key]
-    if (key === '_and') {
-      if ((filterValue as any[]).every(f => filterItem(store, collection, item, f))) {
-        return true
-      }
-    }
-    else if (key === '_or') {
-      if ((filterValue as any[]).some(f => filterItem(store, collection, item, f))) {
-        return true
-      }
-    }
-    else if (key in collection.relations) {
-      throw new Error('Relation filter not implemented yet')
-    }
-
-    // Field
-    const [operator] = Object.keys(filterValue)
-    if (!operator) {
-      throw new Error('Invalid filter operator')
-    }
-
-    let value = filterValue[operator]
-
-    // Dynamic variables
-    if (typeof value === 'string') {
-      if (value in DYNAMIC_VARIABLES) {
-        value = DYNAMIC_VARIABLES[value as keyof typeof DYNAMIC_VARIABLES]()
-      }
-      else if (value.startsWith('$NOW(') && value.endsWith(')')) {
-        const [, distance] = /\$NOW\((.*)\)/.exec(value) ?? []
-        if (distance) {
-          const date = new Date()
-          const [distanceValue, unit] = distance.split(' ')
-          switch (unit) {
-            case 'seconds':
-              date.setSeconds(date.getSeconds() + Number.parseInt(distanceValue))
-              break
-            case 'minutes':
-              date.setMinutes(date.getMinutes() + Number.parseInt(distanceValue))
-              break
-            case 'hours':
-              date.setHours(date.getHours() + Number.parseInt(distanceValue))
-              break
-            case 'days':
-              date.setDate(date.getDate() + Number.parseInt(distanceValue))
-              break
-            case 'months':
-              date.setMonth(date.getMonth() + Number.parseInt(distanceValue))
-              break
-            case 'years':
-              date.setFullYear(date.getFullYear() + Number.parseInt(distanceValue))
-              break
-            default:
-              throw new Error(`Invalid date unit: ${unit}`)
-          }
-          value = date
-        }
-        else {
-          throw new Error('Invalid date distance')
-        }
-      }
-    }
-
-    let itemValue
-
-    // Function parameters
-    const functionParameterRegResult = /^(\w+)\((.*)\)$/.exec(key) ?? []
-    if (functionParameterRegResult?.[1] in FUNCTION_PARAMETERS) {
-      const functionName = functionParameterRegResult[1] as keyof typeof FUNCTION_PARAMETERS
-      const functionParameter = functionParameterRegResult[2]
-      if (functionParameter in item) {
-        itemValue = FUNCTION_PARAMETERS[functionName](item[functionParameter])
-      }
-      else {
-        throw new Error(`Invalid filter parameter: ${functionParameter}`)
-      }
-    }
-    else {
-      itemValue = item[key]
-    }
-
-    switch (operator) {
-      case '_eq': {
-        if (itemValue == value) {
-          return true
-        }
-        break
-      }
-      case '_neq': {
-        if (itemValue != value) {
-          return true
-        }
-        break
-      }
-      case '_lt': {
-        if (itemValue < value) {
-          return true
-        }
-        break
-      }
-      case '_lte': {
-        if (itemValue <= value) {
-          return true
-        }
-        break
-      }
-      case '_gt': {
-        if (itemValue > value) {
-          return true
-        }
-        break
-      }
-      case '_gte': {
-        if (itemValue >= value) {
-          return true
-        }
-        break
-      }
-      case '_in': {
-        if (Array.isArray(value) && value.includes(itemValue)) {
-          return true
-        }
-        break
-      }
-      case '_nin': {
-        if (Array.isArray(value) && !value.includes(itemValue)) {
-          return true
-        }
-        break
-      }
-      case '_null': {
-        if (itemValue == null) {
-          return true
-        }
-        break
-      }
-      case '_nnull': {
-        if (itemValue != null) {
-          return true
-        }
-        break
-      }
-      case '_contains': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && itemValue.includes(value)) {
-          return true
-        }
-        break
-      }
-      case '_icontains': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && itemValue.toLowerCase().includes(value.toLowerCase())) {
-          return true
-        }
-        break
-      }
-      case '_ncontains': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && !itemValue.includes(value)) {
-          return true
-        }
-        break
-      }
-      case '_starts_with': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && itemValue.startsWith(value)) {
-          return true
-        }
-        break
-      }
-      case '_istarts_with': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && itemValue.toLowerCase().startsWith(value.toLowerCase())) {
-          return true
-        }
-        break
-      }
-      case '_nstarts_with': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && !itemValue.startsWith(value)) {
-          return true
-        }
-        break
-      }
-      case '_nistarts_with': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && !itemValue.toLowerCase().startsWith(value.toLowerCase())) {
-          return true
-        }
-        break
-      }
-      case '_ends_with': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && itemValue.endsWith(value)) {
-          return true
-        }
-        break
-      }
-      case '_iends_with': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && itemValue.toLowerCase().endsWith(value.toLowerCase())) {
-          return true
-        }
-        break
-      }
-      case '_nends_with': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && !itemValue.endsWith(value)) {
-          return true
-        }
-        break
-      }
-      case '_niends_with': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && !itemValue.toLowerCase().endsWith(value.toLowerCase())) {
-          return true
-        }
-        break
-      }
-      case '_between': {
-        if (Array.isArray(value) && value.length === 2 && itemValue >= value[0] && itemValue <= value[1]) {
-          return true
-        }
-        break
-      }
-      case '_nbetween': {
-        if (Array.isArray(value) && value.length === 2 && (itemValue < value[0] || itemValue > value[1])) {
-          return true
-        }
-        break
-      }
-      case '_empty': {
-        if (!itemValue) {
-          return true
-        }
-        break
-      }
-      case '_nempty': {
-        if (itemValue) {
-          return true
-        }
-        break
-      }
-      case '_regex': {
-        if (typeof itemValue === 'string' && typeof value === 'string' && new RegExp(value).test(itemValue)) {
-          return true
-        }
-        break
-      }
-      default:
-        throw new Error(`Filter operator not supported: ${operator}`)
+    const value = filter[key]
+    const result = evaluateFilterEntry(item, key, value, context)
+    if (!result.supported || !result.matches) {
+      return result
     }
   }
 
-  return false
+  return supported(true)
+}
+
+/**
+ * Applies Directus cache-safe filter, sort, and pagination options.
+ */
+export function applyDirectusQuery<TItem extends Record<string, any>>(
+  items: TItem[],
+  query: Record<string, any> | undefined,
+  context: DirectusFilterContext = {},
+): DirectusQueryEvaluation<TItem> {
+  if (query?.search) {
+    return unsupported('Directus search cannot be evaluated cache-side')
+  }
+  if (query?.deep || query?.alias || query?.version || query?.versionRaw) {
+    return unsupported('Nested, aliased, or versioned Directus queries require a fetch')
+  }
+
+  let result = items
+  if (query?.filter) {
+    const filtered: TItem[] = []
+    for (const item of items) {
+      const evaluation = evaluateDirectusFilter(item, query.filter, context)
+      if (!evaluation.supported) {
+        return evaluation
+      }
+      if (evaluation.matches) {
+        filtered.push(item)
+      }
+    }
+    result = filtered
+  }
+
+  return {
+    supported: true,
+    items: paginateItems(sortItems(result, query?.sort), query),
+  }
+}
+
+/**
+ * Backward-compatible boolean filter used by older imports.
+ */
+export function filterItem(
+  _store: any,
+  collection: DirectusFilterContext['collection'],
+  item: Record<string, any>,
+  filter: Record<string, any>,
+): boolean {
+  const result = evaluateDirectusFilter(item, filter, { collection })
+  return result.supported && result.matches
+}
+
+/**
+ * Evaluates a top-level field, function, or logical operator entry.
+ */
+function evaluateFilterEntry(
+  item: Record<string, any>,
+  key: string,
+  filterValue: any,
+  context: DirectusFilterContext,
+): DirectusFilterEvaluation {
+  if (key === '_and') {
+    return evaluateAndGroup(item, filterValue, context)
+  }
+  if (key === '_or') {
+    return evaluateOrGroup(item, filterValue, context)
+  }
+  if (context.collection?.relations?.[key]) {
+    return unsupported(`Relation filter "${key}" cannot be evaluated cache-side`)
+  }
+  if (!filterValue || typeof filterValue !== 'object' || Array.isArray(filterValue)) {
+    return unsupported(`Invalid Directus filter for "${key}"`)
+  }
+
+  for (const operator in filterValue) {
+    if (RELATION_OPERATORS.has(operator)) {
+      return unsupported(`Relation operator "${operator}" cannot be evaluated cache-side`)
+    }
+    if (GEOMETRY_OPERATORS.has(operator)) {
+      return unsupported(`Geometry operator "${operator}" cannot be evaluated cache-side`)
+    }
+
+    const value = resolveFilterValue(filterValue[operator], context)
+    if (!value.supported) {
+      return value
+    }
+
+    const matches = evaluateOperator(readItemValue(item, key), operator, value.value)
+    if (!matches.supported || !matches.matches) {
+      return matches
+    }
+  }
+
+  return supported(true)
+}
+
+/**
+ * Evaluates an `_and` filter group.
+ */
+function evaluateAndGroup(
+  item: Record<string, any>,
+  filters: any,
+  context: DirectusFilterContext,
+): DirectusFilterEvaluation {
+  if (!Array.isArray(filters)) {
+    return unsupported('Directus _and expects an array')
+  }
+  for (const filter of filters) {
+    const result = evaluateDirectusFilter(item, filter, context)
+    if (!result.supported || !result.matches) {
+      return result
+    }
+  }
+  return supported(true)
+}
+
+/**
+ * Evaluates an `_or` filter group.
+ */
+function evaluateOrGroup(
+  item: Record<string, any>,
+  filters: any,
+  context: DirectusFilterContext,
+): DirectusFilterEvaluation {
+  if (!Array.isArray(filters)) {
+    return unsupported('Directus _or expects an array')
+  }
+  for (const filter of filters) {
+    const result = evaluateDirectusFilter(item, filter, context)
+    if (!result.supported) {
+      return result
+    }
+    if (result.matches) {
+      return supported(true)
+    }
+  }
+  return supported(false)
 }

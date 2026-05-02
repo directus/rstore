@@ -769,9 +769,9 @@ importers:
 
   packages/playground-nuxt-directus:
     dependencies:
-      '@libsql/client':
-        specifier: 'catalog:'
-        version: 0.14.0
+      '@directus/sdk':
+        specifier: ^19.0.1
+        version: 19.1.0
       '@rstore/nuxt-directus':
         specifier: workspace:*
         version: link:../nuxt-directus
@@ -781,9 +781,6 @@ importers:
       '@vueuse/nuxt':
         specifier: 'catalog:'
         version: 14.2.1(magicast@0.5.2)(nuxt@4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@25.4.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(yaml@2.8.2))(vue@3.5.30(typescript@5.9.3))
-      drizzle-orm:
-        specifier: 'catalog:'
-        version: 0.45.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)
     devDependencies:
       '@iconify-json/lucide':
         specifier: 'catalog:'
@@ -794,9 +791,9 @@ importers:
       '@nuxt/ui':
         specifier: 'catalog:'
         version: 3.3.7(@babel/parser@7.29.0)(change-case@5.4.4)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(embla-carousel@8.6.0)(focus-trap@7.8.0)(ioredis@5.10.0)(magicast@0.5.2)(typescript@5.9.3)(vite@7.3.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(vue-router@4.6.4(vue@3.5.30(typescript@5.9.3)))(vue@3.5.30(typescript@5.9.3))(zod@3.25.76)
-      drizzle-kit:
+      '@playwright/test':
         specifier: 'catalog:'
-        version: 0.30.6
+        version: 1.58.2
       nuxt:
         specifier: 'catalog:'
         version: 4.3.1(@libsql/client@0.14.0)(@parcel/watcher@2.5.6)(@types/node@25.4.0)(@vue/compiler-sfc@3.5.30)(cac@6.7.14)(commander@13.1.0)(db0@0.3.4(@libsql/client@0.14.0)(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0)))(drizzle-orm@0.45.1(@cloudflare/workers-types@4.20260310.1)(@libsql/client@0.14.0)(gel@2.2.0))(eslint@9.39.4(jiti@2.6.1))(ioredis@5.10.0)(lightningcss@1.32.0)(magicast@0.5.2)(optionator@0.9.4)(rollup@4.59.0)(terser@5.46.0)(typescript@5.9.3)(vite@7.3.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))(yaml@2.8.2)

@@ -1,7 +1,9 @@
-import type { createDirectus } from '@directus/sdk'
-import { useNuxtApp } from 'nuxt/app'
+import { useNuxtApp } from '#imports'
 
-export function useDirectus(): ReturnType<typeof createDirectus> {
+/**
+ * Returns the Directus SDK client registered by the rstore Directus plugin.
+ */
+export function useDirectus(): any {
   const nuxt = useNuxtApp()
   return nuxt.$directus as any
 }

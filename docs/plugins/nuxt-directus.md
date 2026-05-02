@@ -46,6 +46,7 @@ export default defineNuxtConfig({
   rstoreDirectus: {
     url: 'https://your-directus-instance.com', // The URL of your Directus instance
     adminToken: process.env.DIRECTUS_TOKEN, // or use runtime config indirection
+    scopeId: 'rstore-directus', // Optional
   },
 })
 ```
@@ -73,14 +74,63 @@ const { data: todos } = await store.Todos.query(q => q.many({
 </script>
 ```
 
-In this example, `Todos` is the Directus collection name exposed on the store API. The query uses standard Directus [filter rules](https://directus.io/docs/guides/connect/filter-rules), which are also computed client-side because rstore is local-first.
+In this example, `Todos` is the Directus collection name exposed on the store API. The query uses standard Directus [filter rules](https://docs.directus.io/reference/filter-rules), which are also computed client-side when rstore can safely evaluate them from the local cache.
 
-## Filtering
+## Query Options
 
-You can use the `filter` option in your queries to filter the data returned from Directus. The filter rules are the same as the ones used in Directus, so you can refer to the [Directus documentation](https://directus.io/docs/guides/connect/filter-rules) for more information.
+You can use Directus [global query parameters](https://docs.directus.io/reference/query) directly in rstore find options:
 
-Some options are not supported just yet:
+```ts
+const { data: todos } = await store.Todos.query(q => q.many({
+  filter: {
+    completed: { _eq: false },
+  },
+  fields: ['id', 'title', 'completed'],
+  sort: ['-date_created'],
+  limit: 20,
+  offset: 0,
+}))
+```
+
+Supported REST query options are:
+
+- `filter`
+- `fields`
+- `search`
+- `sort`
+- `limit`
+- `offset`
+- `page`
+- `deep`
+- `alias`
+- `backlink`
+- `version`
+- `versionRaw`
+
+rstore pagination options are also mapped to Directus requests: `pageIndex` and `pageSize` become `offset` and `limit` when explicit Directus pagination is not provided.
+
+## Cache Filtering
+
+The module evaluates supported Directus filters, sorting, and pagination locally when reading from the rstore cache. If a query cannot be evaluated safely, rstore falls through to a Directus fetch instead of returning a possibly incorrect cache result.
+
+Cache-side filtering supports scalar operators such as `_eq`, `_neq`, `_lt`, `_lte`, `_gt`, `_gte`, `_in`, `_nin`, `_null`, `_nnull`, string contains/starts/ends variants, `_between`, `_nbetween`, `_empty`, `_nempty`, `_regex`, `$NOW`, and Directus function parameters such as `year(date_created)`.
+
+These filters are sent to Directus but are not evaluated locally yet:
 
 - Relation filters
-- `$CURRENT_USER` and `$CURRENT_ROLE` dynamic variables
+- `$CURRENT_USER`, `$CURRENT_ROLE`, `$CURRENT_ROLES`, and `$CURRENT_POLICIES` dynamic variables
 - `$FOLLOW`
+- Geometry operators
+
+## Generated Schema
+
+At Nuxt build time, the module introspects Directus collections, fields, and relations with the admin token. It generates rstore collections with:
+
+- Primary key-aware `getKey` functions
+- Directus singleton metadata
+- TypeScript item interfaces from Directus fields
+- Safe one-to-many alias-side rstore relations
+
+Directus singleton collections are exposed as rstore collections with one stable local key. Reads use Directus singleton reads and updates use Directus singleton updates.
+
+For relations, the module keeps many-to-one foreign key fields as regular scalar fields. It only generates alias-side relations when Directus exposes a non-colliding alias field, which avoids replacing raw foreign keys with nested objects in the rstore cache.

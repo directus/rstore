@@ -85,7 +85,8 @@ export function createCache<
   // Auto-GC keeps the tombstone store from growing unboundedly in long-lived
   // clients. Skipped during SSR / when explicitly disabled.
   let stopTombstoneGc: (() => void) | undefined
-  if (tombstoneGc !== false && typeof setInterval !== 'undefined') {
+  const canScheduleTombstoneGc = (import.meta as unknown as { client?: boolean }).client === true && typeof setInterval !== 'undefined'
+  if (tombstoneGc !== false && canScheduleTombstoneGc) {
     stopTombstoneGc = scheduleTombstoneGc(state.tombstones, {
       intervalMs: tombstoneGc.intervalMs ?? 60_000,
       ttlMs: tombstoneGc.ttlMs ?? 24 * 60 * 60 * 1000,

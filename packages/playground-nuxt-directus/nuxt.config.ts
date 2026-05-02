@@ -1,7 +1,11 @@
+import process from 'node:process'
+
+const directusURL = process.env.DIRECTUS_URL ?? 'http://127.0.0.1:8056'
+const directusToken = process.env.DIRECTUS_TOKEN ?? 'rstore-directus-e2e-token'
+
 export default defineNuxtConfig({
   modules: [
     '@nuxt/ui',
-    // '@rstore/nuxt-drizzle',
     '../nuxt-directus/src',
     '@vueuse/nuxt',
   ],
@@ -9,7 +13,7 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-09-01',
   css: ['~/assets/style.css'],
   rstoreDirectus: {
-    url: import.meta.env.DIRECTUS_URL,
-    adminToken: import.meta.env.DIRECTUS_TOKEN,
+    url: directusURL,
+    adminToken: directusToken,
   },
 })

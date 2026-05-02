@@ -1,0 +1,44 @@
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: directus
+      POSTGRES_USER: directus
+      POSTGRES_PASSWORD: directus
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U directus -d directus']
+      interval: 2s
+      timeout: 5s
+      retries: 30
+    volumes:
+      - directus-e2e-database:/var/lib/postgresql/data
+
+  directus:
+    image: directus/directus:11.16
+    ports:
+      - '8056:8055'
+    depends_on:
+      database:
+        condition: service_healthy
+    environment:
+      SECRET: rstore_directus_e2e_secret_32_chars_minimum
+      ADMIN_EMAIL: admin@example.com
+      ADMIN_PASSWORD: directus
+      ADMIN_TOKEN: rstore-directus-e2e-token
+      DB_CLIENT: pg
+      DB_HOST: database
+      DB_PORT: 5432
+      DB_DATABASE: directus
+      DB_USER: directus
+      DB_PASSWORD: directus
+      PUBLIC_URL: http://127.0.0.1:8056
+      CORS_ENABLED: 'true'
+      CORS_ORIGIN: 'true'
+    healthcheck:
+      test: ['CMD', 'node', '-e', 'fetch("http://127.0.0.1:8055/server/health").then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))']
+      interval: 2s
+      timeout: 5s
+      retries: 60
+
+volumes:
+  directus-e2e-database:

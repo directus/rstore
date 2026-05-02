@@ -1,24 +1,29 @@
 {
-  "name": "rstore-drizzle-playground",
+  "name": "rstore-nuxt-directus-playground",
   "type": "module",
   "private": true,
   "scripts": {
     "dev": "nuxt dev",
     "dev:build": "nuxt build",
-    "dev:prepare": "nuxt prepare"
+    "dev:prepare": "nuxt prepare",
+    "dev:preview": "nuxt preview",
+    "directus:e2e:up": "docker compose -p rstore-nuxt-directus-e2e -f docker-compose.e2e.yml up -d --wait",
+    "directus:e2e:down": "docker compose -p rstore-nuxt-directus-e2e -f docker-compose.e2e.yml down --volumes --remove-orphans",
+    "directus:e2e:seed": "node ./scripts/seed-directus-e2e.mjs",
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --ui"
   },
   "dependencies": {
-    "@libsql/client": "catalog:",
+    "@directus/sdk": "^19.0.1",
     "@rstore/nuxt-directus": "workspace:*",
     "@vueuse/core": "catalog:",
-    "@vueuse/nuxt": "catalog:",
-    "drizzle-orm": "catalog:"
+    "@vueuse/nuxt": "catalog:"
   },
   "devDependencies": {
     "@iconify-json/lucide": "catalog:",
     "@iconify-json/simple-icons": "catalog:",
     "@nuxt/ui": "catalog:",
-    "drizzle-kit": "catalog:",
+    "@playwright/test": "catalog:",
     "nuxt": "catalog:"
   }
 }
