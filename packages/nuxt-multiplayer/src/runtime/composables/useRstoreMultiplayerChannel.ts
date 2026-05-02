@@ -3,6 +3,7 @@ import type { MultiplayerLeaveMessage, MultiplayerMessage, MultiplayerPeer, Mult
 import { useWebSocket } from '@vueuse/core'
 import { useRuntimeConfig } from 'nuxt/app'
 import { computed, onUnmounted, ref, shallowRef, triggerRef, watch } from 'vue'
+import { isMultiplayerPeerStrict, validateMultiplayerMessage } from '../utils/messageGuards'
 import { areMultiplayerTextCursorsEqual, rebaseMultiplayerTextCursor } from '../utils/multiplayerTextCursor'
 
 const DEFAULT_COLORS = [
@@ -172,28 +173,26 @@ export function useRstoreMultiplayerChannel<
       return
     }
 
-    try {
-      const message = JSON.parse(data as string) as MultiplayerMessage<TUpdate, TField>
-
-      if (message.type === 'multiplayer:update' && message.roomId === options.roomId && message.userId !== user.id) {
-        remoteUpdate.value = message.data
-      }
-      else if (message.type === 'multiplayer:presence' && message.roomId === options.roomId && message.user?.id && message.user.id !== user.id) {
-        peers.value.set(message.user.id, {
-          ...message.user,
-          field: message.field ?? null,
-          cursor: message.cursor ?? null,
-          lastSeen: Date.now(),
-        })
-        triggerRef(peers)
-      }
-      else if (message.type === 'multiplayer:leave' && message.roomId === options.roomId) {
-        peers.value.delete(message.userId)
-        triggerRef(peers)
-      }
+    const message = validateMultiplayerMessage<TUpdate, TField>(data as unknown)
+    if (!message) {
+      return
     }
-    catch {
-      // Ignore unrelated messages sent over the same socket.
+
+    if (message.type === 'multiplayer:update' && message.roomId === options.roomId && message.userId !== user.id) {
+      remoteUpdate.value = message.data
+    }
+    else if (message.type === 'multiplayer:presence' && message.roomId === options.roomId && message.user.id !== user.id) {
+      peers.value.set(message.user.id, {
+        ...message.user,
+        field: message.field ?? null,
+        cursor: message.cursor ?? null,
+        lastSeen: Date.now(),
+      })
+      triggerRef(peers)
+    }
+    else if (message.type === 'multiplayer:leave' && message.roomId === options.roomId) {
+      peers.value.delete(message.userId)
+      triggerRef(peers)
     }
   })
 
@@ -217,7 +216,7 @@ export function useRstoreMultiplayerChannel<
 
   return {
     user,
-    peers: computed(() => Array.from(peers.value.values()).filter(isMultiplayerPeer<TField>)),
+    peers: computed(() => Array.from(peers.value.values()).filter(isMultiplayerPeerStrict<TField>)),
     remoteUpdate,
     status: ws.status,
     joinRoom,
@@ -244,11 +243,4 @@ function createMultiplayerUser(
     name,
     color,
   }
-}
-
-function isMultiplayerPeer<TField extends string>(peer: unknown): peer is MultiplayerPeer<TField> {
-  return !!peer
-    && typeof peer === 'object'
-    && 'id' in peer
-    && typeof peer.id === 'string'
 }

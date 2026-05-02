@@ -1,0 +1,48 @@
+{
+  "name": "@rstore/nuxt-multiplayer-server",
+  "type": "module",
+  "version": "0.8.4",
+  "description": "Reference realtime multiplayer server for @rstore/nuxt-multiplayer.",
+  "license": "MIT",
+  "repository": {
+    "url": "https://github.com/Akryum/rstore.git",
+    "type": "git",
+    "directory": "packages/nuxt-multiplayer-server"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/types.d.ts",
+      "import": "./dist/module.mjs",
+      "require": "./dist/module.cjs"
+    },
+    "./hooks": {
+      "types": "./dist/runtime/server/hooks.d.ts",
+      "import": "./dist/runtime/server/hooks.js"
+    }
+  },
+  "main": "./dist/module.cjs",
+  "types": "./dist/types.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "nuxt-module-build build",
+    "dev": "pnpm run build",
+    "test": "vitest run",
+    "test:types": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@nuxt/kit": "^4.0.0"
+  },
+  "devDependencies": {
+    "@nuxt/module-builder": "catalog:",
+    "@nuxt/schema": "catalog:",
+    "@types/node": "catalog:",
+    "nuxt": "catalog:",
+    "typescript": "catalog:",
+    "vitest": "catalog:"
+  }
+}

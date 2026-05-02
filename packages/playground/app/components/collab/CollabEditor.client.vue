@@ -126,6 +126,7 @@ form.$onSuccess(() => {
     <!-- Conflict banner -->
     <div
       v-if="form.$conflicts.length > 0"
+      data-testid="collab-conflict-banner"
       class="p-3 rounded-lg bg-warning-50 dark:bg-warning-950 border border-warning-200 dark:border-warning-800"
     >
       <div class="flex items-center gap-2 mb-2 font-medium text-warning-700 dark:text-warning-300">
@@ -150,6 +151,7 @@ form.$onSuccess(() => {
           variant="soft"
           color="primary"
           label="Keep mine"
+          :data-testid="`collab-conflict-keep-local-${String(conflict.field)}`"
           @click="form.$resolveConflict(conflict.field, 'local')"
         />
         <UButton
@@ -157,6 +159,7 @@ form.$onSuccess(() => {
           variant="soft"
           color="warning"
           label="Accept remote"
+          :data-testid="`collab-conflict-accept-remote-${String(conflict.field)}`"
           @click="form.$resolveConflict(conflict.field, 'remote')"
         />
       </div>
@@ -249,18 +252,24 @@ form.$onSuccess(() => {
         label="Status"
         name="status"
       >
-        <USelect
-          v-model="form.status"
-          :items="[
-            { label: 'Draft',
-              value: 'draft' },
-            { label: 'Published',
-              value: 'published' },
-          ]"
-          class="w-48"
-          @focus="statusField.onFocus"
-          @blur="statusField.onBlur"
-        />
+        <div
+          data-testid="collab-status-field"
+          @click="statusField.onFocus"
+          @focusin="statusField.onFocus"
+          @focusout="statusField.onBlur"
+        >
+          <USelect
+            v-model="form.status"
+            data-testid="collab-status-select"
+            :items="[
+              { label: 'Draft',
+                value: 'draft' },
+              { label: 'Published',
+                value: 'published' },
+            ]"
+            class="w-48"
+          />
+        </div>
       </UFormField>
 
       <USeparator />

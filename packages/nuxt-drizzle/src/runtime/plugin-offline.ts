@@ -1,6 +1,6 @@
 import type { VueStore } from '@rstore/vue'
 // @ts-expect-error virtual file
-import { syncSerializeDateValue } from '#build/$rstore-drizzle-config'
+import { scopeId as drizzleScopeId, syncSerializeDateValue } from '#build/$rstore-drizzle-config'
 import { definePlugin } from '@rstore/vue'
 import { gte } from './utils/where'
 
@@ -9,8 +9,7 @@ export default definePlugin({
 
   category: 'local',
 
-  // @TODO multi drizzle instances
-  scopeId: 'rstore-drizzle',
+  scopeId: drizzleScopeId,
 
   setup({ hook }) {
     if (import.meta.client) {

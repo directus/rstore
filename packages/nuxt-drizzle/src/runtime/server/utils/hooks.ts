@@ -66,9 +66,44 @@ export interface RstoreDrizzleItemAfterHookPayload<TResult> extends RstoreDrizzl
   key: string
 }
 
-export interface RstoreDrizzleRealtimeFilterPayload<TResult, TType extends 'created' | 'updated' | 'deleted' = 'created' | 'updated' | 'deleted'> extends RstoreDrizzleRealtimePayload<TResult, TType> {
+/**
+ * Invoked **for every update frame** that matched at least one of the
+ * peer's active subscriptions, just before the frame is forwarded to
+ * the client. Call `reject()` to suppress the frame for this peer.
+ *
+ * Because this runs per-message, it is the right place for permission
+ * checks that depend on mutable state (current role, ACL membership,
+ * row-level visibility tied to the session). Use `realtime.authorize`
+ * for one-shot subscription gating only.
+ */
+export interface RstoreDrizzleRealtimeFilterPayload<TResult> extends RstoreDrizzleRealtimePayload<TResult> {
   peer: Peer
   reject: () => void
+}
+
+/**
+ * Invoked **once** when a client sends a `subscribe` frame. Handlers may
+ * call `reject()` to refuse the subscription — the server then responds
+ * with a `{ subscription: { action: 'rejected', ... } }` frame and does
+ * NOT record the subscription.
+ *
+ * **Scope**: This hook runs at subscribe time only. If the caller's
+ * permissions can change while a subscription is active (e.g. role
+ * revoked, session expired), `realtime.authorize` will NOT be re-run —
+ * the existing subscription keeps streaming. To re-evaluate authorization
+ * on every update, do the check inside `realtime.filter` instead, and/or
+ * close the peer (`peer.close()`) when the session is invalidated.
+ */
+export interface RstoreDrizzleRealtimeAuthorizePayload {
+  peer: Peer
+  /**
+   * Collection name being subscribed to. Mirrors `subscription.collection`
+   * so `hooksForTable` can filter authorize handlers uniformly.
+   */
+  collection: string
+  subscription: import('../../utils/realtime').SubscriptionMessage
+  meta: RstoreDrizzleMeta
+  reject: (reason?: string) => void
 }
 
 export interface RstoreDrizzleHooks<
@@ -85,6 +120,7 @@ export interface RstoreDrizzleHooks<
   'item.delete.before': (payload: RstoreDrizzleItemBeforeHookPayload) => Awaitable<void>
   'item.delete.after': (payload: RstoreDrizzleItemAfterHookPayload<TResult>) => Awaitable<void>
   'realtime.filter': (payload: RstoreDrizzleRealtimeFilterPayload<TResult>) => Awaitable<void>
+  'realtime.authorize': (payload: RstoreDrizzleRealtimeAuthorizePayload) => Awaitable<void>
 }
 
 export const rstoreDrizzleHooks = createHooks<RstoreDrizzleHooks>()

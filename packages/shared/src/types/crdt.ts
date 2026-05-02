@@ -1,8 +1,17 @@
 /**
+ * A single field timestamp value. Either a legacy wall-clock number or a
+ * serialized Hybrid Logical Clock string (see `@rstore/core`'s `hlc.ts`).
+ *
+ * HLC strings sort lexicographically in causal order, so both forms can be
+ * compared with the same helper (`compareHLC`).
+ */
+export type FieldTimestampValue = number | string
+
+/**
  * Field-level timestamps for Last-Writer-Wins (LWW) register.
  * Maps field names to the timestamp of their last modification.
  */
-export type FieldTimestamps = Record<string, number>
+export type FieldTimestamps = Record<string, FieldTimestampValue>
 
 /**
  * Describes a conflict on a single field where both local and remote
@@ -12,8 +21,8 @@ export interface FieldConflict {
   field: string
   localValue: any
   remoteValue: any
-  localTimestamp: number
-  remoteTimestamp: number
+  localTimestamp: FieldTimestampValue
+  remoteTimestamp: FieldTimestampValue
 }
 
 /**

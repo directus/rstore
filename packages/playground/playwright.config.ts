@@ -13,6 +13,12 @@ export default defineConfig({
   reporter: process.env.CI
     ? [['list']]
     : [['list'], ['html', { open: 'never' }]],
+  // Multiplayer/collab tests round-trip through WebSocket pub/sub and
+  // re-render across tabs — give assertions a generous polling window
+  // so they're stable under CI load without per-call timeout overrides.
+  expect: {
+    timeout: 15_000,
+  },
   use: {
     baseURL,
     trace: 'on-first-retry',

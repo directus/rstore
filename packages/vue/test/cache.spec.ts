@@ -1,6 +1,11 @@
 import type { CacheLayer } from '@rstore/shared'
+import { stringifyHLC } from '@rstore/core'
 import { describe, expect, it, vi } from 'vitest'
 import { createStore } from '../src'
+
+function hlc(physical: number, logical = 0, nodeId = 'n') {
+  return stringifyHLC({ physical, logical, nodeId })
+}
 
 describe('cache', () => {
   const mockItem = { id: 1, name: 'Test Item' }
@@ -679,6 +684,203 @@ describe('cache', () => {
 
       // Should have the last value
       expect(cache.readItem({ collection, key: 1 })?.name).toBe('Third')
+    })
+  })
+
+  describe('tombstones', () => {
+    it('should record a tombstone when deletedAt is provided', async () => {
+      const store = await createStore({
+        schema: [{ name: 'TestCollection' }],
+        plugins: [],
+      })
+      const cache = store.$cache
+      const collection = store.$collections[0]!
+      cache.writeItem({ collection, key: 1, item: mockItem })
+      cache.deleteItem({ collection, key: 1, deletedAt: hlc(200) })
+      expect(cache.tombstones.get('TestCollection', 1)?.deletedAt).toBe(hlc(200))
+    })
+
+    it('should not record a tombstone when deletedAt is omitted (legacy path)', async () => {
+      const store = await createStore({
+        schema: [{ name: 'TestCollection' }],
+        plugins: [],
+      })
+      const cache = store.$cache
+      const collection = store.$collections[0]!
+      cache.writeItem({ collection, key: 1, item: mockItem })
+      cache.deleteItem({ collection, key: 1 })
+      expect(cache.tombstones.get('TestCollection', 1)).toBeUndefined()
+    })
+
+    it('should suppress a later write whose timestamps lose to the tombstone', async () => {
+      const store = await createStore({
+        schema: [{ name: 'TestCollection' }],
+        plugins: [],
+      })
+      const cache = store.$cache
+      const collection = store.$collections[0]!
+      cache.deleteItem({ collection, key: 1, deletedAt: hlc(500) })
+      cache.writeItem({
+        collection,
+        key: 1,
+        item: { id: 1, name: 'Ghost' },
+        fieldTimestamps: { name: hlc(200) },
+      })
+      expect(cache.readItem({ collection, key: 1 })).toBeUndefined()
+      expect(cache.tombstones.get('TestCollection', 1)?.deletedAt).toBe(hlc(500))
+    })
+
+    it('should resurrect the item and clear the tombstone when write timestamps win', async () => {
+      const store = await createStore({
+        schema: [{ name: 'TestCollection' }],
+        plugins: [],
+      })
+      const cache = store.$cache
+      const collection = store.$collections[0]!
+      cache.deleteItem({ collection, key: 1, deletedAt: hlc(100) })
+      cache.writeItem({
+        collection,
+        key: 1,
+        item: { id: 1, name: 'Reborn' },
+        fieldTimestamps: { name: hlc(300) },
+      })
+      expect(cache.readItem({ collection, key: 1 })?.name).toBe('Reborn')
+      expect(cache.tombstones.get('TestCollection', 1)).toBeUndefined()
+    })
+
+    it('should clear the tombstone on a write without timestamps (explicit intent)', async () => {
+      const store = await createStore({
+        schema: [{ name: 'TestCollection' }],
+        plugins: [],
+      })
+      const cache = store.$cache
+      const collection = store.$collections[0]!
+      cache.deleteItem({ collection, key: 1, deletedAt: hlc(500) })
+      cache.writeItem({ collection, key: 1, item: mockItem })
+      expect(cache.readItem({ collection, key: 1 })?.name).toBe('Test Item')
+      expect(cache.tombstones.get('TestCollection', 1)).toBeUndefined()
+    })
+
+    it('should gc tombstones older than the cutoff', async () => {
+      const store = await createStore({
+        schema: [{ name: 'TestCollection' }],
+        plugins: [],
+      })
+      const cache = store.$cache
+      const collection = store.$collections[0]!
+      cache.deleteItem({ collection, key: 1, deletedAt: hlc(100) })
+      cache.deleteItem({ collection, key: 2, deletedAt: hlc(300) })
+      const dropped = cache.gcTombstones(hlc(200))
+      expect(dropped).toEqual([{ collection: 'TestCollection', key: 1 }])
+      expect(cache.tombstones.get('TestCollection', 1)).toBeUndefined()
+      expect(cache.tombstones.get('TestCollection', 2)).toBeDefined()
+    })
+
+    it('should clear tombstones on clear()', async () => {
+      const store = await createStore({
+        schema: [{ name: 'TestCollection' }],
+        plugins: [],
+      })
+      const cache = store.$cache
+      const collection = store.$collections[0]!
+      cache.deleteItem({ collection, key: 1, deletedAt: hlc(100) })
+      expect(cache.tombstones.size()).toBe(1)
+      cache.clear()
+      expect(cache.tombstones.size()).toBe(0)
+    })
+
+    it('should clear tombstones for a specific collection on clearCollection', async () => {
+      const store = await createStore({
+        schema: [{ name: 'A' }, { name: 'B' }],
+        plugins: [],
+      })
+      const cache = store.$cache
+      const [a, b] = store.$collections
+      cache.deleteItem({ collection: a!, key: 1, deletedAt: hlc(100) })
+      cache.deleteItem({ collection: b!, key: 2, deletedAt: hlc(100) })
+      cache.clearCollection({ collection: a! })
+      expect(cache.tombstones.get('A', 1)).toBeUndefined()
+      expect(cache.tombstones.get('B', 2)).toBeDefined()
+    })
+
+    it('should auto-gc tombstones older than the configured ttl', async () => {
+      vi.useFakeTimers()
+      try {
+        // Pin Date.now so the TTL calculation is deterministic relative
+        // to the tombstone's HLC physical time.
+        vi.setSystemTime(new Date(10_000))
+        const store = await createStore({
+          schema: [{ name: 'TestCollection' }],
+          plugins: [],
+          tombstoneGc: { intervalMs: 1000, ttlMs: 5000 },
+        })
+        const cache = store.$cache
+        const collection = store.$collections[0]!
+
+        // Tombstone at physical time 1 — at "now" = 10000 with ttl 5000,
+        // the cutoff is 5000, so this tombstone is eligible for GC.
+        cache.deleteItem({ collection, key: 1, deletedAt: hlc(1) })
+        // Recent tombstone at physical time 9999 — survives.
+        cache.deleteItem({ collection, key: 2, deletedAt: hlc(9999) })
+
+        await vi.advanceTimersByTimeAsync(1000)
+
+        expect(cache.tombstones.get('TestCollection', 1)).toBeUndefined()
+        expect(cache.tombstones.get('TestCollection', 2)).toBeDefined()
+
+        cache.dispose()
+      }
+      finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('should not run auto-gc when tombstoneGc is false', async () => {
+      vi.useFakeTimers()
+      try {
+        vi.setSystemTime(new Date(10_000))
+        const store = await createStore({
+          schema: [{ name: 'TestCollection' }],
+          plugins: [],
+          tombstoneGc: false,
+        })
+        const cache = store.$cache
+        const collection = store.$collections[0]!
+        cache.deleteItem({ collection, key: 1, deletedAt: hlc(1) })
+
+        await vi.advanceTimersByTimeAsync(120_000)
+
+        expect(cache.tombstones.get('TestCollection', 1)).toBeDefined()
+        cache.dispose()
+      }
+      finally {
+        vi.useRealTimers()
+      }
+    })
+
+    it('dispose should stop the auto-gc timer', async () => {
+      vi.useFakeTimers()
+      try {
+        vi.setSystemTime(new Date(10_000))
+        const store = await createStore({
+          schema: [{ name: 'TestCollection' }],
+          plugins: [],
+          tombstoneGc: { intervalMs: 1000, ttlMs: 5000 },
+        })
+        const cache = store.$cache
+        const collection = store.$collections[0]!
+
+        cache.dispose()
+        cache.deleteItem({ collection, key: 1, deletedAt: hlc(1) })
+
+        // Without dispose, this would clear the tombstone after 1s.
+        await vi.advanceTimersByTimeAsync(60_000)
+
+        expect(cache.tombstones.get('TestCollection', 1)).toBeDefined()
+      }
+      finally {
+        vi.useRealTimers()
+      }
     })
   })
 })

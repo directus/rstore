@@ -1,9 +1,28 @@
 import type { Collection, CollectionDefaults, CollectionRelation, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from './collection'
-import type { FieldTimestamps } from './crdt'
+import type { FieldTimestamps, FieldTimestampValue } from './crdt'
 import type { CustomHookMeta } from './hooks'
 import type { WrappedItem } from './item'
 import type { CacheLayer } from './layer'
 import type { Module, ResolvedModuleState } from './module'
+
+/**
+ * A tombstone records the causal timestamp of a deletion so concurrent
+ * writes arriving after the delete can be suppressed (or applied, if newer).
+ */
+export interface CacheTombstone {
+  collection: string
+  key: string | number
+  deletedAt: FieldTimestampValue
+}
+
+/**
+ * Read-only view of the cache's tombstone index.
+ */
+export interface CacheTombstones {
+  get: (collection: string, key: string | number) => CacheTombstone | undefined
+  entries: () => IterableIterator<[string, CacheTombstone]>
+  size: () => number
+}
 
 /*
 
@@ -63,6 +82,12 @@ export interface Cache<
   deleteItem: <TCollection extends Collection = Collection>(params: {
     collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
     key: string | number
+    /**
+     * Causal timestamp (HLC string or legacy number) of the delete.
+     * When provided, a tombstone is recorded so that concurrent writes
+     * older than this timestamp are dropped.
+     */
+    deletedAt?: FieldTimestampValue
   }) => void
 
   readItems: <TCollection extends Collection = Collection>(params: {
@@ -156,6 +181,18 @@ export interface Cache<
 
   garbageCollect: () => void
 
+  /**
+   * Read-only access to the tombstone index. Useful for devtools/debug
+   * and protocol publishers that want to replay deletions to new subscribers.
+   */
+  tombstones: CacheTombstones
+
+  /**
+   * Drop tombstones older than the given cutoff (HLC string or numeric).
+   * Pass a number `n` to drop tombstones whose `deletedAt.physical < n`.
+   */
+  gcTombstones: (olderThan: FieldTimestampValue) => Array<{ collection: string, key: string | number }>
+
   addLayer: (layer: CacheLayer) => void
 
   getLayer: (layerId: string) => CacheLayer | undefined
@@ -171,4 +208,11 @@ export interface Cache<
    * Resume cache updates and apply all queued updates.
    */
   resume: () => void
+
+  /**
+   * Tear down any background timers (e.g. tombstone GC) owned by the
+   * cache. Safe to call multiple times. Mainly used by tests and by
+   * embedding apps that recreate the cache between tenants/sessions.
+   */
+  dispose: () => void
 }

@@ -30,13 +30,21 @@ export {
 // Protocol message types & helpers
 export type {
   ClientInitMessage,
+  InitAckMessage,
+  InitErrorMessage,
   RstoreDrizzleRealtimePayload,
   RstoreDrizzleRealtimeUpdateType,
   SubscriptionMessage,
   SubscriptionUpdateMessage,
 } from './utils/realtime'
 
-export { getSubscriptionId, normalizeSubscriptionKey } from './utils/realtime'
+export {
+  getSubscriptionId,
+  normalizeSubscriptionKey,
+  RSTORE_DRIZZLE_PROTOCOL_MAX_VERSION,
+  RSTORE_DRIZZLE_PROTOCOL_MIN_VERSION,
+  RSTORE_DRIZZLE_PROTOCOL_VERSION,
+} from './utils/realtime'
 
 // Subscription matcher — pure function used by the built-in WebSocket
 // handler; re-exported so custom realtime servers can share the exact

@@ -13,6 +13,12 @@ export default defineConfig({
   reporter: process.env.CI
     ? [['list']]
     : [['list'], ['html', { open: 'never' }]],
+  // Realtime tests cross WebSocket + DB + pubsub + remote-tab render —
+  // each step adds a few hundred ms under load. Bump the default expect
+  // timeout so per-test `{ timeout: ... }` overrides are rarely needed.
+  expect: {
+    timeout: 15_000,
+  },
   use: {
     baseURL,
     trace: 'on-first-retry',

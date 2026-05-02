@@ -126,15 +126,12 @@ describe('subscriptionMatches', () => {
     expect(matched).toBe(true)
   })
 
-  it('rejects created events for key-specific subscriptions', () => {
-    // A subscription keyed on a specific id can't match a row whose key is
-    // not yet known (new `created` frames carry no key). This protects the
-    // client from receiving irrelevant rows.
+  it('matches created events for key-specific subscriptions when the payload carries the canonical key', () => {
     const matched = subscriptionMatches(
       { action: 'subscribe', collection: 'todos', key: '42' },
-      { collection: 'todos', record: { id: 43 } },
+      { collection: 'todos', key: '42', record: { id: 42 } },
       'sqlite',
     )
-    expect(matched).toBe(false)
+    expect(matched).toBe(true)
   })
 })

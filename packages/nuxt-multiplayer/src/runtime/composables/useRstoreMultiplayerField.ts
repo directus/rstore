@@ -37,10 +37,6 @@ export function useRstoreMultiplayerField<TField extends string>(
         return
       }
 
-      if (typeof document !== 'undefined' && !document.hasFocus()) {
-        return
-      }
-
       activeField.value = null
       options.channel.clearFocus()
     }, 0)

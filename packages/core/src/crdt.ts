@@ -1,8 +1,16 @@
+import type { FieldTimestampValue } from './hlc.js'
+import { compareHLC, getDefaultClock, stringifyHLC } from './hlc.js'
+
 /**
  * Field-level timestamps for Last-Writer-Wins (LWW) register.
  * Maps field names to the timestamp of their last modification.
+ *
+ * Values are either legacy wall-clock numbers (back-compat) or serialized
+ * Hybrid Logical Clock strings. Both are compared via {@link compareHLC}.
  */
-export type FieldTimestamps = Record<string, number>
+export type FieldTimestamps = Record<string, FieldTimestampValue>
+
+export type { FieldTimestampValue } from './hlc.js'
 
 /**
  * Describes a conflict on a single field where both local and remote
@@ -12,8 +20,8 @@ export interface FieldConflict {
   field: string
   localValue: any
   remoteValue: any
-  localTimestamp: number
-  remoteTimestamp: number
+  localTimestamp: FieldTimestampValue
+  remoteTimestamp: FieldTimestampValue
 }
 
 /**
@@ -102,19 +110,23 @@ export function mergeItemFields<T extends Record<string, any>>(
     const remoteTs = remoteTimestamps[field] ?? 0
     const localVal = local[field]
     const remoteVal = remote[field]
+    const order = compareHLC(localTs, remoteTs)
 
-    if (remoteTs > localTs) {
+    if (order < 0) {
       // Remote wins
       merged[field] = remoteVal
       mergedTimestamps[field] = remoteTs
     }
-    else if (localTs > remoteTs) {
+    else if (order > 0) {
       // Local wins
       merged[field] = localVal
       mergedTimestamps[field] = localTs
     }
     else {
-      // Same timestamp — check if values differ
+      // Same timestamp — check if values differ. With HLC, ties only happen
+      // if both sides emitted the same (physical, logical, nodeId), which in
+      // practice means the same write; differing values here are a genuine
+      // conflict the caller should surface.
       if (!fieldValuesEqual(localVal, remoteVal)) {
         conflicts.push({
           field,
@@ -138,15 +150,18 @@ export function mergeItemFields<T extends Record<string, any>>(
 }
 
 /**
- * Create initial field timestamps for an object, setting all fields to the given time.
+ * Create initial field timestamps for an object.
  *
- * @param data - The object whose fields to timestamp
- * @param time - The timestamp to assign (defaults to `Date.now()`)
+ * @param data - The object whose fields to timestamp.
+ * @param time - Optional explicit timestamp. A bare number is stored as-is
+ *   (legacy behaviour). If omitted, a fresh HLC timestamp from the process
+ *   default clock is emitted and serialized.
  */
-export function createFieldTimestamps(data: Record<string, any>, time = Date.now()): FieldTimestamps {
+export function createFieldTimestamps(data: Record<string, any>, time?: FieldTimestampValue): FieldTimestamps {
+  const resolved = time ?? stringifyHLC(getDefaultClock().now())
   const timestamps: FieldTimestamps = {}
   for (const field of Object.keys(data)) {
-    timestamps[field] = time
+    timestamps[field] = resolved
   }
   return timestamps
 }
@@ -154,19 +169,22 @@ export function createFieldTimestamps(data: Record<string, any>, time = Date.now
 /**
  * Update the timestamps for the specified fields.
  *
- * @param timestamps - Existing field timestamps
- * @param fields - The fields to update
- * @param time - The timestamp to set (defaults to `Date.now()`)
- * @returns A new timestamps object with the updated fields
+ * @param timestamps - Existing field timestamps.
+ * @param fields - The fields to update.
+ * @param time - Optional explicit timestamp. When omitted a fresh HLC
+ *   timestamp is pulled from the process default clock. Providing a raw
+ *   `number` preserves legacy wall-clock semantics for opt-out.
+ * @returns A new timestamps object with the updated fields.
  */
 export function touchFields(
   timestamps: FieldTimestamps,
   fields: string[],
-  time = Date.now(),
+  time?: FieldTimestampValue,
 ): FieldTimestamps {
+  const resolved = time ?? stringifyHLC(getDefaultClock().now())
   const result = { ...timestamps }
   for (const field of fields) {
-    result[field] = time
+    result[field] = resolved
   }
   return result
 }
@@ -189,28 +207,128 @@ export function diffFields(
   return changed
 }
 
+const MAX_DEEP_EQUAL_DEPTH = 32
+
 /**
- * Compare two field values for equality.
- * Handles primitives by strict equality and arrays/objects by JSON comparison.
+ * Compare two field values for structural equality.
+ *
+ * Handles primitives (with `Object.is` so NaN === NaN), `Date` (by `getTime`),
+ * `Map`/`Set` (by entries/members), arrays (index-wise, order significant)
+ * and plain objects (key order independent). Recursion is capped at
+ * `MAX_DEEP_EQUAL_DEPTH` and cycles are tracked to avoid infinite loops.
  */
 export function fieldValuesEqual(a: any, b: any): boolean {
-  if (a === b)
+  return deepEqual(a, b, new WeakMap(), 0)
+}
+
+function deepEqual(a: any, b: any, visited: WeakMap<object, WeakSet<object>>, depth: number): boolean {
+  // NaN-aware identity check (Object.is treats NaN as equal).
+  if (Object.is(a, b)) {
     return true
-  if (a == null && b == null)
+  }
+  // Treat nullish values as interchangeable for compatibility with prior behavior.
+  if (a == null && b == null) {
     return true
-  if (a == null || b == null)
+  }
+  if (a == null || b == null) {
     return false
-  if (typeof a !== typeof b)
+  }
+  if (typeof a !== typeof b) {
     return false
-  if (typeof a === 'object') {
-    try {
-      return JSON.stringify(a) === JSON.stringify(b)
+  }
+  if (typeof a !== 'object') {
+    // Non-object primitives that failed Object.is above are not equal.
+    return false
+  }
+  if (depth > MAX_DEEP_EQUAL_DEPTH) {
+    return false
+  }
+
+  // Cycle guard: if we're already comparing this exact pair, assume equal so
+  // two mirror-shaped cyclic graphs don't loop forever.
+  let pairs = visited.get(a as object)
+  if (pairs?.has(b as object)) {
+    return true
+  }
+  pairs ??= new WeakSet()
+  pairs.add(b as object)
+  visited.set(a as object, pairs)
+
+  if (a instanceof Date || b instanceof Date) {
+    if (!(a instanceof Date) || !(b instanceof Date)) {
+      return false
     }
-    catch {
+    const aTime = a.getTime()
+    const bTime = b.getTime()
+    // Both invalid Dates count as equal (NaN === NaN).
+    if (Number.isNaN(aTime) && Number.isNaN(bTime)) {
+      return true
+    }
+    return aTime === bTime
+  }
+
+  const aIsArray = Array.isArray(a)
+  const bIsArray = Array.isArray(b)
+  if (aIsArray || bIsArray) {
+    if (!aIsArray || !bIsArray) {
+      return false
+    }
+    if (a.length !== b.length) {
+      return false
+    }
+    for (let i = 0; i < a.length; i++) {
+      if (!deepEqual(a[i], b[i], visited, depth + 1)) {
+        return false
+      }
+    }
+    return true
+  }
+
+  if (a instanceof Map || b instanceof Map) {
+    if (!(a instanceof Map) || !(b instanceof Map)) {
+      return false
+    }
+    if (a.size !== b.size) {
+      return false
+    }
+    for (const [key, value] of a) {
+      if (!b.has(key) || !deepEqual(value, b.get(key), visited, depth + 1)) {
+        return false
+      }
+    }
+    return true
+  }
+
+  if (a instanceof Set || b instanceof Set) {
+    if (!(a instanceof Set) || !(b instanceof Set)) {
+      return false
+    }
+    if (a.size !== b.size) {
+      return false
+    }
+    for (const value of a) {
+      if (!b.has(value)) {
+        return false
+      }
+    }
+    return true
+  }
+
+  // Plain objects — compare by own keys, order independent.
+  const aKeys = Object.keys(a)
+  const bKeys = Object.keys(b)
+  if (aKeys.length !== bKeys.length) {
+    return false
+  }
+  for (const key of aKeys) {
+    if (!Object.prototype.hasOwnProperty.call(b, key)) {
+      return false
+    }
+    if (!deepEqual((a as any)[key], (b as any)[key], visited, depth + 1)) {
       return false
     }
   }
-  return false
+  return true
 }
 
 /**
@@ -401,11 +519,38 @@ export function rebaseTextRange(
 }
 
 /**
+ * Optional metadata that disambiguates concurrent edits during a merge.
+ * When both timestamps are supplied, {@link mergeText} orders concurrent
+ * inserts at the same position by HLC instead of falling back to a
+ * lexicographic tiebreak.
+ */
+export interface MergeTextOptions {
+  /** HLC timestamp of the local edit (string form or {@link HLCTimestamp}). */
+  localTimestamp?: FieldTimestampValue
+  /** HLC timestamp of the remote edit (string form or {@link HLCTimestamp}). */
+  remoteTimestamp?: FieldTimestampValue
+}
+
+/**
  * Merge concurrent text edits made against the same base string.
  * Non-overlapping edits are merged automatically. Overlapping replacements
  * remain conflicts and must be resolved at the field level.
+ *
+ * For concurrent inserts at the *same position*, ordering depends on the
+ * supplied {@link MergeTextOptions}:
+ * - With both `localTimestamp` and `remoteTimestamp`: the smaller HLC's
+ *   text comes first, so peers that share the same timestamps converge to
+ *   the same merge regardless of which side they call "local".
+ * - Without both timestamps: fall back to a stable lexicographic tiebreak
+ *   (legacy behavior). This still converges, but does not respect the
+ *   actual order of writes.
  */
-export function mergeText(base: string, local: string, remote: string): TextMergeResult {
+export function mergeText(
+  base: string,
+  local: string,
+  remote: string,
+  options: MergeTextOptions = {},
+): TextMergeResult {
   const localChanges = diffText(base, local)
   const remoteChanges = diffText(base, remote)
 
@@ -452,6 +597,30 @@ export function mergeText(base: string, local: string, remote: string): TextMerg
       continue
     }
 
+    // Concurrent pure inserts at the exact same position — handle before
+    // `compareTextChangeOrder` because it would otherwise pick whichever
+    // side is "local" via the `aEnd <= b.index` short-circuit, breaking
+    // commutativity across peers.
+    if (
+      localChange.index === remoteChange.index
+      && localChange.deleteCount === 0
+      && remoteChange.deleteCount === 0
+    ) {
+      mergedChanges.push({
+        index: localChange.index,
+        deleteCount: 0,
+        insertText: orderConcurrentInserts(
+          localChange.insertText,
+          remoteChange.insertText,
+          options.localTimestamp,
+          options.remoteTimestamp,
+        ),
+      })
+      localIndex++
+      remoteIndex++
+      continue
+    }
+
     const order = compareTextChangeOrder(localChange, remoteChange)
 
     if (order < 0) {
@@ -466,37 +635,32 @@ export function mergeText(base: string, local: string, remote: string): TextMerg
       continue
     }
 
-    if (localChange.index === remoteChange.index && localChange.deleteCount === 0 && remoteChange.deleteCount === 0) {
-      mergedChanges.push({
-        index: localChange.index,
-        deleteCount: 0,
-        insertText: [localChange.insertText, remoteChange.insertText].sort().join(''),
-      })
-      localIndex++
-      remoteIndex++
-      continue
-    }
-
+    // Overlapping replacements cannot be merged automatically — record the
+    // conflict and skip both sides' conflicting change so we can still merge
+    // any non-overlapping changes that come after.
     conflicts.push({
       index: Math.min(localChange.index, remoteChange.index),
       localChange,
       remoteChange,
     })
-    break
+    localIndex++
+    remoteIndex++
   }
 
-  while (conflicts.length === 0 && localIndex < localChanges.length) {
+  // Drain any remaining changes on either side — these are all safe to apply
+  // because they occur after the last pair-wise comparison.
+  while (localIndex < localChanges.length) {
     mergedChanges.push(localChanges[localIndex]!)
     localIndex++
   }
 
-  while (conflicts.length === 0 && remoteIndex < remoteChanges.length) {
+  while (remoteIndex < remoteChanges.length) {
     mergedChanges.push(remoteChanges[remoteIndex]!)
     remoteIndex++
   }
 
   return {
-    merged: conflicts.length === 0 ? applyTextChanges(base, mergedChanges) : local,
+    merged: applyTextChanges(base, mergedChanges),
     localChanges,
     remoteChanges,
     conflicts,
@@ -558,4 +722,25 @@ function compareTextChangeOrder(a: TextChange, b: TextChange): number {
     return 1
 
   return 0
+}
+
+/**
+ * Decide which side's text comes first when two peers concurrently insert
+ * at the same position. Uses HLC ordering when both timestamps are present
+ * so the merge is causally consistent and commutative across peers; falls
+ * back to a stable lexicographic sort otherwise.
+ */
+function orderConcurrentInserts(
+  localText: string,
+  remoteText: string,
+  localTimestamp: FieldTimestampValue | undefined,
+  remoteTimestamp: FieldTimestampValue | undefined,
+): string {
+  if (localTimestamp != null && remoteTimestamp != null) {
+    return compareHLC(localTimestamp, remoteTimestamp) <= 0
+      ? `${localText}${remoteText}`
+      : `${remoteText}${localText}`
+  }
+  // Legacy fallback: deterministic but not causally meaningful.
+  return [localText, remoteText].sort().join('')
 }

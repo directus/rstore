@@ -1,8 +1,9 @@
-import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { TombstoneStore } from '@rstore/core'
+import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, FieldTimestampValue, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from './item'
 import type { VueStore } from './store'
-import { isKeyDefined, mergeItemFields } from '@rstore/core'
+import { createTombstoneStore, gcTombstones, isKeyDefined, mergeItemFields, scheduleTombstoneGc, shouldResurrect } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { computed, markRaw, ref, shallowRef, toValue } from 'vue'
 import { wrapItem } from './item'
@@ -33,6 +34,11 @@ interface InternalCacheState {
    * collectionName -> key -> FieldTimestamps
    */
   fieldTimestamps: Map<string, Map<string | number, FieldTimestamps>>
+  /**
+   * Deletion tombstones keyed by `${collection}:${key}`.
+   * Used to suppress concurrent updates that arrive after a delete.
+   */
+  tombstones: TombstoneStore
 }
 
 export interface CreateCacheOptions<
@@ -41,6 +47,17 @@ export interface CreateCacheOptions<
 > {
   getStore: () => VueStore<TSchema, TCollectionDefaults>
   cacheStaggering?: number
+  /**
+   * Auto-GC settings for the per-cache tombstone store. Defaults to a
+   * 60s sweep with a 24h TTL. Pass `false` to disable (e.g. on the
+   * server, where the cache lives only as long as the request).
+   */
+  tombstoneGc?: false | {
+    /** Sweep interval in ms. Defaults to 60_000. */
+    intervalMs?: number
+    /** Drop tombstones older than this many ms. Defaults to 86_400_000 (24h). */
+    ttlMs?: number
+  }
 }
 
 export function createCache<
@@ -49,6 +66,7 @@ export function createCache<
 >({
   getStore,
   cacheStaggering: rawCacheStaggering = 0,
+  tombstoneGc = {},
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): Cache {
   const cacheStaggering = Math.max(0, Math.floor(rawCacheStaggering))
   const state: InternalCacheState = {
@@ -61,6 +79,17 @@ export function createCache<
     paused: false,
     queue: [],
     fieldTimestamps: new Map(),
+    tombstones: createTombstoneStore(),
+  }
+
+  // Auto-GC keeps the tombstone store from growing unboundedly in long-lived
+  // clients. Skipped during SSR / when explicitly disabled.
+  let stopTombstoneGc: (() => void) | undefined
+  if (tombstoneGc !== false && typeof setInterval !== 'undefined') {
+    stopTombstoneGc = scheduleTombstoneGc(state.tombstones, {
+      intervalMs: tombstoneGc.intervalMs ?? 60_000,
+      ttlMs: tombstoneGc.ttlMs ?? 24 * 60 * 60 * 1000,
+    })
   }
 
   const layers: Record<string, Ref<CacheLayer[]>> = {}
@@ -436,6 +465,18 @@ export function createCache<
 
   function writeItemNow(params: Parameters<Cache['writeItem']>[0]) {
     const { collection, key, item, marker, fromWriteItems, meta } = params
+
+    // Tombstone guard: if a tombstone exists and the incoming write has
+    // per-field timestamps, drop the write when the tombstone is newer.
+    // Writes without timestamps always resurrect (explicit user intent).
+    const tomb = state.tombstones.get(collection.name, key)
+    if (tomb) {
+      if (params.fieldTimestamps && !shouldResurrect(tomb, params.fieldTimestamps)) {
+        return
+      }
+      state.tombstones.clear(collection.name, key)
+    }
+
     invalidateCollectionStateCache(collection.name)
 
     const collectionState = ensureCollectionRef(collection.name).value
@@ -630,6 +671,10 @@ export function createCache<
     collectionStateCache.clear()
     state.collectionIndexes.clear()
     state.fieldTimestamps.clear()
+    const tombIds = Array.from(state.tombstones.entries(), ([, t]) => t)
+    for (const t of tombIds) {
+      state.tombstones.clear(t.collection, t.key)
+    }
 
     const store = getStore()
     store.$hooks.callHookSync('afterCacheReset', {
@@ -724,10 +769,17 @@ export function createCache<
             break
           case 'deleteItem':
             {
-              const { collection, key } = operation.params
+              const { collection, key, deletedAt } = operation.params
               const collectionTs = state.fieldTimestamps.get(collection.name)
               if (collectionTs) {
                 collectionTs.delete(key)
+              }
+              if (deletedAt != null) {
+                state.tombstones.set({
+                  collection: collection.name,
+                  key,
+                  deletedAt,
+                })
               }
               deleteItem(collection, key)
             }
@@ -883,6 +935,11 @@ export function createCache<
     clearCollection({ collection }) {
       invalidateCollectionStateCache(collection.name)
       state.fieldTimestamps.delete(collection.name)
+      const tombIds = Array.from(state.tombstones.entries(), ([, t]) => t)
+        .filter(t => t.collection === collection.name)
+      for (const t of tombIds) {
+        state.tombstones.clear(t.collection, t.key)
+      }
       const itemsForType = state.collections[collection.name]
       if (itemsForType) {
         for (const key in itemsForType.value) {
@@ -922,12 +979,24 @@ export function createCache<
     removeLayer(layerId) {
       enqueueOperation({ type: 'removeLayer', layerId })
     },
+    tombstones: {
+      get: (c, k) => state.tombstones.get(c, k),
+      entries: () => state.tombstones.entries(),
+      size: () => state.tombstones.size(),
+    },
+    gcTombstones(olderThan: FieldTimestampValue) {
+      return gcTombstones(state.tombstones, olderThan)
+    },
     pause() {
       state.paused = true
     },
     resume() {
       state.paused = false
       flushQueuedOperations()
+    },
+    dispose() {
+      stopTombstoneGc?.()
+      stopTombstoneGc = undefined
     },
     _private: {
       state,

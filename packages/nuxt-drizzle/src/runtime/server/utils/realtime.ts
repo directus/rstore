@@ -1,5 +1,7 @@
+import type { FieldTimestamps, FieldTimestampValue } from '@rstore/shared'
 import type { Table } from 'drizzle-orm'
 import type { RstoreDrizzleRealtimePayload } from './hooks'
+import { getDefaultClock, stringifyHLC } from '@rstore/core'
 import { getDrizzleCollectionNameFromTable, getDrizzleTableFromCollection } from './index'
 import { getPubSub } from './pubsub'
 
@@ -13,11 +15,20 @@ export interface PublishRstoreDrizzleRealtimeCreatedUpdateOptions<TRecord = any>
   type: 'created'
   record: TRecord
   /**
+   * Primary key value (or composite key array). If omitted, key is inferred from `record` and table primary keys.
+   */
+  key?: RealtimeKeyInput
+  /**
    * Optional id of the client that triggered this update. The realtime
    * handler will skip forwarding the update to the peer whose `clientId`
    * matches — avoids optimistic-update echo back to the originator.
    */
   originClientId?: string
+  /**
+   * Optional explicit per-field timestamps. When omitted, a fresh HLC is
+   * generated server-side and applied to every field of the record.
+   */
+  fieldTimestamps?: FieldTimestamps
 }
 
 export interface PublishRstoreDrizzleRealtimeChangedUpdateOptions<
@@ -35,6 +46,15 @@ export interface PublishRstoreDrizzleRealtimeChangedUpdateOptions<
    * @see PublishRstoreDrizzleRealtimeCreatedUpdateOptions.originClientId
    */
   originClientId?: string
+  /**
+   * Per-field HLC timestamps for `updated` frames. Ignored for `deleted`.
+   */
+  fieldTimestamps?: FieldTimestamps
+  /**
+   * Explicit tombstone timestamp for `deleted` frames. Falls back to a
+   * fresh server HLC when omitted.
+   */
+  deletedAt?: FieldTimestampValue
 }
 
 export type PublishRstoreDrizzleRealtimeUpdateOptions<TRecord = any>
@@ -63,6 +83,19 @@ function inferRecordKey(collection: string, record: Record<string, any>): string
   }).join('::')
 }
 
+/**
+ * Build a `FieldTimestamps` object where every own field of `record` is
+ * stamped with the same HLC. Used when the caller did not supply an
+ * explicit per-field timestamp map.
+ */
+function buildUniformFieldTimestamps(record: Record<string, any>, stamp: FieldTimestampValue): FieldTimestamps {
+  const out: FieldTimestamps = {}
+  for (const key of Object.keys(record)) {
+    out[key] = stamp
+  }
+  return out
+}
+
 export function publishRstoreDrizzleRealtimeUpdate<TRecord = any>(
   options: PublishRstoreDrizzleRealtimeUpdateOptions<TRecord>,
 ): RstoreDrizzleRealtimePayload<TRecord> {
@@ -78,9 +111,19 @@ export function publishRstoreDrizzleRealtimeUpdate<TRecord = any>(
     originClientId: options.originClientId,
   } as RstoreDrizzleRealtimePayload<TRecord>
 
-  if (options.type !== 'created') {
-    const providedKey = options.key == null ? undefined : normalizeKey(options.key)
-    payload.key = providedKey ?? inferRecordKey(collection, options.record as Record<string, any>)
+  const providedKey = options.key == null ? undefined : normalizeKey(options.key)
+  payload.key = providedKey ?? inferRecordKey(collection, options.record as Record<string, any>)
+
+  // Stamp a fresh HLC on every publish so clients can CRDT-merge and
+  // tombstones order correctly. Callers can override via options.
+  const stamp = stringifyHLC(getDefaultClock().now())
+  if (options.type === 'deleted') {
+    payload.deletedAt = (options as PublishRstoreDrizzleRealtimeChangedUpdateOptions<TRecord, 'deleted'>).deletedAt ?? stamp
+  }
+  else {
+    const record = options.record as Record<string, any>
+    payload.fieldTimestamps = options.fieldTimestamps
+      ?? (record && typeof record === 'object' ? buildUniformFieldTimestamps(record, stamp) : undefined)
   }
 
   getPubSub().publish('update', payload)

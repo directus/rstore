@@ -57,6 +57,17 @@ export interface CreateStoreOptions<
    * Set to `true` for default options, or provide a `BatchOptions` object for fine-grained control.
    */
   batching?: BatchingConfig
+
+  /**
+   * Configuration for the per-cache tombstone garbage collector.
+   * Defaults to a 60s sweep with a 24h TTL — long enough for most
+   * intermittent connectivity gaps while still bounding the working
+   * set. Pass `false` to disable (e.g. on the server).
+   */
+  tombstoneGc?: false | {
+    intervalMs?: number
+    ttlMs?: number
+  }
 }
 
 export type VueStoreCollectionApiProxy<
@@ -95,6 +106,7 @@ export async function createStore<
     cache: createCache({
       getStore: () => storeProxy,
       cacheStaggering: options.cacheStaggering,
+      tombstoneGc: options.tombstoneGc,
     }),
     hooks: createHooks(),
     findDefaults: options.findDefaults,

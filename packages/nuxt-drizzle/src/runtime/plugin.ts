@@ -1,7 +1,7 @@
 import type { VueStore } from '@rstore/vue'
 import type { BatchWireOperation, BatchWireResponse } from './utils/batch'
 // @ts-expect-error virtual module
-import { apiPath, dialect } from '#build/$rstore-drizzle-config.js'
+import { apiPath, dialect, scopeId as drizzleScopeId } from '#build/$rstore-drizzle-config.js'
 import { useRequestFetch } from '#imports'
 import { definePlugin } from '@rstore/vue'
 import SuperJSON from 'superjson'
@@ -24,8 +24,7 @@ export default definePlugin({
 
   category: 'remote',
 
-  // @TODO multi drizzle instances
-  scopeId: 'rstore-drizzle',
+  scopeId: drizzleScopeId,
 
   setup({ addCollectionDefaults, hook }) {
     function parseDate(value: any): Date {

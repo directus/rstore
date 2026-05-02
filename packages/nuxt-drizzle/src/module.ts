@@ -100,6 +100,15 @@ export interface ModuleOptions {
      */
     serializeDateValue?: (date: Date) => any
   })
+
+  /**
+   * Scope id under which the realtime plugin registers. Defaults to
+   * `'rstore-drizzle'`. Override when running alongside another plugin
+   * that wants to share or isolate the scope.
+   *
+   * @default 'rstore-drizzle'
+   */
+  scopeId?: string
 }
 
 type AllTableConfig = TableConfig & (
@@ -133,6 +142,7 @@ export default defineNuxtModule<ModuleOptions>({
     })
 
     const apiPath = options.apiPath ?? '/api/rstore'
+    const scopeId = options.scopeId ?? 'rstore-drizzle'
 
     // Add files to nuxt app
     addServerHandler({
@@ -273,7 +283,7 @@ export default defineNuxtModule<ModuleOptions>({
         const collection: Collection = {
           '~type': 'collection',
           'name': key,
-          'scopeId': 'rstore-drizzle',
+          'scopeId': scopeId,
           'meta': {
             table: tableName,
             primaryKeys: config?.primaryKeys?.length ? config.primaryKeys[0]!.columns.map(col => getColumnKey(table, col)) : config?.columns?.filter(col => col.primary).map(col => getColumnKey(table, col)) ?? [],
@@ -637,6 +647,7 @@ export const wsApiPath = ${JSON.stringify(wsApiPath)}
 export const wsClientEndpoint = ${JSON.stringify(wsClientEndpoint)}
 export const wsHeartbeatInterval = ${JSON.stringify(wsHeartbeatInterval)}
 export const wsAutoReconnect = ${JSON.stringify(wsAutoReconnect)}
+export const scopeId = ${JSON.stringify(scopeId)}
 export const dialect = '${drizzleConfig.dialect}'
 export const syncSerializeDateValue = ${offlineOptions?.serializeDateValue ? offlineOptions.serializeDateValue.toString() : 'undefined'}\n`,
     })
