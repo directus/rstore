@@ -24,9 +24,11 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
+    name: 'playground-drizzle',
     command: `pnpm db:push && pnpm dev:build && NITRO_HOST=${host} pnpm dev:preview --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
+    stdout: process.env.CI ? 'pipe' : 'ignore',
     timeout: 180_000,
   },
 })

@@ -54,6 +54,13 @@ jobs:
 
   e2e:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        package:
+          - packages/playground
+          - packages/playground-drizzle
+          - packages/playground-nuxt-directus
     steps:
       - name: Set alternate npm integrity keys
         run: |
@@ -66,8 +73,8 @@ jobs:
           cache: pnpm
       - run: pnpm install
       - run: pnpm build
-      - run: pnpm -C packages/playground exec playwright install --with-deps chromium
-      - run: pnpm test:e2e
+      - run: pnpm -C "${{ matrix.package }}" exec playwright install --with-deps chromium
+      - run: pnpm -C "${{ matrix.package }}" test:e2e
 
   ci:
     runs-on: ubuntu-latest

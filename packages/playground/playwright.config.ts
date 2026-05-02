@@ -24,9 +24,11 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
+    name: 'playground',
     command: `NUXT_SESSION_PASSWORD=e2e_session_password_32_chars_long pnpm dev:build && NITRO_HOST=${host} NUXT_SESSION_PASSWORD=e2e_session_password_32_chars_long pnpm dev:preview --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
+    stdout: process.env.CI ? 'pipe' : 'ignore',
     timeout: 180_000,
   },
 })

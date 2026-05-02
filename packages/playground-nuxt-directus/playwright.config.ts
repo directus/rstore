@@ -24,9 +24,11 @@ export default defineConfig({
     trace: 'on-first-retry',
   },
   webServer: {
+    name: 'playground-nuxt-directus',
     command: `export DIRECTUS_URL=${directusURL} DIRECTUS_TOKEN=${directusToken} NITRO_HOST=${host}; pnpm directus:e2e:up && pnpm directus:e2e:seed && pnpm dev:build && pnpm dev:preview --port ${port}`,
     url: baseURL,
     reuseExistingServer: !process.env.CI,
+    stdout: process.env.CI ? 'pipe' : 'ignore',
     timeout: 240_000,
   },
 })
