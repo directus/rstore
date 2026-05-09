@@ -1,5 +1,24 @@
 import type { RstoreDrizzleCondition } from './utils/types'
 
+/**
+ * Drizzle JSON-mode columns (e.g. `text({ mode: 'json' })`) are stored as
+ * JSON-encoded text in SQL but parsed back to arrays/objects in the client
+ * cache. LIKE patterns are typically authored against the SQL representation
+ * (`'%"tag"%'` to find a string in a JSON array), so re-encode array/object
+ * field values before regex matching to keep cache and server filters
+ * consistent. Strings, numbers, booleans, null, and undefined are returned
+ * untouched.
+ */
+function coerceForLike(value: any): any {
+  if (value == null) {
+    return value
+  }
+  if (Array.isArray(value) || typeof value === 'object') {
+    return JSON.stringify(value)
+  }
+  return value
+}
+
 export function filterWhere(
   item: any,
   condition: RstoreDrizzleCondition,
@@ -42,14 +61,14 @@ export function filterWhere(
         return !condition.value.includes(item[condition.field])
       case 'like':
         // Including `%` in the pattern matches zero or more characters, and including `_` will match a single character.
-        return new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), dialect === 'sqlite' ? 'i' : undefined).test(item[condition.field])
+        return new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), dialect === 'sqlite' ? 'i' : undefined).test(coerceForLike(item[condition.field]))
       case 'notLike':
-        return !new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), dialect === 'sqlite' ? 'i' : undefined).test(item[condition.field])
+        return !new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), dialect === 'sqlite' ? 'i' : undefined).test(coerceForLike(item[condition.field]))
       case 'ilike':
         // Including `%` in the pattern matches zero or more characters, and including `_` will match a single character.
-        return new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), 'i').test(item[condition.field])
+        return new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), 'i').test(coerceForLike(item[condition.field]))
       case 'notIlike':
-        return !new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), 'i').test(item[condition.field])
+        return !new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), 'i').test(coerceForLike(item[condition.field]))
       case 'arrayContains':
         return Array.isArray(item[condition.field]) && item[condition.field].includes(condition.value)
       case 'arrayContained':

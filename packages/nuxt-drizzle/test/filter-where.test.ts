@@ -177,6 +177,40 @@ describe('filterWhere — like / ilike pattern matching', () => {
     expect(filterWhere({ name: 'HELLO' }, { operator: 'notIlike', field: 'name', value: 'hello' }, 'postgresql')).toBe(false)
     expect(filterWhere({ name: 'world' }, { operator: 'notIlike', field: 'name', value: 'hello' }, 'postgresql')).toBe(true)
   })
+
+  // JSON-mode columns (`text({ mode: 'json' })`) are stored as encoded text in
+  // SQL but parsed back to arrays/objects in the cache. Without coercion the
+  // default `Array.toString()` (`["Judge"]` → `Judge`) drops the quotes the
+  // LIKE pattern (`%"Judge"%`) was authored against and the cache filter
+  // wrongly excludes every row.
+  describe('json-mode columns (array / object fields)', () => {
+    it('like matches JSON-encoded array contents', () => {
+      const cond = { operator: 'like' as const, field: 'tags', value: '%"Judge"%' }
+      expect(filterWhere({ tags: ['Judge'] }, cond, DIALECT)).toBe(true)
+      expect(filterWhere({ tags: ['Judge', 'Promo'] }, cond, DIALECT)).toBe(true)
+      expect(filterWhere({ tags: ['Other'] }, cond, DIALECT)).toBe(false)
+      expect(filterWhere({ tags: [] }, cond, DIALECT)).toBe(false)
+      expect(filterWhere({ tags: null }, cond, DIALECT)).toBe(false)
+    })
+
+    it('like matches JSON-encoded object contents', () => {
+      const cond = { operator: 'like' as const, field: 'meta', value: '%"role":"judge"%' }
+      expect(filterWhere({ meta: { role: 'judge' } }, cond, DIALECT)).toBe(true)
+      expect(filterWhere({ meta: { role: 'player' } }, cond, DIALECT)).toBe(false)
+    })
+
+    it('notLike inverts the JSON-encoded match', () => {
+      const cond = { operator: 'notLike' as const, field: 'tags', value: '%"Judge"%' }
+      expect(filterWhere({ tags: ['Judge'] }, cond, DIALECT)).toBe(false)
+      expect(filterWhere({ tags: ['Other'] }, cond, DIALECT)).toBe(true)
+    })
+
+    it('ilike on arrays is case-insensitive across dialects', () => {
+      const cond = { operator: 'ilike' as const, field: 'tags', value: '%"judge"%' }
+      expect(filterWhere({ tags: ['Judge'] }, cond, 'postgresql')).toBe(true)
+      expect(filterWhere({ tags: ['Other'] }, cond, 'postgresql')).toBe(false)
+    })
+  })
 })
 
 describe('filterWhere — array ops', () => {
