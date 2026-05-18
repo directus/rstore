@@ -28,6 +28,14 @@ const CLIENT_ID_HEADER = 'x-rstore-client-id'
  * separate pubsub listeners.
  */
 interface PeerState {
+  /**
+   * Reference to the peer itself. Stored so the shutdown hook can iterate
+   * over `peerStates` and force-close every live socket — without this,
+   * the Nitro dev worker hangs on restart because Node's HTTP `listener.close()`
+   * waits for upgraded WebSocket connections that `closeAllConnections()`
+   * intentionally leaves open.
+   */
+  peer: any
   /** Client id used for skip-self echo suppression. Set via the `init` frame. */
   clientId?: string
   /** Whether the init ack has already been sent to this peer. */
@@ -50,19 +58,52 @@ interface PeerState {
 
 const peerStates: Map<string, PeerState> = new Map()
 
-function getPeerState(peerId: string): PeerState {
-  let state = peerStates.get(peerId)
+function getPeerState(peer: any): PeerState {
+  let state = peerStates.get(peer.id)
   if (!state) {
     state = {
+      peer,
       initAckSent: false,
       rejected: false,
       subscriptions: new Map(),
       pendingUpdates: [],
       flushScheduled: false,
     }
-    peerStates.set(peerId, state)
+    peerStates.set(peer.id, state)
   }
   return state
+}
+
+/**
+ * Close every tracked peer. Called from the Nitro `close` hook so the
+ * worker thread can finish shutting down — Node's `server.closeAllConnections()`
+ * deliberately skips upgraded sockets, which means an open WebSocket keeps
+ * `listener.close()` pending and blocks dev-server restarts.
+ *
+ * Prefers `terminate()` (forced socket destroy) over `close()` (graceful
+ * close handshake) because the close handshake races against client
+ * auto-reconnect: a polite close frame the browser ACKs after the new
+ * connection is already in flight defeats the point of shutting down.
+ *
+ * Best-effort: per-peer failures are logged and do not abort the loop, so a
+ * single misbehaving peer cannot deadlock the shutdown sequence.
+ */
+export function closeAllRstoreDrizzlePeers() {
+  for (const state of peerStates.values()) {
+    const peer = state.peer
+    try {
+      if (typeof peer?.terminate === 'function') {
+        peer.terminate()
+      }
+      else {
+        peer?.close?.(1001, 'server-shutdown')
+      }
+    }
+    catch (error) {
+      console.error('[ws] failed to close peer on shutdown', error)
+    }
+  }
+  peerStates.clear()
 }
 
 /**
@@ -159,7 +200,7 @@ export default defineWebSocketHandler({
   },
 
   open(peer) {
-    const state = getPeerState(peer.id)
+    const state = getPeerState(peer)
     const preBound = (peer.context as Record<string, unknown> | undefined)?.rstoreClientId
     if (typeof preBound === 'string' && !state.clientId) {
       state.clientId = preBound
@@ -184,7 +225,7 @@ export default defineWebSocketHandler({
       return
     }
 
-    const state = getPeerState(peer.id)
+    const state = getPeerState(peer)
 
     // Drop everything once the peer has been rejected — the close frame
     // is in flight but the client may still ship buffered data.

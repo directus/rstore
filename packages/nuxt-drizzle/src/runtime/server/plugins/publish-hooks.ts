@@ -2,6 +2,7 @@ import process from 'node:process'
 import { createHLCClock, setDefaultClock } from '@rstore/core'
 import { getHeader } from 'h3'
 import { defineNitroPlugin } from 'nitropack/runtime'
+import { closeAllRstoreDrizzlePeers } from '../api/realtime.ws'
 import { rstoreDrizzleHooks } from '../utils/hooks'
 import { publishRstoreDrizzleRealtimeUpdate } from '../utils/realtime'
 
@@ -24,7 +25,7 @@ function installServerHLC() {
   setDefaultClock(createHLCClock(nodeId))
 }
 
-export default defineNitroPlugin(() => {
+export default defineNitroPlugin((nitroApp) => {
   installServerHLC()
 
   rstoreDrizzleHooks.hook('index.post.after', async ({ event, collection, result }) => {
@@ -54,5 +55,15 @@ export default defineNitroPlugin(() => {
       record: result,
       originClientId: getHeader(event, CLIENT_ID_HEADER),
     })
+  })
+
+  // Force-close every realtime peer when Nitro shuts down. Node's
+  // `server.closeAllConnections()` (called by the dev worker) skips upgraded
+  // WebSocket sockets, so the subsequent `listener.close()` would otherwise
+  // hang waiting for sockets that the browser keeps alive via auto-reconnect
+  // — that is exactly what causes `nuxt dev` to freeze on config-change
+  // restarts. Closing the peers ourselves lets `listener.close()` settle.
+  nitroApp.hooks.hook('close', () => {
+    closeAllRstoreDrizzlePeers()
   })
 })
