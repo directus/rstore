@@ -64,11 +64,11 @@ catalogs:
       specifier: 4.0.7
       version: 4.0.7
     '@tresjs/core':
-      specifier: ^5.6.0
-      version: 5.7.0
+      specifier: ^5.8.1
+      version: 5.8.1
     '@tresjs/post-processing':
-      specifier: ^3.5.0
-      version: 3.6.0
+      specifier: ^3.7.2
+      version: 3.7.2
     '@types/node':
       specifier: ^24.3.1
       version: 24.12.0
@@ -181,10 +181,10 @@ importers:
         version: 4.0.7(vite@7.3.1(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2))
       '@tresjs/core':
         specifier: 'catalog:'
-        version: 5.7.0(three@0.183.2)(vue@3.5.30(typescript@5.9.3))
+        version: 5.8.1(three@0.183.2)(vue@3.5.30(typescript@5.9.3))
       '@tresjs/post-processing':
         specifier: 'catalog:'
-        version: 3.6.0(@tresjs/core@5.7.0(three@0.183.2)(vue@3.5.30(typescript@5.9.3)))(three@0.183.2)(vue@3.5.30(typescript@5.9.3))
+        version: 3.7.2(@tresjs/core@5.8.1(three@0.183.2)(vue@3.5.30(typescript@5.9.3)))(three@0.183.2)(vue@3.5.30(typescript@5.9.3))
       animejs:
         specifier: 'catalog:'
         version: 4.3.6
@@ -3642,16 +3642,16 @@ packages:
     peerDependencies:
       vue: ^2.7.0 || ^3.0.0
 
-  '@tresjs/core@5.7.0':
-    resolution: {integrity: sha512-omGQDyrG7m6ozbo+AWOAw1lO3UhQIKT6h/w/3Ci0TacQLzd2eFJOIsCPbicn4JI88fJG2EVT+IOQWsx9j+d+hQ==}
+  '@tresjs/core@5.8.1':
+    resolution: {integrity: sha512-Lg0S8ZY3PLMIDDh+VN21QQBSC6afITAAWJ41gOYz9L0Et5RPAqDNCR/OncQxH4CXrNe/c5GB2wqGgRT3tHPoCg==}
     peerDependencies:
       three: '>=0.133'
       vue: '>=3.4'
 
-  '@tresjs/post-processing@3.6.0':
-    resolution: {integrity: sha512-UR/P7HwEbDfFmdJab6NUhNNhALl1xTYGABtqcQMt07xI3444OyotGXwjMdd3JjaLWZ07WraXtWbwC4vwwvIezQ==}
+  '@tresjs/post-processing@3.7.2':
+    resolution: {integrity: sha512-CoaLHgm49uwDGbr0epjQ26N2KjEqaP86RmYlxcfR8wPVqfVRXaalX6t7gy87ISg3E4NVEfPhkrWOn45ovzy4zA==}
     peerDependencies:
-      '@tresjs/core': 5.7.0
+      '@tresjs/core': 5.8.1
       three: '>=0.169'
       vue: '>=3.4'
 
@@ -7061,10 +7061,10 @@ packages:
     resolution: {integrity: sha512-OW/rX8O/jXnm82Ey1k44pObPtdblfiuWnrd8X7GJ7emImCOstunGbXUpp7HdBrFQX6rJzn3sPT397Wp5aCwCHg==}
     engines: {node: ^10 || ^12 || >=14}
 
-  postprocessing@6.38.3:
-    resolution: {integrity: sha512-5qCFp8j62nWL6sSVv/RKuHscQUIV+VMMgWeHLYZQEBpAk7G+r3jA3bSKON7gZjiuxdZ/F4PXj2Jc1oPh/7Eg+g==}
+  postprocessing@6.39.1:
+    resolution: {integrity: sha512-R2dG2zy+BAx3USl5EHw+PvnrlbT5PKnZVp3se0HCR0pWH8WQdh742yNG4YWOsq6c0bFpffk0Gd2RqPeoP/wKng==}
     peerDependencies:
-      three: '>= 0.157.0 < 0.184.0'
+      three: '>= 0.168.0 < 0.185.0'
 
   prelude-ls@1.2.1:
     resolution: {integrity: sha512-vkcDPrRZo1QZLbn5RLGPpg/WmIQ65qoWWhcGKf/b5eplkkarX0m9z8ppCat4mlOqUsWpyNuYgO3VRyrYHSzX5g==}
@@ -7108,8 +7108,8 @@ packages:
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
 
-  radashi@12.7.2:
-    resolution: {integrity: sha512-BfoN4XJll34ok3rCHjVlRypymJvD3cE+M3UATC8519wUgHl1/AXt2dEEIFv5865gO6t0ENAU6qEOqjr/NcIRyQ==}
+  radashi@12.9.1:
+    resolution: {integrity: sha512-HCvrL1Ag7qnyH11UiSWQaEIiizJ7kldHjBw63aELoum7C8nQrSLqotLDuKKvoRPtO0w8azCzUQcL3yrU3lBksw==}
     engines: {node: '>=16.0.0'}
 
   radix3@1.1.2:
@@ -12009,20 +12009,20 @@ snapshots:
       '@tanstack/virtual-core': 3.13.21
       vue: 3.5.30(typescript@5.9.3)
 
-  '@tresjs/core@5.7.0(three@0.183.2)(vue@3.5.30(typescript@5.9.3))':
+  '@tresjs/core@5.8.1(three@0.183.2)(vue@3.5.30(typescript@5.9.3))':
     dependencies:
       '@pmndrs/pointer-events': 6.6.29
       '@vue/devtools-api': 7.7.9
       '@vueuse/core': 13.9.0(vue@3.5.30(typescript@5.9.3))
-      radashi: 12.7.2
+      radashi: 12.9.1
       three: 0.183.2
       vue: 3.5.30(typescript@5.9.3)
 
-  '@tresjs/post-processing@3.6.0(@tresjs/core@5.7.0(three@0.183.2)(vue@3.5.30(typescript@5.9.3)))(three@0.183.2)(vue@3.5.30(typescript@5.9.3))':
+  '@tresjs/post-processing@3.7.2(@tresjs/core@5.8.1(three@0.183.2)(vue@3.5.30(typescript@5.9.3)))(three@0.183.2)(vue@3.5.30(typescript@5.9.3))':
     dependencies:
-      '@tresjs/core': 5.7.0(three@0.183.2)(vue@3.5.30(typescript@5.9.3))
+      '@tresjs/core': 5.8.1(three@0.183.2)(vue@3.5.30(typescript@5.9.3))
       '@vueuse/core': 13.9.0(vue@3.5.30(typescript@5.9.3))
-      postprocessing: 6.38.3(three@0.183.2)
+      postprocessing: 6.39.1(three@0.183.2)
       three: 0.183.2
       vue: 3.5.30(typescript@5.9.3)
 
@@ -16552,7 +16552,7 @@ snapshots:
       picocolors: 1.1.1
       source-map-js: 1.2.1
 
-  postprocessing@6.38.3(three@0.183.2):
+  postprocessing@6.39.1(three@0.183.2):
     dependencies:
       three: 0.183.2
 
@@ -16583,7 +16583,7 @@ snapshots:
 
   queue-microtask@1.2.3: {}
 
-  radashi@12.7.2: {}
+  radashi@12.9.1: {}
 
   radix3@1.1.2: {}
 

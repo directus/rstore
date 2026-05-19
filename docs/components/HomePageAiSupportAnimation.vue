@@ -285,7 +285,9 @@ function onLoop(context: TresContextWithClock) {
         class="size-full"
         :alpha="true"
         :antialias="true"
+        :fps-limit="30"
         clear-color="#00000000"
+        render-mode="always"
         @loop="onLoop"
       >
         <TresPerspectiveCamera :position="[0, 0.25, 7.8]" :rotation="[-0.03, 0, 0]" />

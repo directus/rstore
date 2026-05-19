@@ -284,6 +284,7 @@ function onLoop({ elapsed: elapsedTime }: TresContextWithClock) {
         class="size-full"
         :alpha="true"
         clear-color="#00000000"
+        :fps-limit="30"
         @loop="onLoop"
       >
         <!-- Camera framing and user interaction -->
