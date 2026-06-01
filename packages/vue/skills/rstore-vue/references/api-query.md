@@ -17,7 +17,7 @@ await q.refresh()
 
 ## Behavior
 
-- Exposes `data`, `loading`, `error`, `refresh`, `pages`, `mainPage`, `fetchMore`, `meta`.
+- Exposes `data`, `loading`, `error`, `refresh`, `pages`, `mainPage`, `fetchMore`, `getPage`, `meta`.
 - `resultMode: 'computed'` reads the result from the cache using the query options.
 - `resultMode: 'responseRefs'` preserves backend response order by mapping stored refs back to cached items.
 

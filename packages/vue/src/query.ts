@@ -45,6 +45,12 @@ export interface VueQueryReturn<
    * @param optionsExtension Options to extend the base query options for the new page. You can provide `pageIndex` to set the index of the page in the `pages` array.
    */
   fetchMore: (optionsExtension: Partial<TOptions>) => HybridPromise<{ page: VueQueryPage<TCollection, TCollectionDefaults, TSchema, any, TResult> }>
+  /**
+   * Get a page or create a new one if it doesn't exist.
+   * @param optionsExtension Options to identify the page.
+   */
+  getPage: (optionsExtension: Partial<TOptions>) => VueQueryPage<TCollection, TCollectionDefaults, TSchema, any, TResult>
+
   meta: Ref<CustomHookMeta>
   /**
    * @private
@@ -91,6 +97,10 @@ export interface VueQueryPage<
   main: boolean
   index: number
   loading: boolean
+  /**
+   * Whether the latest page fetch has completed.
+   */
+  completed: boolean
   error: Error | null
   options: VueQueryPageOptions<TOptions>
   rawData: {
@@ -188,6 +198,7 @@ export function createQuery<
       main,
       index,
       loading: false,
+      completed: false,
       error: null,
       options: optionsExtension,
       rawData: cached ?? {
@@ -257,6 +268,7 @@ export function createQuery<
     pages,
     mainPage,
     fetchMore,
+    getPage,
     meta,
     _result: result,
   }
@@ -267,6 +279,7 @@ export function createQuery<
     pages.value = []
     const options = getPageOptions(mainPage)
     const index = options.pageIndex ?? 0
+    mainPage.index = index
     pages.value[index] = mainPage
 
     // Reset main page
@@ -283,22 +296,30 @@ export function createQuery<
     return returnObject
   }
 
+  function getPage(optionsExtension: PageOverrideOptions): VueQueryPage<TCollection, TCollectionDefaults, TSchema, TOptions, TResult> {
+    if (optionsExtension.pageIndex != null) {
+      const existingPage = pages.value[optionsExtension.pageIndex]
+      if (existingPage) {
+        return existingPage
+      }
+
+      if (optionsExtension.pageIndex === mainPage.index) {
+        pages.value[optionsExtension.pageIndex] = mainPage
+        return mainPage
+      }
+
+      const page = createPage(optionsExtension, false)
+      pages.value[optionsExtension.pageIndex] = page
+      return page
+    }
+
+    const page = createPage(optionsExtension, false)
+    pages.value.push(page)
+    return page
+  }
+
   function fetchMore(optionsExtension: PageOverrideOptions): HybridPromise<{ page: VueQueryPage<TCollection, TCollectionDefaults, TSchema, TOptions, TResult> }> {
-    let page: VueQueryPage<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>
-    if (optionsExtension.pageIndex != null && pages.value[optionsExtension.pageIndex]?.main) {
-      // Reuse main page
-      page = pages.value[optionsExtension.pageIndex]!
-    }
-    else {
-      // Create new page
-      page = createPage(optionsExtension, false)
-      if (optionsExtension.pageIndex != null) {
-        pages.value[optionsExtension.pageIndex] = page
-      }
-      else {
-        pages.value.push(page)
-      }
-    }
+    const page = getPage(optionsExtension)
     const promise = loadPage(page, false) as HybridPromise<{ page: VueQueryPage<TCollection, TCollectionDefaults, TSchema, TOptions, TResult> }>
     Object.assign(promise, { page })
     return promise
@@ -433,6 +454,8 @@ export function createQuery<
   }
 
   async function loadPage(page: VueQueryPage<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>, forceFetch: boolean) {
+    page.completed = false
+
     if (!isDisabled()) {
       loadingCount.value++
       error.value = null
@@ -523,6 +546,9 @@ export function createQuery<
       }
       finally {
         loadingCount.value--
+        if (page.requestId === savedPageRequestId && pages.value.includes(page)) {
+          page.completed = true
+        }
         page.loading = false
       }
     }

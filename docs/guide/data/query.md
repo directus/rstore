@@ -39,6 +39,14 @@ The `query` and `liveQuery` composables return an object with the following prop
 
 - `refresh`: a function that can be called to refresh the data.
 
+- `pages`: a ref containing the query pages.
+
+- `mainPage`: the main page of the query.
+
+- `fetchMore`: a function that fetches an additional page.
+
+- `getPage`: a function that returns an existing page or creates one if needed.
+
 - `meta`: a ref that contains metadata that plugins can set or update.
 
 The composables also return a promise so they can be used with async setup.
@@ -208,6 +216,10 @@ await fetchMore({
 })
 ```
 
+::: tip
+The `fetchMore` method returns an "hybrid promise", meaning you can use the result both with `await` and directly as an object.
+:::
+
 #### Distinct Pages
 
 In case you want to implement pagination in the listing view as well, you can use the `pages` ref returned by the query composable. It allows to display only one page at a time.
@@ -220,7 +232,7 @@ First you need to pass the `pageIndex` and `pageSize` options to the initial que
 const pageSize = 10
 const pageIndex = ref(0)
 
-const { pages, fetchMore }
+const { fetchMore, getPage }
   = await store.messages.query(q => q.many({
     pageIndex: 0,
     pageSize,
@@ -228,27 +240,32 @@ const { pages, fetchMore }
 ```
 
 ::: warning
-Don't use the reactive `pageIndex` ref directly in the query options. The query should always be initialized with a static `pageIndex` (usually `0`) to fetch the first page. The `pageIndex` ref should only be used to read the current page from the `pages` ref and to pass the correct `pageIndex` to the `fetchMore` function.
+Don't use the reactive `pageIndex` ref directly in the query options. The query should always be initialized with a static `pageIndex` (usually `0`) to fetch the first page. The `pageIndex` ref should only be used to get the current page with `getPage` and to pass the correct `pageIndex` to the `fetchMore` function.
 :::
 
-Then you can create a computed property to get the current page based on the `pageIndex` ref. If the page is not yet fetched, it will call `fetchMore` to fetch it:
+Then you can create a computed property to get the current page based on the `pageIndex` ref. `getPage` returns the existing page or creates an empty page object so the UI can read `data`, `loading`, `completed`, and `error` immediately. It doesn't fetch data by itself, so call `fetchMore` for non-main pages that have not completed loading yet. The main page at index `0` is loaded by the query itself.
 
 ```ts
-const currentPage = computed(() =>
-  pages.value[pageIndex.value] ?? fetchMore({
-    pageIndex: pageIndex.value,
-  }).page
-)
-```
+const currentPage = computed(() => getPage({
+  pageIndex: pageIndex.value,
+}))
 
-::: tip
-The `fetchMore` method returns an "hybrid promise", meaning you can use it both with `await` and directly in the computed property - which proves to be very convenient in this case with the nullish coalescing operator (`??`) operator.
-:::
+watch(currentPage, (page) => {
+  if (pageIndex.value > 0 && !page.completed && !page.loading) {
+    fetchMore({
+      pageIndex: pageIndex.value,
+    })
+  }
+}, {
+  immediate: true,
+})
+```
 
 You can then access some useful properties of the `currentPage`:
 
 - `page.data`: the items for the page.
 - `page.loading`: whether the page is being fetched.
+- `page.completed`: whether the latest page fetch has completed.
 - `page.error`: the error if the page could not be fetched.
 
 ```vue
@@ -288,17 +305,25 @@ const store = useStore()
 const pageSize = 10
 const pageIndex = ref(0)
 
-const { pages, fetchMore }
+const { fetchMore, getPage }
   = await store.messages.query(q => q.many({
     pageIndex: 0,
     pageSize,
   }))
 
-const currentPage = computed(() =>
-  pages.value[pageIndex.value] ?? fetchMore({
-    pageIndex: pageIndex.value,
-  }).page
-)
+const currentPage = computed(() => getPage({
+  pageIndex: pageIndex.value,
+}))
+
+watch(currentPage, (page) => {
+  if (pageIndex.value > 0 && !page.completed && !page.loading) {
+    fetchMore({
+      pageIndex: pageIndex.value,
+    })
+  }
+}, {
+  immediate: true,
+})
 </script>
 
 <template>
