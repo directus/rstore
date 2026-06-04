@@ -1,7 +1,7 @@
 import type { FieldTimestamps } from '@rstore/shared'
 import type { DeleteItemParams, EngineContext, WriteItemForRelationParams, WriteItemParams } from './types.js'
 import { pickNonSpecialProps } from '@rstore/shared'
-import { mergeItemFields } from '../crdt.js'
+import { mergeItemFields } from '../crdt/index.js'
 import { isKeyDefined } from '../key.js'
 import { shouldResurrect } from '../tombstone.js'
 import { removeKeyFromIndexes, updateItemIndexes } from './resolve.js'

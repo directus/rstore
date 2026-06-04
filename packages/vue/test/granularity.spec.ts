@@ -176,4 +176,57 @@ describe('cache reactivity granularity', () => {
     scope.stop()
     cache.dispose()
   })
+
+  it('frees an item signal + its engine subscription when the item is deleted', async () => {
+    const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
+    const cache = store.$cache
+    const collection = store.$collections[0]!
+    cache.writeItem({ collection, key: 1, item: { id: 1, label: 'a' } })
+
+    const scope = effectScope()
+    scope.run(() => {
+      watchEffect(() => {
+        void (cache.readItem({ collection, key: 1 }) as any)?.label
+      }, { flush: 'sync' })
+    })
+
+    const signals = (cache as any)._private.signals
+    expect(signals.size().items).toBe(1)
+
+    // The signal outlives the effect: nothing reclaims it implicitly.
+    scope.stop()
+    expect(signals.size().items).toBe(1)
+
+    // Deleting the item drops its signal (and unsubscribes the engine observer).
+    cache.deleteItem({ collection, key: 1 })
+    expect(signals.size().items).toBe(0)
+
+    cache.dispose()
+  })
+
+  it('disposes every signal on cache reset (clear)', async () => {
+    const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
+    const cache = store.$cache
+    const collection = store.$collections[0]!
+    cache.writeItem({ collection, key: 1, item: { id: 1, label: 'a' }, marker: 'all' })
+
+    const scope = effectScope()
+    scope.run(() => {
+      watchEffect(() => {
+        void cache.readItems({ collection, marker: 'all' }).length
+        void (cache.readItem({ collection, key: 1 }) as any)?.label
+      }, { flush: 'sync' })
+    })
+
+    const signals = (cache as any)._private.signals
+    expect(signals.size().items).toBe(1)
+    expect(signals.size().lists).toBe(1)
+
+    scope.stop()
+    cache.clear()
+    // onReset disposed every signal + its engine subscription.
+    expect(signals.size()).toEqual({ items: 0, lists: 0, indexes: 0 })
+
+    cache.dispose()
+  })
 })
