@@ -39,4 +39,21 @@ describe('store-engine: staggering & pause', () => {
     engine.resume()
     expect(engine.resolveKeys({ collection })).toEqual([1, 2])
   })
+
+  it('clears the budget-reset timer on dispose so queued writes never apply', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection], { cacheStaggering: 2 })
+
+    for (let i = 1; i <= 5; i++) {
+      engine.writeItem({ collection, key: i, item: { id: i } })
+    }
+    // Budget exhausted after 2; the rest are queued behind a pending reset timer.
+    expect(engine.resolveKeys({ collection })).toEqual([1, 2])
+
+    engine.dispose()
+    vi.advanceTimersByTime(50)
+
+    // The pending timer was cancelled: no late flush re-drove the queue.
+    expect(engine.resolveKeys({ collection })).toEqual([1, 2])
+  })
 })

@@ -16,6 +16,8 @@ export interface SignalRegistry {
   dropIndexBucket: (collection: string, indexKey: string, indexValue: string) => void
   /** Unsubscribe every registered signal. */
   dispose: () => void
+  /** Count of currently-tracked signals, for diagnostics + leak tests. */
+  size: () => { items: number, lists: number, indexes: number }
 }
 
 interface Signal {
@@ -44,6 +46,7 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
       dropItem: noop,
       dropIndexBucket: noop,
       dispose: noop,
+      size: () => ({ items: 0, lists: 0, indexes: 0 }),
     }
   }
 
@@ -149,6 +152,24 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
     indexSignals.clear()
   }
 
+  /**
+   * Count tracked signals across the three registries (item count is summed
+   * across collections; index count is summed across buckets).
+   */
+  function size(): { items: number, lists: number, indexes: number } {
+    let items = 0
+    for (const byKey of itemSignals.values()) {
+      items += byKey.size
+    }
+    let indexes = 0
+    for (const byIndexKey of indexSignals.values()) {
+      for (const byValue of byIndexKey.values()) {
+        indexes += byValue.size
+      }
+    }
+    return { items, lists: listSignals.size, indexes }
+  }
+
   return {
     trackItem,
     trackList,
@@ -156,5 +177,6 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
     dropItem,
     dropIndexBucket,
     dispose,
+    size,
   }
 }

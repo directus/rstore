@@ -143,4 +143,36 @@ describe('store-engine: indexes', () => {
 
     expect(engine.resolveKeys({ collection, indexKey: 'authorId', indexValue: 'a' })).toEqual([])
   })
+
+  it('removes a key from its index bucket when an indexed field is cleared to null', () => {
+    // Detaching a relation by setting its FK to null must drop the item from
+    // its old bucket — not leave it indexed under the stale value.
+    const collection = buildCollection('Comment', {
+      indexes: new Map([['postId', ['postId']]]),
+    })
+    const { engine } = createTestEngine([collection])
+
+    engine.writeItem({ collection, key: 1, item: { id: 1, postId: 'p1' } })
+    expect(engine.resolveKeys({ collection, indexKey: 'postId', indexValue: 'p1' })).toEqual([1])
+
+    engine.writeItem({ collection, key: 1, item: { id: 1, postId: null } })
+
+    expect(engine.resolveKeys({ collection, indexKey: 'postId', indexValue: 'p1' })).toEqual([])
+  })
+
+  it('keeps untouched index fields when a partial update changes a sibling field', () => {
+    // Regression guard for the `f in newData` fix: a multi-field index must
+    // retain the previous value of a field absent from the patch.
+    const collection = buildCollection('Event', {
+      indexes: new Map([['venue', ['city', 'room']]]),
+    })
+    const { engine } = createTestEngine([collection])
+
+    engine.writeItem({ collection, key: 1, item: { id: 1, city: 'paris', room: 'A' } })
+    // Patch only `room`; `city` is absent and must be preserved in the index.
+    engine.writeItem({ collection, key: 1, item: { id: 1, room: 'B' } })
+
+    expect(engine.resolveKeys({ collection, indexKey: 'venue', indexValue: 'paris:A' })).toEqual([])
+    expect(engine.resolveKeys({ collection, indexKey: 'venue', indexValue: 'paris:B' })).toEqual([1])
+  })
 })

@@ -70,4 +70,33 @@ describe('store-engine: serialize', () => {
     // Same reference so any reactive wrapper over it stays valid.
     expect(engine.getModuleState('m', 'k', { count: 1 })).toBe(mod)
   })
+
+  it('replaces an array module in place on setState without leaving stale slots', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+    const mod = engine.getModuleState('list', 'k', [1, 2, 3]) as number[]
+
+    engine.setState({
+      collections: {},
+      markers: {},
+      modules: { 'list:k': [9] },
+      queryMeta: {},
+    })
+
+    // Truncated in place (length corrected, no leftover holes), same reference.
+    expect(mod).toEqual([9])
+    expect(mod.length).toBe(1)
+    expect(engine.getModuleState('list', 'k', [])).toBe(mod)
+  })
+
+  it('empties an array module to length 0 on clear', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+    const mod = engine.getModuleState('list', 'k', [1, 2, 3]) as number[]
+
+    engine.clear()
+
+    expect(Array.isArray(mod)).toBe(true)
+    expect(mod.length).toBe(0)
+  })
 })
