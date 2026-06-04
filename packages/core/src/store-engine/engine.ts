@@ -165,9 +165,23 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       }
       const collectionState = ctx.collections.get(collection.name)
       if (collectionState) {
-        // Snapshot keys: each delete mutates `base` as the queue drains.
-        for (const key of Array.from(collectionState.base.keys())) {
-          enqueueOperation(ctx, { type: 'deleteItem', params: { collection, key } })
+        // Batch all deletes behind a single flush: enqueuing per key while
+        // unpaused would drain + dispatch observers once per item (O(N) on
+        // large collections). Pause around the loop, then flush once. If the
+        // caller already paused, leave the deletes queued for their resume.
+        const wasPaused = ctx.paused
+        ctx.paused = true
+        try {
+          // Snapshot keys: each delete mutates `base` as the queue drains.
+          for (const key of Array.from(collectionState.base.keys())) {
+            enqueueOperation(ctx, { type: 'deleteItem', params: { collection, key } })
+          }
+        }
+        finally {
+          ctx.paused = wasPaused
+          if (!wasPaused) {
+            flushQueuedOperations(ctx)
+          }
         }
       }
     },
@@ -220,6 +234,8 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     dispose() {
       stopTombstoneGc?.()
       stopTombstoneGc = undefined
+      // Cancel any pending staggering budget-reset timer.
+      staggering.dispose()
     },
 
     observeItem: observers.observeItem,

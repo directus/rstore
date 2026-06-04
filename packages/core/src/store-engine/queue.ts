@@ -48,6 +48,13 @@ export function createStaggering(cacheStaggering: number): Staggering {
     setFlush(fn) {
       flush = fn
     },
+    dispose() {
+      // Cancel a pending budget refill so it can't re-drive a torn-down engine.
+      if (resetTimer) {
+        clearTimeout(resetTimer)
+        resetTimer = undefined
+      }
+    },
   }
 }
 
