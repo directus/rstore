@@ -37,6 +37,7 @@
     "build": "unbuild",
     "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",
     "prepack": "node ../../scripts/sync-dep-skills.mjs .",
+    "benchmark": "vitest bench --run benchmark/cache.bench.ts",
     "test:types": "tsrs --noEmit && pnpm run build && tsrs --noEmit -p test/tsconfig.plugin-global-store.json"
   },
   "peerDependencies": {
