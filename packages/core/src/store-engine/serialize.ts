@@ -38,12 +38,24 @@ export function getState(ctx: EngineContext): CustomCacheState {
  * bridge created over it keeps observing the same object reference.
  */
 function replaceModuleContents(target: any, source: any): void {
-  if (target && typeof target === 'object' && source && typeof source === 'object') {
-    for (const key of Object.keys(target)) {
-      delete target[key]
-    }
-    Object.assign(target, source)
+  if (!(target && typeof target === 'object' && source && typeof source === 'object')) {
+    return
   }
+  // Arrays must be truncated in place: deleting indices leaves stale `length`
+  // and empty holes (`[9, <2 empty>]`), corrupting the array. Reset length and
+  // re-fill from the source when it is also an array (an empty/object source —
+  // e.g. `clear()` passing `{}` — just empties the array).
+  if (Array.isArray(target)) {
+    target.length = 0
+    if (Array.isArray(source)) {
+      target.push(...source)
+    }
+    return
+  }
+  for (const key of Object.keys(target)) {
+    delete target[key]
+  }
+  Object.assign(target, source)
 }
 
 /**
