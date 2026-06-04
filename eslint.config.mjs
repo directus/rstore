@@ -6,6 +6,9 @@ export default antfu({
     '**/.nitro',
     'docs/guide/migration/**',
     '**/skills/**',
+    // Benchmark fixtures: contains a verbatim snapshot of the previous cache
+    // implementation (the baseline) plus intentional console reporting.
+    'packages/*/benchmark/**',
   ],
   rules: {
     'vue/object-property-newline': ['error', {

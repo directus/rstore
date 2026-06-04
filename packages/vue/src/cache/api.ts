@@ -1,18 +1,9 @@
-import type { Cache, CacheOperationReceipts, CollectionDefaults, CustomCacheState, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Cache, CollectionDefaults, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CacheRuntime, VueCachePrivate } from './types'
-import { gcTombstones } from '@rstore/core'
-import { nextTick, ref, toRaw, toValue } from 'vue'
-import { getCollectionIndex, invalidateCollectionStateCache } from './context'
-import { rebuildIndexes } from './indexes'
-import { inspectCache } from './inspection'
-import { ensureLayersForCollection, getStateForCollection } from './layers'
+import { reactive } from 'vue'
+import { ensureLayersForCollection } from './context'
 import { applyMutationToCache } from './mutations'
-import { holdRetainedQueryState, releaseRetainedQueryState } from './queryRetention'
-import { clearQueryStateForCollection, clonePageRefs } from './queryState'
-import { enqueueOperation, enqueueOperationWithReceipt, enqueueWriteItems, flushQueuedOperations } from './queue'
-import { resolveRelationWriteParams } from './relationWrite'
-import { garbageCollect, sweepManagedRows } from './rowGc'
-import { createRowGcQueue } from './rowGcQueue'
+import { clearAllQueryState, clearQueryStateForCollection } from './queryState'
 import { garbageCollectItem, getWrappedItem } from './wrapped'
 
 /** Create the public Cache implementation from a cache runtime. */
@@ -46,58 +37,50 @@ export function createCacheApi<
       return getWrappedItem(ctx, collection, item, noCache)!
     },
     readItem({ collection, key }) {
-      const item = getWrappedItem(ctx, collection, getStateForCollection(ctx, collection.name)[key])
-      if (item && ctx.rowRetention.tracks(collection) && ctx.state.collections[collection.name]?.value[key])
-        ctx.rowRetention.touch(collection, key)
-      return item
+      ctx.signals.trackItem(collection.name, key)
+      return getWrappedItem(ctx, collection, ctx.engine.readItemRaw({ collection, key }))
     },
     readItems(params) {
       return readItems(ctx, params)
     },
     writeItem(params) {
-      enqueueOperation(ctx, { type: 'writeItem', params })
+      ctx.engine.writeItem(params)
     },
     writeItems(params) {
-      enqueueWriteItems(ctx, params)
+      ctx.engine.writeItems(params)
     },
     writeItemForRelation(params) {
-      enqueueOperation(ctx, { type: 'writeItem', params: resolveRelationWriteParams(ctx, params) })
+      ctx.engine.writeItemForRelation(params)
     },
     applyMutation(params) {
       return applyMutationToCache(ctx, params)
     },
     deleteItem(params) {
-      enqueueOperation(ctx, { type: 'deleteItem', params })
+      ctx.engine.deleteItem(params)
     },
-    readFieldTimestamps({ collectionName, key }) {
-      return ctx.state.fieldTimestamps.get(collectionName)?.get(key)
+    readFieldTimestamps(params) {
+      return ctx.engine.readFieldTimestamps(params)
     },
-    writeFieldTimestamps({ collectionName, key, timestamps }) {
-      let collectionTs = ctx.state.fieldTimestamps.get(collectionName)
-      if (!collectionTs) {
-        collectionTs = new Map()
-        ctx.state.fieldTimestamps.set(collectionName, collectionTs)
-      }
-      collectionTs.set(key, { ...timestamps })
+    writeFieldTimestamps(params) {
+      ctx.engine.writeFieldTimestamps(params)
     },
     getModuleState(name, key, initState) {
-      const cacheKey = `${name}:${key}`
-      if (!ctx.state.modules[cacheKey]) {
-        ctx.state.modules[cacheKey] = ref(initState)
-      }
-      return ctx.state.modules[cacheKey]!.value
+      return reactive(ctx.engine.getModuleState(name, key, initState))
     },
     getState() {
-      return getState(ctx)
+      return ctx.engine.getState()
     },
     setState(state) {
-      enqueueOperation(ctx, { type: 'setState', state })
+      ctx.state.pageRefs.clear()
+      ctx.engine.setState(state)
     },
     clear() {
-      enqueueOperation(ctx, { type: 'clear' })
+      clearAllQueryState(ctx)
+      ctx.engine.clear()
     },
-    clearCollection({ collection }) {
-      clearCollection(ctx, collection)
+    clearCollection(params) {
+      clearQueryStateForCollection(ctx, params.collection.name)
+      ctx.engine.clearCollection(params)
     },
     garbageCollectItem({ collection, item }) {
       if (ctx.rowRetention.managed(collection))
@@ -109,75 +92,31 @@ export function createCacheApi<
       garbageCollect(ctx)
     },
     addLayer(layer) {
-      enqueueOperation(ctx, { type: 'addLayer', layer })
+      ctx.engine.addLayer(layer)
     },
     getLayer(layerId) {
-      const collectionName = ctx.layerIdToCollectionName[layerId]
-      if (!collectionName) {
-        return undefined
-      }
-      return ensureLayersForCollection(ctx, collectionName).value.find(l => l.id === layerId)
+      return ctx.engine.getLayer(layerId)
     },
     removeLayer(layerId) {
-      enqueueOperation(ctx, { type: 'removeLayer', layerId })
+      ctx.engine.removeLayer(layerId)
     },
     tombstones: {
-      get: (c, k) => ctx.state.tombstones.get(c, k),
-      entries: () => ctx.state.tombstones.entries(),
-      size: () => ctx.state.tombstones.size(),
+      get: (c, k) => ctx.engine.tombstones.get(c, k),
+      entries: () => ctx.engine.tombstones.entries(),
+      size: () => ctx.engine.tombstones.size(),
     },
     gcTombstones(olderThan) {
-      return gcTombstones(ctx.state.tombstones, olderThan)
+      return ctx.engine.gcTombstones(olderThan)
     },
     pause() {
-      ctx.state.paused = true
+      ctx.engine.pause()
     },
     resume() {
-      ctx.state.paused = false
-      flushQueuedOperations(ctx)
+      ctx.engine.resume()
     },
     dispose() {
-      if (ctx.disposed) {
-        return
-      }
-      ctx.disposed = true
-      try {
-        const store = ctx.getStore()
-        // Construction can fail before the cache receives its owning store.
-        if (store) {
-          store.$hooks.callHookWith('dispose', (hooks) => {
-            let firstError: unknown
-            let failed = false
-            // Every owner gets a release notification even when another observer
-            // fails. Preserve the first failure after all resources can release.
-            for (const { callback } of hooks) {
-              try {
-                callback({ store })
-              }
-              catch (error) {
-                if (!failed) {
-                  failed = true
-                  firstError = error
-                }
-              }
-            }
-            if (failed) {
-              throw firstError
-            }
-          })
-        }
-      }
-      finally {
-        ctx.rowRetention.clear()
-        if (ctx.rowGcTimer) {
-          clearInterval(ctx.rowGcTimer)
-          ctx.rowGcTimer = undefined
-        }
-        ctx.stopTombstoneGc?.()
-        ctx.stopTombstoneGc = undefined
-        ctx.stopQueryStateSweeps?.()
-        ctx.stopQueryStateSweeps = undefined
-      }
+      ctx.engine.dispose()
+      ctx.signals.dispose()
     },
     _private: {
       scopes: ctx.scopes,
@@ -188,62 +127,27 @@ export function createCacheApi<
       getWrappedItem: (collection, item, noCache) => getWrappedItem(ctx, collection, item, noCache),
       layers: ctx.layers,
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
-      rebuildIndexes: () => rebuildIndexes(ctx, collectionName => getStateForCollection(ctx, collectionName)),
-      prune: params => enqueueOperation(ctx, { type: 'prune', params }),
-      hasRowRetention: () => ctx.getStore().$collections.some(ctx.rowRetention.managed),
-      touchRow(collection, key) {
-        if (ctx.rowRetention.tracks(collection) && ctx.state.collections[collection.name]?.value[key])
-          ctx.rowRetention.touch(collection, key)
-      },
-      collectReleasedRow(collection, key, managedOnly) {
-        if (ctx.rowRetention.managed(collection)) {
-          queueManagedGc(collection.name)
-          return
-        }
-        if (managedOnly)
-          return
-        void nextTick(() => {
-          if (ctx.disposed)
-            return
-          const item = getWrappedItem(ctx, collection, ctx.state.collections[collection.name]?.value[key])
-          if (item)
-            garbageCollectItem(ctx, collection, item)
-        })
-      },
-      holdQueryState: (queryId, holder, savedKeys = 0) => {
-        ctx.queryStateKeyCount += savedKeys
-        holdRetainedQueryState(ctx, queryId, holder)
-      },
-      releaseQueryState: holder => releaseRetainedQueryState(ctx, holder),
-      isDisposed: () => ctx.disposed === true,
     },
   } satisfies Cache & VueCachePrivate as any
 }
 
 function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit, indexKey, indexValue }: Parameters<Cache['readItems']>[0]) {
-  if (marker && !ctx.state.markers[marker]) {
+  if (keys == null && indexKey != null) {
+    ctx.signals.trackIndex(collection.name, indexKey, String(indexValue))
+  }
+  else {
+    ctx.signals.trackList(collection.name)
+  }
+
+  if (marker && !ctx.engine.hasMarker(marker)) {
     return []
   }
-  const retainedMarker = marker && ctx.markerRetention.get(marker)
-  if (retainedMarker)
-    retainedMarker.usedAt = Date.now()
-  const data: Record<string | number, ResolvedCollectionItemBase<any, any, any>> = getStateForCollection(ctx, collection.name)
+
+  const candidateKeys = ctx.engine.resolveKeys({ collection, marker, keys, indexKey, indexValue })
   const result: Array<WrappedItem<any, any, any>> = []
   let count = 0
-  const usedAt = ctx.rowRetention.tracks(collection) ? Date.now() : undefined
-
-  if (keys == null && indexKey != null) {
-    const index = getCollectionIndex(ctx, collection.name, indexKey)
-    const itemKeys = index.get(indexValue)
-    keys = itemKeys ? Array.from(itemKeys.value) : []
-  }
-
-  for (const key of keys ?? Object.keys(data)) {
-    const item = data[key]
-    if (!item) {
-      continue
-    }
-    const wrappedItem = getWrappedItem(ctx, collection, item)
+  for (const key of candidateKeys) {
+    const wrappedItem = getWrappedItem(ctx, collection, ctx.engine.readItemRaw({ collection, key }))
     if (!wrappedItem || (filter && !filter(wrappedItem))) {
       continue
     }
@@ -258,67 +162,17 @@ function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit,
   return result
 }
 
-function getState(ctx: CacheRuntime): CustomCacheState {
-  const result: CustomCacheState = {
-    collections: {},
-    markers: { ...ctx.state.markers },
-    modules: {},
-    queryMeta: ctx.state.queryMeta,
-    pageRefs: Object.fromEntries(clonePageRefs(ctx.state.pageRefs)),
-    fieldTimestamps: {},
-    // Serialized as a list: `TombstoneStore` is a Map behind an interface, and
-    // the payload has to survive JSON/devalue.
-    tombstones: Array.from(ctx.state.tombstones.entries(), ([, tombstone]) => ({
-      collection: tombstone.collection,
-      key: tombstone.key,
-      deletedAt: tombstone.deletedAt,
-    })),
-  }
-
-  for (const [collectionName, keys] of ctx.state.fieldTimestamps) {
-    const target: Record<string | number, any> = result.fieldTimestamps![collectionName] = {}
-    for (const [key, timestamps] of keys) {
-      target[key] = { ...timestamps }
-    }
-  }
-
-  for (const collectionName in ctx.state.collections) {
-    const targetState: Record<string | number, any> = result.collections[collectionName] = {}
-    const itemsForType = ctx.state.collections[collectionName]!.value
-    for (const key in itemsForType) {
-      const item = itemsForType[key]
-      if (item) {
-        targetState[key] = toValue(item)
+function garbageCollect(ctx: CacheRuntime) {
+  const store = ctx.getStore()
+  for (const collection of store.$collections) {
+    ctx.engine.forEachKey(collection.name, (key) => {
+      const wrappedItem = getWrappedItem(ctx, collection, ctx.engine.readItemRaw({ collection, key }))
+      if (wrappedItem) {
+        garbageCollectItem(ctx, collection, wrappedItem)
       }
-    }
+    })
   }
-
-  for (const moduleKey in ctx.state.modules) {
-    // Module refs are reactive, but cache snapshots are transport values.
-    // Detachment belongs to the transport (`structuredClone`/devalue), not this
-    // synchronous cache read, which preserves non-plain values such as Date.
-    result.modules[moduleKey] = toRaw(toValue(ctx.state.modules[moduleKey]!))
-  }
-
-  return result
-}
-
-function clearCollection(ctx: CacheRuntime, collection: Parameters<Cache['clearCollection']>[0]['collection']) {
-  clearQueryStateForCollection(ctx, collection.name)
-  ctx.retainedRows.delete(collection.name)
-  ctx.scopes.clear(collection.name)
-  invalidateCollectionStateCache(ctx, collection.name)
-  ctx.state.fieldTimestamps.delete(collection.name)
-  const tombIds = Array.from(ctx.state.tombstones.entries(), ([, t]) => t)
-    .filter(t => t.collection === collection.name)
-  for (const t of tombIds) {
-    ctx.state.tombstones.clear(t.collection, t.key)
-  }
-  const itemsForType = ctx.state.collections[collection.name]
-  if (!itemsForType) {
-    return
-  }
-  for (const key in itemsForType.value) {
-    enqueueOperation(ctx, { type: 'deleteItem', params: { collection, key } })
-  }
+  // Rows whose queued write was dropped or rejected are only reachable here.
+  releaseUnwrittenItems(ctx)
+  sweepQueryState(ctx)
 }

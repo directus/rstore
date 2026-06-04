@@ -15,6 +15,17 @@ export interface WrapItemOptions<
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
   item: Ref<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   metadata: WrappedItemMetadata<TCollection, TCollectionDefaults, TSchema>
+  /**
+   * Non-reactive snapshot used to seed the proxy target and the `isFrozen`
+   * check. When omitted, `item.value` is read once at construction.
+   *
+   * For engine-backed items, `item` is a tracking `computed` that registers a
+   * fine-grained signal on read. Reading it during construction would leak that
+   * dependency into whatever effect first wraps the item (e.g. a list query),
+   * defeating the per-item granularity. Passing the raw item here keeps the
+   * computed lazy: it is only evaluated when an actual field is accessed.
+   */
+  seed?: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
 }
 
 export function wrapItem<
@@ -26,6 +37,7 @@ export function wrapItem<
   collection,
   item,
   metadata,
+  seed,
 }: WrapItemOptions<TCollection, TCollectionDefaults, TSchema>): WrappedItem<TCollection, TCollectionDefaults, TSchema> {
   function getApi(): VueCollectionApi<TCollection, TCollectionDefaults, TSchema, WrappedItem<TCollection, TCollectionDefaults, TSchema>> {
     return store[collection.name as keyof typeof store] as any
@@ -33,13 +45,12 @@ export function wrapItem<
 
   const cache = store.$cache as unknown as Cache & VueCachePrivate
 
-  const isFrozen = Object.isFrozen(item.value)
+  // Construct from the non-reactive seed (falling back to a single `item.value`
+  // read) so a tracking `computed` source is not evaluated here — see `seed`.
+  const target = seed ?? item.value
+  const isFrozen = Object.isFrozen(target)
 
-  // Every trap reads `item.value`, so a detached target keeps the proxy from
-  // pinning the row version (or raw fetch response) it was created with.
-  // Frozen rows stay the target: proxy invariants require their non-configurable
-  // properties to be reported by the target itself.
-  const proxy = new Proxy(isFrozen ? item.value : {} as typeof item.value, {
+  const proxy = new Proxy(target, {
     get: (proxyTarget, key) => {
       switch (key) {
         case '$collection':
