@@ -2,10 +2,7 @@ import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollec
 import type { CacheRuntime } from './types'
 import { computed, shallowRef } from 'vue'
 import { wrapItem } from '../item'
-import { addWrappedItemKeyToLayer, ensureCollectionRef, getItemKey, getItemWrapKey } from './context'
-import { isKeyPinnedByActiveLayer } from './layers'
-import { invalidatePageRefsForItem } from './queryState'
-import { deleteItemNow } from './writes'
+import { addWrappedItemKeyToLayer, getItemKey, getItemWrapKey } from './context'
 
 /** Return the cached wrapped proxy for an item, creating it when needed. */
 export function getWrappedItem<
@@ -50,10 +47,14 @@ export function getWrappedItem<
     wrappedItem = wrapItem({
       store: ctx.getStore(),
       collection,
-      item: computed(() => layer
-        ? item
-        : ensureCollectionRef(ctx, collection.name).value[key] ?? item),
+      item: layer
+        ? shallowRef(item)
+        : computed(() => {
+            ctx.signals.trackItem(collection.name, key)
+            return ctx.engine.readItemRaw({ collection, key }) ?? item
+          }),
       metadata,
+      seed: item,
     })
     ctx.wrappedItems.set(wrapKey, wrappedItem)
     addWrappedItemKeyToLayer(ctx, item.$layer, wrapKey)
@@ -71,13 +72,7 @@ export function garbageCollectItem<TCollection extends Collection>(
     return
   }
   const key = getItemKey(collection, item)
-  if (isKeyPinnedByActiveLayer(ctx, collection.name, key)) {
-    return
-  }
-  if (!deleteItemNow(ctx, collection, key)) {
-    return
-  }
-  invalidatePageRefsForItem(ctx, collection.name, key)
+  ctx.engine.garbageCollectKey(collection, key)
   const store = ctx.getStore()
   store.$hooks.callHookSync('itemGarbageCollect', {
     store,

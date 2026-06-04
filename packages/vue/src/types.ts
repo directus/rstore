@@ -1,31 +1,9 @@
 import type { UpdateOptions } from '@rstore/core'
-import type { Collection, CollectionDefaults, CustomHookMeta, ResolvedCollectionItem, StandardSchemaV1, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollectionItem, StandardSchemaV1, StoreSchema } from '@rstore/shared'
 import type { VueUpdateFormObject } from './form'
 import type { WrappedItemMetadata } from './item'
 
 declare module '@rstore/shared' {
-  export interface CustomCacheState {
-    markers: Record<string, boolean>
-    collections: Record<string, Record<string | number, any>>
-    modules: Record<string, any>
-    queryMeta: Record<string, CustomHookMeta>
-    /**
-     * Per-field HLC stamps, by collection then key. Carried across the
-     * SSR boundary so a stale realtime frame cannot overwrite a value the
-     * server already had at a later stamp.
-     */
-    fieldTimestamps?: Record<string, Record<string | number, Record<string, string | number>>>
-    /**
-     * Deletions the server already knew about. Without them a hydrated client
-     * resurrects an item the server had deleted.
-     */
-    tombstones?: Array<{
-      collection: string
-      key: string | number
-      deletedAt: string | number
-    }>
-  }
-
   export interface MutationSpecialProps {
     $loading: boolean
     $error: Error | null
