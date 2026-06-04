@@ -1,16 +1,9 @@
 import type { UpdateOptions } from '@rstore/core'
-import type { Collection, CollectionDefaults, CustomHookMeta, ResolvedCollectionItem, StandardSchemaV1, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollectionItem, StandardSchemaV1, StoreSchema } from '@rstore/shared'
 import type { VueUpdateFormObject } from './form'
 import type { WrappedItemMetadata } from './item'
 
 declare module '@rstore/shared' {
-  export interface CustomCacheState {
-    markers: Record<string, boolean>
-    collections: Record<string, Record<string | number, any>>
-    modules: Record<string, any>
-    queryMeta: Record<string, CustomHookMeta>
-  }
-
   export interface MutationSpecialProps {
     $loading: boolean
     $error: Error | null
