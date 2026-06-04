@@ -1,5 +1,5 @@
 import type { StoreEngine, TombstoneGcOptions } from '@rstore/core'
-import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from '../item'
 import type { VueStore } from '../store'
@@ -72,5 +72,7 @@ export interface VueCachePrivate {
     layers: Record<string, Ref<CacheLayer[]>>
     /** Ensure a devtools layer mirror exists for a collection. */
     ensureLayersForCollection: (collectionName: string) => Ref<CacheLayer[]>
+    /** Signal registry used by diagnostics and leak tests. */
+    signals: SignalRegistry
   }
 }

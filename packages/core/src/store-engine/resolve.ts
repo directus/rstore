@@ -177,7 +177,11 @@ export function updateItemIndexes(
       }
     }
 
-    const newValues = indexFields.map(f => newData[f] ?? previousData?.[f])
+    // Use `f in newData` (not `??`) so an explicit `null`/`undefined` in the
+    // patch — i.e. clearing an indexed field — drops the item from the index
+    // instead of falling back to its previous value. Fields absent from the
+    // patch still inherit the previous value (preserves partial updates).
+    const newValues = indexFields.map(f => f in newData ? newData[f] : previousData?.[f])
     if (newValues.every(v => v != null)) {
       const newValue = newValues.join(':')
       let existingKeys = index.get(newValue)

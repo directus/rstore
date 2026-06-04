@@ -97,6 +97,7 @@ export function createCacheApi<
       getWrappedItem: (collection, item, noCache) => getWrappedItem(ctx, collection, item, noCache),
       layers: ctx.layers,
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
+      signals: ctx.signals,
     },
   } satisfies Cache & VueCachePrivate as any
 }

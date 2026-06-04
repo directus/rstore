@@ -73,6 +73,7 @@ export function createCacheRuntime<
       runtime.wrappedItems.clear()
       runtime.wrappedItemsMetadata.clear()
       runtime.wrappedItemKeysPerLayer.clear()
+      runtime.signals.dispose()
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', { store, meta: {} })
     },
@@ -142,6 +143,7 @@ export function evictBaseWrappedItem(ctx: CacheRuntime, collection: ResolvedColl
   const wrapKey = getItemWrapKey(collection, key, undefined)
   ctx.wrappedItems.delete(wrapKey)
   ctx.wrappedItemsMetadata.delete(wrapKey)
+  ctx.signals.dropItem(collection.name, key)
 }
 
 function clearLayerWrappedItems(ctx: CacheRuntime, layerId: string) {

@@ -14,26 +14,13 @@ import type {
 } from '@rstore/shared'
 import type { TombstoneStore } from '../tombstone.js'
 
-/**
- * Unsubscribe handle returned by the engine's `observe*` methods.
- */
+/** Unsubscribe handle returned by the engine's `observe*` methods. */
 export type Unsubscribe = () => void
 
-/**
- * A plain callback fired when an observed scope changes.
- */
+/** A plain callback fired when an observed scope changes. */
 export type ObserverCallback = () => void
 
-/**
- * Fine-grained observer registry exposed by the engine. A framework bridge
- * (e.g. `@rstore/vue`) subscribes one observer per reactive scope and maps
- * notifications onto its own signals.
- *
- * Mutating code records touched scopes via `touch*`; those are deduped into
- * a pending change set and dispatched once by {@link ObserverRegistry.flush}
- * so that, for example, a `writeItems` of N items notifies each item
- * observer once and the list observer once.
- */
+/** Fine-grained observer registry exposed by the engine. */
 export interface ObserverRegistry {
   /** Observe changes to a single item by key. */
   observeItem: (collection: string, key: string | number, cb: ObserverCallback) => Unsubscribe
@@ -51,10 +38,7 @@ export interface ObserverRegistry {
   flush: () => void
 }
 
-/**
- * Payload passed to {@link EngineCallbacks.onAfterWrite}. Mirrors the data
- * the Vue bridge forwards to the `afterCacheWrite` hook (minus `store`).
- */
+/** Payload passed to {@link EngineCallbacks.onAfterWrite}. */
 export interface EngineAfterWritePayload {
   collection: ResolvedCollection<any, any, any>
   key?: string | number
@@ -63,20 +47,14 @@ export interface EngineAfterWritePayload {
   operation: 'write' | 'delete'
 }
 
-/**
- * Payload passed to {@link EngineCallbacks.onConflict} when a CRDT field
- * merge produces conflicting concurrent edits.
- */
+/** Payload passed to {@link EngineCallbacks.onConflict}. */
 export interface EngineConflictPayload {
   collection: ResolvedCollection<any, any, any>
   key: string | number
   conflicts: FieldConflict[]
 }
 
-/**
- * Callbacks injected by the embedding framework. They keep the engine free
- * of any dependency on the host store (`$hooks`, `$collections`, Vue, ...).
- */
+/** Callbacks injected by the embedding framework. */
 export interface EngineCallbacks {
   /** Resolve a collection by name. */
   getCollection: (name: string) => ResolvedCollection<any, any, any> | undefined
@@ -94,9 +72,7 @@ export interface EngineCallbacks {
   onReset?: () => void
 }
 
-/**
- * Tombstone auto-GC configuration. `false` disables the background sweep.
- */
+/** Tombstone auto-GC configuration. `false` disables the background sweep. */
 export type TombstoneGcOptions = false | {
   /** Sweep interval in ms. Defaults to 60_000. */
   intervalMs?: number
@@ -104,9 +80,7 @@ export type TombstoneGcOptions = false | {
   ttlMs?: number
 }
 
-/**
- * Options for {@link createStoreEngine}.
- */
+/** Options for {@link createStoreEngine}. */
 export interface EngineOptions {
   callbacks: EngineCallbacks
   /**
@@ -177,9 +151,7 @@ export interface WriteItemForRelationParams {
   meta?: CustomHookMeta
 }
 
-/**
- * Parameters for reading a list of candidate keys from the engine.
- */
+/** Parameters for reading a list of candidate keys from the engine. */
 export interface ResolveKeysParams {
   collection: ResolvedCollection<any, any, any>
   marker?: string
@@ -188,9 +160,7 @@ export interface ResolveKeysParams {
   indexValue?: string
 }
 
-/**
- * Internal mutable engine context shared across the engine's focused modules.
- */
+/** Internal mutable engine context shared across the engine's focused modules. */
 export interface EngineContext {
   collections: Map<string, EngineCollectionState>
   markers: Record<string, boolean>
@@ -210,10 +180,7 @@ export interface EngineContext {
   ensureCollection: (name: string) => EngineCollectionState
 }
 
-/**
- * Staggering controller: throttles how many writes are applied per 10ms
- * window so a flood of cache writes doesn't block the main thread.
- */
+/** Staggering controller for throttling writes per 10ms window. */
 export interface Staggering {
   canProcess: () => boolean
   consume: () => void
@@ -221,6 +188,8 @@ export interface Staggering {
   setFlush: (flush: () => void) => void
   /** Whether staggering is active (budget > 0 configured). */
   enabled: boolean
+  /** Cancel any pending budget-reset timer (called on engine dispose). */
+  dispose: () => void
 }
 
 /**
@@ -235,51 +204,38 @@ export interface StoreEngine<
 > {
   /** Read the resolved (layer-merged) raw item for a key, or undefined. */
   readItemRaw: (params: { collection: ResolvedCollection<any, any, any>, key: string | number }) => any | undefined
-
   /** Resolve the candidate key list for a list read (honors layers/index). */
   resolveKeys: (params: ResolveKeysParams) => Array<string | number>
-
   /** Read an index bucket's key set (after layer reconciliation). */
   getIndexBucket: (collection: string, indexKey: string, indexValue: string) => ReadonlySet<string | number> | undefined
-
   /** Whether a marker has been set. */
   hasMarker: (marker: string) => boolean
-
   writeItem: (params: WriteItemParams) => void
   writeItems: (params: WriteItemsParams) => void
   deleteItem: (params: DeleteItemParams) => void
   writeItemForRelation: (params: WriteItemForRelationParams) => void
-
   readFieldTimestamps: (params: { collectionName: string, key: string | number }) => FieldTimestamps | undefined
   writeFieldTimestamps: (params: { collectionName: string, key: string | number, timestamps: FieldTimestamps }) => void
-
   getModuleState: (name: string, key: string, initState: any) => any
-
   getState: () => CustomCacheState
   setState: (state: CustomCacheState) => void
   clear: () => void
   clearCollection: (params: { collection: ResolvedCollection<any, any, any> }) => void
-
   /** Immediately delete a key without queuing (used by GC). Returns true if removed. */
   garbageCollectKey: (collection: ResolvedCollection<any, any, any>, key: string | number) => boolean
   /** Iterate the base keys of a collection (used by GC). */
   forEachKey: (collection: string, cb: (key: string | number) => void) => void
-
   addLayer: (layer: CacheLayer) => void
   getLayer: (layerId: string) => CacheLayer | undefined
   removeLayer: (layerId: string) => void
-
   tombstones: TombstoneStore
   gcTombstones: (olderThan: FieldTimestampValue) => Array<{ collection: string, key: string | number }>
-
   pause: () => void
   resume: () => void
   dispose: () => void
-
   observeItem: ObserverRegistry['observeItem']
   observeList: ObserverRegistry['observeList']
   observeIndex: ObserverRegistry['observeIndex']
-
   /**
    * Direct access to the layer index for devtools/debug.
    * @internal
@@ -290,7 +246,6 @@ export interface StoreEngine<
    * @internal
    */
   _getQueryMeta: () => Record<string, CustomHookMeta>
-
   _ctx: EngineContext
 }
 
