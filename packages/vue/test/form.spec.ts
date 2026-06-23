@@ -282,6 +282,92 @@ describe('createFormObject - operation log', () => {
     expect(obj.$hasChanges()).toBe(false)
   })
 
+  it('preserves edits made while resetOnSuccess submit is pending', async () => {
+    let persistedName = 'John'
+    let resolveSubmit!: () => void
+
+    const obj = createFormObject({
+      defaultValues: () => ({ name: persistedName }),
+      resetDefaultValues: async () => ({ name: persistedName }),
+      submit: async (data) => {
+        persistedName = data.name!
+        await new Promise<void>((resolve) => {
+          resolveSubmit = resolve
+        })
+      },
+      resetOnSuccess: true,
+    })
+
+    obj.name = 'Jane'
+
+    const submitPromise = obj.$submit()
+
+    obj.name = 'Janet'
+    await nextTick()
+
+    resolveSubmit()
+    await submitPromise
+
+    expect(obj.name).toBe('Janet')
+    expect(obj.$changedProps).toEqual({
+      name: ['Janet', 'Jane'],
+    })
+    expect(obj.$hasChanges()).toBe(true)
+    expect(obj.$opLog.getOptimized()).toEqual([
+      expect.objectContaining({
+        field: 'name',
+        type: 'set',
+        newValue: 'Janet',
+        oldValue: 'Jane',
+      }),
+    ])
+  })
+
+  it('submits data and form operations from the same pre-validation snapshot', async () => {
+    let resolveValidation!: () => void
+    let submittedData: any = null
+    let submittedOps: any[] = []
+
+    const obj = createFormObject({
+      defaultValues: () => ({ name: 'John' }),
+      schema: {
+        '~standard': {
+          version: 1,
+          vendor: 'test',
+          validate: async (data: any) => {
+            await new Promise<void>((resolve) => {
+              resolveValidation = resolve
+            })
+            return { value: data }
+          },
+        },
+      },
+      submit: async (data, { formOperations }) => {
+        submittedData = data
+        submittedOps = formOperations
+      },
+      resetOnSuccess: false,
+    })
+
+    obj.name = 'Jane'
+
+    const submitPromise = obj.$submit()
+
+    obj.name = 'Janet'
+    resolveValidation()
+    await submitPromise
+
+    expect(submittedData).toEqual({ name: 'Jane' })
+    expect(submittedOps).toEqual([
+      expect.objectContaining({
+        field: 'name',
+        type: 'set',
+        newValue: 'Jane',
+        oldValue: 'John',
+      }),
+    ])
+  })
+
   it('does not clear the op log on successful submit when resetOnSuccess is false', async () => {
     const obj = createFormObject({
       defaultValues: () => ({ name: 'John' }),

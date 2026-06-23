@@ -513,6 +513,35 @@ export function createFormObject<
     }
   }
 
+  /**
+   * Load the base data used by `$reset()` without mutating the form state.
+   */
+  async function getResetInitialData() {
+    if (options.resetDefaultValues) {
+      const values = await options.resetDefaultValues()
+      return pickNonSpecialProps(values, true) as Partial<TData>
+    }
+    else if (options.defaultValues) {
+      return pickNonSpecialProps(options.defaultValues(), true) as Partial<TData>
+    }
+
+    return pickNonSpecialProps(initialData, true) as Partial<TData>
+  }
+
+  /**
+   * Remove private relation cache fields from data that leaves the form.
+   */
+  function removeInternalRelationData(data: Partial<TData>) {
+    if (!options.collection)
+      return
+
+    for (const key of Object.keys(data)) {
+      if (key.startsWith('_$')) {
+        delete (data as any)[key]
+      }
+    }
+  }
+
   const form = reactive({
     ...initialData as TData,
     ...options.additionalProps,
@@ -520,41 +549,24 @@ export function createFormObject<
     $error: null,
     $loading: false as boolean,
     async $reset() {
-      if (options.resetDefaultValues) {
-        const values = await options.resetDefaultValues()
-        initialData = pickNonSpecialProps(values, true) as Partial<TData>
-      }
-      else if (options.defaultValues) {
-        initialData = pickNonSpecialProps(options.defaultValues(), true) as Partial<TData>
-      }
+      initialData = await getResetInitialData()
       // Clear operation log and redo stack on reset
       opLog.length = 0
       redoStack.length = 0
-      form.$changedProps = {}
-      form.$conflicts = []
-      for (const key in form) {
-        if (!key.startsWith('$') && !key.startsWith('_$')) {
-          delete (form as any)[key]
-        }
-      }
-      Object.assign(form, initialData)
-      initRelationData(form as Record<string, any>)
-      // Re-validate after reset
-      queueChange()
+      rebuildFormFromBase()
     },
     async $submit() {
       form.$loading = true
       form.$error = null
       try {
+        const submittedBaseData = pickNonSpecialProps(form, true) as Partial<TData>
+        removeInternalRelationData(submittedBaseData)
+        const submittedOperations = [...opLog]
+        const submittedOpCount = submittedOperations.length
+        const submittedFormOperations = optimizeOpLog(submittedOperations, options.collection)
         const data = options?.transformData ? options.transformData(form as unknown as Partial<TData>) : pickNonSpecialProps(form, true) as Partial<TData>
         // Remove internal relation data keys (_$*Data) that shouldn't be submitted
-        if (options.collection) {
-          for (const key of Object.keys(data)) {
-            if (key.startsWith('_$')) {
-              delete (data as any)[key]
-            }
-          }
-        }
+        removeInternalRelationData(data)
         if (options.validateOnSubmit ?? true) {
           const { issues } = await this.$schema['~standard'].validate(data)
           if (issues) {
@@ -563,10 +575,10 @@ export function createFormObject<
             throw error
           }
         }
-        const item = await options.submit(data, { formOperations: optimizeOpLog([...opLog], options.collection) })
+        const item = await options.submit(data, { formOperations: submittedFormOperations })
         onSuccess.trigger(item)
         if (options.resetOnSuccess ?? true) {
-          await form.$reset()
+          await rebasePendingSubmitEdits(submittedOpCount, submittedBaseData)
         }
         return item
       }
@@ -660,6 +672,37 @@ export function createFormObject<
     },
     $onConflict: onConflict.on,
   } satisfies FormObjectBase<TResult, TSchema> & FormObjectAdditionalProps<TData>) as FormObjectBase<TResult, TSchema> & FormObjectAdditionalProps<TData>
+
+  /**
+   * Replace the projected form state with the current base and queued ops.
+   */
+  function rebuildFormFromBase() {
+    form.$changedProps = {}
+    form.$conflicts = []
+    for (const key in form) {
+      if (!key.startsWith('$') && !key.startsWith('_$')) {
+        delete (form as any)[key]
+      }
+    }
+    Object.assign(form, initialData)
+    initRelationData(form as Record<string, any>)
+    queueChange()
+  }
+
+  /**
+   * Reset after a successful submit while keeping edits made after submit began.
+   */
+  async function rebasePendingSubmitEdits(submittedOpCount: number, submittedBaseData: Partial<TData>) {
+    const nextInitialData = await getResetInitialData()
+    const pendingOps = opLog.slice(submittedOpCount).map(op => ({ ...op }))
+
+    opLog.length = 0
+    opLog.push(...pendingOps)
+    redoStack.length = 0
+
+    initialData = pickNonSpecialProps(submittedBaseData, true) as Partial<TData>
+    rebaseForm(nextInitialData)
+  }
 
   // On change
 

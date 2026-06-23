@@ -1,5 +1,6 @@
 import { withItemType } from '@rstore/core'
 import { describe, expect, it } from 'vitest'
+import { nextTick } from 'vue'
 import { createStore } from '../src/store'
 
 describe('updateForm', () => {
@@ -519,6 +520,72 @@ describe('updateForm', () => {
     expect(form.name).toBe('Item Name')
     expect(form.description).toBe(null)
     expect(form.category).toBe('Electronics')
+  })
+
+  it('should preserve updateForm edits made while submit is pending', async () => {
+    let persistedUser = {
+      id: 1,
+      name: 'John',
+      email: 'john@example.com',
+    }
+
+    let resolveUpdate!: () => void
+
+    const Users = withItemType<{
+      id: number
+      name: string
+      email: string
+    }>().defineCollection({
+      name: 'users',
+      hooks: {
+        fetchFirst: () => ({ ...persistedUser }),
+        update: async ({ key, item }) => {
+          if (typeof key === 'string') {
+            throw new TypeError('Key should be a number')
+          }
+
+          await new Promise<void>((resolve) => {
+            resolveUpdate = resolve
+          })
+
+          persistedUser = { ...persistedUser, ...item }
+          return { ...persistedUser }
+        },
+      },
+    })
+
+    const store = await createStore({
+      schema: [Users],
+      plugins: [],
+    })
+
+    const form = await store.users.updateForm(1, {
+      validateOnSubmit: false,
+    })
+
+    form.name = 'Jane'
+
+    const submitPromise = form.$submit()
+
+    form.name = 'Janet'
+    await nextTick()
+
+    resolveUpdate()
+    await submitPromise
+
+    expect(form.name).toBe('Janet')
+    expect(form.$changedProps).toEqual({
+      name: ['Janet', 'Jane'],
+    })
+    expect(form.$hasChanges()).toBe(true)
+    expect(form.$opLog.getOptimized()).toEqual([
+      expect.objectContaining({
+        field: 'name',
+        type: 'set',
+        newValue: 'Janet',
+        oldValue: 'Jane',
+      }),
+    ])
   })
 
   it('should work with transformData option', async () => {
