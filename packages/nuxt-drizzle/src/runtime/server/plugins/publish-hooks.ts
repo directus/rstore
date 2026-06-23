@@ -3,15 +3,9 @@ import { createHLCClock, setDefaultClock } from '@rstore/core'
 import { getHeader } from 'h3'
 import { defineNitroPlugin } from 'nitropack/runtime'
 import { closeAllRstoreDrizzlePeers } from '../api/realtime.ws'
+import { CLIENT_ID_HEADER } from '../realtime/utils/protocol'
 import { rstoreDrizzleHooks } from '../utils/hooks'
 import { publishRstoreDrizzleRealtimeUpdate } from '../utils/realtime'
-
-/**
- * Name of the header used by the generated REST + batch API to tag the
- * originating browser tab. Kept in sync with the client-side constant in
- * `runtime/utils/client-id.ts`.
- */
-const CLIENT_ID_HEADER = 'x-rstore-client-id'
 
 /**
  * Install a dedicated server HLC so every realtime publish gets a

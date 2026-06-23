@@ -1,5 +1,5 @@
-import type { FieldTimestampValue } from './hlc.js'
-import { compareHLC, stringifyHLC } from './hlc.js'
+import type { FieldTimestampValue } from './hlc/index.js'
+import { compareHLC, stringifyHLC } from './hlc/index.js'
 
 /**
  * A tombstone records a deletion with its causal timestamp so that concurrent
