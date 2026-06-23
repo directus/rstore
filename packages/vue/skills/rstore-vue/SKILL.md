@@ -18,7 +18,6 @@ Build typed, cache-first Vue data flows with `@rstore/vue`, including core engin
 | Mutations and forms | [https://rstore.akryum.dev/guide/data/mutation](https://rstore.akryum.dev/guide/data/mutation), [https://rstore.akryum.dev/guide/data/form](https://rstore.akryum.dev/guide/data/form) |
 | Cache and modules | [https://rstore.akryum.dev/guide/data/cache](https://rstore.akryum.dev/guide/data/cache), [https://rstore.akryum.dev/guide/data/module](https://rstore.akryum.dev/guide/data/module) |
 | Plugin setup and hooks | [https://rstore.akryum.dev/guide/plugin/setup](https://rstore.akryum.dev/guide/plugin/setup), [https://rstore.akryum.dev/guide/plugin/hooks](https://rstore.akryum.dev/guide/plugin/hooks) |
-| Collaboration plugin (Yjs) | [https://rstore.akryum.dev/plugins/yjs](https://rstore.akryum.dev/plugins/yjs) |
 | Skill-local API references | [./references/index.md](./references/index.md) |
 
 ## Core concepts
@@ -152,4 +151,3 @@ Notes:
 - Mutation docs: [https://rstore.akryum.dev/guide/data/mutation](https://rstore.akryum.dev/guide/data/mutation)
 - Form docs: [https://rstore.akryum.dev/guide/data/form](https://rstore.akryum.dev/guide/data/form)
 - Plugin hook docs: [https://rstore.akryum.dev/guide/plugin/hooks](https://rstore.akryum.dev/guide/plugin/hooks)
-- Yjs plugin docs: [https://rstore.akryum.dev/plugins/yjs](https://rstore.akryum.dev/plugins/yjs)

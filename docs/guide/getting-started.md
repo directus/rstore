@@ -152,7 +152,6 @@ Successful mutations update the normalized cache, so all reactive readers stay i
 - Learn the collection model in [Schema > Collection](./schema/collection.md)
 - Move repeated backend logic into [Plugins](./plugin/setup.md)
 - Use [Queries](./data/query.md), [Mutations](./data/mutation.md), and [Forms](./data/form.md)
-- Add realtime collaboration with [Yjs plugin](../plugins/yjs.md)
 
 ## Nuxt
 
@@ -262,7 +261,6 @@ Open Nuxt DevTools and inspect the `rstore` tab to see collections, cache state,
 - Embed the Devtools UI in your app with [Devtools](./devtools.md)
 - Learn Nuxt-specific helpers in [Plugins](./plugin/setup.md)
 - Explore [live subscriptions](./data/live.md) and [offline support](./data/offline.md)
-- Add collaborative editing with [Yjs plugin](../plugins/yjs.md)
 - Read about [federation](./schema/federation.md) if you have multiple data sources
 
 ## Nuxt + Drizzle

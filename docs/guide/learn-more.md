@@ -41,7 +41,7 @@ With rstore, you can build applications that work offline by prioritizing local 
 
 ### Realtime and collaboration
 
-rstore design makes it easy to add support for realtime updates and collaboration to your app, making it ideal for applications that require live data synchronization. The reactive cache ensures that any changes to the data are immediately reflected in the UI, and the mutation history allows replaying mutations in sync engines. For collaborative editing, you can use the [`@rstore/yjs` plugin](../plugins/yjs.md). Examples of realtime applications: chat apps, collaborative document editors, and other realtime interactive tools.
+rstore design makes it easy to add support for realtime updates and collaboration to your app, making it ideal for applications that require live data synchronization. The reactive cache ensures that any changes to the data are immediately reflected in the UI, and the mutation history allows replaying mutations in sync engines. Examples of realtime applications include chat apps, collaborative document editors, and other realtime interactive tools.
 
 ## Cache
 
