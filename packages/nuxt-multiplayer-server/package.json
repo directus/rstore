@@ -35,7 +35,9 @@
     "test:types": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@nuxt/kit": "^4.0.0"
+    "@nuxt/kit": "^4.0.0",
+    "crossws": "^0.3.5",
+    "h3": "^1.15.1"
   },
   "devDependencies": {
     "@nuxt/module-builder": "catalog:",

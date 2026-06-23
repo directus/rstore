@@ -515,6 +515,12 @@ importers:
       '@nuxt/kit':
         specifier: ^4.0.0
         version: 4.3.1(magicast@0.5.2)
+      crossws:
+        specifier: ^0.3.5
+        version: 0.3.5
+      h3:
+        specifier: ^1.15.1
+        version: 1.15.6
     devDependencies:
       '@nuxt/module-builder':
         specifier: 'catalog:'
