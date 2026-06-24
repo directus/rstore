@@ -3,6 +3,7 @@ import type { UpdateManyOptions } from '../../src/mutation/updateMany'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { updateMany } from '../../src/mutation/updateMany'
+import { applyMutationToMockCache } from './mockCache'
 
 describe('updateMany', () => {
   let mockStore: StoreCore<StoreSchema, CollectionDefaults>
@@ -28,6 +29,7 @@ describe('updateMany', () => {
         writeItems: vi.fn(),
         addLayer: vi.fn(),
         removeLayer: vi.fn(),
+        applyMutation: vi.fn(params => applyMutationToMockCache(mockStore.$cache, params)),
       },
       $mutationHistory: [],
       $processItemParsing: vi.fn(),
@@ -103,6 +105,7 @@ describe('updateMany', () => {
     expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'update',
       collection: mockCollection,
+      keys: ['1', '2'],
       payload: expect.any(Array),
     })
   })
@@ -237,15 +240,16 @@ describe('updateMany', () => {
       items: expect.any(Array),
       setItems: expect.any(Function),
     })
-    expect(afterHook).toHaveBeenCalledWith({
+    expect(afterHook).toHaveBeenCalledWith(expect.objectContaining({
       store: mockStore,
       meta: {},
       collection: mockCollection,
       mutation: 'update',
       items: expect.any(Array),
+      keys: expect.any(Array),
       getResult: expect.any(Function),
       setResult: expect.any(Function),
-    })
+    }))
   })
 
   it('should call afterMutation hook for each item when falling back to individual updates', async () => {
@@ -327,6 +331,7 @@ describe('updateMany', () => {
     expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'update',
       collection: mockCollection,
+      keys: ['1', '2'],
       payload: expect.any(Array),
     })
   })
@@ -345,6 +350,7 @@ describe('updateMany', () => {
     expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'update',
       collection: mockCollection,
+      keys: ['3'],
       payload: expect.arrayContaining([
         expect.objectContaining({ key: '3' }),
       ]),

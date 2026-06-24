@@ -89,6 +89,62 @@ You can also use the `store.<collectionName>.clearItem` method:
 store.User.clearItem('abc')
 ```
 
+## Apply mutations <Badge text="New in v0.9" />
+
+Use `store.$cache.applyMutation` when an external source gives you an authoritative cache update and you do not want to run the mutation lifecycle. This is useful for realtime subscriptions, sync engines, or replication messages, such as upload events from another client.
+
+```ts
+const collection = store.$collections.find(c => c.name === 'files')!
+
+store.$cache.applyMutation({
+  collection,
+  mutation: 'create',
+  result: {
+    id: 'file-id',
+    filename: 'receipt.pdf',
+    mimeType: 'application/pdf',
+    size: 123456,
+  },
+})
+```
+
+You can apply `create`, `update`, and `delete` operations. For many operations, pass `results`, `items`, or `keys`:
+
+```ts
+store.$cache.applyMutation({
+  collection,
+  mutation: 'update',
+  results: [
+    { id: 'file-id-1', uploadStatus: 'processed', thumbnailUrl: '/thumbs/file-id-1.webp' },
+    { id: 'file-id-2', uploadStatus: 'processed', thumbnailUrl: '/thumbs/file-id-2.webp' },
+  ],
+})
+```
+
+```ts
+store.$cache.applyMutation({
+  collection,
+  mutation: 'delete',
+  keys: ['file-id-1', 'file-id-2'],
+})
+```
+
+`applyMutation` returns the cache outcome:
+
+```ts
+const result = store.$cache.applyMutation({
+  collection,
+  mutation: 'delete',
+  key: 'file-id-1',
+})
+
+console.log(result.written, result.deleted, result.skipped)
+```
+
+::: warning
+`applyMutation` only updates the cache. It does not call `beforeMutation`, `afterMutation`, `beforeManyMutation`, or `afterManyMutation`, and it does not record mutation history. Use [`mutate`](./mutation.md#custom-mutations) for custom remote work that should behave like a rstore mutation.
+:::
+
 ## Layers <Badge text="New in v0.7" />
 
 A cache layer is a way to create a temporary state modification that can be easily reverted. This is how [optimistic updates](./mutation.md#optimistic-updates) are implemented.

@@ -27,15 +27,20 @@ export function set<TObject, TPath extends Path<TObject>>(obj: TObject, path: TP
   current[keys.at(-1)!] = value
 }
 
+/** Return whether a property key is part of the public item/form data surface. */
+export function isPublicKey(key: PropertyKey): boolean {
+  return typeof key !== 'string' || (!key.startsWith('$') && !key.startsWith('_$'))
+}
+
 export const cloneInfo = {
   cloning: false,
 }
 
-export function pickNonSpecialProps<TItem extends Record<string, any>>(item: TItem, clone = false): Pick<TItem, FilterNotStartingWith<keyof TItem, '$'>> {
+export function pickNonSpecialProps<TItem extends Record<string, any>>(item: TItem, clone = false): Pick<TItem, FilterNotStartingWith<keyof TItem, '$' | '_$'>> {
   cloneInfo.cloning = true
   const result: any = {}
   for (const key in item) {
-    if (!key.startsWith('$')) {
+    if (isPublicKey(key)) {
       result[key] = clone ? klona(item[key]) : item[key]
     }
   }

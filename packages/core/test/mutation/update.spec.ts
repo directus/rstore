@@ -3,6 +3,7 @@ import type { UpdateOptions } from '../../src/mutation/update'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { updateItem } from '../../src/mutation/update'
+import { applyMutationToMockCache } from './mockCache'
 
 vi.mock('../../src/query/peekFirst', () => ({
   peekFirst: vi.fn(() => ({ result: null })),
@@ -24,6 +25,7 @@ describe('updateItem', () => {
         readItem: vi.fn(),
         addLayer: vi.fn(),
         removeLayer: vi.fn(),
+        applyMutation: vi.fn(params => applyMutationToMockCache(mockStore.$cache, params)),
       },
       $mutationHistory: [],
     } as unknown as StoreCore<StoreSchema, CollectionDefaults>

@@ -1,9 +1,9 @@
 import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
-import { unwrapItem } from '../item'
 import { isKeyDefined } from '../key'
 import { peekFirst } from '../query'
+import { finalizeMutation } from './finalizeMutation'
 
 export interface UpdateOptions<
   TCollection extends Collection,
@@ -105,6 +105,12 @@ export async function updateItem<
   }
 
   let layer: CacheLayer | undefined
+  const removeOptimisticLayer = () => {
+    if (layer) {
+      store.$cache.removeLayer(layer.id)
+      layer = undefined
+    }
+  }
 
   if (!skipCache && optimistic) {
     layer = {
@@ -150,53 +156,25 @@ export async function updateItem<
       })
     }
 
-    await store.$hooks.callHook('afterMutation', {
-      store: store as unknown as GlobalStoreType,
+    const commitResult = await finalizeMutation(store, {
       meta,
       collection,
       mutation: 'update',
       key,
       item,
-      getResult: () => result ?? undefined,
-      setResult: (newResult) => {
-        result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
-      },
+      result: result ?? undefined,
+      skipCache,
       formOperations: formOperations as FormOperation[],
+    }, {
+      requireResultError: 'Item update failed: result is nullish',
+      onBeforeApplyCache: removeOptimisticLayer,
     })
 
-    if (result) {
-      result = unwrapItem(result)
-
-      store.$processItemParsing(collection, result)
-
-      if (!skipCache) {
-        if (layer) {
-          store.$cache.removeLayer(layer.id)
-        }
-
-        store.$cache.writeItem({
-          collection,
-          key,
-          item: result as NonNullable<typeof result>,
-        })
-      }
-    }
-    else {
-      throw new Error('Item update failed: result is nullish')
-    }
-
-    store.$mutationHistory.push({
-      operation: 'update',
-      collection,
-      key,
-      payload: item,
-    })
+    result = commitResult.result as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
   }
   catch (error) {
     // Rollback optimistic layer in case of error
-    if (layer) {
-      store.$cache.removeLayer(layer.id)
-    }
+    removeOptimisticLayer()
     throw error
   }
 

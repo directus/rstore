@@ -6,6 +6,7 @@ import { createItem } from '../../src/mutation/create'
 import { deleteItem } from '../../src/mutation/delete'
 import { updateItem } from '../../src/mutation/update'
 import { findFirst } from '../../src/query/findFirst'
+import { applyMutationToMockCache } from '../mutation/mockCache'
 
 vi.mock('../../src/query/peekFirst', () => ({
   peekFirst: vi.fn(() => ({ result: null, marker: undefined })),
@@ -177,6 +178,7 @@ describe('batch options', () => {
           addLayer: vi.fn(),
           removeLayer: vi.fn(),
           deleteItem: vi.fn(),
+          applyMutation: vi.fn(params => applyMutationToMockCache(mockStore.$cache, params)),
         },
         $hooks: createHooks(),
         $processItemSerialization: vi.fn(),

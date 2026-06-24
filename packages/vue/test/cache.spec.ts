@@ -1,6 +1,7 @@
 import type { CacheLayer } from '@rstore/shared'
 import { stringifyHLC } from '@rstore/core'
 import { describe, expect, it, vi } from 'vitest'
+import { watchSyncEffect } from 'vue'
 import { createStore } from '../src'
 
 function hlc(physical: number, logical = 0, nodeId = 'n') {
@@ -76,6 +77,61 @@ describe('cache', () => {
 
     const state = cache.getState() as any
     expect(state.collections.TestCollection).toEqual({})
+  })
+
+  it('should apply a write mutation without emitting mutation hooks', async () => {
+    const store = await createStore({
+      schema: [{ name: 'TestCollection' }],
+      plugins: [],
+    })
+    const afterMutation = vi.fn()
+    store.$hooks.hook('afterMutation', afterMutation)
+
+    const collection = store.$collections[0]!
+    const result = store.$cache.applyMutation({
+      collection,
+      mutation: 'create',
+      result: { id: 1, name: 'Created' },
+    })
+
+    expect(result).toEqual({ written: [1], deleted: [], skipped: 0 })
+    expect(afterMutation).not.toHaveBeenCalled()
+    expect(store.$cache.readItem({ collection, key: 1 })).toEqual({ id: 1, name: 'Created' })
+  })
+
+  it('should apply input-only mutation items directly to cache', async () => {
+    const store = await createStore({
+      schema: [{ name: 'TestCollection' }],
+      plugins: [],
+    })
+    const collection = store.$collections[0]!
+
+    const result = store.$cache.applyMutation({
+      collection,
+      mutation: 'update',
+      items: [{ id: 1, name: 'Updated' }],
+    })
+
+    expect(result).toEqual({ written: [1], deleted: [], skipped: 0 })
+    expect(store.$cache.readItem({ collection, key: 1 })).toEqual({ id: 1, name: 'Updated' })
+  })
+
+  it('should apply a delete mutation', async () => {
+    const store = await createStore({
+      schema: [{ name: 'TestCollection' }],
+      plugins: [],
+    })
+    const collection = store.$collections[0]!
+    store.$cache.writeItem({ collection, key: 1, item: mockItem })
+
+    const result = store.$cache.applyMutation({
+      collection,
+      mutation: 'delete',
+      key: 1,
+    })
+
+    expect(result).toEqual({ written: [], deleted: [1], skipped: 0 })
+    expect(store.$cache.readItem({ collection, key: 1 })).toBeUndefined()
   })
 
   it('should clear the cache', async () => {
@@ -375,6 +431,40 @@ describe('cache', () => {
   })
 
   describe('layers', () => {
+    it('keeps layered reads fresh when a sync reader runs during a write', async () => {
+      const store = await createStore({
+        schema: [{ name: 'TestCollection' }],
+        plugins: [],
+      })
+      const cache = store.$cache
+      const collection = store.$collections[0]!
+
+      cache.addLayer({
+        id: 'empty-layer',
+        collectionName: 'TestCollection',
+        state: {},
+        deletedItems: new Set(),
+      })
+
+      const stop = watchSyncEffect(() => {
+        cache.readItems({ collection })
+      })
+
+      try {
+        cache.writeItem({
+          collection,
+          key: 1,
+          item: { id: 1, name: 'item1' },
+        })
+
+        expect(cache.readItem({ collection, key: 1 })).toEqual({ id: 1, name: 'item1' })
+        expect(cache.readItems({ collection })).toHaveLength(1)
+      }
+      finally {
+        stop()
+      }
+    })
+
     it('should add a new item from a layer', async () => {
       const store = await createStore({
         schema: [{ name: 'TestCollection' }],

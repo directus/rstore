@@ -1,5 +1,6 @@
 import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
+import { finalizeMutation } from './finalizeMutation'
 
 export interface DeleteOptions<
   TCollection extends Collection,
@@ -59,6 +60,12 @@ export async function deleteItem<
   })
 
   let layer: CacheLayer | undefined
+  const removeOptimisticLayer = () => {
+    if (layer) {
+      store.$cache.removeLayer(layer.id)
+      layer = undefined
+    }
+  }
 
   if (!skipCache && optimistic) {
     layer = {
@@ -88,38 +95,19 @@ export async function deleteItem<
       })
     }
 
-    await store.$hooks.callHook('afterMutation', {
-      store: store as unknown as GlobalStoreType,
+    await finalizeMutation(store, {
       meta,
       collection,
       mutation: 'delete',
       key,
-      getResult: () => undefined,
-      setResult: () => {},
-    })
-
-    if (!skipCache) {
-      if (layer) {
-        store.$cache.removeLayer(layer.id)
-      }
-
-      store.$cache.deleteItem({
-        collection,
-        key,
-      })
-    }
-
-    store.$mutationHistory.push({
-      operation: 'delete',
-      collection,
-      key,
+      skipCache,
+    }, {
+      onBeforeApplyCache: removeOptimisticLayer,
     })
   }
   catch (error) {
     // Rollback optimistic layer in case of error
-    if (layer) {
-      store.$cache.removeLayer(layer.id)
-    }
+    removeOptimisticLayer()
     throw error
   }
 }

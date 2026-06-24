@@ -3,6 +3,7 @@ import type { CreateOptions } from '../../src/mutation/create'
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { createItem } from '../../src/mutation/create'
+import { applyMutationToMockCache } from './mockCache'
 
 describe('createItem', () => {
   let mockStore: StoreCore<StoreSchema, CollectionDefaults>
@@ -19,6 +20,7 @@ describe('createItem', () => {
         readItem: vi.fn(),
         addLayer: vi.fn(),
         removeLayer: vi.fn(),
+        applyMutation: vi.fn(params => applyMutationToMockCache(mockStore.$cache, params)),
       },
       $mutationHistory: [],
       $processItemParsing: vi.fn(),
@@ -56,6 +58,7 @@ describe('createItem', () => {
     expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'create',
       collection: mockCollection,
+      key: '1',
       payload: mockItem,
     })
   })
@@ -87,6 +90,7 @@ describe('createItem', () => {
     expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'create',
       collection: mockCollection,
+      key: '1',
       payload: mockItem,
     })
   })

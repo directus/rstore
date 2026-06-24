@@ -1029,6 +1029,131 @@ describe('createFormObject - relation field methods', () => {
     })
   })
 
+  it('omits relation method fields from submitted data', async () => {
+    const collection: any = {
+      name: 'User',
+      normalizedRelations: {
+        profile: {
+          many: false,
+          to: [{
+            collection: 'Profile',
+            on: {
+              'Profile.id': 'User.profileId',
+            },
+          }],
+        },
+      },
+    }
+
+    let submittedData: any = null
+    const obj = createFormObject({
+      defaultValues: () => ({ name: 'John', profileId: null as string | null }),
+      submit: async (data) => {
+        submittedData = data
+        return data as any
+      },
+      collection,
+      validateOnSubmit: false,
+    }) as any
+
+    obj.profile.connect({ id: 'profile-123' })
+
+    await expect(obj.$submit()).resolves.toEqual({ name: 'John', profileId: 'profile-123' })
+    expect(submittedData).toEqual({ name: 'John', profileId: 'profile-123' })
+    expect(submittedData.profile).toBeUndefined()
+    expect(submittedData._$profileData).toBeUndefined()
+  })
+
+  it('keeps assigned relation payload fields in submitted data', async () => {
+    const collection: any = {
+      name: 'User',
+      normalizedRelations: {
+        profile: {
+          many: false,
+          to: [{
+            collection: 'Profile',
+            on: {
+              'Profile.id': 'User.profileId',
+            },
+          }],
+        },
+      },
+    }
+
+    const relationPayload = { _connect: { key: { id: 'profile-123' } } }
+    let submittedData: any = null
+    const obj = createFormObject({
+      defaultValues: () => ({ name: 'John', profileId: null as string | null }),
+      submit: async (data) => {
+        submittedData = data
+      },
+      collection,
+      store: { $collections: [], $cache: {} } as any,
+      validateOnSubmit: false,
+    }) as any
+
+    obj.profile = relationPayload
+
+    expect(obj.profile).toEqual(relationPayload)
+    expect({ ...obj }).toMatchObject({ profile: relationPayload })
+    expect(obj.$hasChanges()).toBe(true)
+    expect(obj.$changedProps.profile).toEqual([relationPayload, undefined])
+
+    await obj.$submit()
+
+    expect(submittedData).toEqual({
+      name: 'John',
+      profileId: null,
+      profile: relationPayload,
+    })
+  })
+
+  it('passes relation-safe enumerable fields to transformData', async () => {
+    const collection: any = {
+      name: 'User',
+      normalizedRelations: {
+        posts: {
+          many: true,
+          to: [{
+            collection: 'Post',
+            on: {
+              'Post.authorId': 'User.id',
+            },
+          }],
+        },
+      },
+    }
+
+    let submittedData: any = null
+    let enumerableKeys: string[] = []
+    let changedProps: any = null
+    const obj = createFormObject({
+      defaultValues: () => ({ id: 'user-1', name: 'John' }),
+      transformData: (data: any) => {
+        enumerableKeys = Object.keys({ ...data })
+        changedProps = data.$changedProps
+        return {
+          ...data,
+          slug: data.name.toLowerCase(),
+        }
+      },
+      submit: async (data) => {
+        submittedData = data
+      },
+      collection,
+      validateOnSubmit: false,
+    }) as any
+
+    obj.name = 'Jane'
+    obj.posts.connect({ id: 'post-1' })
+
+    await obj.$submit()
+
+    expect(enumerableKeys).toEqual(['id', 'name'])
+    expect(changedProps).toEqual({ name: ['Jane', 'John'] })
+    expect(submittedData).toEqual({ id: 'user-1', name: 'Jane', slug: 'jane' })
+  })
+
   it('should provide disconnect method for one-to-one relations', () => {
     const collection: any = {
       name: 'User',

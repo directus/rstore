@@ -3,7 +3,7 @@ import type { Cache } from './cache'
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionList, StoreSchema } from './collection'
 import type { CustomHookMeta } from './hooks'
 import type { ResolvedModule } from './module'
-import type { MutationOperation, MutationSpecialProps } from './mutation'
+import type { MutateCallback, MutateOptions, MutationOperation, MutationSpecialProps } from './mutation'
 import type { RegisteredPlugin } from './plugin'
 import type { FetchPolicy, FindOptions, QueryFetchOptions, QueryResultMode } from './query'
 
@@ -60,6 +60,11 @@ export interface StoreCore<
   $processItemSerialization: <TCollection extends Collection> (collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>, item: any) => void
   $getCollection: (item: any, collectionNames?: string[]) => ResolvedCollection<Collection, CollectionDefaults, StoreSchema> | null
   $mutationHistory: Array<MutationOperation<any, TCollectionDefaults, TSchema>>
+  /** Run custom collection-shaped mutation work through rstore hooks, history, and cache. */
+  $mutate: <TCollection extends Collection = Collection, TResult = unknown>(
+    options: MutateOptions<TCollection, any, any>,
+    callback: MutateCallback<TCollection, any, any, TResult>,
+  ) => Promise<TResult>
   $isServer: boolean
   /**
    * @private

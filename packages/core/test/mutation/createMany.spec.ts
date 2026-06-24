@@ -4,6 +4,7 @@ import type { CreateManyOptions } from '../../src/mutation/createMany'
 import { createHooks } from '@rstore/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createMany } from '../../src/mutation/createMany'
+import { applyMutationToMockCache } from './mockCache'
 
 describe('createMany', () => {
   let mockStore: StoreCore<StoreSchema, CollectionDefaults>
@@ -27,6 +28,7 @@ describe('createMany', () => {
         writeItems: vi.fn(),
         addLayer: vi.fn(),
         removeLayer: vi.fn(),
+        applyMutation: vi.fn(params => applyMutationToMockCache(mockStore.$cache, params)),
       },
       $mutationHistory: [],
       $processItemParsing: vi.fn(),
@@ -75,6 +77,7 @@ describe('createMany', () => {
     expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'create',
       collection: mockCollection,
+      keys: ['1', '2'],
       payload: expect.any(Array),
     })
   })
@@ -247,15 +250,16 @@ describe('createMany', () => {
       items: expect.any(Array),
       setItems: expect.any(Function),
     })
-    expect(afterHook).toHaveBeenCalledWith({
+    expect(afterHook).toHaveBeenCalledWith(expect.objectContaining({
       store: mockStore,
       meta: {},
       collection: mockCollection,
       mutation: 'create',
       items: expect.any(Array),
+      keys: expect.any(Array),
       getResult: expect.any(Function),
       setResult: expect.any(Function),
-    })
+    }))
   })
 
   it('should call afterMutation hook for each item when falling back to individual creates', async () => {
@@ -268,15 +272,16 @@ describe('createMany', () => {
 
     await createMany({ ...options, items: [mockItems[0]!] })
 
-    expect(afterMutationHook).toHaveBeenCalledWith({
+    expect(afterMutationHook).toHaveBeenCalledWith(expect.objectContaining({
       store: mockStore,
       meta: {},
       collection: mockCollection,
       mutation: 'create',
+      key: '1',
       item: expect.any(Object),
       getResult: expect.any(Function),
       setResult: expect.any(Function),
-    })
+    }))
   })
 
   it('should auto abort when createMany setResult is called with non-empty result', async () => {
@@ -353,6 +358,7 @@ describe('createMany', () => {
     expect(mockStore.$mutationHistory).toContainEqual({
       operation: 'create',
       collection: mockCollection,
+      keys: ['3'],
       payload: modifiedItems,
     })
   })

@@ -4,6 +4,7 @@ import type { CustomHookMeta } from './hooks'
 import type { WrappedItem } from './item'
 import type { CacheLayer } from './layer'
 import type { Module, ResolvedModuleState } from './module'
+import type { ApplyMutationOptions, ApplyMutationResult } from './mutation'
 
 /**
  * A tombstone records the causal timestamp of a deletion so concurrent
@@ -137,6 +138,11 @@ export interface Cache<
     childItem: any
     meta?: CustomHookMeta
   }) => void
+
+  /**
+   * Apply mutation-shaped changes directly to cache without emitting mutation hooks.
+   */
+  applyMutation: <TCollection extends Collection = Collection>(params: ApplyMutationOptions<TCollection, any, any>) => ApplyMutationResult
 
   /**
    * Read the per-field timestamps for an item.

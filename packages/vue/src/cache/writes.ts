@@ -22,6 +22,8 @@ export function deleteItemNow<TCollection extends Collection>(
   removeItemIndexes(ctx, collection, key, item)
   invalidateCollectionStateCache(ctx, collection.name)
   delete collectionState[key]
+  invalidateCollectionStateCache(ctx, collection.name)
+
   const wrapKey = getItemWrapKey(collection, key, undefined)
   ctx.wrappedItems.delete(wrapKey)
   ctx.wrappedItemsMetadata.delete(wrapKey)
@@ -84,6 +86,8 @@ export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeI
   else {
     writeMutableItem(ctx, params, collectionState)
   }
+  invalidateCollectionStateCache(ctx, collection.name)
+
   if (marker) {
     mark(ctx, marker)
   }

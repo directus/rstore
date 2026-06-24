@@ -1,9 +1,10 @@
 import type { FormOperation, StandardSchemaV1 } from '@rstore/shared'
 import type { FormObjectRuntime } from './context'
 import { isKeyDefined } from '@rstore/core'
+import { isPublicKey } from '@rstore/shared'
 import { markRaw } from 'vue'
 import { optimizeOpLog } from './opLog'
-import { queueChange, recordAndApplyOp } from './state'
+import { isInternalRelationMethodField, queueChange, recordAndApplyOp } from './state'
 import { leafFieldName } from './utils/fieldPath'
 import { itemsMatch } from './utils/items'
 
@@ -15,9 +16,18 @@ export function createFormProxy<TData extends Record<string, any>, TSchema exten
 ) {
   return new Proxy(ctx.form, {
     set(_target, key, value) {
-      if (typeof key === 'string' && !key.startsWith('$') && !key.startsWith('_$')
-        && !(ctx.options.collection && key in (ctx.options.collection.normalizedRelations as Record<string, any>))) {
-        const oldValue = ctx.form[key]
+      const isPublicFormKey = isPublicKey(key)
+      const isRelationKey = typeof key === 'string'
+        && isPublicFormKey
+        && !!ctx.options.collection
+        && key in (ctx.options.collection.normalizedRelations as Record<string, any>)
+      const shouldRecordSet = typeof key === 'string' && isPublicFormKey && (!isRelationKey || value !== ctx.relationMethods[key])
+
+      if (shouldRecordSet) {
+        const currentValue = ctx.form[key]
+        const oldValue = isRelationKey && currentValue === ctx.relationMethods[key]
+          ? ctx.initialData[key as keyof typeof ctx.initialData]
+          : currentValue
         ctx.redoStack.length = 0
         ctx.opLog.push({
           timestamp: Date.now(),
@@ -42,13 +52,17 @@ export function createFormProxy<TData extends Record<string, any>, TSchema exten
     },
     get(_target, key) {
       if (typeof key === 'string' && ctx.options.store && ctx.options.collection
-        && key in (ctx.options.collection.normalizedRelations as Record<string, any>)) {
+        && key in (ctx.options.collection.normalizedRelations as Record<string, any>)
+        && isInternalRelationMethodField(ctx, key)) {
         return getRelationValue(ctx, key)
       }
       return Reflect.get(ctx.form, key)
     },
     ownKeys() {
-      return Reflect.ownKeys(ctx.form).filter(key => typeof key !== 'string' || (!key.startsWith('$') && !key.startsWith('_$')))
+      return Reflect.ownKeys(ctx.form).filter(key =>
+        isPublicKey(key)
+        && (typeof key !== 'string' || !isInternalRelationMethodField(ctx, key)),
+      )
     },
   })
 }

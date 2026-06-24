@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { get, pickNonSpecialProps, pickSpecialProps, set } from '../../src/utils/obj.js'
+import { get, isPublicKey, pickNonSpecialProps, pickSpecialProps, set } from '../../src/utils/obj.js'
 
 describe('get', () => {
   it('should return the value at the given path', () => {
@@ -47,6 +47,12 @@ describe('pickNonSpecialProps', () => {
     expect(pickNonSpecialProps(obj)).toEqual({ a: 1, b: 2 })
   })
 
+  it('should ignore internal relation data starting with _$', () => {
+    const obj = { a: 1, _$relationData: { connect: () => {} } }
+
+    expect(pickNonSpecialProps(obj, true)).toEqual({ a: 1 })
+  })
+
   it('should return an empty object if all properties start with $', () => {
     const obj = { $a: 1, $b: 2 }
     expect(pickNonSpecialProps(obj)).toEqual({})
@@ -55,6 +61,22 @@ describe('pickNonSpecialProps', () => {
   it('should return the same object if no properties start with $', () => {
     const obj = { a: 1, b: 2 }
     expect(pickNonSpecialProps(obj)).toEqual({ a: 1, b: 2 })
+  })
+})
+
+describe('isPublicKey', () => {
+  it('should allow non-internal string keys', () => {
+    expect(isPublicKey('title')).toBe(true)
+  })
+
+  it('should reject rstore private string keys', () => {
+    expect(isPublicKey('$loading')).toBe(false)
+    expect(isPublicKey('_$relationData')).toBe(false)
+  })
+
+  it('should allow symbol and number keys', () => {
+    expect(isPublicKey(Symbol('field'))).toBe(true)
+    expect(isPublicKey(1)).toBe(true)
   })
 })
 

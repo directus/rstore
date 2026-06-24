@@ -2,6 +2,7 @@ import type { Collection, CollectionDefaults, ResolvedCollection, StoreCore, Sto
 import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { deleteItem } from '../../src/mutation/delete'
+import { applyMutationToMockCache } from './mockCache'
 
 describe('deleteItem', () => {
   let mockStore: StoreCore<StoreSchema, CollectionDefaults>
@@ -16,6 +17,7 @@ describe('deleteItem', () => {
         readItem: vi.fn(),
         addLayer: vi.fn(),
         removeLayer: vi.fn(),
+        applyMutation: vi.fn(params => applyMutationToMockCache(mockStore.$cache, params)),
       },
       $mutationHistory: [],
     } as any

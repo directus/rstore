@@ -4,6 +4,7 @@ import { gcTombstones, isKeyDefined } from '@rstore/core'
 import { ref, toValue } from 'vue'
 import { getCollectionIndex, invalidateCollectionStateCache } from './context'
 import { ensureLayersForCollection, getStateForCollection } from './layers'
+import { applyMutationToCache } from './mutations'
 import { enqueueOperation, flushQueuedOperations } from './queue'
 import { garbageCollectItem, getWrappedItem } from './wrapped'
 
@@ -30,6 +31,9 @@ export function createCacheApi<
     },
     writeItemForRelation(params) {
       writeItemForRelation(ctx, params)
+    },
+    applyMutation(params) {
+      return applyMutationToCache(ctx, params)
     },
     deleteItem(params) {
       enqueueOperation(ctx, { type: 'deleteItem', params })

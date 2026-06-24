@@ -1,8 +1,8 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WriteItem } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps } from '@rstore/shared'
-import { unwrapItem } from '../item'
 import { isKeyDefined } from '../key'
 import { peekMany } from '../query'
+import { finalizeMutation } from './finalizeMutation'
 
 export interface UpdateManyOptions<
   TCollection extends Collection,
@@ -91,6 +91,12 @@ export async function updateMany<
   }
 
   let layer: CacheLayer | undefined
+  const removeOptimisticLayer = () => {
+    if (layer) {
+      store.$cache.removeLayer(layer.id)
+      layer = undefined
+    }
+  }
 
   if (!skipCache && optimistic) {
     const optimisticState: Record<string, any> = {}
@@ -159,19 +165,6 @@ export async function updateMany<
           abort,
         })
 
-        await store.$hooks.callHook('afterMutation', {
-          store: store as unknown as GlobalStoreType,
-          meta,
-          collection,
-          mutation: 'update',
-          key,
-          item,
-          getResult: () => singleResult ?? undefined,
-          setResult: (newResult) => {
-            singleResult = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
-          },
-        })
-
         if (singleResult) {
           const index = result.findIndex(r => collection.getKey(r) === key)
           if (index > -1) {
@@ -187,52 +180,21 @@ export async function updateMany<
       }))
     }
 
-    await store.$hooks.callHook('afterManyMutation', {
-      store: store as unknown as GlobalStoreType,
+    const commitResult = await finalizeMutation(store, {
       meta,
       collection,
       mutation: 'update',
       items: itemsWithKey,
-      getResult: () => result ?? undefined,
-      setResult: (newResult) => {
-        result = newResult as Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
-      },
+      results: result,
+      skipCache,
+    }, {
+      emitItemHooks: !aborted,
+      onBeforeApplyCache: removeOptimisticLayer,
     })
 
+    result = commitResult.results as Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> ?? []
+
     if (result.length) {
-      const newResult = [] as typeof result
-
-      for (const item of result) {
-        const unwrappedItem = unwrapItem(item)
-        store.$processItemParsing(collection, unwrappedItem)
-        newResult.push(unwrappedItem)
-      }
-
-      result = newResult
-
-      if (!skipCache) {
-        if (layer) {
-          store.$cache.removeLayer(layer.id)
-        }
-
-        const items = result
-        const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
-        for (const item of items) {
-          const key = collection.getKey(item)
-          if (!isKeyDefined(key)) {
-            console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
-            continue
-          }
-          writes.push({ key, value: item })
-        }
-        if (writes.length) {
-          store.$cache.writeItems<TCollection>({
-            collection,
-            items: writes,
-          })
-        }
-      }
-
       // Sort result to match the order of input items
       const resultByKey: Record<string | number, ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> = {}
       for (const item of result) {
@@ -243,18 +205,10 @@ export async function updateMany<
       }
       result = itemsWithKey.map(({ key }) => resultByKey[key]).filter(Boolean) as Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
     }
-
-    store.$mutationHistory.push({
-      operation: 'update',
-      collection,
-      payload: itemsWithKey,
-    })
   }
   catch (error) {
     // Rollback optimistic layer in case of error
-    if (layer) {
-      store.$cache.removeLayer(layer.id)
-    }
+    removeOptimisticLayer()
     throw error
   }
 

@@ -138,6 +138,154 @@ await store.todos.deleteMany(['id-1', 'id-2'])
 
 It can be useful to batch the delete operations into a single fetch request to your backend. See `deleteMany` in the [plugin hooks](../plugin/hooks.md#deletemany).
 
+## Custom Mutations <Badge text="New in v0.9" />
+
+Use `mutate` when you need to perform custom remote work that still represents a collection `create`, `update`, or `delete`.
+
+The callback replaces the remote plugin hook for that operation. rstore still owns the mutation lifecycle around it:
+
+- `beforeMutation` / `beforeManyMutation` run before the callback
+- the callback receives the hook-final `item`, `items`, `key`, `keys`, `meta`, `store`, and `collection`
+- `createItem`, `updateItem`, `deleteItem`, and their many variants are not called
+- `afterMutation` / `afterManyMutation` run after a successful callback
+- the final result is written to cache and recorded in mutation history
+
+```ts
+const selectedFile = fileInput.files?.[0]
+
+if (!selectedFile) {
+  throw new Error('No file selected')
+}
+
+const uploadedFile = await store.files.mutate({
+  mutation: 'create',
+  item: {
+    filename: selectedFile.name,
+    mimeType: selectedFile.type,
+  },
+}, async ({ item }) => {
+  const formData = new FormData()
+  formData.set('file', selectedFile)
+  formData.set('metadata', JSON.stringify(item))
+
+  const uploadResponse = await fetch('/api/files/upload', {
+    method: 'POST',
+    body: formData,
+  })
+  const { id } = await uploadResponse.json()
+
+  const fileResponse = await fetch(`/api/files/${id}`)
+  return await fileResponse.json()
+})
+```
+
+The returned value is the final mutation result. If an `afterMutation` hook calls `setResult`, `mutate` resolves with that updated result and writes it to cache.
+
+::: tip
+For `create` and `update`, return the full saved item so rstore can parse it and compute its key before writing to cache.
+:::
+
+For cache writes, `create` and `update` need a non-null final result with a key. `delete` needs a `key`, `keys`, `item`, `items`, or result item keys. These cache-key requirements are skipped when `skipCache: true` is set.
+
+If you are working with a resolved collection instead of the generated collection API, use `store.$mutate`:
+
+```ts
+const collection = store.$collections.find(c => c.name === 'files')!
+const replacementFile = fileInput.files?.[0]
+
+if (!replacementFile) {
+  throw new Error('No replacement file selected')
+}
+
+const file = await store.$mutate({
+  collection,
+  mutation: 'update',
+  key: 'file-id',
+  item: {
+    filename: replacementFile.name,
+    mimeType: replacementFile.type,
+  },
+}, async ({ key, item }) => {
+  const formData = new FormData()
+  formData.set('file', replacementFile)
+  formData.set('metadata', JSON.stringify(item))
+
+  const response = await fetch(`/api/files/${key}/replace`, {
+    method: 'POST',
+    body: formData,
+  })
+  return await response.json()
+})
+```
+
+### Many custom mutations
+
+`mutate` uses the many lifecycle when you pass `many: true`, `keys`, or `items`. The callback return value alone does not switch to many mode because rstore needs to know which before hook to call before the callback runs.
+
+```ts
+await store.files.mutate({
+  mutation: 'delete',
+  keys: ['file-id-1', 'file-id-2'],
+}, async ({ keys }) => {
+  await fetch('/api/files/uploads', {
+    method: 'DELETE',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      fileIds: keys,
+    }),
+  })
+})
+```
+
+For many `create` and `update` mutations, return the saved items:
+
+```ts
+const files = await store.files.mutate({
+  mutation: 'update',
+  items: [
+    { id: 'file-id-1', folderId: 'receipts' },
+    { id: 'file-id-2', folderId: 'receipts' },
+  ],
+}, async ({ items }) => {
+  const response = await fetch('/api/files/bulk-move', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(items),
+  })
+  return await response.json()
+})
+```
+
+### Skipping cache writes
+
+Pass `skipCache: true` when the custom mutation should run mutation hooks and record history without writing the callback result to cache.
+
+```ts
+const archiveFormData = new FormData()
+archiveFormData.set('archive', archiveFile)
+
+await store.files.mutate({
+  mutation: 'create',
+  skipCache: true,
+}, async () => {
+  const response = await fetch('/api/files/import-archive', {
+    method: 'POST',
+    body: archiveFormData,
+  })
+  return await response.json()
+})
+```
+
+If the callback throws, rstore does not call after hooks, write to cache, or record mutation history.
+
+::: info
+`mutate` does not use optimistic layers or batch scheduling. Use the normal `create`, `update`, and `delete` APIs when you want those features.
+:::
+
 ## Batching <Badge text="New in v0.9" />
 
 Individual `create` / `update` / `delete` calls that happen in the same tick can also be combined into a single request by a batch-aware plugin, without switching to the `*Many` variants. See [Batching](./batching.md).

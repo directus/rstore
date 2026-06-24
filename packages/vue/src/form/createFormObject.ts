@@ -1,13 +1,12 @@
 import type { FieldConflict, FormObjectBase, FormOperation, StandardSchemaV1 } from '@rstore/shared'
 import type { CreateFormObjectOptions, FormObjectAdditionalProps, FormObjectChanged, OpLogAPI, VueFormObject } from './types'
 import { emptySchema } from '@rstore/core'
-import { pickNonSpecialProps } from '@rstore/shared'
 import { markRaw, reactive } from 'vue'
 import { createFormRuntime } from './context'
 import { optimizeOpLog } from './opLog'
 import { rebaseForm, rebasePendingSubmitEdits, resolveConflict } from './rebase'
 import { createFormProxy, installRelationMethods } from './relations'
-import { createOpLogApi, getResetInitialData, queueChange, rebuildFormFromBase, removeInternalRelationData } from './state'
+import { createOpLogApi, getResetInitialData, pickFormData, queueChange, rebuildFormFromBase, removeInternalRelationData } from './state'
 
 export function createFormObject<
   TData extends Record<string, any> = Record<string, any>,
@@ -73,14 +72,13 @@ async function submitForm<TData extends Record<string, any>, TSchema extends Sta
   ctx.form.$loading = true
   ctx.form.$error = null
   try {
-    const submittedBaseData = pickNonSpecialProps(ctx.form, true) as Partial<TData>
-    removeInternalRelationData(ctx, submittedBaseData)
+    const submittedBaseData = pickFormData(ctx, true)
     const submittedOperations = [...ctx.opLog]
     const submittedOpCount = submittedOperations.length
     const submittedFormOperations = optimizeOpLog(submittedOperations, ctx.options.collection)
     const data = ctx.options.transformData
-      ? ctx.options.transformData(ctx.form as unknown as Partial<TData>)
-      : pickNonSpecialProps(ctx.form, true) as Partial<TData>
+      ? ctx.options.transformData(ctx.proxy as Partial<TData>)
+      : pickFormData(ctx, true)
     removeInternalRelationData(ctx, data)
 
     if (ctx.options.validateOnSubmit ?? true) {

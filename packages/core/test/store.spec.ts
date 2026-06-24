@@ -292,6 +292,213 @@ describe('createStoreCore', () => {
     })
   })
 
+  describe('mutate', () => {
+    it('should run before hooks, callback, after hooks, cache, and history', async () => {
+      const applyResult = { written: [2], deleted: [], skipped: 0 }
+      const applyMutation = vi.fn((_params: any) => applyResult)
+      const callback = vi.fn(() => ({ id: 1, name: 'From callback' }))
+      const beforeMutation = vi.fn(({ modifyItem }) => {
+        modifyItem('name', 'From before hook')
+      })
+      const afterMutation = vi.fn(({ setResult }) => {
+        setResult({ id: 2, name: 'Changed' })
+      })
+      const createItem = vi.fn()
+
+      options.schema = [{ name: 'messages' }]
+      options.cache = { applyMutation } as unknown as Cache
+      options.hooks = createHooks()
+      options.hooks.hook('beforeMutation', beforeMutation)
+      options.hooks.hook('createItem', createItem)
+      options.hooks.hook('afterMutation', afterMutation)
+
+      const store = await createStoreCore(options)
+      const collection = store.$collections[0]!
+      const result = await store.$mutate({
+        collection,
+        mutation: 'create',
+        item: { name: 'Original' },
+      }, callback)
+
+      expect(result).toEqual({ id: 2, name: 'Changed' })
+      expect(beforeMutation).toHaveBeenCalledWith(expect.objectContaining({
+        store,
+        meta: {},
+        collection,
+        mutation: 'create',
+        modifyItem: expect.any(Function),
+        setItem: expect.any(Function),
+      }))
+      expect(callback).toHaveBeenCalledWith(expect.objectContaining({
+        store,
+        meta: {},
+        collection,
+        mutation: 'create',
+        item: { name: 'From before hook' },
+      }))
+      expect(createItem).not.toHaveBeenCalled()
+      expect(afterMutation).toHaveBeenCalledWith(expect.objectContaining({
+        store,
+        meta: {},
+        collection,
+        mutation: 'create',
+        getResult: expect.any(Function),
+        setResult: expect.any(Function),
+      }))
+      expect(applyMutation).toHaveBeenCalledWith(expect.objectContaining({
+        collection,
+        mutation: 'create',
+        result: { id: 2, name: 'Changed' },
+        meta: {},
+      }))
+      expect(store.$mutationHistory).toContainEqual({
+        operation: 'create',
+        collection,
+        key: 2,
+        payload: { name: 'From before hook' },
+      })
+    })
+
+    it('should run many hooks and apply many deletes', async () => {
+      const applyResult = { written: [], deleted: [1, 2], skipped: 0 }
+      const applyMutation = vi.fn((_params: any) => applyResult)
+      const beforeManyMutation = vi.fn()
+      const afterManyMutation = vi.fn()
+      const deleteMany = vi.fn()
+      const callback = vi.fn()
+
+      options.schema = [{ name: 'messages' }]
+      options.cache = { applyMutation } as unknown as Cache
+      options.hooks = createHooks()
+      options.hooks.hook('beforeManyMutation', beforeManyMutation)
+      options.hooks.hook('afterManyMutation', afterManyMutation)
+      options.hooks.hook('deleteMany', deleteMany)
+
+      const store = await createStoreCore(options)
+      const collection = store.$collections[0]!
+      const result = await store.$mutate({
+        collection,
+        mutation: 'delete',
+        keys: [1, 2],
+      }, callback)
+
+      expect(result).toBeUndefined()
+      expect(beforeManyMutation).toHaveBeenCalledWith(expect.objectContaining({
+        collection,
+        mutation: 'delete',
+        keys: [1, 2],
+      }))
+      expect(callback).toHaveBeenCalledWith(expect.objectContaining({
+        collection,
+        mutation: 'delete',
+        keys: [1, 2],
+      }))
+      expect(deleteMany).not.toHaveBeenCalled()
+      expect(afterManyMutation).toHaveBeenCalledWith(expect.objectContaining({
+        store,
+        meta: {},
+        collection,
+        mutation: 'delete',
+        keys: [1, 2],
+        getResult: expect.any(Function),
+        setResult: expect.any(Function),
+      }))
+      expect(applyMutation).toHaveBeenCalledWith(expect.objectContaining({
+        collection,
+        mutation: 'delete',
+        keys: [1, 2],
+        meta: {},
+      }))
+      expect(store.$mutationHistory).toContainEqual({
+        operation: 'delete',
+        collection,
+        keys: [1, 2],
+        payload: undefined,
+      })
+    })
+
+    it('should pass hook-modified items to the callback in many mode', async () => {
+      const applyResult = { written: [1], deleted: [], skipped: 0 }
+      const applyMutation = vi.fn((_params: any) => applyResult)
+      const callback = vi.fn(({ items }) => items.map((entry: any) => ({ ...(entry.item ?? entry), saved: true })))
+
+      options.schema = [{ name: 'messages' }]
+      options.cache = { applyMutation } as unknown as Cache
+      options.hooks = createHooks()
+      options.hooks.hook('beforeManyMutation', ({ setItems }) => {
+        setItems([{ id: 1, name: 'Changed by before hook' }])
+      })
+
+      const store = await createStoreCore(options)
+      const collection = store.$collections[0]!
+      const result = await store.$mutate({
+        collection,
+        mutation: 'update',
+        items: [{ id: 1, name: 'Original' }],
+      }, callback)
+
+      expect(callback).toHaveBeenCalledWith(expect.objectContaining({
+        items: [{ id: 1, name: 'Changed by before hook' }],
+      }))
+      expect(result).toEqual([{ id: 1, name: 'Changed by before hook', saved: true }])
+      expect(applyMutation).toHaveBeenCalledWith(expect.objectContaining({
+        results: [{ id: 1, name: 'Changed by before hook', saved: true }],
+      }))
+    })
+
+    it('should emit hooks and history without applying cache when skipCache is true', async () => {
+      const applyMutation = vi.fn()
+      const afterMutation = vi.fn()
+
+      options.schema = [{ name: 'messages' }]
+      options.cache = { applyMutation } as unknown as Cache
+      options.hooks = createHooks()
+      options.hooks.hook('afterMutation', afterMutation)
+
+      const store = await createStoreCore(options)
+      const collection = store.$collections[0]!
+      const result = await store.$mutate({
+        collection,
+        mutation: 'create',
+        skipCache: true,
+      }, () => ({ id: 1, name: 'Skipped' }))
+
+      expect(result).toEqual({ id: 1, name: 'Skipped' })
+      expect(afterMutation).toHaveBeenCalled()
+      expect(applyMutation).not.toHaveBeenCalled()
+      expect(store.$mutationHistory).toContainEqual({
+        operation: 'create',
+        collection,
+        key: 1,
+        payload: undefined,
+      })
+    })
+
+    it('should skip after hooks, cache, and history when the callback throws', async () => {
+      const applyMutation = vi.fn()
+      const afterMutation = vi.fn()
+
+      options.schema = [{ name: 'messages' }]
+      options.cache = { applyMutation } as unknown as Cache
+      options.hooks = createHooks()
+      options.hooks.hook('afterMutation', afterMutation)
+
+      const store = await createStoreCore(options)
+      const collection = store.$collections[0]!
+
+      await expect(store.$mutate({
+        collection,
+        mutation: 'create',
+      }, async () => {
+        throw new Error('custom failed')
+      })).rejects.toThrow('custom failed')
+
+      expect(afterMutation).not.toHaveBeenCalled()
+      expect(applyMutation).not.toHaveBeenCalled()
+      expect(store.$mutationHistory).toEqual([])
+    })
+  })
+
   describe('getCollection', () => {
     it('should return the correct collection for an item', async () => {
       const schema: StoreSchema = [

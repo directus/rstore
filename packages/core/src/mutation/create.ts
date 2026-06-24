@@ -1,8 +1,8 @@
 import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
-import { unwrapItem } from '../item'
 import { isKeyDefined } from '../key'
+import { finalizeMutation } from './finalizeMutation'
 
 export interface CreateOptions<
   TCollection extends Collection,
@@ -72,6 +72,12 @@ export async function createItem<
   })
 
   let layer: CacheLayer | undefined
+  const removeOptimisticLayer = () => {
+    if (layer) {
+      store.$cache.removeLayer(layer.id)
+      layer = undefined
+    }
+  }
 
   if (!skipCache && optimistic) {
     let key = collection.getKey(item)
@@ -124,58 +130,25 @@ export async function createItem<
       })
     }
 
-    await store.$hooks.callHook('afterMutation', {
-      store: store as unknown as GlobalStoreType,
+    const commitResult = await finalizeMutation(store, {
       meta,
       collection,
       mutation: 'create',
       item,
-      getResult: () => result,
-      setResult: (newResult) => {
-        result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
-      },
+      result,
+      skipCache,
       formOperations: formOperations as FormOperation[],
+    }, {
+      requireResultError: 'Item creation failed: result is nullish',
+      missingCacheKeyError: 'Item creation failed: key is not defined',
+      onBeforeApplyCache: removeOptimisticLayer,
     })
 
-    if (result) {
-      result = unwrapItem(result)
-
-      store.$processItemParsing(collection, result)
-
-      if (!skipCache) {
-        if (layer) {
-          store.$cache.removeLayer(layer.id)
-        }
-
-        const key = collection.getKey(result)
-
-        if (isKeyDefined(key)) {
-          store.$cache.writeItem({
-            collection,
-            key,
-            item: result as NonNullable<typeof result>,
-          })
-        }
-        else {
-          throw new Error('Item creation failed: key is not defined')
-        }
-      }
-    }
-    else {
-      throw new Error('Item creation failed: result is nullish')
-    }
-
-    store.$mutationHistory.push({
-      operation: 'create',
-      collection,
-      payload: item,
-    })
+    result = commitResult.result as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
   }
   catch (error) {
     // Rollback optimistic layer in case of error
-    if (layer) {
-      store.$cache.removeLayer(layer.id)
-    }
+    removeOptimisticLayer()
     throw error
   }
 

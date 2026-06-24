@@ -1,5 +1,5 @@
 import type { CreateManyOptions, CreateOptions, DeleteManyOptions, DeleteOptions, UpdateManyOptions, UpdateOptions } from '@rstore/core'
-import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StandardSchemaV1, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CollectionMutateCallback, CollectionMutateOptions, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StandardSchemaV1, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { CreateFormObjectOptions, VueCreateFormObject, VueUpdateFormObject } from '../form'
 import type { VueQueryReturn } from '../query'
@@ -143,6 +143,11 @@ export interface VueCollectionApi<
     keysOrItems: Array<string | number | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>,
     deleteOptions?: Pick<DeleteManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
   ) => Promise<void>
+  /** Run custom collection-shaped mutation work through rstore. */
+  mutate: <TResult>(
+    options: CollectionMutateOptions<TCollection, TCollectionDefaults, TSchema>,
+    callback: CollectionMutateCallback<TCollection, TCollectionDefaults, TSchema, TResult>,
+  ) => Promise<TResult>
   getKey: (item: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>) => string | number | null | undefined
   writeItem: (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => WrappedItem<TCollection, TCollectionDefaults, TSchema>
   clearItem: (key: string | number) => void

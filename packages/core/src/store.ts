@@ -4,6 +4,7 @@ import { createBatchScheduler } from './batch'
 import { builtinCollectionHooksPlugin } from './builtin/collectionHooks'
 import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollectionOppositeRelations, resolveCollections } from './collection'
 import { defaultFetchPolicy } from './fetchPolicy'
+import { mutate } from './mutation/mutate'
 import { setupPlugin, sortPlugins } from './plugin'
 
 export interface CreateStoreCoreOptions<
@@ -124,6 +125,9 @@ export async function createStoreCore<
       return null
     },
     $mutationHistory: [],
+    $mutate(options, callback) {
+      return mutate(store, options, callback)
+    },
     $isServer: options.isServer ?? false,
     $dedupePromises: new Map(),
     $registeredModules: new Map(),

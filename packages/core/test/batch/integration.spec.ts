@@ -7,6 +7,7 @@ import { createBatchScheduler } from '../../src/batch/scheduler'
 import { createItem } from '../../src/mutation/create'
 import { updateItem } from '../../src/mutation/update'
 import { findFirst } from '../../src/query/findFirst'
+import { applyMutationToMockCache } from '../mutation/mockCache'
 
 /**
  * End-to-end regression tests that exercise the batch scheduler
@@ -30,6 +31,7 @@ describe('batching integration', () => {
         readItems: vi.fn(() => []),
         addLayer: vi.fn(),
         removeLayer: vi.fn(),
+        applyMutation: vi.fn(params => applyMutationToMockCache(mockStore.$cache, params)),
         wrapItem: vi.fn(({ item }: any) => item),
       },
       $resolveFindOptions: (_c: any, options: any) => ({

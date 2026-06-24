@@ -1,6 +1,6 @@
 import type { Collection, CollectionDefaults, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CreateCollectionApiOptions, VueCollectionApi } from './types'
-import { createItem, createMany, deleteItem, deleteMany, findFirst, findMany, isKeyDefined, peekFirst, peekMany, updateItem, updateMany } from '@rstore/core'
+import { createItem, createMany, deleteItem, deleteMany, findFirst, findMany, isKeyDefined, mutate, peekFirst, peekMany, updateItem, updateMany } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { createFormObject } from '../form'
 import { runApiQuery, subscribeToApiQuery } from './query'
@@ -34,6 +34,7 @@ export function createCollectionApi<
     updateForm: (options, formOptions) => createUpdateForm(api, getCollection, store, options, formOptions),
     delete: (keyOrItem, options) => deleteOne(store, getCollection(), keyOrItem, options),
     deleteMany: (keysOrItems, options) => deleteManyItems(store, getCollection(), keysOrItems, options),
+    mutate: (options, callback) => mutate(store, { ...options, collection: getCollection() }, callback),
     getKey: item => getCollection().getKey(item),
     writeItem: item => writeItem(store, getCollection(), item),
     clearItem: key => store.$cache.deleteItem({ collection: getCollection(), key }),

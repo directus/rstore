@@ -1,10 +1,22 @@
 import type { FormOperation, StandardSchemaV1 } from '@rstore/shared'
 import type { FormObjectRuntime } from './context'
 import type { FormObjectChanged } from './types'
-import { pickNonSpecialProps } from '@rstore/shared'
+import { isPublicKey, pickNonSpecialProps } from '@rstore/shared'
 import { nextTick } from 'vue'
 import { optimizeOpLog } from './opLog'
 import { applyOp } from './projection'
+
+/**
+ * Return whether a relation field still contains rstore's internal method facade.
+ */
+export function isInternalRelationMethodField<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
+  ctx: FormObjectRuntime<TData, TSchema, TResult>,
+  key: string,
+) {
+  return !!ctx.options.collection
+    && key in (ctx.options.collection.normalizedRelations as Record<string, any>)
+    && ctx.form[key] === ctx.relationMethods[key]
+}
 
 /**
  * Initialize relation data fields on a target object.
@@ -43,16 +55,33 @@ export async function getResetInitialData<TData extends Record<string, any>, TSc
 }
 
 /**
- * Remove private relation cache fields from data leaving the form.
+ * Pick data fields from a form object without private form state or relation
+ * method fields.
+ */
+export function pickFormData<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
+  ctx: FormObjectRuntime<TData, TSchema, TResult>,
+  clone = false,
+): Partial<TData> {
+  const data: Record<string, any> = {}
+
+  for (const key in ctx.form) {
+    if (!isPublicKey(key) || isInternalRelationMethodField(ctx, key))
+      continue
+    data[key] = ctx.form[key]
+  }
+
+  return pickNonSpecialProps(data, clone) as Partial<TData>
+}
+
+/**
+ * Remove private form state and relation method fields from data leaving the form.
  */
 export function removeInternalRelationData<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
   ctx: FormObjectRuntime<TData, TSchema, TResult>,
   data: Partial<TData>,
 ) {
-  if (!ctx.options.collection)
-    return
   for (const key of Object.keys(data)) {
-    if (key.startsWith('_$')) {
+    if (!isPublicKey(key) || (isInternalRelationMethodField(ctx, key) && (data as any)[key] === ctx.relationMethods[key])) {
       delete (data as any)[key]
     }
   }
@@ -71,7 +100,7 @@ export function queueChange<TData extends Record<string, any>, TSchema extends S
     ctx.changeQueued = false
     ctx.onChange.trigger(ctx.changedSinceLastHandled)
     ctx.changedSinceLastHandled = {}
-    const { issues } = await ctx.form.$schema['~standard'].validate(pickNonSpecialProps(ctx.form))
+    const { issues } = await ctx.form.$schema['~standard'].validate(pickFormData(ctx))
     ctx.form.$valid = !issues
   })
 }
@@ -101,7 +130,7 @@ export function updateChangedProps<TData extends Record<string, any>, TSchema ex
     if (op.type !== 'set')
       continue
     const key = String(op.field)
-    if (key in (ctx.initialData as Record<string, any>) || key in changed)
+    if ((!relationKeys?.has(key) && key in (ctx.initialData as Record<string, any>)) || key in changed)
       continue
     const current = ctx.form[key]
     if (current !== undefined) {
@@ -118,7 +147,7 @@ export function rebuildState<TData extends Record<string, any>, TSchema extends 
   ctx: FormObjectRuntime<TData, TSchema, TResult>,
 ) {
   for (const key in ctx.form) {
-    if (!key.startsWith('$') && !key.startsWith('_$')) {
+    if (isPublicKey(key)) {
       delete ctx.form[key]
     }
   }
@@ -141,7 +170,7 @@ export function rebuildFormFromBase<TData extends Record<string, any>, TSchema e
   ctx.form.$changedProps = {}
   ctx.form.$conflicts = []
   for (const key in ctx.form) {
-    if (!key.startsWith('$') && !key.startsWith('_$')) {
+    if (isPublicKey(key)) {
       delete ctx.form[key]
     }
   }

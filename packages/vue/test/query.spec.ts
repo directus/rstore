@@ -793,5 +793,58 @@ describe('query', () => {
       expect(query.data.value?.[2]?.text).toBe('Message 3')
       expect(query.data.value?.[3]?.text).toBe('Message 4')
     })
+
+    it('should keep paginated rows when cache-and-fetch results include to-one relations', async () => {
+      const store = await createStore({
+        schema: [
+          {
+            name: 'articles',
+            relations: {
+              author: {
+                to: {
+                  authors: {
+                    on: {
+                      id: 'authorId',
+                    },
+                  },
+                },
+                many: false,
+              },
+            },
+            hooks: {
+              fetchMany: () => [
+                {
+                  id: 1,
+                  title: 'Test Article',
+                  authorId: 1,
+                  author: {
+                    id: 1,
+                    name: 'Jane Doe',
+                  },
+                },
+              ],
+            },
+          },
+          {
+            name: 'authors',
+          },
+        ],
+        plugins: [],
+      })
+
+      const query = await store.articles.query(q => q.many({
+        pageIndex: 0,
+        pageSize: 25,
+        fetchPolicy: 'cache-and-fetch',
+        resultMode: 'responseRefs',
+        experimentalGarbageCollection: true,
+      }))
+
+      await until(() => query.pages.value[0]?.data.length).toBe(1)
+
+      expect(query.pages.value[0]?.rawData).toEqual({ type: 'refs', keys: [1] })
+      expect(query.pages.value[0]?.data.map(item => item.title)).toEqual(['Test Article'])
+      expect(query.data.value?.map(item => item.title)).toEqual(['Test Article'])
+    })
   })
 })
