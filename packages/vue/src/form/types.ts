@@ -92,6 +92,10 @@ export interface FormObjectAdditionalProps<
 > {
   $changedProps: FormObjectChanged<TData>
   $hasChanges: () => boolean
+  /** Read a backing form field without invoking proxy-only relation facades. */
+  $getRaw: <TKey extends PropertyKey>(field: TKey) => TKey extends keyof TData ? TData[TKey] | undefined : unknown
+  /** Return the public backing form data without proxy-only relation facades. */
+  $getRawData: (options?: { clone?: boolean }) => Partial<TData>
   /** Operation log API for querying and managing change history. */
   $opLog: OpLogAPI<TData>
   /** @deprecated Use `$onSuccess` instead. */

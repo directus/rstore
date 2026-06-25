@@ -1108,6 +1108,65 @@ describe('createFormObject - relation field methods', () => {
     })
   })
 
+  it('reads raw form fields without invoking relation value facades', async () => {
+    const collection: any = {
+      name: 'User',
+      normalizedRelations: {
+        profile: {
+          many: false,
+          to: [{
+            collection: 'Profile',
+            on: {
+              'Profile.id': 'User.profileId',
+            },
+          }],
+        },
+      },
+    }
+
+    const relationPayload = { _connect: { key: { id: 'profile-123' } } }
+    const obj = createFormObject({
+      defaultValues: () => ({ name: 'John', profileId: null as string | null }),
+      submit: async data => ({ name: 'John', profileId: null, ...data }),
+      collection,
+      store: { $collections: [], $cache: {} } as any,
+      validateOnSubmit: false,
+    }) as any
+
+    expect(obj.profile.value).toBe(null)
+    expect(obj.$getRaw('profile')).toBeUndefined()
+    expect(obj.$getRaw('name')).toBe('John')
+    expect(obj.$getRawData()).toEqual({ name: 'John', profileId: null })
+    expect(obj.$hasChanges()).toBe(false)
+
+    obj.name = 'Jane'
+    obj.profile = relationPayload
+    obj._$profileData = { internal: true }
+    obj.$custom = 'internal'
+
+    expect(obj.$getRaw('name')).toBe('Jane')
+    expect(obj.$getRaw('profile')).toEqual(relationPayload)
+    expect(obj.$getRawData()).toEqual({
+      name: 'Jane',
+      profileId: null,
+      profile: relationPayload,
+    })
+    expect(obj.profile).toEqual(relationPayload)
+    expect(obj.$changedProps.profile).toEqual([relationPayload, undefined])
+
+    const clonedData = obj.$getRawData({ clone: true })
+    ;(clonedData.profile as any)._connect.key.id = 'profile-456'
+
+    expect(obj.$getRaw('profile')).toEqual(relationPayload)
+
+    await obj.$reset()
+
+    expect(obj.profile.value).toBe(null)
+    expect(obj.$getRaw('profile')).toBeUndefined()
+    expect(obj.$getRaw('name')).toBe('John')
+    expect(obj.$getRawData()).toEqual({ name: 'John', profileId: null })
+  })
+
   it('passes relation-safe enumerable fields to transformData', async () => {
     const collection: any = {
       name: 'User',

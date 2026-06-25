@@ -20,6 +20,8 @@ await form.$submit()
 
 - Can fetch item first to prefill form.
 - Defaults to changed-field submission (`pickOnlyChanged: true`).
+- Supports `$getRaw(field)` for reading backing form values without invoking relation facades.
+- Supports `$getRawData({ clone?: boolean })` for exporting public backing form data.
 
 ## Requirements
 

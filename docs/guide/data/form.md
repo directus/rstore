@@ -224,6 +224,26 @@ form.posts.set([
 ])
 ```
 
+### Reading raw form fields
+
+Relation reads normally return rstore's relation facade so you can call `connect`, `disconnect`, `set`, and inspect `.value`. If you are building an integration that needs the backing form field instead, use `$getRaw(field)`.
+
+```ts
+const form = store.File.createForm()
+
+console.log(form.folder.value) // resolved relation value
+console.log(form.$getRaw('folder')) // undefined until the field is assigned directly
+
+form.folder = { _connect: { key: { id: 'folder-1' } } }
+
+console.log(form.$getRaw('folder')) // { _connect: { key: { id: 'folder-1' } } }
+
+console.log(form.$getRawData()) // { folder: { _connect: { key: { id: 'folder-1' } } } }
+console.log(form.$getRawData({ clone: true })) // cloned public form data
+```
+
+`$getRaw` and `$getRawData` are read-only. Assign fields normally (`form.folder = value`) so rstore can keep change tracking, validation, and submit data in sync.
+
 ### Handling relation operations on submit
 
 Relation operations are recorded as `connect`, `disconnect`, and `set` entries in the operation log. When the form is submitted, the optimized operations are passed to the `submit` callback (or to plugin hooks) via `formOperations`, so your backend logic can handle the relational edits:

@@ -19,6 +19,18 @@ export function isInternalRelationMethodField<TData extends Record<string, any>,
 }
 
 /**
+ * Read a backing form field without resolving proxy-only relation facades.
+ */
+export function getRawFormValue<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
+  ctx: FormObjectRuntime<TData, TSchema, TResult>,
+  key: PropertyKey,
+) {
+  if (typeof key === 'string' && isInternalRelationMethodField(ctx, key))
+    return undefined
+  return ctx.form[key as keyof typeof ctx.form]
+}
+
+/**
  * Initialize relation data fields on a target object.
  */
 export function initRelationData<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(

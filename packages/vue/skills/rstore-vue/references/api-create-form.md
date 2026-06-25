@@ -20,6 +20,8 @@ await form.$submit()
 
 - Uses collection create schema by default.
 - Provides change tracking and submit lifecycle APIs.
+- Supports `$getRaw(field)` for reading backing form values without invoking relation facades.
+- Supports `$getRawData({ clone?: boolean })` for exporting public backing form data.
 
 ## Requirements
 

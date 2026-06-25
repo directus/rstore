@@ -22,6 +22,8 @@ await form.$submit()
 
 - Exposes `$submit`, `$reset`, `$loading`, `$error`, `$valid`, `$changedProps`.
 - Exposes `$opLog` (undo/redo, optimized operation access).
+- Exposes `$getRaw(field)` for integration code that needs the backing form field without resolving relation facades.
+- Exposes `$getRawData({ clone?: boolean })` for integration code that needs public backing form data without internal state.
 - Supports collaborative rebasing via `$rebase`, `$conflicts`, and `$resolveConflict`.
 - Supports `validateOnSubmit`, `transformData`, `resetOnSuccess`.
 

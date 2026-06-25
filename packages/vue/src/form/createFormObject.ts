@@ -6,7 +6,7 @@ import { createFormRuntime } from './context'
 import { optimizeOpLog } from './opLog'
 import { rebaseForm, rebasePendingSubmitEdits, resolveConflict } from './rebase'
 import { createFormProxy, installRelationMethods } from './relations'
-import { createOpLogApi, getResetInitialData, pickFormData, queueChange, rebuildFormFromBase, removeInternalRelationData } from './state'
+import { createOpLogApi, getRawFormValue, getResetInitialData, pickFormData, queueChange, rebuildFormFromBase, removeInternalRelationData } from './state'
 
 export function createFormObject<
   TData extends Record<string, any> = Record<string, any>,
@@ -39,6 +39,8 @@ export function createFormObject<
     $changedProps: {} as FormObjectChanged<TData>,
     $hasChanges: (): boolean => Object.keys(ctx.form.$changedProps).length > 0,
     $opLog: createOpLogApi(ctx) as OpLogAPI<TData>,
+    $getRaw: (field: PropertyKey) => getRawFormValue(ctx, field),
+    $getRawData: options => pickFormData(ctx, options?.clone),
     $onSuccess: ctx.onSuccess.on,
     $onError: ctx.onError.on,
     $onSaved(...args: Parameters<FormObjectAdditionalProps<TData, TResult>['$onSaved']>) {
