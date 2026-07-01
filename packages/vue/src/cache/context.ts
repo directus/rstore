@@ -1,7 +1,9 @@
-import type { CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
+import type { EngineAfterWritePayload, EngineCallbacks, EngineConflictPayload } from '@rstore/core'
+import type { CacheLayer, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
 import type { CacheRuntime, CreateCacheOptions } from './types'
-import { createTombstoneStore, isKeyDefined, scheduleTombstoneGc } from '@rstore/core'
-import { ref } from 'vue'
+import { createStoreEngine, isKeyDefined } from '@rstore/core'
+import { shallowRef } from 'vue'
+import { createSignalRegistry } from './signals'
 
 /** Create the mutable runtime shared by all cache modules. */
 export function createCacheRuntime<
@@ -9,62 +11,99 @@ export function createCacheRuntime<
   TCollectionDefaults extends CollectionDefaults,
 >({
   getStore,
-  cacheStaggering: rawCacheStaggering = 0,
+  cacheStaggering,
   tombstoneGc = {},
   isServer = (import.meta as unknown as { server?: boolean }).server === true,
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): CacheRuntime<TSchema, TCollectionDefaults> {
-  const cacheStaggering = Math.max(0, Math.floor(rawCacheStaggering))
-  const runtime: CacheRuntime<TSchema, TCollectionDefaults> = {
-    getStore,
-    cacheStaggering,
-    state: {
-      markers: {},
-      collections: {},
-      collectionIndexes: new Map(),
-      modules: {},
-      queryMeta: {},
-      pageRefs: new Map(),
-      paused: false,
-      queue: [],
-      fieldTimestamps: new Map(),
-      tombstones: createTombstoneStore(),
+  let runtime: CacheRuntime<TSchema, TCollectionDefaults>
+  const pageRefs = new Map<string, any>()
+
+  const callbacks: EngineCallbacks = {
+    getCollection: name => getStore().$collections.find(c => c.name === name),
+
+    resolveChildCollection: (item, possibleNames) => getStore().$getCollection(item, possibleNames),
+
+    onAfterWrite: (payload: EngineAfterWritePayload) => {
+      if (payload.operation === 'delete' && payload.key != null) {
+        evictBaseWrappedItem(runtime, payload.collection, payload.key)
+      }
+      const store = getStore()
+      store.$hooks.callHookSync('afterCacheWrite', {
+        store,
+        meta: {},
+        collection: payload.collection,
+        key: payload.key,
+        result: payload.result,
+        marker: payload.marker,
+        operation: payload.operation,
+      })
     },
+
+    onConflict: (payload: EngineConflictPayload) => {
+      const store = getStore()
+      store.$hooks.callHookSync('cacheConflict', {
+        store,
+        meta: {},
+        collection: payload.collection,
+        key: payload.key,
+        conflicts: payload.conflicts,
+      })
+    },
+
+    onLayerAdd: (layer) => {
+      const ref = ensureLayersForCollection(runtime, layer.collectionName)
+      ref.value = [...ref.value.filter(l => l.id !== layer.id), layer]
+      runtime.layerIdToCollectionName[layer.id] = layer.collectionName
+      const store = getStore()
+      store.$hooks.callHookSync('cacheLayerAdd', { store, layer })
+    },
+
+    onLayerRemove: (layer) => {
+      const ref = runtime.layers[layer.collectionName]
+      if (ref) {
+        ref.value = ref.value.filter(l => l.id !== layer.id)
+      }
+      delete runtime.layerIdToCollectionName[layer.id]
+      clearLayerWrappedItems(runtime, layer.id)
+      const store = getStore()
+      store.$hooks.callHookSync('cacheLayerRemove', { store, layer })
+    },
+
+    onReset: () => {
+      runtime.wrappedItems.clear()
+      runtime.wrappedItemsMetadata.clear()
+      runtime.wrappedItemKeysPerLayer.clear()
+      runtime.signals.dispose()
+      const store = getStore()
+      store.$hooks.callHookSync('afterCacheReset', { store, meta: {} })
+    },
+  }
+
+  const engine = createStoreEngine({
+    callbacks,
+    cacheStaggering,
+    tombstoneGc,
+    isServer,
+  })
+
+  runtime = {
+    getStore,
+    engine,
+    state: {
+      pageRefs,
+      get queryMeta() {
+        return engine._getQueryMeta()
+      },
+    },
+    signals: createSignalRegistry({ engine, isServer }),
     layers: {},
     layerIdToCollectionName: {},
     wrappedItems: new Map(),
     wrappedItemsMetadata: new Map(),
     wrappedItemKeysPerLayer: new Map(),
-    collectionStateCache: new Map(),
-    collectionStateCacheReactivityMarker: new Map(),
-    isFlushingQueue: false,
-    staggeringBudget: cacheStaggering,
-  }
-
-  const canScheduleTombstoneGc = !isServer && typeof setInterval !== 'undefined'
-  if (tombstoneGc !== false && canScheduleTombstoneGc) {
-    runtime.stopTombstoneGc = scheduleTombstoneGc(runtime.state.tombstones, {
-      intervalMs: tombstoneGc.intervalMs ?? 60_000,
-      ttlMs: tombstoneGc.ttlMs ?? 24 * 60 * 60 * 1000,
-    })
   }
 
   return runtime
-}
-
-/** Ensure the reactivity marker for a collection overlay cache exists. */
-export function ensureCollectionStateCacheReactivityMarker(ctx: CacheRuntime, collectionName: string) {
-  let marker = ctx.collectionStateCacheReactivityMarker.get(collectionName)
-  if (!marker) {
-    marker = ref(0)
-    ctx.collectionStateCacheReactivityMarker.set(collectionName, marker)
-  }
-  return marker
-}
-
-/** Drop a cached overlay state and notify reactive readers. */
-export function invalidateCollectionStateCache(ctx: CacheRuntime, collectionName: string) {
-  ctx.collectionStateCache.delete(collectionName)
-  ensureCollectionStateCacheReactivityMarker(ctx, collectionName).value++
 }
 
 /** Build the cache key for a wrapped item proxy. */
@@ -94,30 +133,27 @@ export function addWrappedItemKeyToLayer(ctx: CacheRuntime, layer: { id: string 
   keys.add(wrapKey)
 }
 
-/** Ensure a collection state ref exists. */
-export function ensureCollectionRef(ctx: CacheRuntime, collectionName: string) {
-  if (!ctx.state.collections[collectionName]) {
-    ctx.state.collections[collectionName] = ref({})
-  }
-  return ctx.state.collections[collectionName]
+/** Ensure the devtools layer mirror for a collection exists. */
+export function ensureLayersForCollection(ctx: CacheRuntime, collectionName: string) {
+  return ctx.layers[collectionName] ??= shallowRef<CacheLayer[]>([])
 }
 
-/** Mark a query marker as fetched. */
-export function mark(ctx: CacheRuntime, marker: string) {
-  ctx.state.markers[marker] = true
+/** Drop a wrapped base item and its metadata from the identity maps. */
+export function evictBaseWrappedItem(ctx: CacheRuntime, collection: ResolvedCollection<any, any, any>, key: string | number) {
+  const wrapKey = getItemWrapKey(collection, key, undefined)
+  ctx.wrappedItems.delete(wrapKey)
+  ctx.wrappedItemsMetadata.delete(wrapKey)
+  ctx.signals.dropItem(collection.name, key)
 }
 
-/** Get or create a collection index map. */
-export function getCollectionIndex(ctx: CacheRuntime, collectionName: string, indexKey: string) {
-  let collectionIndex = ctx.state.collectionIndexes.get(collectionName)
-  if (!collectionIndex) {
-    collectionIndex = new Map()
-    ctx.state.collectionIndexes.set(collectionName, collectionIndex)
+function clearLayerWrappedItems(ctx: CacheRuntime, layerId: string) {
+  const keys = ctx.wrappedItemKeysPerLayer.get(layerId)
+  if (!keys) {
+    return
   }
-  let index = collectionIndex.get(indexKey)
-  if (!index) {
-    index = new Map()
-    collectionIndex.set(indexKey, index)
+  for (const wrapKey of keys) {
+    ctx.wrappedItems.delete(wrapKey)
+    ctx.wrappedItemsMetadata.delete(wrapKey)
   }
-  return index
+  ctx.wrappedItemKeysPerLayer.delete(layerId)
 }

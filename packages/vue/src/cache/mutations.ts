@@ -2,7 +2,6 @@ import type { ApplyMutationOptions, ApplyMutationResult, Collection, CollectionD
 import type { CacheRuntime } from './types'
 import { isKeyDefined } from '@rstore/core'
 import { getMutationItemKey, unwrapMutationItem } from '@rstore/shared'
-import { enqueueOperation } from './queue'
 
 /** Apply a mutation-shaped cache update without emitting mutation hooks. */
 export function applyMutationToCache<TCollection extends Collection, TCollectionDefaults extends CollectionDefaults, TSchema extends StoreSchema>(
@@ -39,26 +38,19 @@ function applyWriteMutation<TCollection extends Collection, TCollectionDefaults 
   }
 
   if (!many && writes.length === 1 && writes[0]) {
-    enqueueOperation(ctx, {
-      type: 'writeItem',
-      params: {
-        collection: params.collection,
-        key: writes[0].key,
-        item: writes[0].value,
-        meta: params.meta,
-        fieldTimestamps: params.fieldTimestamps,
-      },
+    ctx.engine.writeItem({
+      collection: params.collection,
+      key: writes[0].key,
+      item: writes[0].value,
+      meta: params.meta,
+      fieldTimestamps: params.fieldTimestamps,
     })
   }
   else if (writes.length) {
-    enqueueOperation(ctx, {
-      type: 'writeItems',
-      params: {
-        collection: params.collection,
-        items: writes,
-        meta: params.meta,
-      },
-      index: 0,
+    ctx.engine.writeItems({
+      collection: params.collection,
+      items: writes,
+      meta: params.meta,
     })
   }
 
@@ -73,13 +65,10 @@ function applyDeleteMutation(
   const result: ApplyMutationResult = { written: [], deleted: [], skipped: 0 }
 
   for (const key of keys) {
-    enqueueOperation(ctx, {
-      type: 'deleteItem',
-      params: {
-        collection: params.collection,
-        key,
-        deletedAt: params.deletedAt,
-      },
+    ctx.engine.deleteItem({
+      collection: params.collection,
+      key,
+      deletedAt: params.deletedAt,
     })
     result.deleted.push(key)
   }
