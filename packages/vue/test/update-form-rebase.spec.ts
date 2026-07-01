@@ -3,6 +3,51 @@ import { describe, expect, it } from 'vitest'
 import { createStore } from '../src/store'
 
 describe('updateForm realtime rebases', () => {
+  it('does not mark structurally equal array fields changed after submit rebase', async () => {
+    interface User {
+      id: number
+      fullName: string
+      authLinks: Array<{ providerId: string }>
+    }
+
+    const updates: Array<Partial<User>> = []
+
+    const Users = withItemType<User>().defineCollection({
+      name: 'users',
+      hooks: {
+        update: async ({ key, item }) => {
+          updates.push(item ?? {})
+          return {
+            id: key as number,
+            fullName: item?.fullName ?? 'Ada',
+            authLinks: [{ providerId: 'provider-a' }],
+          }
+        },
+      },
+    })
+
+    const store = await createStore({
+      schema: [Users],
+      plugins: [],
+    })
+
+    store.users.writeItem({
+      id: 1,
+      fullName: 'Ada',
+      authLinks: [{ providerId: 'provider-a' }],
+    })
+
+    const form = await store.users.updateForm({ key: 1, fetchPolicy: 'cache-only' })
+
+    form.fullName = 'Ada Lovelace'
+    await form.$submit()
+
+    expect(updates).toEqual([{ fullName: 'Ada Lovelace' }])
+    expect(form.$opLog.getAll()).toHaveLength(0)
+    expect(form.$changedProps).toEqual({})
+    expect(form.$hasChanges()).toBe(false)
+  })
+
   it('preserves the current op log after a remote cache write and rebase', async () => {
     const Documents = withItemType<{
       id: number

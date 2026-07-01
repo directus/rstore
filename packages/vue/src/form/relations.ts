@@ -4,7 +4,7 @@ import { isKeyDefined } from '@rstore/core'
 import { isPublicKey } from '@rstore/shared'
 import { markRaw } from 'vue'
 import { optimizeOpLog } from './opLog'
-import { isInternalRelationMethodField, queueChange, recordAndApplyOp } from './state'
+import { formFieldValuesEqual, isInternalRelationMethodField, queueChange, recordAndApplyOp } from './state'
 import { leafFieldName } from './utils/fieldPath'
 import { itemsMatch } from './utils/items'
 
@@ -38,7 +38,7 @@ export function createFormProxy<TData extends Record<string, any>, TSchema exten
         })
 
         const initialValue = ctx.initialData[key as keyof typeof ctx.initialData]
-        if (value !== initialValue) {
+        if (!formFieldValuesEqual(value, initialValue)) {
           ctx.form.$changedProps[key as keyof TData] = [value, initialValue] as [TData[keyof TData], TData[keyof TData]]
           ctx.changedSinceLastHandled[key as keyof TData] = [value, initialValue] as [TData[keyof TData], TData[keyof TData]]
         }

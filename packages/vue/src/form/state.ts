@@ -1,10 +1,18 @@
 import type { FormOperation, StandardSchemaV1 } from '@rstore/shared'
 import type { FormObjectRuntime } from './context'
 import type { FormObjectChanged } from './types'
+import { fieldValuesEqual } from '@rstore/core'
 import { isPublicKey, pickNonSpecialProps } from '@rstore/shared'
-import { nextTick } from 'vue'
+import { nextTick, toRaw } from 'vue'
 import { optimizeOpLog } from './opLog'
 import { applyOp } from './projection'
+
+/**
+ * Compare form field values after unwrapping Vue proxies.
+ */
+export function formFieldValuesEqual(a: any, b: any): boolean {
+  return fieldValuesEqual(toRaw(a), toRaw(b))
+}
 
 /**
  * Return whether a relation field still contains rstore's internal method facade.
@@ -133,7 +141,7 @@ export function updateChangedProps<TData extends Record<string, any>, TSchema ex
       continue
     const current = ctx.form[key]
     const initial = ctx.initialData[key]
-    if (current !== initial) {
+    if (!formFieldValuesEqual(current, initial)) {
       changed[key as keyof TData] = [current, initial] as [TData[keyof TData], TData[keyof TData]]
     }
   }
