@@ -4,8 +4,11 @@ import type { FormObjectChanged } from './types'
 import { fieldValuesEqual } from '@rstore/core'
 import { isPublicKey, pickNonSpecialProps } from '@rstore/shared'
 import { nextTick, toRaw } from 'vue'
-import { optimizeOpLog } from './opLog'
 import { applyOp } from './projection'
+import { createRelationPayloadField, getInitialRelationData, getRelationPayloadField, pickRelationPayload } from './utils/relationPayload'
+
+/** Options for replaying form operations into runtime state. */
+interface ApplyRuntimeOpOptions { attachRelationApi?: boolean }
 
 /**
  * Compare form field values after unwrapping Vue proxies.
@@ -15,15 +18,20 @@ export function formFieldValuesEqual(a: any, b: any): boolean {
 }
 
 /**
- * Return whether a relation field still contains rstore's internal method facade.
+ * Return whether a key is a configured relation field.
  */
-export function isInternalRelationMethodField<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
+export function isRelationField<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
   ctx: FormObjectRuntime<TData, TSchema, TResult>,
   key: string,
 ) {
-  return !!ctx.options.collection
-    && key in (ctx.options.collection.normalizedRelations as Record<string, any>)
-    && ctx.form[key] === ctx.relationMethods[key]
+  return !!ctx.options.collection && key in (ctx.options.collection.normalizedRelations as Record<string, any>)
+}
+
+/**
+ * Pick the user-owned payload from a relation field value.
+ */
+export function pickRelationRawPayload(value: unknown, clone = false, force = false): Record<string, any> | any[] | undefined {
+  return pickRelationPayload(value, { clone, force })
 }
 
 /**
@@ -33,8 +41,8 @@ export function getRawFormValue<TData extends Record<string, any>, TSchema exten
   ctx: FormObjectRuntime<TData, TSchema, TResult>,
   key: PropertyKey,
 ) {
-  if (typeof key === 'string' && isInternalRelationMethodField(ctx, key))
-    return undefined
+  if (typeof key === 'string' && isRelationField(ctx, key))
+    return getRelationPayloadField(ctx.form[key])
   return ctx.form[key as keyof typeof ctx.form]
 }
 
@@ -49,12 +57,10 @@ export function initRelationData<TData extends Record<string, any>, TSchema exte
   if (!ctx.options.collection)
     return
   for (const [rKey, rel] of Object.entries(ctx.options.collection.normalizedRelations)) {
-    const initialRelData = ctx.initialData[rKey as keyof typeof ctx.initialData]
-    target[`_$${rKey}Data`] = initialRelData
-      ? (Array.isArray(initialRelData) ? [...initialRelData as any[]] : initialRelData)
-      : (rel.many ? [] : null)
+    const initialValue = ctx.initialData[rKey as keyof typeof ctx.initialData]
+    target[`_$${rKey}Data`] = getInitialRelationData(rel)
     if (restoreMethods) {
-      target[rKey] = ctx.relationMethods[rKey]
+      target[rKey] = createRelationPayloadField(ctx.relationMethods[rKey], initialValue)
     }
   }
 }
@@ -85,8 +91,15 @@ export function pickFormData<TData extends Record<string, any>, TSchema extends 
   const data: Record<string, any> = {}
 
   for (const key in ctx.form) {
-    if (!isPublicKey(key) || isInternalRelationMethodField(ctx, key))
+    if (!isPublicKey(key))
       continue
+    if (isRelationField(ctx, key)) {
+      const relationPayload = pickRelationRawPayload(ctx.form[key], clone)
+      if (relationPayload) {
+        data[key] = relationPayload
+      }
+      continue
+    }
     data[key] = ctx.form[key]
   }
 
@@ -99,12 +112,25 @@ export function pickFormData<TData extends Record<string, any>, TSchema extends 
 export function removeInternalRelationData<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
   ctx: FormObjectRuntime<TData, TSchema, TResult>,
   data: Partial<TData>,
-) {
+): Partial<TData> {
+  const cleanData: Record<string, any> = {}
   for (const key of Object.keys(data)) {
-    if (!isPublicKey(key) || (isInternalRelationMethodField(ctx, key) && (data as any)[key] === ctx.relationMethods[key])) {
-      delete (data as any)[key]
+    if (!isPublicKey(key))
+      continue
+
+    const value = (data as any)[key]
+    if (isRelationField(ctx, key)) {
+      const hasLivePayload = !!pickRelationRawPayload(ctx.form[key])
+      const isLiveRelationField = value === ctx.form[key]
+      const forcePayloadPick = !isLiveRelationField || hasLivePayload || (Array.isArray(value) && value.length === 0)
+      const relationPayload = pickRelationRawPayload(value, true, forcePayloadPick)
+      if (relationPayload)
+        cleanData[key] = relationPayload
+      continue
     }
+    cleanData[key] = value
   }
+  return cleanData as Partial<TData>
 }
 
 /**
@@ -137,8 +163,14 @@ export function updateChangedProps<TData extends Record<string, any>, TSchema ex
     : undefined
 
   for (const key in ctx.initialData) {
-    if (relationKeys?.has(key))
+    if (relationKeys?.has(key)) {
+      const current = pickRelationRawPayload(ctx.form[key])
+      const initial = pickRelationRawPayload(ctx.initialData[key as keyof typeof ctx.initialData], false, true)
+      if (!formFieldValuesEqual(current, initial)) {
+        changed[key as keyof TData] = [current, initial] as [TData[keyof TData], TData[keyof TData]]
+      }
       continue
+    }
     const current = ctx.form[key]
     const initial = ctx.initialData[key]
     if (!formFieldValuesEqual(current, initial)) {
@@ -150,11 +182,17 @@ export function updateChangedProps<TData extends Record<string, any>, TSchema ex
     if (op.type !== 'set')
       continue
     const key = String(op.field)
-    if ((!relationKeys?.has(key) && key in (ctx.initialData as Record<string, any>)) || key in changed)
+    const isRelationKey = !!relationKeys?.has(key)
+    if ((!isRelationKey && key in (ctx.initialData as Record<string, any>)) || key in changed)
       continue
-    const current = ctx.form[key]
+    const current = isRelationKey
+      ? pickRelationRawPayload(ctx.form[key])
+      : ctx.form[key]
     if (current !== undefined) {
-      changed[key as keyof TData] = [current, undefined] as [TData[keyof TData], TData[keyof TData]]
+      const initial = isRelationKey
+        ? pickRelationRawPayload(ctx.initialData[key as keyof typeof ctx.initialData], false, true)
+        : undefined
+      changed[key as keyof TData] = [current, initial] as [TData[keyof TData], TData[keyof TData]]
     }
   }
   ctx.form.$changedProps = changed
@@ -174,7 +212,7 @@ export function rebuildState<TData extends Record<string, any>, TSchema extends 
   Object.assign(ctx.form, ctx.initialData)
   initRelationData(ctx, ctx.form)
   for (const op of ctx.opLog) {
-    applyOp(ctx.form, op, ctx.options.collection)
+    applyRuntimeOp(ctx, ctx.form, op)
   }
   updateChangedProps(ctx)
   ctx.changedSinceLastHandled = { ...ctx.form.$changedProps }
@@ -202,74 +240,57 @@ export function rebuildFormFromBase<TData extends Record<string, any>, TSchema e
 /**
  * Record an operation and apply it to the projected state.
  */
-export function recordAndApplyOp<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
-  ctx: FormObjectRuntime<TData, TSchema, TResult>,
-  opData: Omit<FormOperation<TData>, 'timestamp'>,
-) {
+export function recordAndApplyOp<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(ctx: FormObjectRuntime<TData, TSchema, TResult>, opData: Omit<FormOperation<TData>, 'timestamp'>) {
   const op: FormOperation<TData> = { ...opData, timestamp: Date.now() }
   ctx.opLog.push(op)
   ctx.redoStack.length = 0
-  applyOp(ctx.form, op, ctx.options.collection)
+  applyRuntimeOp(ctx, ctx.form, op)
   updateChangedProps(ctx)
   ctx.changedSinceLastHandled = { ...ctx.form.$changedProps }
   queueChange(ctx)
 }
 
 /**
- * Create the public op-log API bound to a runtime context.
+ * Return a public copy of one operation with internal relation APIs stripped.
  */
-export function createOpLogApi<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
-  ctx: FormObjectRuntime<TData, TSchema, TResult>,
-) {
-  return {
-    getAll: (): FormOperation<TData>[] => [...ctx.opLog],
-    getOptimized: (): FormOperation<TData>[] => optimizeOpLog([...ctx.opLog], ctx.options.collection),
-    getFieldOps: (field: keyof TData): FormOperation<TData>[] => ctx.opLog.filter(op => op.field === field),
-    getOpsBy: (filter: (operation: FormOperation<TData>) => boolean): FormOperation<TData>[] => ctx.opLog.filter(filter),
-    getLastFieldOp: (field: keyof TData): FormOperation<TData> | undefined => {
-      for (let i = ctx.opLog.length - 1; i >= 0; i--) {
-        const op = ctx.opLog[i]
-        if (op && op.field === field)
-          return op
-      }
-      return undefined
-    },
-    hasFieldChanged: (field: keyof TData): boolean => ctx.opLog.some(op => op.field === field),
-    getOpsInRange: (startTime: number, endTime: number): FormOperation<TData>[] =>
-      ctx.opLog.filter(op => op.timestamp >= startTime && op.timestamp <= endTime),
-    clear: (): void => {
-      ctx.opLog.length = 0
-      ctx.redoStack.length = 0
-      ctx.form.$changedProps = {}
-    },
-    undo: (): boolean => {
-      if (ctx.opLog.length === 0)
-        return false
-      ctx.redoStack.push(ctx.opLog.pop()!)
-      rebuildState(ctx)
-      return true
-    },
-    redo: (): boolean => {
-      if (ctx.redoStack.length === 0)
-        return false
-      ctx.opLog.push(ctx.redoStack.pop()!)
-      rebuildState(ctx)
-      return true
-    },
-    get canUndo(): boolean {
-      return ctx.opLog.length > 0
-    },
-    get canRedo(): boolean {
-      return ctx.redoStack.length > 0
-    },
-    stateAt: (index: number): Partial<TData> => {
-      const state: Record<string, any> = { ...(ctx.initialData as TData) }
-      initRelationData(ctx, state, false)
-      const count = Math.min(index, ctx.opLog.length)
-      for (let i = 0; i < count; i++) {
-        applyOp(state, ctx.opLog[i]!, ctx.options.collection)
-      }
-      return state as Partial<TData>
-    },
+export function snapshotFormOperation<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(ctx: FormObjectRuntime<TData, TSchema, TResult>, op: FormOperation<TData>): FormOperation<TData> {
+  const field = String(op.field)
+  if (op.type === 'set' && ctx.relationPayloadSetOps.has(op) && isRelationField(ctx, field)) {
+    return {
+      ...op,
+      newValue: pickRelationRawPayload(op.newValue, true, true),
+      oldValue: pickRelationRawPayload(op.oldValue, true, true),
+    }
   }
+  return { ...op }
+}
+
+/**
+ * Return public operation copies for submit callbacks and op-log reads.
+ */
+export function snapshotFormOperations<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(ctx: FormObjectRuntime<TData, TSchema, TResult>, operations: FormOperation<TData>[] = ctx.opLog): FormOperation<TData>[] {
+  return operations.map(op => snapshotFormOperation(ctx, op))
+}
+
+/**
+ * Apply an operation while preserving direct relation-payload assignments.
+ */
+export function applyRuntimeOp<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
+  ctx: FormObjectRuntime<TData, TSchema, TResult>,
+  target: Record<string, any>,
+  op: FormOperation<TData>,
+  options: ApplyRuntimeOpOptions = {},
+) {
+  const field = String(op.field)
+  if (op.type === 'set' && ctx.relationPayloadSetOps.has(op) && isRelationField(ctx, field)) {
+    if (options.attachRelationApi === false) {
+      target[field] = pickRelationRawPayload(op.newValue, true, true)
+      return
+    }
+    const relationField = createRelationPayloadField(ctx.relationMethods[field], op.newValue)
+    target[field] = relationField
+    op.newValue = relationField
+    return
+  }
+  applyOp(target, op, ctx.options.collection)
 }

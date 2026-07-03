@@ -4,9 +4,10 @@ import { emptySchema } from '@rstore/core'
 import { markRaw, reactive } from 'vue'
 import { createFormRuntime } from './context'
 import { optimizeOpLog } from './opLog'
+import { createOpLogApi } from './opLogApi'
 import { rebaseForm, rebasePendingSubmitEdits, resolveConflict } from './rebase'
 import { createFormProxy, installRelationMethods } from './relations'
-import { createOpLogApi, getRawFormValue, getResetInitialData, pickFormData, queueChange, rebuildFormFromBase, removeInternalRelationData } from './state'
+import { getRawFormValue, getResetInitialData, pickFormData, queueChange, rebuildFormFromBase, removeInternalRelationData, snapshotFormOperations } from './state'
 
 export function createFormObject<
   TData extends Record<string, any> = Record<string, any>,
@@ -75,13 +76,13 @@ async function submitForm<TData extends Record<string, any>, TSchema extends Sta
   ctx.form.$error = null
   try {
     const submittedBaseData = pickFormData(ctx, true)
-    const submittedOperations = [...ctx.opLog]
-    const submittedOpCount = submittedOperations.length
+    const submittedOpCount = ctx.opLog.length
+    const submittedOperations = snapshotFormOperations(ctx)
     const submittedFormOperations = optimizeOpLog(submittedOperations, ctx.options.collection)
-    const data = ctx.options.transformData
+    const transformedData = ctx.options.transformData
       ? ctx.options.transformData(ctx.proxy as Partial<TData>)
       : pickFormData(ctx, true)
-    removeInternalRelationData(ctx, data)
+    const data = removeInternalRelationData(ctx, transformedData)
 
     if (ctx.options.validateOnSubmit ?? true) {
       const { issues } = await ctx.form.$schema['~standard'].validate(data)

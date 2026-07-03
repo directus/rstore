@@ -18,6 +18,8 @@ export interface FormObjectRuntime<
   opLog: FormOperation<TData>[]
   redoStack: FormOperation<TData>[]
   relationMethods: Record<string, any>
+  /** Set operations that came from direct relation-payload assignment. */
+  relationPayloadSetOps: WeakSet<object>
   form: FormObjectBase<TResult, TSchema> & FormObjectAdditionalProps<TData, TResult> & Record<string, any>
   proxy: any
   changeQueued: boolean
@@ -44,6 +46,7 @@ export function createFormRuntime<
     opLog: shallowReactive<FormOperation<TData>[]>([]),
     redoStack: shallowReactive<FormOperation<TData>[]>([]),
     relationMethods: {},
+    relationPayloadSetOps: new WeakSet(),
     form: null as any,
     proxy: null,
     changeQueued: false,

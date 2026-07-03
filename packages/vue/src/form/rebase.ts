@@ -13,7 +13,12 @@ export async function rebasePendingSubmitEdits<TData extends Record<string, any>
   submittedBaseData: Partial<TData>,
 ) {
   const nextInitialData = await getResetInitialData(ctx)
-  const pendingOps = ctx.opLog.slice(submittedOpCount).map(op => ({ ...op }))
+  const pendingOps = ctx.opLog.slice(submittedOpCount).map((op) => {
+    const pendingOp = { ...op }
+    if (ctx.relationPayloadSetOps.has(op))
+      ctx.relationPayloadSetOps.add(pendingOp)
+    return pendingOp
+  })
   ctx.opLog.length = 0
   ctx.opLog.push(...pendingOps)
   ctx.redoStack.length = 0

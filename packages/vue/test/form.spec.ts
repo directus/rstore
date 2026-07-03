@@ -700,7 +700,7 @@ describe('createFormObject - event sourcing', () => {
       collection,
     }) as any
 
-    obj.profile.connect({ id: 'profile-123' })
+    obj.profile.$connect({ id: 'profile-123' })
 
     await nextTick()
 
@@ -741,8 +741,8 @@ describe('createFormObject - event sourcing', () => {
       collection,
     }) as any
 
-    obj.posts.connect({ id: 'post-1', title: 'First' })
-    obj.posts.connect({ id: 'post-2', title: 'Second' })
+    obj.posts.$connect({ id: 'post-1', title: 'First' })
+    obj.posts.$connect({ id: 'post-2', title: 'Second' })
 
     expect(obj._$postsData).toHaveLength(2)
 
@@ -988,7 +988,7 @@ describe('createFormObject - op log queries', () => {
 })
 
 describe('createFormObject - relation field methods', () => {
-  it('should provide connect method for one-to-one relations', () => {
+  it('should provide $connect method for one-to-one relations', () => {
     const collection: any = {
       name: 'User',
       normalizedRelations: {
@@ -1011,11 +1011,11 @@ describe('createFormObject - relation field methods', () => {
     }) as any
 
     expect(obj.profile).toBeDefined()
-    expect(obj.profile.connect).toBeDefined()
-    expect(obj.profile.disconnect).toBeDefined()
-    expect(obj.profile.set).toBeDefined()
+    expect(obj.profile.$connect).toBeDefined()
+    expect(obj.profile.$disconnect).toBeDefined()
+    expect(obj.profile.$set).toBeDefined()
 
-    obj.profile.connect({ id: 'profile-123' })
+    obj.profile.$connect({ id: 'profile-123' })
 
     expect(obj.profileId).toBe('profile-123')
 
@@ -1056,7 +1056,7 @@ describe('createFormObject - relation field methods', () => {
       validateOnSubmit: false,
     }) as any
 
-    obj.profile.connect({ id: 'profile-123' })
+    obj.profile.$connect({ id: 'profile-123' })
 
     await expect(obj.$submit()).resolves.toEqual({ name: 'John', profileId: 'profile-123' })
     expect(submittedData).toEqual({ name: 'John', profileId: 'profile-123' })
@@ -1094,7 +1094,8 @@ describe('createFormObject - relation field methods', () => {
 
     obj.profile = relationPayload
 
-    expect(obj.profile).toEqual(relationPayload)
+    expect(obj.profile.$connect).toBeDefined()
+    expect(obj.$getRaw('profile')).toEqual(relationPayload)
     expect({ ...obj }).toMatchObject({ profile: relationPayload })
     expect(obj.$hasChanges()).toBe(true)
     expect(obj.$changedProps.profile).toEqual([relationPayload, undefined])
@@ -1133,7 +1134,7 @@ describe('createFormObject - relation field methods', () => {
       validateOnSubmit: false,
     }) as any
 
-    expect(obj.profile.value).toBe(null)
+    expect(obj.profile.$value).toBe(null)
     expect(obj.$getRaw('profile')).toBeUndefined()
     expect(obj.$getRaw('name')).toBe('John')
     expect(obj.$getRawData()).toEqual({ name: 'John', profileId: null })
@@ -1151,7 +1152,8 @@ describe('createFormObject - relation field methods', () => {
       profileId: null,
       profile: relationPayload,
     })
-    expect(obj.profile).toEqual(relationPayload)
+    expect(obj.profile.$connect).toBeDefined()
+    expect(obj.$getRaw('profile')).toEqual(relationPayload)
     expect(obj.$changedProps.profile).toEqual([relationPayload, undefined])
 
     const clonedData = obj.$getRawData({ clone: true })
@@ -1161,10 +1163,124 @@ describe('createFormObject - relation field methods', () => {
 
     await obj.$reset()
 
-    expect(obj.profile.value).toBe(null)
+    expect(obj.profile.$value).toBe(null)
     expect(obj.$getRaw('profile')).toBeUndefined()
     expect(obj.$getRaw('name')).toBe('John')
     expect(obj.$getRawData()).toEqual({ name: 'John', profileId: null })
+  })
+
+  it('keeps default relation object fields in submitted data', async () => {
+    const collection: any = {
+      name: 'User',
+      normalizedRelations: {
+        profile: {
+          many: false,
+          to: [{
+            collection: 'Profile',
+            on: {
+              'Profile.id': 'User.profileId',
+            },
+          }],
+        },
+      },
+    }
+
+    const relationData = { id: 'profile-123', label: 'Profile', _connect: { key: { id: 'profile-123' } } }
+    let submittedData: any = null
+    let transformedData: any = null
+    const obj = createFormObject({
+      defaultValues: () => ({ name: 'John', profileId: null as string | null, profile: relationData }),
+      transformData: (data: any) => {
+        transformedData = { ...data }
+        return transformedData
+      },
+      submit: async (data) => {
+        submittedData = data
+      },
+      collection,
+      store: { $collections: [], $cache: {} } as any,
+      validateOnSubmit: false,
+    }) as any
+
+    expect(obj.profile.$connect).toBeDefined()
+    expect(obj.profile.$disconnect).toBeDefined()
+    expect(obj.profile.$set).toBeDefined()
+    expect(obj.profile.id).toBe('profile-123')
+    expect(obj._$profileData).toBe(null)
+    expect(obj.$getRaw('profile')).toEqual(relationData)
+    expect(obj.$getRawData()).toEqual({
+      name: 'John',
+      profileId: null,
+      profile: relationData,
+    })
+    expect({ ...obj }).toEqual({
+      name: 'John',
+      profileId: null,
+      profile: relationData,
+    })
+
+    await obj.$submit()
+
+    expect(transformedData).toEqual({
+      name: 'John',
+      profileId: null,
+      profile: relationData,
+    })
+    expect(submittedData).toEqual({
+      name: 'John',
+      profileId: null,
+      profile: relationData,
+    })
+  })
+
+  it('replaces relation payload assignments without dropping relation methods', async () => {
+    const collection: any = {
+      name: 'User',
+      normalizedRelations: {
+        profile: {
+          many: false,
+          to: [{
+            collection: 'Profile',
+            on: {
+              'Profile.id': 'User.profileId',
+            },
+          }],
+        },
+      },
+    }
+
+    const initialPayload = { _connect: { key: { id: 'profile-123' } } }
+    const nextPayload = { _connect: { key: { id: 'profile-456' } } }
+    const obj = createFormObject({
+      defaultValues: () => ({ name: 'John', profileId: null as string | null }),
+      submit: async data => data as any,
+      collection,
+      store: { $collections: [], $cache: {} } as any,
+      validateOnSubmit: false,
+    }) as any
+
+    obj.profile = initialPayload
+    obj.profile = nextPayload
+
+    expect(obj.profile.$connect).toBeDefined()
+    expect(obj.profile._connect.key.id).toBe('profile-456')
+    expect(obj.$getRaw('profile')).toEqual(nextPayload)
+    expect(obj.$changedProps.profile).toEqual([nextPayload, undefined])
+
+    obj.$opLog.undo()
+
+    expect(obj.profile.$connect).toBeDefined()
+    expect(obj.$getRaw('profile')).toEqual(initialPayload)
+
+    obj.$opLog.redo()
+
+    expect(obj.profile.$connect).toBeDefined()
+    expect(obj.$getRaw('profile')).toEqual(nextPayload)
+
+    await obj.$reset()
+
+    expect(obj.profile.$connect).toBeDefined()
+    expect(obj.$getRaw('profile')).toBeUndefined()
   })
 
   it('passes relation-safe enumerable fields to transformData', async () => {
@@ -1204,7 +1320,7 @@ describe('createFormObject - relation field methods', () => {
     }) as any
 
     obj.name = 'Jane'
-    obj.posts.connect({ id: 'post-1' })
+    obj.posts.$connect({ id: 'post-1' })
 
     await obj.$submit()
 
@@ -1213,7 +1329,7 @@ describe('createFormObject - relation field methods', () => {
     expect(submittedData).toEqual({ id: 'user-1', name: 'Jane', slug: 'jane' })
   })
 
-  it('should provide disconnect method for one-to-one relations', () => {
+  it('should provide $disconnect method for one-to-one relations', () => {
     const collection: any = {
       name: 'User',
       normalizedRelations: {
@@ -1235,7 +1351,7 @@ describe('createFormObject - relation field methods', () => {
       collection,
     }) as any
 
-    obj.profile.disconnect()
+    obj.profile.$disconnect()
 
     expect(obj.profileId).toBe(null)
 
@@ -1248,7 +1364,7 @@ describe('createFormObject - relation field methods', () => {
     })
   })
 
-  it('should provide connect method for one-to-many relations', () => {
+  it('should provide $connect method for one-to-many relations', () => {
     const collection: any = {
       name: 'User',
       normalizedRelations: {
@@ -1270,8 +1386,8 @@ describe('createFormObject - relation field methods', () => {
       collection,
     }) as any
 
-    obj.posts.connect({ id: 'post-1', title: 'First Post' })
-    obj.posts.connect({ id: 'post-2', title: 'Second Post' })
+    obj.posts.$connect({ id: 'post-1', title: 'First Post' })
+    obj.posts.$connect({ id: 'post-2', title: 'Second Post' })
 
     expect(obj._$postsData).toHaveLength(2)
     expect(obj._$postsData[0]).toEqual({ id: 'post-1', title: 'First Post' })
@@ -1292,7 +1408,7 @@ describe('createFormObject - relation field methods', () => {
     })
   })
 
-  it('should provide disconnect method for one-to-many relations', () => {
+  it('should provide $disconnect method for one-to-many relations', () => {
     const collection: any = {
       name: 'User',
       normalizedRelations: {
@@ -1308,25 +1424,26 @@ describe('createFormObject - relation field methods', () => {
       },
     }
 
+    const posts = [
+      { id: 'post-1', title: 'First Post' },
+      { id: 'post-2', title: 'Second Post' },
+    ]
     const obj = createFormObject({
       defaultValues: () => ({
         id: 'user-1',
         name: 'John',
-        posts: [
-          { id: 'post-1', title: 'First Post' },
-          { id: 'post-2', title: 'Second Post' },
-        ] as any[],
       }),
       submit: async () => {},
       collection,
     }) as any
+    obj._$postsData = posts
 
-    obj.posts.disconnect({ id: 'post-1' })
+    obj.posts.$disconnect({ id: 'post-1' })
 
     expect(obj._$postsData).toHaveLength(1)
     expect(obj._$postsData[0]).toEqual({ id: 'post-2', title: 'Second Post' })
 
-    obj.posts.disconnect()
+    obj.posts.$disconnect()
 
     expect(obj._$postsData).toHaveLength(0)
 
@@ -1344,7 +1461,7 @@ describe('createFormObject - relation field methods', () => {
     })
   })
 
-  it('should provide set method for one-to-many relations', () => {
+  it('should provide $set method for one-to-many relations', () => {
     const collection: any = {
       name: 'User',
       normalizedRelations: {
@@ -1366,7 +1483,7 @@ describe('createFormObject - relation field methods', () => {
       collection,
     }) as any
 
-    obj.posts.set([
+    obj.posts.$set([
       { id: 'post-1', title: 'First Post' },
       { id: 'post-2', title: 'Second Post' },
       { id: 'post-3', title: 'Third Post' },
@@ -1413,7 +1530,7 @@ describe('createFormObject - relation field methods', () => {
       collection,
     }) as any
 
-    obj.related.connect({ type: 'TypeA', id: 'item-123' })
+    obj.related.$connect({ type: 'TypeA', id: 'item-123' })
 
     expect(obj.relatedType).toBe('TypeA')
     expect(obj.relatedId).toBe('item-123')
@@ -1429,7 +1546,7 @@ describe('createFormObject - relation field methods', () => {
   })
 })
 
-describe('createFormObject - relation .value', () => {
+describe('createFormObject - relation .$value', () => {
   it('should return null value for one-to-one relation with no cached data', async () => {
     const Users = withItemType<{ id: number, name: string, profileId: number | null }>().defineCollection({
       name: 'users',
@@ -1447,10 +1564,10 @@ describe('createFormObject - relation .value', () => {
     const store = await createStore({ schema: [Users, Profiles], plugins: [] })
     const form = store.users.createForm({ validateOnSubmit: false }) as any
 
-    expect(form.profile.value).toBe(null)
-    expect(form.profile.connect).toBeTypeOf('function')
-    expect(form.profile.disconnect).toBeTypeOf('function')
-    expect(form.profile.set).toBeTypeOf('function')
+    expect(form.profile.$value).toBe(null)
+    expect(form.profile.$connect).toBeTypeOf('function')
+    expect(form.profile.$disconnect).toBeTypeOf('function')
+    expect(form.profile.$set).toBeTypeOf('function')
   })
 
   it('should resolve one-to-one relation value from cache after connect', async () => {
@@ -1479,18 +1596,18 @@ describe('createFormObject - relation .value', () => {
     const form = store.users.createForm({ validateOnSubmit: false }) as any
 
     // Before connect, value is null
-    expect(form.profile.value).toBe(null)
+    expect(form.profile.$value).toBe(null)
 
     // Connect the profile
-    form.profile.connect({ id: 42 })
+    form.profile.$connect({ id: 42 })
 
     // After connect, FK is set
     expect(form.profileId).toBe(42)
 
     // value resolves from cache
-    expect(form.profile.value).toBeDefined()
-    expect(form.profile.value.id).toBe(42)
-    expect(form.profile.value.bio).toBe('Hello world')
+    expect(form.profile.$value).toBeDefined()
+    expect(form.profile.$value.id).toBe(42)
+    expect(form.profile.$value.bio).toBe('Hello world')
   })
 
   it('should return null for one-to-one after disconnect', async () => {
@@ -1521,14 +1638,14 @@ describe('createFormObject - relation .value', () => {
     }) as any
 
     // Before disconnect, value resolves from cache
-    expect(form.profile.value).toBeDefined()
-    expect(form.profile.value.id).toBe(42)
+    expect(form.profile.$value).toBeDefined()
+    expect(form.profile.$value.id).toBe(42)
 
     // Disconnect
-    form.profile.disconnect()
+    form.profile.$disconnect()
 
     expect(form.profileId).toBe(null)
-    expect(form.profile.value).toBe(null)
+    expect(form.profile.$value).toBe(null)
   })
 
   it('should return empty array for many relation with no cached data', async () => {
@@ -1551,10 +1668,10 @@ describe('createFormObject - relation .value', () => {
       validateOnSubmit: false,
     }) as any
 
-    expect(form.posts.value).toEqual([])
-    expect(form.posts.connect).toBeTypeOf('function')
-    expect(form.posts.disconnect).toBeTypeOf('function')
-    expect(form.posts.set).toBeTypeOf('function')
+    expect(form.posts.$value).toEqual([])
+    expect(form.posts.$connect).toBeTypeOf('function')
+    expect(form.posts.$disconnect).toBeTypeOf('function')
+    expect(form.posts.$set).toBeTypeOf('function')
   })
 
   it('should resolve many relation value from cache', async () => {
@@ -1585,7 +1702,7 @@ describe('createFormObject - relation .value', () => {
     }) as any
 
     // value resolves from cache — only posts with authorId=1
-    const posts = form.posts.value
+    const posts = form.posts.$value
     expect(posts).toHaveLength(2)
     expect(posts[0].id).toBe(10)
     expect(posts[1].id).toBe(20)
@@ -1617,13 +1734,13 @@ describe('createFormObject - relation .value', () => {
     }) as any
 
     // Initially one post from cache
-    expect(form.posts.value).toHaveLength(1)
+    expect(form.posts.$value).toHaveLength(1)
 
     // Connect a new post
-    form.posts.connect({ id: 99, title: 'New Post' })
+    form.posts.$connect({ id: 99, title: 'New Post' })
 
     // value now includes both cache item and connected item
-    const posts = form.posts.value
+    const posts = form.posts.$value
     expect(posts).toHaveLength(2)
     expect(posts[0].id).toBe(10)
     expect(posts[1].id).toBe(99)
@@ -1654,12 +1771,12 @@ describe('createFormObject - relation .value', () => {
       validateOnSubmit: false,
     }) as any
 
-    expect(form.posts.value).toHaveLength(2)
+    expect(form.posts.$value).toHaveLength(2)
 
     // Disconnect first post
-    form.posts.disconnect({ id: 10 })
+    form.posts.$disconnect({ id: 10 })
 
-    const posts = form.posts.value
+    const posts = form.posts.$value
     expect(posts).toHaveLength(1)
     expect(posts[0].id).toBe(20)
   })
@@ -1689,15 +1806,15 @@ describe('createFormObject - relation .value', () => {
       validateOnSubmit: false,
     }) as any
 
-    expect(form.posts.value).toHaveLength(1)
+    expect(form.posts.$value).toHaveLength(1)
 
     // Set replaces with new items
-    form.posts.set([
+    form.posts.$set([
       { id: 50, title: 'Replaced A' },
       { id: 60, title: 'Replaced B' },
     ])
 
-    const posts = form.posts.value
+    const posts = form.posts.$value
     expect(posts).toHaveLength(2)
     expect(posts[0]).toMatchObject({ id: 50, title: 'Replaced A' })
     expect(posts[1]).toMatchObject({ id: 60, title: 'Replaced B' })
@@ -1729,9 +1846,9 @@ describe('createFormObject - relation .value', () => {
     }) as any
 
     // Connect with partial data — but full item exists in cache
-    form.posts.connect({ id: 99 })
+    form.posts.$connect({ id: 99 })
 
-    const posts = form.posts.value
+    const posts = form.posts.$value
     expect(posts).toHaveLength(1)
     // Should resolve to the full cached item
     expect(posts[0].title).toBe('Full Post')
@@ -1905,8 +2022,8 @@ describe('optimizeOpLog', () => {
       }) as any
 
       // Connect and then disconnect the same item → should cancel out
-      obj.posts.connect({ id: 'post-1', title: 'First' })
-      obj.posts.disconnect({ id: 'post-1' })
+      obj.posts.$connect({ id: 'post-1', title: 'First' })
+      obj.posts.$disconnect({ id: 'post-1' })
 
       await obj.$submit()
 
@@ -1936,9 +2053,9 @@ describe('optimizeOpLog', () => {
       }) as any
 
       // Connect two items, disconnect one → only the remaining connect should be in ops
-      obj.posts.connect({ id: 'post-1', title: 'First' })
-      obj.posts.connect({ id: 'post-2', title: 'Second' })
-      obj.posts.disconnect({ id: 'post-1' })
+      obj.posts.$connect({ id: 'post-1', title: 'First' })
+      obj.posts.$connect({ id: 'post-2', title: 'Second' })
+      obj.posts.$disconnect({ id: 'post-1' })
 
       await obj.$submit()
 
@@ -1966,9 +2083,9 @@ describe('optimizeOpLog', () => {
         collection,
       }) as any
 
-      obj.posts.connect({ id: 'post-1', title: 'First' })
-      obj.posts.connect({ id: 'post-2', title: 'Second' })
-      obj.posts.disconnect({ id: 'post-1' })
+      obj.posts.$connect({ id: 'post-1', title: 'First' })
+      obj.posts.$connect({ id: 'post-2', title: 'Second' })
+      obj.posts.$disconnect({ id: 'post-1' })
 
       // Raw log still has all 3 operations
       expect(obj.$opLog.getAll()).toHaveLength(3)

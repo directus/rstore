@@ -2,18 +2,16 @@ import type { FormOperation, StandardSchemaV1 } from '@rstore/shared'
 import type { FormObjectRuntime } from './context'
 import { isKeyDefined } from '@rstore/core'
 import { isPublicKey } from '@rstore/shared'
-import { markRaw } from 'vue'
 import { optimizeOpLog } from './opLog'
-import { formFieldValuesEqual, isInternalRelationMethodField, queueChange, recordAndApplyOp } from './state'
+import { formFieldValuesEqual, isRelationField, pickRelationRawPayload, queueChange, recordAndApplyOp, updateChangedProps } from './state'
 import { leafFieldName } from './utils/fieldPath'
 import { itemsMatch } from './utils/items'
+import { createRelationPayloadField, getInitialRelationData } from './utils/relationPayload'
 
 /**
  * Create the proxy that tracks field writes and resolves relation reads.
  */
-export function createFormProxy<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
-  ctx: FormObjectRuntime<TData, TSchema, TResult>,
-) {
+export function createFormProxy<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(ctx: FormObjectRuntime<TData, TSchema, TResult>) {
   return new Proxy(ctx.form, {
     set(_target, key, value) {
       const isPublicFormKey = isPublicKey(key)
@@ -21,20 +19,22 @@ export function createFormProxy<TData extends Record<string, any>, TSchema exten
         && isPublicFormKey
         && !!ctx.options.collection
         && key in (ctx.options.collection.normalizedRelations as Record<string, any>)
-      const shouldRecordSet = typeof key === 'string' && isPublicFormKey && (!isRelationKey || value !== ctx.relationMethods[key])
+
+      if (isRelationKey) {
+        return setRelationPayload(ctx, key, value)
+      }
+
+      const shouldRecordSet = typeof key === 'string' && isPublicFormKey
 
       if (shouldRecordSet) {
         const currentValue = ctx.form[key]
-        const oldValue = isRelationKey && currentValue === ctx.relationMethods[key]
-          ? ctx.initialData[key as keyof typeof ctx.initialData]
-          : currentValue
         ctx.redoStack.length = 0
         ctx.opLog.push({
           timestamp: Date.now(),
           field: key as keyof TData,
           type: 'set',
           newValue: value,
-          oldValue,
+          oldValue: currentValue,
         })
 
         const initialValue = ctx.initialData[key as keyof typeof ctx.initialData]
@@ -51,17 +51,12 @@ export function createFormProxy<TData extends Record<string, any>, TSchema exten
       return Reflect.set(ctx.form, key, value)
     },
     get(_target, key) {
-      if (typeof key === 'string' && ctx.options.store && ctx.options.collection
-        && key in (ctx.options.collection.normalizedRelations as Record<string, any>)
-        && isInternalRelationMethodField(ctx, key)) {
-        return getRelationValue(ctx, key)
-      }
       return Reflect.get(ctx.form, key)
     },
     ownKeys() {
       return Reflect.ownKeys(ctx.form).filter(key =>
         isPublicKey(key)
-        && (typeof key !== 'string' || !isInternalRelationMethodField(ctx, key)),
+        && (typeof key !== 'string' || !isRelationField(ctx, key) || !!pickRelationRawPayload(ctx.form[key])),
       )
     },
   })
@@ -70,74 +65,105 @@ export function createFormProxy<TData extends Record<string, any>, TSchema exten
 /**
  * Install relation methods on the form object.
  */
-export function installRelationMethods<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
-  ctx: FormObjectRuntime<TData, TSchema, TResult>,
-) {
+export function installRelationMethods<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(ctx: FormObjectRuntime<TData, TSchema, TResult>) {
   if (!ctx.options.collection)
     return
   for (const [relationKey, relation] of Object.entries(ctx.options.collection.normalizedRelations)) {
     const relationDataKey = `_$${relationKey}Data`
-    ctx.form[relationDataKey] = ctx.initialData[relationKey as keyof typeof ctx.initialData] || (relation.many ? [] : null)
-    const methods = markRaw(createRelationMethods(ctx, relationKey, relation, relationDataKey))
-    ctx.relationMethods[relationKey] = methods
-    ctx.form[relationKey] = methods
+    const initialValue = ctx.initialData[relationKey as keyof typeof ctx.initialData]
+    ctx.form[relationDataKey] = getInitialRelationData(relation)
+    const relationApi = createRelationApi(ctx, relationKey, relation, relationDataKey)
+    ctx.relationMethods[relationKey] = relationApi
+    ctx.form[relationKey] = createRelationPayloadField(relationApi, initialValue)
   }
 }
 
 /**
- * Create event-sourced methods for one relation field.
+ * Create the non-enumerable relation API attached to relation payload fields.
  */
-function createRelationMethods<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
-  ctx: FormObjectRuntime<TData, TSchema, TResult>,
-  relationKey: string,
-  relation: any,
-  relationDataKey: string,
-) {
-  const methods = {
-    connect: (item: Record<string, any>) => {
-      recordAndApplyOp(ctx, { field: relationKey as keyof TData, type: 'connect', newValue: item, oldValue: undefined })
+function createRelationApi<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(ctx: FormObjectRuntime<TData, TSchema, TResult>, relationKey: string, relation: any, relationDataKey: string) {
+  const relationApi = {}
+  Object.defineProperties(relationApi, {
+    $connect: {
+      value: (item: Record<string, any>) => {
+        recordAndApplyOp(ctx, { field: relationKey as keyof TData, type: 'connect', newValue: item, oldValue: undefined })
+      },
     },
-    disconnect: (item?: Record<string, any>) => {
-      const found = relation.many && item ? findDisconnectTarget(ctx, relationKey, relationDataKey, item) : undefined
-      if (relation.many && item && found) {
-        recordAndApplyOp(ctx, { field: relationKey as keyof TData, type: 'disconnect', newValue: undefined, oldValue: found })
-      }
-      else if (relation.many && !item) {
-        recordAndApplyOp(ctx, { field: relationKey as keyof TData, type: 'disconnect', newValue: [], oldValue: [...(ctx.form[relationDataKey] || [])] })
-      }
-      else if (!relation.many) {
-        recordAndApplyOp(ctx, { field: relationKey as keyof TData, type: 'disconnect', newValue: undefined, oldValue: undefined })
-      }
+    $disconnect: {
+      value: (item?: Record<string, any>) => {
+        const found = relation.many && item ? findDisconnectTarget(ctx, relationKey, relationDataKey, item) : undefined
+        if (relation.many && item && found) {
+          recordAndApplyOp(ctx, { field: relationKey as keyof TData, type: 'disconnect', newValue: undefined, oldValue: found })
+        }
+        else if (relation.many && !item) {
+          recordAndApplyOp(ctx, { field: relationKey as keyof TData, type: 'disconnect', newValue: [], oldValue: [...(ctx.form[relationDataKey] || [])] })
+        }
+        else if (!relation.many) {
+          recordAndApplyOp(ctx, { field: relationKey as keyof TData, type: 'disconnect', newValue: undefined, oldValue: undefined })
+        }
+      },
     },
-    set: (items: Array<Record<string, any>>) => {
-      if (relation.many) {
-        recordAndApplyOp(ctx, { field: relationKey as keyof TData, type: 'set', newValue: [...items], oldValue: [...(ctx.form[relationDataKey] || [])] })
-      }
-      else if (items.length > 0 && items[0]) {
-        methods.connect(items[0])
-      }
-      else {
-        methods.disconnect()
-      }
+    $set: {
+      value: (items: Array<Record<string, any>>) => {
+        if (relation.many) {
+          recordAndApplyOp(ctx, { field: relationKey as keyof TData, type: 'set', newValue: [...items], oldValue: [...(ctx.form[relationDataKey] || [])] })
+        }
+        else if (items.length > 0 && items[0]) {
+          ;(relationApi as any).$connect(items[0])
+        }
+        else {
+          ;(relationApi as any).$disconnect()
+        }
+      },
     },
-  }
-  return methods
+    $value: {
+      get: () => resolveRelationValue(ctx, relationKey, relation),
+    },
+  })
+  return relationApi
 }
 
 /**
- * Resolve the value returned when a relation field is read from the proxy.
+ * Replace a relation field with the assigned user-owned payload.
  */
-function getRelationValue<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
+function setRelationPayload<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(ctx: FormObjectRuntime<TData, TSchema, TResult>, key: string, value: any) {
+  if (value === ctx.form[key])
+    return true
+
+  const currentRelationField = ctx.form[key] ?? ctx.relationMethods[key]
+  const oldValue = pickRelationRawPayload(currentRelationField, true)
+  const relationField = createRelationPayloadField(ctx.relationMethods[key], value)
+  const op: FormOperation<TData> = {
+    timestamp: Date.now(),
+    field: key as keyof TData,
+    type: 'set',
+    newValue: relationField,
+    oldValue,
+  }
+  ctx.redoStack.length = 0
+  ctx.relationPayloadSetOps.add(op)
+  ctx.opLog.push(op)
+  Reflect.set(ctx.form, key, relationField)
+  updateChangedProps(ctx)
+  ctx.changedSinceLastHandled = { ...ctx.form.$changedProps }
+  queueChange(ctx)
+  return true
+}
+
+/**
+ * Resolve the current value for a relation field.
+ */
+function resolveRelationValue<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
   ctx: FormObjectRuntime<TData, TSchema, TResult>,
   key: string,
+  relation: any,
 ) {
-  const relation = (ctx.options.collection!.normalizedRelations as Record<string, any>)[key]!
-  const methods = ctx.relationMethods[key]
-  if (!relation.many) {
-    return { ...methods, value: resolveRelationFromCache(ctx, relation, false) ?? null }
-  }
+  if (!ctx.options.store)
+    return relation.many ? [] : null
+  if (!relation.many)
+    return resolveRelationFromCache(ctx, relation, false) ?? null
   const cacheItems = resolveRelationFromCache(ctx, relation, true)
-  return { ...methods, value: applyFormOpsToManyRelation(ctx, key, relation, cacheItems as any[]) }
+  return applyFormOpsToManyRelation(ctx, key, relation, cacheItems as any[])
 }
 
 /**
@@ -230,7 +256,10 @@ function applyFormOpsToManyRelation<TData extends Record<string, any>, TSchema e
   cacheItems: any[],
 ) {
   const result = [...cacheItems]
-  const fieldOps = optimizeOpLog(ctx.opLog.filter(op => op.field === fieldKey) as FormOperation<TData>[], ctx.options.collection)
+  const fieldOps = optimizeOpLog(
+    ctx.opLog.filter(op => op.field === fieldKey && !ctx.relationPayloadSetOps.has(op)) as FormOperation<TData>[],
+    ctx.options.collection,
+  )
   for (const op of fieldOps) {
     if (op.type === 'set') {
       result.length = 0

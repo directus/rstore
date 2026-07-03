@@ -141,14 +141,14 @@ For each relation defined on the collection, the form object provides a relation
 
 | Method | Description |
 |---|---|
-| `connect(item)` | Connect a related item. |
-| `disconnect(item?)` | Disconnect a specific related item (many-relations), or the current item (one-to-one). Calling without arguments on a many-relation disconnects **all** items. |
-| `set(items)` | Replace all related items at once (many-relations), or connect/disconnect a single item (one-to-one). |
-| `value` | The current resolved value of the relation. For one-to-one relations this is the related item or `null`. For many-relations this is an array. |
+| `$connect(item)` | Connect a related item. |
+| `$disconnect(item?)` | Disconnect a specific related item (many-relations), or the current item (one-to-one). Calling without arguments on a many-relation disconnects **all** items. |
+| `$set(items)` | Replace all related items at once (many-relations), or connect/disconnect a single item (one-to-one). |
+| `$value` | The current resolved value of the relation. For one-to-one relations this is the related item or `null`. For many-relations this is an array. |
 
 ### One-to-one relations
 
-For one-to-one relations, `connect` automatically sets the foreign key field(s) on the form, and `disconnect` clears them.
+For one-to-one relations, `$connect` automatically sets the foreign key field(s) on the form, and `$disconnect` clears them.
 
 ```ts
 // Given a User collection with a 'profile' one-to-one relation:
@@ -163,16 +163,16 @@ For one-to-one relations, `connect` automatically sets the foreign key field(s) 
 const form = store.User.createForm()
 
 // Connect a profile — sets form.profileId automatically
-form.profile.connect({ id: 'profile-123' })
+form.profile.$connect({ id: 'profile-123' })
 console.log(form.profileId) // 'profile-123'
 
 // Access the resolved related item
-console.log(form.profile.value) // { id: 'profile-123', ... } (resolved from cache)
+console.log(form.profile.$value) // { id: 'profile-123', ... } (resolved from cache)
 
 // Disconnect the profile — clears form.profileId
-form.profile.disconnect()
+form.profile.$disconnect()
 console.log(form.profileId) // null
-console.log(form.profile.value) // null
+console.log(form.profile.$value) // null
 ```
 
 For relations with multiple foreign key fields, all mapped fields are set or cleared:
@@ -181,7 +181,7 @@ For relations with multiple foreign key fields, all mapped fields are set or cle
 // Relation with multiple fields:
 // on: { 'OtherThing.type': 'Thing.relatedType', 'OtherThing.id': 'Thing.relatedId' }
 
-form.related.connect({ type: 'TypeA', id: 'item-123' })
+form.related.$connect({ type: 'TypeA', id: 'item-123' })
 console.log(form.relatedType) // 'TypeA'
 console.log(form.relatedId) // 'item-123'
 ```
@@ -204,21 +204,21 @@ For many-relations (one-to-many), connected items are stored internally and trac
 const form = store.User.createForm()
 
 // Connect items
-form.posts.connect({ id: 'post-1', title: 'First Post' })
-form.posts.connect({ id: 'post-2', title: 'Second Post' })
+form.posts.$connect({ id: 'post-1', title: 'First Post' })
+form.posts.$connect({ id: 'post-2', title: 'Second Post' })
 
 // Access the current list of related items
-console.log(form.posts.value) // [{ id: 'post-1', ... }, { id: 'post-2', ... }]
+console.log(form.posts.$value) // [{ id: 'post-1', ... }, { id: 'post-2', ... }]
 
 // Disconnect a specific item (matched by property)
-form.posts.disconnect({ id: 'post-1' })
-console.log(form.posts.value) // [{ id: 'post-2', ... }]
+form.posts.$disconnect({ id: 'post-1' })
+console.log(form.posts.$value) // [{ id: 'post-2', ... }]
 
 // Disconnect all items
-form.posts.disconnect()
+form.posts.$disconnect()
 
 // Replace all items at once
-form.posts.set([
+form.posts.$set([
   { id: 'post-3', title: 'Third Post' },
   { id: 'post-4', title: 'Fourth Post' },
 ])
@@ -226,19 +226,21 @@ form.posts.set([
 
 ### Reading raw form fields
 
-Relation reads normally return rstore's relation facade so you can call `connect`, `disconnect`, `set`, and inspect `.value`. If you are building an integration that needs the backing form field instead, use `$getRaw(field)`.
+Relation fields reserve `$`-prefixed properties for rstore's relation API. Non-`$` properties are treated as user payload, are returned by `$getRaw(field)`, and are included in submit data.
 
 ```ts
 const form = store.File.createForm()
 
-console.log(form.folder.value) // resolved relation value
+console.log(form.folder.$value) // resolved relation value
 console.log(form.$getRaw('folder')) // undefined until the field is assigned directly
 
-form.folder = { _connect: { key: { id: 'folder-1' } } }
+form.folder = { pendingKey: { id: 'folder-1' } }
 
-console.log(form.$getRaw('folder')) // { _connect: { key: { id: 'folder-1' } } }
+console.log(form.folder.$connect) // relation API is still available
+console.log(form.folder.pendingKey) // user payload is stored on the relation field
+console.log(form.$getRaw('folder')) // { pendingKey: { id: 'folder-1' } }
 
-console.log(form.$getRawData()) // { folder: { _connect: { key: { id: 'folder-1' } } } }
+console.log(form.$getRawData()) // { folder: { pendingKey: { id: 'folder-1' } } }
 console.log(form.$getRawData({ clone: true })) // cloned public form data
 ```
 
@@ -292,7 +294,7 @@ const postTitle = ref('')
 
 function addPost() {
   if (postTitle.value) {
-    form.posts.connect({ title: postTitle.value })
+    form.posts.$connect({ title: postTitle.value })
     postTitle.value = ''
   }
 }
@@ -303,7 +305,7 @@ function addPost() {
     <input v-model="form.name" placeholder="User name">
 
     <!-- One-to-one: Select a profile -->
-    <select @change="form.profile.connect({ id: $event.target.value })">
+    <select @change="form.profile.$connect({ id: $event.target.value })">
       <option value="">
         No profile
       </option>
@@ -323,7 +325,7 @@ function addPost() {
 
     <!-- Display connected posts -->
     <ul>
-      <li v-for="post in form.posts.value" :key="post.id">
+      <li v-for="post in form.posts.$value" :key="post.id">
         {{ post.title }}
       </li>
     </ul>

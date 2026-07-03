@@ -77,13 +77,13 @@ export type FormObjectChanged<TData> = {
  */
 export interface RelationFieldMethods<TItem = any> {
   /** Current resolved relation value. */
-  value: TItem | TItem[] | null
+  $value: TItem | TItem[] | null
   /** Connect a related item by its identifier(s). */
-  connect: (item: Partial<TItem>) => void
+  $connect: (item: Partial<TItem>) => void
   /** Disconnect the related item(s). */
-  disconnect: (item?: Partial<TItem>) => void
+  $disconnect: (item?: Partial<TItem>) => void
   /** Set related items for many relations. */
-  set: (items: Array<Partial<TItem>>) => void
+  $set: (items: Array<Partial<TItem>>) => void
 }
 
 export interface FormObjectAdditionalProps<
