@@ -1,0 +1,31 @@
+{
+  "openapi": "3.1.0",
+  "paths": {},
+  "x-monospace-mappings": {
+    "Todos": {
+      "many": {
+        "$ref": "#/paths/~1api~1blog~1items~1Todos"
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "TodosCollectionOutput": {
+        "required": [
+          "id",
+          "title"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "x-monospace-primary-key": true
+          },
+          "title": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

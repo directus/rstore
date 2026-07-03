@@ -1,0 +1,54 @@
+{
+  "name": "@rstore/monospace",
+  "type": "module",
+  "version": "0.8.4",
+  "description": "Reusable Monospace REST integration for rstore",
+  "repository": {
+    "url": "https://github.com/Akryum/rstore.git",
+    "type": "git",
+    "directory": "packages/monospace"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.mjs"
+      },
+      "default": "./dist/index.mjs"
+    },
+    "./schema": {
+      "import": {
+        "types": "./dist/schema/index.d.ts",
+        "default": "./dist/schema/index.mjs"
+      },
+      "default": "./dist/schema/index.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "dev": "unbuild --stub",
+    "dev:prepare": "pnpm run dev",
+    "test": "vitest run",
+    "test:types": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@rstore/core": "workspace:^",
+    "@rstore/shared": "workspace:^"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "typescript": "catalog:",
+    "unbuild": "catalog:",
+    "vitest": "catalog:"
+  }
+}
