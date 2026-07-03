@@ -45,7 +45,19 @@ If there wasn't a marker, the cache would return a list with the single user tha
 
 */
 
-export interface CustomCacheState {}
+/**
+ * Serializable snapshot of the store engine's state (used for SSR transfer).
+ *
+ * These are the canonical fields the engine reads and writes. The interface
+ * stays open for declaration merging so a host framework can attach extra
+ * state if needed.
+ */
+export interface CustomCacheState {
+  markers: Record<string, boolean>
+  collections: Record<string, Record<string | number, any>>
+  modules: Record<string, any>
+  queryMeta: Record<string, CustomHookMeta>
+}
 
 export interface WriteItem<
   TCollection extends Collection = Collection,

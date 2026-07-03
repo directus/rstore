@@ -1,11 +1,8 @@
-import type { Cache, CollectionDefaults, CustomCacheState, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Cache, CollectionDefaults, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CacheRuntime, VueCachePrivate } from './types'
-import { gcTombstones, isKeyDefined } from '@rstore/core'
-import { ref, toValue } from 'vue'
-import { getCollectionIndex, invalidateCollectionStateCache } from './context'
-import { ensureLayersForCollection, getStateForCollection } from './layers'
+import { reactive } from 'vue'
+import { ensureLayersForCollection } from './context'
 import { applyMutationToCache } from './mutations'
-import { enqueueOperation, flushQueuedOperations } from './queue'
 import { garbageCollectItem, getWrappedItem } from './wrapped'
 
 /** Create the public Cache implementation from a cache runtime. */
@@ -18,55 +15,47 @@ export function createCacheApi<
       return getWrappedItem(ctx, collection, item, noCache)!
     },
     readItem({ collection, key }) {
-      return getWrappedItem(ctx, collection, getStateForCollection(ctx, collection.name)[key])
+      ctx.signals.trackItem(collection.name, key)
+      return getWrappedItem(ctx, collection, ctx.engine.readItemRaw({ collection, key }))
     },
     readItems(params) {
       return readItems(ctx, params)
     },
     writeItem(params) {
-      enqueueOperation(ctx, { type: 'writeItem', params })
+      ctx.engine.writeItem(params)
     },
     writeItems(params) {
-      enqueueOperation(ctx, { type: 'writeItems', params, index: 0 })
+      ctx.engine.writeItems(params)
     },
     writeItemForRelation(params) {
-      writeItemForRelation(ctx, params)
+      ctx.engine.writeItemForRelation(params)
     },
     applyMutation(params) {
       return applyMutationToCache(ctx, params)
     },
     deleteItem(params) {
-      enqueueOperation(ctx, { type: 'deleteItem', params })
+      ctx.engine.deleteItem(params)
     },
-    readFieldTimestamps({ collectionName, key }) {
-      return ctx.state.fieldTimestamps.get(collectionName)?.get(key)
+    readFieldTimestamps(params) {
+      return ctx.engine.readFieldTimestamps(params)
     },
-    writeFieldTimestamps({ collectionName, key, timestamps }) {
-      let collectionTs = ctx.state.fieldTimestamps.get(collectionName)
-      if (!collectionTs) {
-        collectionTs = new Map()
-        ctx.state.fieldTimestamps.set(collectionName, collectionTs)
-      }
-      collectionTs.set(key, { ...timestamps })
+    writeFieldTimestamps(params) {
+      ctx.engine.writeFieldTimestamps(params)
     },
     getModuleState(name, key, initState) {
-      const cacheKey = `${name}:${key}`
-      if (!ctx.state.modules[cacheKey]) {
-        ctx.state.modules[cacheKey] = ref(initState)
-      }
-      return ctx.state.modules[cacheKey]!.value
+      return reactive(ctx.engine.getModuleState(name, key, initState))
     },
     getState() {
-      return getState(ctx)
+      return ctx.engine.getState()
     },
     setState(state) {
-      enqueueOperation(ctx, { type: 'setState', state })
+      ctx.engine.setState(state)
     },
     clear() {
-      enqueueOperation(ctx, { type: 'clear' })
+      ctx.engine.clear()
     },
-    clearCollection({ collection }) {
-      clearCollection(ctx, collection)
+    clearCollection(params) {
+      ctx.engine.clearCollection(params)
     },
     garbageCollectItem({ collection, item }) {
       garbageCollectItem(ctx, collection, item)
@@ -75,36 +64,31 @@ export function createCacheApi<
       garbageCollect(ctx)
     },
     addLayer(layer) {
-      enqueueOperation(ctx, { type: 'addLayer', layer })
+      ctx.engine.addLayer(layer)
     },
     getLayer(layerId) {
-      const collectionName = ctx.layerIdToCollectionName[layerId]
-      if (!collectionName) {
-        return undefined
-      }
-      return ensureLayersForCollection(ctx, collectionName).value.find(l => l.id === layerId)
+      return ctx.engine.getLayer(layerId)
     },
     removeLayer(layerId) {
-      enqueueOperation(ctx, { type: 'removeLayer', layerId })
+      ctx.engine.removeLayer(layerId)
     },
     tombstones: {
-      get: (c, k) => ctx.state.tombstones.get(c, k),
-      entries: () => ctx.state.tombstones.entries(),
-      size: () => ctx.state.tombstones.size(),
+      get: (c, k) => ctx.engine.tombstones.get(c, k),
+      entries: () => ctx.engine.tombstones.entries(),
+      size: () => ctx.engine.tombstones.size(),
     },
     gcTombstones(olderThan) {
-      return gcTombstones(ctx.state.tombstones, olderThan)
+      return ctx.engine.gcTombstones(olderThan)
     },
     pause() {
-      ctx.state.paused = true
+      ctx.engine.pause()
     },
     resume() {
-      ctx.state.paused = false
-      flushQueuedOperations(ctx)
+      ctx.engine.resume()
     },
     dispose() {
-      ctx.stopTombstoneGc?.()
-      ctx.stopTombstoneGc = undefined
+      ctx.engine.dispose()
+      ctx.signals.dispose()
     },
     _private: {
       state: ctx.state,
@@ -113,120 +97,48 @@ export function createCacheApi<
       getWrappedItem: (collection, item, noCache) => getWrappedItem(ctx, collection, item, noCache),
       layers: ctx.layers,
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
+      signals: ctx.signals,
     },
   } satisfies Cache & VueCachePrivate as any
 }
 
 function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit, indexKey, indexValue }: Parameters<Cache['readItems']>[0]) {
-  if (marker && !ctx.state.markers[marker]) {
+  if (keys == null && indexKey != null) {
+    ctx.signals.trackIndex(collection.name, indexKey, String(indexValue))
+  }
+  else {
+    ctx.signals.trackList(collection.name)
+  }
+
+  if (marker && !ctx.engine.hasMarker(marker)) {
     return []
   }
-  const data: Record<string | number, ResolvedCollectionItemBase<any, any, any>> = getStateForCollection(ctx, collection.name)
+
+  const candidateKeys = ctx.engine.resolveKeys({ collection, marker, keys, indexKey, indexValue })
   const result: Array<WrappedItem<any, any, any>> = []
   let count = 0
-
-  if (keys == null && indexKey != null) {
-    const index = getCollectionIndex(ctx, collection.name, indexKey)
-    const itemKeys = index.get(indexValue)
-    keys = itemKeys ? Array.from(itemKeys.value) : []
-  }
-
-  for (const key of keys ?? Object.keys(data)) {
-    const item = data[key]
-    if (!item || (filter && !filter(item))) {
+  for (const key of candidateKeys) {
+    const wrappedItem = getWrappedItem(ctx, collection, ctx.engine.readItemRaw({ collection, key }))
+    if (!wrappedItem || (filter && !filter(wrappedItem))) {
       continue
     }
-    const wrappedItem = getWrappedItem(ctx, collection, item)
-    if (wrappedItem) {
-      result.push(wrappedItem)
-      count++
-      if (limit != null && count >= limit) {
-        break
-      }
+    result.push(wrappedItem)
+    count++
+    if (limit != null && count >= limit) {
+      break
     }
   }
   return result
-}
-
-function writeItemForRelation(ctx: CacheRuntime, { parentCollection, relationKey, relation, childItem, meta }: Parameters<Cache['writeItemForRelation']>[0]) {
-  const possibleCollections = Object.keys(relation.to)
-  const nestedItemCollection = ctx.getStore().$getCollection(childItem, possibleCollections)
-  if (!nestedItemCollection) {
-    throw new Error(`Could not determine type for relation ${parentCollection.name}.${String(relationKey)}`)
-  }
-  const nestedKey = nestedItemCollection.getKey(childItem)
-  if (!isKeyDefined(nestedKey)) {
-    throw new Error(`Could not determine key for relation ${parentCollection.name}.${String(relationKey)}`)
-  }
-  enqueueOperation(ctx, {
-    type: 'writeItem',
-    params: {
-      collection: nestedItemCollection,
-      key: nestedKey,
-      item: childItem,
-      meta,
-    },
-  })
-}
-
-function getState(ctx: CacheRuntime): CustomCacheState {
-  const result: CustomCacheState = {
-    collections: {},
-    markers: toValue(ctx.state.markers),
-    modules: {},
-    queryMeta: ctx.state.queryMeta,
-  }
-
-  for (const collectionName in ctx.state.collections) {
-    const targetState: Record<string | number, any> = result.collections[collectionName] = {}
-    const itemsForType = ctx.state.collections[collectionName]!.value
-    for (const key in itemsForType) {
-      const item = itemsForType[key]
-      if (item) {
-        targetState[key] = toValue(item)
-      }
-    }
-  }
-
-  for (const moduleKey in ctx.state.modules) {
-    result.modules[moduleKey] = toValue(ctx.state.modules[moduleKey]!)
-  }
-
-  return result
-}
-
-function clearCollection(ctx: CacheRuntime, collection: Parameters<Cache['clearCollection']>[0]['collection']) {
-  invalidateCollectionStateCache(ctx, collection.name)
-  ctx.state.fieldTimestamps.delete(collection.name)
-  const tombIds = Array.from(ctx.state.tombstones.entries(), ([, t]) => t)
-    .filter(t => t.collection === collection.name)
-  for (const t of tombIds) {
-    ctx.state.tombstones.clear(t.collection, t.key)
-  }
-  const itemsForType = ctx.state.collections[collection.name]
-  if (!itemsForType) {
-    return
-  }
-  for (const key in itemsForType.value) {
-    enqueueOperation(ctx, { type: 'deleteItem', params: { collection, key } })
-  }
 }
 
 function garbageCollect(ctx: CacheRuntime) {
-  for (const collectionName in ctx.state.collections) {
-    const collection = ctx.getStore().$collections.find(m => m.name === collectionName)
-    if (!collection) {
-      continue
-    }
-    const itemsForType = ctx.state.collections[collectionName]?.value
-    if (!itemsForType) {
-      continue
-    }
-    for (const key in itemsForType) {
-      const wrappedItem = getWrappedItem(ctx, collection, itemsForType[key])
+  const store = ctx.getStore()
+  for (const collection of store.$collections) {
+    ctx.engine.forEachKey(collection.name, (key) => {
+      const wrappedItem = getWrappedItem(ctx, collection, ctx.engine.readItemRaw({ collection, key }))
       if (wrappedItem) {
         garbageCollectItem(ctx, collection, wrappedItem)
       }
-    }
+    })
   }
 }
