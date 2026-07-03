@@ -1,0 +1,5 @@
+*
+!.gitignore
+!.npmignore
+!rstore-vite-directus
+!rstore-vite-directus/**

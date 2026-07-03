@@ -12,6 +12,12 @@
   "publishConfig": {
     "access": "public"
   },
+  "rstore": {
+    "skillDependencies": [
+      "@rstore/nuxt",
+      "@rstore/vue"
+    ]
+  },
   "exports": {
     ".": {
       "types": "./dist/types.d.ts",

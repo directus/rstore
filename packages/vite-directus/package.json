@@ -9,6 +9,12 @@
     "directory": "packages/vite-directus"
   },
   "sideEffects": false,
+  "rstore": {
+    "skillDependencies": [
+      "@rstore/directus",
+      "@rstore/vue"
+    ]
+  },
   "publishConfig": {
     "access": "public"
   },
@@ -25,12 +31,14 @@
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "skills"
   ],
   "scripts": {
     "build": "unbuild",
     "dev": "unbuild --stub",
     "dev:prepare": "pnpm run dev",
+    "prepack": "node ../../scripts/sync-dep-skills.mjs .",
     "test": "vitest run",
     "test:types": "tsc --noEmit"
   },

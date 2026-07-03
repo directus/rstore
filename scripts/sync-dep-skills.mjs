@@ -3,7 +3,8 @@
 /* eslint-disable no-console */
 
 // Copies `skills/<skill-name>/` folders from every transitive `@rstore/*`
-// workspace dependency into the target package's `skills/` folder.
+// runtime dependency and explicit skill-only dependency into the target
+// package's `skills/` folder.
 //
 // Rationale: skills-npm (https://github.com/antfu/skills-npm) scans the
 // consumer project's top-level `node_modules` for packages that ship a
@@ -16,8 +17,11 @@
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import process from 'node:process'
+import { fileURLToPath } from 'node:url'
 
 const WORKSPACE_SCOPE = '@rstore/'
+const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..')
+const WORKSPACE_PACKAGES_DIR = path.join(REPO_ROOT, 'packages')
 
 /**
  * Read and parse a JSON file.
@@ -42,13 +46,33 @@ async function resolveDepDir(depName, fromDir) {
     return await fs.realpath(linkPath)
   }
   catch {
+    return await resolveWorkspacePackageDir(depName)
+  }
+}
+
+/**
+ * Resolve an `@rstore/*` package by looking up the matching workspace package.
+ * @param {string} depName
+ * @returns {Promise<string | null>} Absolute dependency directory, or null when missing.
+ */
+async function resolveWorkspacePackageDir(depName) {
+  if (!depName.startsWith(WORKSPACE_SCOPE))
+    return null
+
+  const unscoped = depName.slice(WORKSPACE_SCOPE.length)
+  const candidateDir = path.join(WORKSPACE_PACKAGES_DIR, unscoped)
+  try {
+    const pkg = await readJson(path.join(candidateDir, 'package.json'))
+    return pkg.name === depName ? candidateDir : null
+  }
+  catch {
     return null
   }
 }
 
 /**
- * Walk the dependency graph starting from `pkgDir`, collecting every
- * `@rstore/*` package reachable through `dependencies`.
+ * Walk the dependency graph starting from `pkgDir`, collecting every `@rstore/*`
+ * package reachable through `dependencies` or `rstore.skillDependencies`.
  * @param {string} pkgDir
  * @param {Map<string, string>} out name -> absolute package dir
  * @returns {Promise<Map<string, string>>} Collected package names mapped to package directories.
@@ -59,16 +83,28 @@ async function collectRstoreDeps(pkgDir, out = new Map()) {
     return out
   out.set(pkg.name, pkgDir)
 
-  const deps = Object.keys(pkg.dependencies || {})
-  for (const depName of deps) {
-    if (!depName.startsWith(WORKSPACE_SCOPE))
-      continue
+  for (const depName of getRstoreDependencyNames(pkg)) {
     const depDir = await resolveDepDir(depName, pkgDir)
     if (!depDir)
       continue
     await collectRstoreDeps(depDir, out)
   }
   return out
+}
+
+/**
+ * Get runtime and explicit skill-only `@rstore/*` dependencies from a package.
+ * @param {any} pkg
+ * @returns {string[]} Unique workspace package names that may publish skills.
+ */
+function getRstoreDependencyNames(pkg) {
+  const dependencies = Object.keys(pkg.dependencies || {})
+  const skillDependencies = Array.isArray(pkg.rstore?.skillDependencies)
+    ? pkg.rstore.skillDependencies
+    : []
+
+  return [...new Set([...dependencies, ...skillDependencies])]
+    .filter(depName => typeof depName === 'string' && depName.startsWith(WORKSPACE_SCOPE))
 }
 
 /**

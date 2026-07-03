@@ -1,0 +1,5 @@
+*
+!.gitignore
+!.npmignore
+!rstore-directus
+!rstore-directus/**

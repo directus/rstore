@@ -1,4 +1,5 @@
 *
 !.gitignore
+!.npmignore
 !rstore-nuxt
 !rstore-nuxt/**

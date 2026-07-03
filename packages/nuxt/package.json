@@ -12,6 +12,11 @@
   "publishConfig": {
     "access": "public"
   },
+  "rstore": {
+    "skillDependencies": [
+      "@rstore/vue"
+    ]
+  },
   "exports": {
     ".": {
       "types": "./dist/module.d.ts",
