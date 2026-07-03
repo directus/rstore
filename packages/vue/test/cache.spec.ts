@@ -154,6 +154,170 @@ describe('cache', () => {
     })
   })
 
+  it('should clear cached query refs and query meta on clear()', async () => {
+    const store = await createStore({
+      schema: [{ name: 'TestCollection' }],
+      plugins: [],
+    })
+    const cache = store.$cache as any
+    const queryId = JSON.stringify(['TestCollection-many', { fetchPolicy: 'cache-first', resultMode: 'responseRefs' }])
+    cache._private.state.pageRefs.set(`${queryId}#0`, { type: 'refs', keys: [1] })
+    cache._private.state.queryMeta[queryId] = { total: 1 }
+
+    store.$cache.clear()
+
+    expect(cache._private.state.pageRefs.size).toBe(0)
+    expect(cache._private.state.queryMeta).toEqual({})
+  })
+
+  it('should clear cached query refs on setState()', async () => {
+    const store = await createStore({
+      schema: [{ name: 'TestCollection' }],
+      plugins: [],
+    })
+    const cache = store.$cache as any
+    const oldQueryId = JSON.stringify(['TestCollection-many', { fetchPolicy: 'cache-first', resultMode: 'responseRefs' }])
+    const incomingQueryMeta = {
+      [JSON.stringify(['TestCollection-many', { fetchPolicy: 'cache-first' }])]: {},
+    }
+    cache._private.state.pageRefs.set(`${oldQueryId}#0`, { type: 'refs', keys: [1] })
+    cache._private.state.queryMeta[oldQueryId] = { total: 1 }
+
+    store.$cache.setState({
+      collections: {
+        TestCollection: {
+          2: { id: 2, name: 'Restored' },
+        },
+      },
+      markers: {},
+      modules: {},
+      queryMeta: incomingQueryMeta,
+    })
+
+    expect(cache._private.state.pageRefs.size).toBe(0)
+    expect(cache._private.state.queryMeta).toEqual(incomingQueryMeta)
+  })
+
+  it('should invalidate cached many query refs for a collection on clearCollection', async () => {
+    const queryOptions = { fetchPolicy: 'cache-first' as const, resultMode: 'responseRefs' as const }
+    let messages = [{ id: 'before', text: 'Before' }]
+    const fetchMany = vi.fn(() => messages)
+    const store = await createStore({
+      schema: [
+        {
+          name: 'messages',
+          hooks: {
+            fetchMany,
+          },
+        },
+      ],
+      plugins: [],
+    })
+    const cache = store.$cache as any
+    const collection = store.$collections[0]!
+    const queryId = JSON.stringify(['messages-many', queryOptions])
+    const pageId = `${queryId}#0`
+
+    const firstQuery = await store.messages.query(q => q.many(queryOptions))
+
+    expect(firstQuery.data.value.map((item: any) => item.text)).toEqual(['Before'])
+    expect(fetchMany).toHaveBeenCalledTimes(1)
+    expect(cache._private.state.pageRefs.has(pageId)).toBe(true)
+    expect(queryId in cache._private.state.queryMeta).toBe(true)
+
+    messages = [{ id: 'after', text: 'After' }]
+    store.$cache.clearCollection({ collection })
+
+    expect(cache._private.state.pageRefs.has(pageId)).toBe(false)
+    expect(queryId in cache._private.state.queryMeta).toBe(false)
+
+    const secondQuery = await store.messages.query(q => q.many(queryOptions))
+
+    expect(fetchMany).toHaveBeenCalledTimes(2)
+    expect(secondQuery.data.value.map((item: any) => item.text)).toEqual(['After'])
+  })
+
+  it('should invalidate cached first query refs for a collection on clearCollection', async () => {
+    const queryOptions = { key: 'listing', fetchPolicy: 'cache-first' as const }
+    let keyStorageItem = { key: 'listing', value: ['Before'] }
+    const fetchFirst = vi.fn(() => keyStorageItem)
+    const store = await createStore({
+      schema: [
+        {
+          name: 'keyStorage',
+          getKey: (item: any) => item.key,
+          hooks: {
+            fetchFirst,
+          },
+        },
+      ],
+      plugins: [],
+    })
+    const cache = store.$cache as any
+    const collection = store.$collections[0]!
+    const queryId = JSON.stringify(['keyStorage-first', queryOptions])
+    const pageId = `${queryId}#0`
+
+    const firstQuery = await store.keyStorage.query(q => q.first(queryOptions))
+
+    expect((firstQuery.data.value as any)?.value).toEqual(['Before'])
+    expect(fetchFirst).toHaveBeenCalledTimes(1)
+    expect(cache._private.state.pageRefs.has(pageId)).toBe(true)
+    expect(queryId in cache._private.state.queryMeta).toBe(true)
+
+    keyStorageItem = { key: 'listing', value: ['After'] }
+    store.$cache.clearCollection({ collection })
+
+    expect(cache._private.state.pageRefs.has(pageId)).toBe(false)
+    expect(queryId in cache._private.state.queryMeta).toBe(false)
+
+    const secondQuery = await store.keyStorage.query(q => q.first(queryOptions))
+
+    expect(fetchFirst).toHaveBeenCalledTimes(2)
+    expect((secondQuery.data.value as any)?.value).toEqual(['After'])
+  })
+
+  it('should keep unrelated collection query refs on clearCollection', async () => {
+    const queryOptions = { fetchPolicy: 'cache-first' as const, resultMode: 'responseRefs' as const }
+    const store = await createStore({
+      schema: [
+        {
+          name: 'messages',
+          hooks: {
+            fetchMany: () => [{ id: 'message-1', text: 'Message' }],
+          },
+        },
+        {
+          name: 'posts',
+          hooks: {
+            fetchMany: () => [{ id: 'post-1', title: 'Post' }],
+          },
+        },
+      ],
+      plugins: [],
+    })
+    const cache = store.$cache as any
+    const messagesQueryId = JSON.stringify(['messages-many', queryOptions])
+    const postsQueryId = JSON.stringify(['posts-many', queryOptions])
+    const messagesPageId = `${messagesQueryId}#0`
+    const postsPageId = `${postsQueryId}#0`
+
+    await store.messages.query(q => q.many(queryOptions))
+    await store.posts.query(q => q.many(queryOptions))
+
+    expect(cache._private.state.pageRefs.has(messagesPageId)).toBe(true)
+    expect(cache._private.state.pageRefs.has(postsPageId)).toBe(true)
+    expect(messagesQueryId in cache._private.state.queryMeta).toBe(true)
+    expect(postsQueryId in cache._private.state.queryMeta).toBe(true)
+
+    store.$cache.clearCollection({ collection: store.$collections[0]! })
+
+    expect(cache._private.state.pageRefs.has(messagesPageId)).toBe(false)
+    expect(cache._private.state.pageRefs.has(postsPageId)).toBe(true)
+    expect(messagesQueryId in cache._private.state.queryMeta).toBe(false)
+    expect(postsQueryId in cache._private.state.queryMeta).toBe(true)
+  })
+
   it('should handle relations when writing items', async () => {
     const store = await createStore({
       schema: [

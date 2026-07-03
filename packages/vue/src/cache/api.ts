@@ -5,6 +5,7 @@ import { ref, toValue } from 'vue'
 import { getCollectionIndex, invalidateCollectionStateCache } from './context'
 import { ensureLayersForCollection, getStateForCollection } from './layers'
 import { applyMutationToCache } from './mutations'
+import { clearQueryStateForCollection } from './queryState'
 import { enqueueOperation, flushQueuedOperations } from './queue'
 import { garbageCollectItem, getWrappedItem } from './wrapped'
 
@@ -196,6 +197,7 @@ function getState(ctx: CacheRuntime): CustomCacheState {
 }
 
 function clearCollection(ctx: CacheRuntime, collection: Parameters<Cache['clearCollection']>[0]['collection']) {
+  clearQueryStateForCollection(ctx, collection.name)
   invalidateCollectionStateCache(ctx, collection.name)
   ctx.state.fieldTimestamps.delete(collection.name)
   const tombIds = Array.from(ctx.state.tombstones.entries(), ([, t]) => t)

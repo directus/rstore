@@ -6,6 +6,7 @@ import { pickNonSpecialProps } from '@rstore/shared'
 import { markRaw, ref, shallowRef } from 'vue'
 import { ensureCollectionRef, getItemWrapKey, invalidateCollectionStateCache, mark } from './context'
 import { removeItemIndexes, updateItemIndexes } from './indexes'
+import { clearAllQueryState } from './queryState'
 
 /** Delete an item immediately without going through the pause queue. */
 export function deleteItemNow<TCollection extends Collection>(
@@ -143,14 +144,14 @@ export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
   ctx.wrappedItems.clear()
   ctx.wrappedItemsMetadata.clear()
   ctx.collectionStateCache.clear()
+  ctx.state.pageRefs.clear()
+  ctx.state.queryMeta = value.queryMeta || {}
 
   const store = ctx.getStore()
   store.$hooks.callHookSync('afterCacheReset', {
     store,
     meta: {},
   })
-
-  ctx.state.queryMeta = value.queryMeta || {}
 }
 
 /** Clear all cache data immediately. */
@@ -167,6 +168,7 @@ export function clearNow(ctx: CacheRuntime) {
   ctx.collectionStateCache.clear()
   ctx.state.collectionIndexes.clear()
   ctx.state.fieldTimestamps.clear()
+  clearAllQueryState(ctx)
   const tombIds = Array.from(ctx.state.tombstones.entries(), ([, t]) => t)
   for (const t of tombIds) {
     ctx.state.tombstones.clear(t.collection, t.key)
