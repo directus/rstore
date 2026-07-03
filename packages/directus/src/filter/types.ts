@@ -51,7 +51,14 @@ export interface DirectusFilterContext {
    * rstore collection, used to detect relation filters.
    */
   collection?: {
+    /**
+     * rstore collection name.
+     */
     name: string
+
+    /**
+     * rstore relations keyed by relation field.
+     */
     relations?: Record<string, any>
   }
 

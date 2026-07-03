@@ -1,5 +1,6 @@
 import type { DirectusCollection, DirectusField, DirectusRelation } from '@directus/sdk'
 import type { Collection } from '@rstore/shared'
+import type { DirectusGeneratedCollectionMeta } from '../runtime'
 
 /**
  * Options used to transform Directus system metadata into rstore collections.
@@ -27,31 +28,6 @@ export interface BuildDirectusCollectionsOptions {
 }
 
 /**
- * Directus metadata stored on generated rstore collections.
- */
-export interface GeneratedDirectusMeta {
-  /**
-   * Primary key field names discovered from Directus field schemas.
-   */
-  primaryKeys: string[]
-
-  /**
-   * Directus-specific collection metadata.
-   */
-  directus: {
-    /**
-     * Original Directus collection name.
-     */
-    collection: string
-
-    /**
-     * Whether the Directus collection is configured as a singleton.
-     */
-    singleton: boolean
-  }
-}
-
-/**
  * rstore collection plus generated metadata used by templates.
  */
 export interface DirectusCollectionDefinition extends Collection {
@@ -73,7 +49,7 @@ export interface DirectusCollectionDefinition extends Collection {
   /**
    * Generated Directus collection metadata.
    */
-  meta: GeneratedDirectusMeta
+  meta: DirectusGeneratedCollectionMeta
 
   /**
    * Generated rstore relations.
@@ -221,7 +197,7 @@ function createGetKeyExpression(primaryKeys: string[], singleton: boolean): stri
  * Creates a safe JavaScript item property access expression.
  */
 function itemAccessExpression(key: string): string {
-  return /^[A-Z_$][\w$]*$/i.test(key) ? `item.${key}` : `item[${JSON.stringify(key)}]`
+  return IDENTIFIER_RE.test(key) ? `item.${key}` : `item[${JSON.stringify(key)}]`
 }
 
 /**

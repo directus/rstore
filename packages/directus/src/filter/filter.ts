@@ -1,7 +1,7 @@
-import type { DirectusFilterContext, DirectusFilterEvaluation, DirectusQueryEvaluation } from './filter-types'
-import { evaluateOperator, paginateItems, sortItems } from './filter-operators'
-import { supported, unsupported } from './filter-types'
-import { readItemValue, resolveFilterValue } from './filter-values'
+import type { DirectusFilterContext, DirectusFilterEvaluation, DirectusQueryEvaluation } from './types'
+import { evaluateOperator, paginateItems, sortItems } from './operators'
+import { supported, unsupported } from './types'
+import { readItemValue, resolveFilterValue } from './values'
 
 const GEOMETRY_OPERATORS = new Set([
   '_intersects',

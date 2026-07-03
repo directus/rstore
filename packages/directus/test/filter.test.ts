@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyDirectusQuery, evaluateDirectusFilter } from '../src/runtime/filter'
+import { applyDirectusQuery, evaluateDirectusFilter } from '../src'
 
 const collection = {
   name: 'Todos',

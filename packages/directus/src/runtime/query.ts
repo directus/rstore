@@ -1,7 +1,7 @@
 import type { Query } from '@directus/sdk'
 
 /**
- * Directus REST query options supported by the Nuxt Directus adapter.
+ * Directus REST query options supported by the Directus adapter.
  */
 export interface DirectusQueryOptions extends Omit<Query<any, any>, 'filter'> {
   /**

@@ -1,5 +1,5 @@
-import type { DirectusFilterContext, DirectusUnsupportedEvaluation } from './filter-types'
-import { unsupported } from './filter-types'
+import type { DirectusFilterContext, DirectusUnsupportedEvaluation } from './types'
+import { unsupported } from './types'
 
 /**
  * Resolved filter value that can be evaluated locally.

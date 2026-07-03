@@ -1,4 +1,4 @@
-import type { Query, QueryFilter } from '@directus/sdk'
+import type { DirectusQueryOptions } from '@rstore/directus'
 
 /* eslint-disable unused-imports/no-unused-vars */
 
@@ -7,27 +7,7 @@ import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/vue'
 /**
  * Directus query options exposed through rstore find options.
  */
-export interface RstoreDirectusQueryOptions extends Omit<Query<any, any>, 'filter'> {
-  /**
-   * Directus filter object.
-   */
-  filter?: QueryFilter<any, any>
-
-  /**
-   * Whether Directus should follow reverse relations for wildcard fields.
-   */
-  backlink?: boolean
-
-  /**
-   * Content version key used for versioned reads.
-   */
-  version?: string
-
-  /**
-   * Return the raw Directus version delta.
-   */
-  versionRaw?: boolean
-}
+export interface RstoreDirectusQueryOptions extends DirectusQueryOptions {}
 
 /**
  * Directus metadata stored on generated rstore collections.

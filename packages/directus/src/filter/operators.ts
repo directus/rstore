@@ -1,8 +1,8 @@
 /* eslint-disable eqeqeq */
 
-import type { DirectusFilterEvaluation } from './filter-types'
-import { supported, unsupported } from './filter-types'
-import { comparableValue, readItemValue } from './filter-values'
+import type { DirectusFilterEvaluation } from './types'
+import { supported, unsupported } from './types'
+import { comparableValue, readItemValue } from './values'
 
 /**
  * Evaluates one Directus field operator.

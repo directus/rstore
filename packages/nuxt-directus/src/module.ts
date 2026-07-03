@@ -1,8 +1,12 @@
-import type { DirectusCollection, DirectusField, DirectusRelation } from '@directus/sdk'
-import { createDirectus, readCollections, readFieldsByCollection, readRelations, rest, staticToken } from '@directus/sdk'
 import { addImportsDir, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, useLogger } from '@nuxt/kit'
-import { generateCollectionsTemplate, generateConfigTemplate, generateItemsTemplate, generateTypedCollectionsTemplate } from './codegen'
-import { buildDirectusCollections } from './introspection'
+import { DEFAULT_DIRECTUS_SCOPE_ID } from '@rstore/directus'
+import {
+  generateCollectionsTemplate,
+  generateConfigTemplate,
+  generateItemsTemplate,
+  generateTypedCollectionsTemplate,
+  loadDirectusCollections,
+} from '@rstore/directus/schema'
 
 export interface ModuleOptions {
   /**
@@ -47,19 +51,10 @@ export default defineNuxtModule<ModuleOptions>({
       return
     }
 
-    const scopeId = options.scopeId ?? 'rstore-directus'
-    const directus = createDirectus(options.url)
-      .with(rest())
-      .with(staticToken(options.adminToken))
-
-    const directusCollections = await directus.request(readCollections()) as DirectusCollection[]
-    const fieldsPerCollection = await readFieldsPerCollection(directus, directusCollections)
-    const relations = await directus.request(readRelations()) as DirectusRelation[]
-
-    const collections = buildDirectusCollections({
-      collections: directusCollections,
-      fields: fieldsPerCollection,
-      relations,
+    const scopeId = options.scopeId ?? DEFAULT_DIRECTUS_SCOPE_ID
+    const collections = await loadDirectusCollections({
+      url: options.url,
+      adminToken: options.adminToken,
       scopeId,
     })
 
@@ -91,21 +86,3 @@ export default defineNuxtModule<ModuleOptions>({
     addPluginImport(nuxt, resolve('./runtime/plugin'))
   },
 })
-
-/**
- * Reads all Directus fields grouped by collection name.
- */
-async function readFieldsPerCollection(
-  directus: ReturnType<typeof createDirectus> & { request: (command: any) => Promise<unknown> },
-  collections: DirectusCollection[],
-): Promise<Map<string, DirectusField[]>> {
-  const fieldsPerCollection = new Map<string, DirectusField[]>()
-  await Promise.all(collections.map(async (collection) => {
-    if (!collection.schema || collection.collection.startsWith('directus_')) {
-      return
-    }
-    const fields = await directus.request(readFieldsByCollection(collection.collection)) as DirectusField[]
-    fieldsPerCollection.set(collection.collection, fields)
-  }))
-  return fieldsPerCollection
-}

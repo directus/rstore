@@ -32,11 +32,12 @@
     "dev:build": "nuxi build playground",
     "test": "vitest run",
     "test:watch": "vitest watch",
+    "test:types": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit",
     "test:types:nope": "vue-tsc --noEmit && cd playground && vue-tsc --noEmit"
   },
   "dependencies": {
-    "@directus/sdk": "^19.0.1",
     "@nuxt/kit": "^4.0.0",
+    "@rstore/directus": "workspace:^",
     "@rstore/nuxt": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^"

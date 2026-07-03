@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createDirectusQuery } from '../src/runtime/query'
+import { createDirectusQuery, stripPrimaryKeys } from '../src'
 
 describe('createDirectusQuery', () => {
   it('copies supported Directus query options from find options', () => {
@@ -63,6 +63,18 @@ describe('createDirectusQuery', () => {
       limit: 1,
     })).toMatchObject({
       limit: 1,
+    })
+  })
+})
+
+describe('stripPrimaryKeys', () => {
+  it('removes generated primary keys before Directus updates', () => {
+    expect(stripPrimaryKeys({
+      id: 1,
+      slug: 'todo',
+      title: 'Todo',
+    }, ['id', 'slug'])).toEqual({
+      title: 'Todo',
     })
   })
 })

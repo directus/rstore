@@ -284,6 +284,28 @@ importers:
         specifier: 'catalog:'
         version: 3.2.5(typescript@5.9.3)
 
+  packages/directus:
+    dependencies:
+      '@directus/sdk':
+        specifier: ^19.0.1
+        version: 19.1.0
+      '@rstore/core':
+        specifier: workspace:^
+        version: link:../core
+      '@rstore/shared':
+        specifier: workspace:^
+        version: link:../shared
+    devDependencies:
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      unbuild:
+        specifier: 'catalog:'
+        version: 3.6.1(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2)
+
   packages/nuxt:
     dependencies:
       '@nuxt/devtools-kit':
@@ -353,9 +375,9 @@ importers:
 
   packages/nuxt-directus:
     dependencies:
-      '@directus/sdk':
-        specifier: ^19.0.1
-        version: 19.1.0
+      '@rstore/directus':
+        specifier: workspace:^
+        version: link:../directus
       '@nuxt/kit':
         specifier: ^4.0.0
         version: 4.3.1(magicast@0.5.2)
@@ -822,6 +844,28 @@ importers:
       vitest:
         specifier: 'catalog:'
         version: 3.2.4(@types/debug@4.1.12)(@types/node@25.4.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2)
+
+  packages/vite-directus:
+    dependencies:
+      '@rstore/directus':
+        specifier: workspace:^
+        version: link:../directus
+    devDependencies:
+      '@types/node':
+        specifier: 'catalog:'
+        version: 24.12.0
+      typescript:
+        specifier: 'catalog:'
+        version: 5.9.3
+      unbuild:
+        specifier: 'catalog:'
+        version: 3.6.1(typescript@5.9.3)(vue-tsc@3.2.5(typescript@5.9.3))(vue@3.5.30(typescript@5.9.3))
+      vite:
+        specifier: ^7.3.1
+        version: 7.3.1(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2)
+      vitest:
+        specifier: 'catalog:'
+        version: 3.2.4(@types/debug@4.1.12)(@types/node@24.12.0)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.46.0)(yaml@2.8.2)
 
   packages/vue:
     dependencies:

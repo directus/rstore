@@ -1,6 +1,6 @@
 import type { DirectusCollection, DirectusField, DirectusRelation } from '@directus/sdk'
 import { describe, expect, it } from 'vitest'
-import { buildDirectusCollections, directusFieldToTsType } from '../src/introspection'
+import { buildDirectusCollections, directusFieldToTsType } from '../src/schema'
 
 function collection(name: string, options: {
   hidden?: boolean
