@@ -1,4 +1,24 @@
 /**
+ * Structured details carried by Monospace error payloads.
+ */
+export interface MonospaceErrorDetails {
+  /**
+   * Monospace error code.
+   */
+  code?: string
+
+  /**
+   * Optional structured error details returned by Monospace.
+   */
+  meta?: Record<string, unknown>
+
+  /**
+   * Nested error that caused this error.
+   */
+  source?: unknown
+}
+
+/**
  * Base error for failed Monospace REST requests.
  */
 export class MonospaceRestError extends Error {
@@ -8,18 +28,30 @@ export class MonospaceRestError extends Error {
   status: number
 
   /**
+   * Monospace error code.
+   */
+  code?: string
+
+  /**
    * Optional structured error details returned by Monospace.
    */
   meta?: Record<string, unknown>
 
   /**
+   * Nested error that caused this error.
+   */
+  source?: unknown
+
+  /**
    * Creates a Monospace REST error.
    */
-  constructor(message: string, status: number, meta?: Record<string, unknown>) {
+  constructor(message: string, status: number, details?: MonospaceErrorDetails) {
     super(message)
     this.name = 'MonospaceRestError'
     this.status = status
-    this.meta = meta
+    this.code = details?.code
+    this.meta = details?.meta
+    this.source = details?.source
   }
 }
 
@@ -28,10 +60,11 @@ export class MonospaceRestError extends Error {
  */
 export class MonospaceValidationError extends MonospaceRestError {
   /**
-   * Creates a Monospace validation error.
+   * Creates a Monospace validation error. Monospace responds with 400 for
+   * invalid payloads and 422 for invalid REST queries.
    */
-  constructor(message: string, meta?: Record<string, unknown>) {
-    super(message, 400, meta)
+  constructor(message: string, details?: MonospaceErrorDetails, status: number = 400) {
+    super(message, status, details)
     this.name = 'MonospaceValidationError'
   }
 }
@@ -43,8 +76,8 @@ export class MonospaceAuthError extends MonospaceRestError {
   /**
    * Creates a Monospace authentication error.
    */
-  constructor(message = 'Authentication failed', meta?: Record<string, unknown>) {
-    super(message, 401, meta)
+  constructor(message = 'Authentication failed', details?: MonospaceErrorDetails) {
+    super(message, 401, details)
     this.name = 'MonospaceAuthError'
   }
 }
@@ -56,8 +89,8 @@ export class MonospacePermissionError extends MonospaceRestError {
   /**
    * Creates a Monospace permission error.
    */
-  constructor(message = 'Permission denied', meta?: Record<string, unknown>) {
-    super(message, 403, meta)
+  constructor(message = 'Permission denied', details?: MonospaceErrorDetails) {
+    super(message, 403, details)
     this.name = 'MonospacePermissionError'
   }
 }
@@ -79,8 +112,8 @@ export class MonospaceNotFoundError extends MonospaceRestError {
   /**
    * Creates a Monospace not-found error.
    */
-  constructor(message = 'Item not found', collection?: string, key?: unknown, meta?: Record<string, unknown>) {
-    super(message, 404, meta)
+  constructor(message = 'Item not found', collection?: string, key?: unknown, details?: MonospaceErrorDetails) {
+    super(message, 404, details)
     this.name = 'MonospaceNotFoundError'
     this.collection = collection
     this.key = key
@@ -107,19 +140,24 @@ export function createMonospaceError(
 ): MonospaceRestError {
   const payload = isErrorPayload(body) ? body : undefined
   const message = payload?.message ?? `Monospace request failed with status ${status}`
-  const meta = payload?.meta
+  const details: MonospaceErrorDetails = {
+    code: payload?.code,
+    meta: payload?.meta,
+    source: payload?.source,
+  }
 
   switch (status) {
     case 400:
-      return new MonospaceValidationError(message, meta)
+    case 422:
+      return new MonospaceValidationError(message, details, status)
     case 401:
-      return new MonospaceAuthError(message, meta)
+      return new MonospaceAuthError(message, details)
     case 403:
-      return new MonospacePermissionError(message, meta)
+      return new MonospacePermissionError(message, details)
     case 404:
-      return new MonospaceNotFoundError(message, context.collection, context.key, meta)
+      return new MonospaceNotFoundError(message, context.collection, context.key, details)
     default:
-      return new MonospaceRestError(message, status, meta)
+      return new MonospaceRestError(message, status, details)
   }
 }
 
@@ -133,9 +171,19 @@ function isErrorPayload(value: unknown): value is {
   message: string
 
   /**
+   * Monospace error code.
+   */
+  code?: string
+
+  /**
    * Optional structured error details.
    */
   meta?: Record<string, unknown>
+
+  /**
+   * Nested error that caused this error.
+   */
+  source?: unknown
 } {
   return typeof value === 'object'
     && value !== null

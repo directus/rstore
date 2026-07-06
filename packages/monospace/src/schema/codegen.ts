@@ -166,6 +166,7 @@ ${collections.map((collection, index) => {
     readonly '~type': undefined
     readonly '~item': ${collection.typeName}
     readonly name: ${JSON.stringify(collection.name)}
+    readonly relations: ${JSON.stringify(collection.relations)}
   }`
 }).join('\n')}
   export const schema: ${collections.length ? `[${collections.map((_, index) => `typeof collection${index}`).join(', ')}]` : 'StoreSchema'}

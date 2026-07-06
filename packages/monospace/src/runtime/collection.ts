@@ -8,6 +8,17 @@ import type { Collection } from '@rstore/shared'
 export const DEFAULT_MONOSPACE_SCOPE_ID = 'rstore-monospace'
 
 /**
+ * Generated Monospace metadata for one relation field.
+ */
+export interface MonospaceGeneratedRelationMeta {
+  /**
+   * Connect key columns accepted by Monospace `_connect` operations for the
+   * relation, extracted from the OpenAPI connect key input schemas.
+   */
+  connectKeys?: string[]
+}
+
+/**
  * Monospace metadata stored on generated rstore collections.
  */
 export interface MonospaceGeneratedCollectionMeta {
@@ -24,6 +35,11 @@ export interface MonospaceGeneratedCollectionMeta {
      * Original Monospace collection name.
      */
     collection: string
+
+    /**
+     * Generated relation metadata keyed by relation field.
+     */
+    relations?: Record<string, MonospaceGeneratedRelationMeta>
   }
 }
 
@@ -53,6 +69,11 @@ export interface MonospaceCollectionLike {
        * Original Monospace collection name.
        */
       collection?: string
+
+      /**
+       * Generated relation metadata keyed by relation field.
+       */
+      relations?: Record<string, MonospaceGeneratedRelationMeta>
     }
   }
 }
@@ -72,6 +93,11 @@ declare module '@rstore/shared' {
        * Original Monospace collection name.
        */
       collection?: string
+
+      /**
+       * Generated relation metadata keyed by relation field.
+       */
+      relations?: Record<string, MonospaceGeneratedRelationMeta>
     }
   }
 }
@@ -88,4 +114,15 @@ export function getMonospacePrimaryKeys(collection: MonospaceCollectionLike): st
  */
 export function getMonospaceCollectionName(collection: MonospaceCollectionLike): string {
   return collection.meta?.monospace?.collection ?? collection.name
+}
+
+/**
+ * Returns the generated connect key columns of a relation, if any.
+ */
+export function getMonospaceRelationConnectKeys(
+  collection: MonospaceCollectionLike,
+  relationKey: string,
+): string[] | undefined {
+  const connectKeys = collection.meta?.monospace?.relations?.[relationKey]?.connectKeys
+  return connectKeys?.length ? connectKeys : undefined
 }

@@ -1,4 +1,7 @@
 export * from './codegen'
 export * from './introspection'
 export * from './load'
+export * from './metadata'
+export * from './metadataTypes'
+export * from './relations'
 export * from './types'

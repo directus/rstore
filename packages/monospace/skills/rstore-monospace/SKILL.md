@@ -17,25 +17,26 @@ Use `@rstore/monospace` as the shared Monospace adapter layer for OpenAPI-genera
 | Query serialization | `serializeMonospaceQuery(query)` |
 | Mutation payloads | `stripPrimaryKeys(item, primaryKeys)` |
 | Collection metadata | `DEFAULT_MONOSPACE_SCOPE_ID`, `getMonospacePrimaryKeys`, `getMonospaceCollectionName` |
-| Schema loading | `loadMonospaceCollections({ url?, project?, schemaApiKey?, input?, primaryKeys?, scopeId? })` |
-| Schema building | `buildMonospaceCollections({ document, primaryKeys?, scopeId })` |
+| Schema loading | `loadMonospaceCollections({ url?, project?, schemaApiKey?, input?, metadataInput?, primaryKeys?, scopeId? })` |
+| Schema building | `buildMonospaceCollections({ document, metadata, primaryKeys?, scopeId })` |
 | Code generation | `generateCollectionsTemplate`, `generateItemsTemplate`, `generateTypedCollectionsTemplate`, `generateConfigTemplate`, `generateViteDeclarations` |
 
 ## Workflow
 
-1. Load Monospace OpenAPI metadata from a remote project or local JSON file.
-2. Generate rstore collections from `x-monospace-mappings` and `*CollectionOutput` schemas.
+1. Load the Monospace OpenAPI document and the system schema metadata (meta collections read through the items API) from a remote project or local JSON files.
+2. Generate rstore collections from `x-monospace-mappings`, `*CollectionOutput` schemas, primary indexes, and FK constraints.
 3. Create a runtime REST client with `createMonospaceRestClient`.
 4. Register `createMonospaceRstorePlugin` in the store plugins list.
 5. Query and mutate through rstore collection APIs instead of component-level REST calls.
 
 ## Schema Loading
 
-- Remote schema loading requires `url` and `project`.
-- Local schema loading uses `input` and can skip remote schema credentials.
-- `schemaApiKey` is only for build-time OpenAPI loading.
-- `primaryKeys` overrides generated primary keys by collection name and accepts a string or string array.
-- Generated collections default to `id` when no explicit primary key is available.
+- Generation requires both the OpenAPI document and the schema metadata (system meta collections: `MonospaceCollection`, `MonospacePrimitiveField`, `MonospaceSingleRelationField`, `MonospaceSingleConstraintField`, `MonospaceIndex`, `MonospaceIndexField`).
+- Remote schema loading requires `url` and `project`; metadata queries use explicit `fields` and `limit=0` (unlimited).
+- Fully local loading uses `input` (OpenAPI JSON) plus `metadataInput` (metadata snapshot keyed by meta collection name) and can skip remote schema credentials.
+- `schemaApiKey` is only for build-time schema loading and needs the `openApiSchema:read` and `dataModel:read` entitlements.
+- Primary keys come from each collection's primary index (ordered, composite supported); `primaryKeys` is an override only, and a collection without a primary index and without an override fails generation.
+- Relations join on the real FK constraint columns (`on` maps target columns to source FK columns).
 
 ## Runtime REST Behavior
 

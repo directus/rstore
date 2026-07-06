@@ -6,6 +6,11 @@
       "many": {
         "$ref": "#/paths/~1api~1blog~1items~1Todos"
       }
+    },
+    "Profiles": {
+      "many": {
+        "$ref": "#/paths/~1api~1blog~1items~1Profiles"
+      }
     }
   },
   "components": {
@@ -18,11 +23,58 @@
         "type": "object",
         "properties": {
           "id": {
-            "type": "integer",
-            "x-monospace-primary-key": true
+            "type": "integer"
           },
           "title": {
             "type": "string"
+          },
+          "author_id": {
+            "oneOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "author": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/ProfilesCollectionOutput"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "ProfilesCollectionOutput": {
+        "required": [
+          "id"
+        ],
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "name": {
+            "type": "string"
+          },
+          "todos": {
+            "type": "object",
+            "properties": {
+              "data": {
+                "type": "array",
+                "items": {
+                  "$ref": "#/components/schemas/TodosCollectionOutput"
+                }
+              }
+            },
+            "required": [
+              "data"
+            ]
           }
         }
       }

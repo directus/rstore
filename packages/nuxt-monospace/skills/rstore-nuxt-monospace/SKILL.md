@@ -49,8 +49,9 @@ const todos = await monospace.readMany('Todos', { limit: 10 })
 | --- | --- |
 | `url` | Monospace API URL |
 | `project` | Monospace project identifier |
-| `schemaApiKey` | Build-time key for remote OpenAPI loading |
+| `schemaApiKey` | Build-time key for remote schema loading (needs `openApiSchema:read` + `dataModel:read`) |
 | `input` | Local OpenAPI JSON path, resolved from Nuxt root |
+| `metadataInput` | Local schema metadata snapshot JSON path, resolved from Nuxt root |
 | `runtimeApiKey` | Runtime API key emitted into generated config |
 | `scopeId` | rstore plugin scope id, defaulting to `rstore-monospace` |
 | `primaryKeys` | Explicit primary key overrides by collection name |
@@ -74,7 +75,7 @@ const todos = await monospace.readMany('Todos', { limit: 10 })
 
 1. Keep `schemaApiKey` server-side/build-time.
 2. Configure `runtimeApiKey` only when the value is safe to expose through generated runtime config.
-3. Use `input` for checked-in or separately generated OpenAPI schemas.
+3. Use `input` plus `metadataInput` for checked-in or separately generated schemas; generation needs both the OpenAPI document and the schema metadata.
 4. Prefer generated rstore collections and plugin wiring over custom Nuxt API routes for generated collections.
 5. Use `rstore-monospace` for shared OpenAPI, REST, query, and mutation behavior.
 6. Use `rstore-nuxt` for base Nuxt rstore module behavior and `rstore-vue` for query/form/cache semantics.

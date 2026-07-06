@@ -25,7 +25,9 @@ export interface ModuleOptions {
   project?: string
 
   /**
-   * Build-time API key for OpenAPI schema loading.
+   * Build-time API key for schema loading (OpenAPI document and schema
+   * metadata queries). It needs the `openApiSchema:read` and
+   * `dataModel:read` entitlements.
    */
   schemaApiKey?: string
 
@@ -33,6 +35,13 @@ export interface ModuleOptions {
    * Local OpenAPI JSON file path.
    */
   input?: string
+
+  /**
+   * Local schema metadata snapshot JSON file path: the raw items of the
+   * Monospace system schema meta collections keyed by meta collection name.
+   * Required alongside `input` for fully local generation.
+   */
+  metadataInput?: string
 
   /**
    * Runtime API key emitted into generated client code.
@@ -111,6 +120,7 @@ export default defineNuxtModule<ModuleOptions>({
     const scopeId = options.scopeId ?? DEFAULT_MONOSPACE_SCOPE_ID
     const collections = await loadMonospaceCollections({
       input: options.input ? resolve(nuxt.options.rootDir, options.input) : undefined,
+      metadataInput: options.metadataInput ? resolve(nuxt.options.rootDir, options.metadataInput) : undefined,
       primaryKeys: options.primaryKeys,
       project: options.project,
       schemaApiKey: options.schemaApiKey,

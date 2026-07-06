@@ -1,9 +1,13 @@
 import type { Plugin } from '@rstore/shared'
 import type { MonospaceRestClient } from './client'
 import { definePlugin } from '@rstore/core'
+import { applyMonospaceQuery } from '../filter'
 import { createMonospaceRestClient } from './client'
 import { DEFAULT_MONOSPACE_SCOPE_ID, getMonospaceCollectionName, getMonospacePrimaryKeys } from './collection'
-import { createMonospaceQuery, stripPrimaryKeys } from './query'
+import { applyMonospaceIncludeFields, createMonospaceQuery, stripPrimaryKeys } from './query'
+import { fetchMissingMonospaceRelations, normalizeMonospaceRelationItems, toArray } from './relations'
+import { buildMonospaceRelationWrites } from './relationWrites'
+import { applyMonospaceRelationCachePatches } from './relationWritesCache'
 
 /**
  * Options used to create the rstore Monospace runtime plugin.
@@ -52,36 +56,96 @@ export function createMonospaceRstorePlugin(options: CreateMonospaceRstorePlugin
     setup({ hook }) {
       hook('fetchFirst', async (payload) => {
         const collectionName = getMonospaceCollectionName(payload.collection)
+        const include = (payload.findOptions as any)?.include
+
+        let result: any
         if (payload.key != null) {
-          payload.setResult(await monospace.readOne(collectionName, payload.key, createMonospaceQuery(payload.findOptions as any)))
-          return
+          result = await monospace.readOne(collectionName, payload.key, applyMonospaceIncludeFields(createMonospaceQuery(payload.findOptions as any), include, payload.collection as any))
+        }
+        else {
+          const results = await monospace.readMany(collectionName, applyMonospaceIncludeFields(createMonospaceQuery(payload.findOptions as any, {
+            limit: 1,
+          }), include, payload.collection as any))
+          result = results?.[0]
         }
 
-        const result = await monospace.readMany(collectionName, createMonospaceQuery(payload.findOptions as any, {
-          limit: 1,
-        }))
-        payload.setResult(result?.[0])
+        normalizeMonospaceRelationItems(payload.store as any, payload.collection as any, [result])
+        payload.setResult(result)
       })
 
       hook('fetchMany', async (payload) => {
         const collectionName = getMonospaceCollectionName(payload.collection)
-        payload.setResult(await monospace.readMany(collectionName, createMonospaceQuery(payload.findOptions as any)))
+        const include = (payload.findOptions as any)?.include
+        const result = await monospace.readMany(collectionName, applyMonospaceIncludeFields(createMonospaceQuery(payload.findOptions as any), include, payload.collection as any))
+        normalizeMonospaceRelationItems(payload.store as any, payload.collection as any, result ?? [])
+        payload.setResult(result)
+      })
+
+      hook('fetchRelations', async (payload) => {
+        await fetchMissingMonospaceRelations(
+          payload.store as any,
+          payload.collection as any,
+          toArray(payload.getResult() as any),
+          payload.findOptions.include as any,
+        )
+      })
+
+      hook('cacheFilterFirst', (payload) => {
+        if (payload.key != null) {
+          return
+        }
+
+        const query = createMonospaceQuery(payload.findOptions as any, { limit: 1 })
+        const evaluation = applyMonospaceQuery(payload.readItemsFromCache() as any[], query, {
+          collection: payload.collection,
+        })
+        payload.setResult(evaluation.supported ? evaluation.items[0] : undefined)
+      })
+
+      hook('cacheFilterMany', (payload) => {
+        const evaluation = applyMonospaceQuery(payload.getResult() as any[], createMonospaceQuery(payload.findOptions as any), {
+          collection: payload.collection,
+        })
+        payload.setResult(evaluation.supported ? evaluation.items : [])
       })
 
       hook('createItem', async (payload) => {
         const collectionName = getMonospaceCollectionName(payload.collection)
-        payload.setResult(await monospace.createOne(collectionName, payload.item as any, {}))
+        // Translate form relation operations: FK column writes for to-one
+        // relations, Monospace `_connect` operations for to-many relations.
+        const writes = buildMonospaceRelationWrites({
+          collection: payload.collection as any,
+          formOperations: payload.formOperations,
+          item: payload.item as Record<string, any>,
+          mode: 'create',
+          store: payload.store as any,
+        })
+        const result = await monospace.createOne(collectionName, writes.item, {})
+        applyMonospaceRelationCachePatches(payload.store as any, result, writes.patches)
+        payload.setResult(result)
       })
 
       hook('createMany', async (payload) => {
         const collectionName = getMonospaceCollectionName(payload.collection)
-        payload.setResult(await monospace.createMany(collectionName, payload.items as any, {}))
+        payload.setResult(await monospace.createMany(collectionName, payload.items as Array<Record<string, any>>, {}))
       })
 
       hook('updateItem', async (payload) => {
         const collectionName = getMonospaceCollectionName(payload.collection)
-        const item = stripPrimaryKeys(payload.item as Record<string, any>, getMonospacePrimaryKeys(payload.collection))
-        payload.setResult(await monospace.updateOne(collectionName, payload.key, item, {}))
+        // Translate form relation operations and strip the generated primary
+        // keys, which are carried by the endpoint URL.
+        const writes = buildMonospaceRelationWrites({
+          collection: payload.collection as any,
+          formOperations: payload.formOperations,
+          item: payload.item as Record<string, any>,
+          key: payload.key,
+          mode: 'update',
+          store: payload.store as any,
+        })
+        const item = stripPrimaryKeys(writes.item, getMonospacePrimaryKeys(payload.collection))
+        const result = await monospace.updateOne(collectionName, payload.key, item, {})
+        applyMonospaceRelationCachePatches(payload.store as any, result, writes.patches)
+        payload.setResult(result)
       })
 
       hook('updateMany', async (payload) => {

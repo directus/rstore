@@ -1,0 +1,51 @@
+{
+  "MonospaceCollection": [
+    { "id": "c_todos", "apiName": "Todos" },
+    { "id": "c_profiles", "apiName": "Profiles" }
+  ],
+  "MonospacePrimitiveField": [
+    { "id": "pf_todos_id", "apiName": "id", "collectionId": "c_todos" },
+    { "id": "pf_todos_title", "apiName": "title", "collectionId": "c_todos" },
+    { "id": "pf_todos_author_id", "apiName": "author_id", "collectionId": "c_todos" },
+    { "id": "pf_profiles_id", "apiName": "id", "collectionId": "c_profiles" },
+    { "id": "pf_profiles_name", "apiName": "name", "collectionId": "c_profiles" }
+  ],
+  "MonospaceSingleRelationField": [
+    {
+      "id": "rf_todos_author",
+      "apiName": "author",
+      "collectionId": "c_todos",
+      "oppositeCollectionId": "c_profiles",
+      "isList": false,
+      "isNullable": true,
+      "constraintId": "ct_author",
+      "oppositeRelationFieldId": "rf_profiles_todos"
+    },
+    {
+      "id": "rf_profiles_todos",
+      "apiName": "todos",
+      "collectionId": "c_profiles",
+      "oppositeCollectionId": "c_todos",
+      "isList": true,
+      "isNullable": false,
+      "constraintId": null,
+      "oppositeRelationFieldId": "rf_todos_author"
+    }
+  ],
+  "MonospaceSingleConstraintField": [
+    {
+      "constraintId": "ct_author",
+      "constrainedFieldId": "pf_todos_author_id",
+      "referencedFieldId": "pf_profiles_id",
+      "order": 0
+    }
+  ],
+  "MonospaceIndex": [
+    { "id": "ix_todos_pk", "kind": "primary", "collectionId": "c_todos" },
+    { "id": "ix_profiles_pk", "kind": "primary", "collectionId": "c_profiles" }
+  ],
+  "MonospaceIndexField": [
+    { "indexId": "ix_todos_pk", "fieldId": "pf_todos_id", "order": 0 },
+    { "indexId": "ix_profiles_pk", "fieldId": "pf_profiles_id", "order": 0 }
+  ]
+}

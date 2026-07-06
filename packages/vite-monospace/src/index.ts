@@ -32,7 +32,9 @@ export interface RstoreMonospaceViteOptions {
   project?: string
 
   /**
-   * Build-time API key for OpenAPI schema loading.
+   * Build-time API key for schema loading (OpenAPI document and schema
+   * metadata queries). It needs the `openApiSchema:read` and
+   * `dataModel:read` entitlements.
    */
   schemaApiKey?: string
 
@@ -40,6 +42,13 @@ export interface RstoreMonospaceViteOptions {
    * Local OpenAPI JSON file path.
    */
   input?: string
+
+  /**
+   * Local schema metadata snapshot JSON file path: the raw items of the
+   * Monospace system schema meta collections keyed by meta collection name.
+   * Required alongside `input` for fully local generation.
+   */
+  metadataInput?: string
 
   /**
    * Runtime API key emitted into generated client code.
@@ -78,6 +87,32 @@ export function rstoreMonospace(options: RstoreMonospaceViteOptions): Plugin {
       config = resolvedConfig
     },
 
+    configureServer(server) {
+      const inputs = resolveLocalInputPaths(config, options)
+      if (!inputs.length) {
+        return
+      }
+
+      // Regenerate the virtual modules when a local schema file changes.
+      for (const input of inputs) {
+        server.watcher.add(input)
+      }
+      server.watcher.on('change', (file) => {
+        if (!inputs.includes(file)) {
+          return
+        }
+
+        collectionsPromise = undefined
+        for (const id of [VIRTUAL_MODULE_ID, VIRTUAL_SCHEMA_ID, VIRTUAL_PLUGIN_ID]) {
+          const module = server.moduleGraph.getModuleById(`${RESOLVED_PREFIX}${id}`)
+          if (module) {
+            server.moduleGraph.invalidateModule(module)
+          }
+        }
+        server.ws.send({ type: 'full-reload' })
+      })
+    },
+
     resolveId(id) {
       if (isVirtualModuleId(id)) {
         return `${RESOLVED_PREFIX}${id}`
@@ -85,7 +120,17 @@ export function rstoreMonospace(options: RstoreMonospaceViteOptions): Plugin {
     },
 
     async buildStart() {
+      for (const input of resolveLocalInputPaths(config, options)) {
+        this.addWatchFile(input)
+      }
       await getCollections()
+    },
+
+    watchChange(id) {
+      // Reload the local schema files on the next rebuild in watch mode.
+      if (resolveLocalInputPaths(config, options).includes(id)) {
+        collectionsPromise = undefined
+      }
     },
 
     async load(id) {
@@ -134,12 +179,12 @@ async function loadCollections(
   options: RstoreMonospaceViteOptions,
 ): Promise<MonospaceCollectionDefinition[]> {
   const input = resolveInputPath(config, options.input)
-  if (!input) {
-    assertRemoteSchemaOptions(options)
-  }
+  const metadataInput = resolveInputPath(config, options.metadataInput)
+  assertSchemaSourceOptions(options, input, metadataInput)
 
   return await loadMonospaceCollections({
     input,
+    metadataInput,
     primaryKeys: options.primaryKeys,
     project: options.project,
     schemaApiKey: options.schemaApiKey,
@@ -149,16 +194,29 @@ async function loadCollections(
 }
 
 /**
- * Asserts that remote schema generation has the required connection options.
+ * Asserts that every schema source can be loaded from the given options.
+ *
+ * Fully local generation needs both `input` (OpenAPI document) and
+ * `metadataInput` (schema metadata snapshot); any missing local file falls
+ * back to remote loading, which requires `url` and `project`.
  */
-function assertRemoteSchemaOptions(options: RstoreMonospaceViteOptions): void {
+function assertSchemaSourceOptions(
+  options: RstoreMonospaceViteOptions,
+  input: string | undefined,
+  metadataInput: string | undefined,
+): void {
+  if (input && metadataInput) {
+    return
+  }
+
   const missing = [
     options.url ? null : 'url',
     options.project ? null : 'project',
   ].filter(Boolean)
 
   if (missing.length) {
-    throw new Error(`@rstore/vite-monospace requires ${missing.join(' and ')} option${missing.length === 1 ? '' : 's'}`)
+    const remoteSource = input ? 'schema metadata' : metadataInput ? 'OpenAPI schema' : 'schema'
+    throw new Error(`@rstore/vite-monospace requires ${missing.join(' and ')} option${missing.length === 1 ? '' : 's'} to load the remote Monospace ${remoteSource}, or both input and metadataInput for local generation`)
   }
 }
 
@@ -206,7 +264,20 @@ function resolveDeclarationPath(
 }
 
 /**
- * Resolves local OpenAPI input relative to the Vite project root.
+ * Resolves the configured local schema file paths.
+ */
+function resolveLocalInputPaths(
+  config: ResolvedConfig | undefined,
+  options: RstoreMonospaceViteOptions,
+): string[] {
+  return [
+    resolveInputPath(config, options.input),
+    resolveInputPath(config, options.metadataInput),
+  ].filter((path): path is string => !!path)
+}
+
+/**
+ * Resolves a local schema file path relative to the Vite project root.
  */
 function resolveInputPath(
   config: ResolvedConfig | undefined,

@@ -16,7 +16,17 @@ const fixtures = vi.hoisted(() => {
         collection: 'Todos',
       },
     },
-    relations: {},
+    relations: {
+      author: {
+        to: {
+          Profiles: {
+            on: {
+              id: 'author$id',
+            },
+          },
+        },
+      },
+    },
     itemFields: [{
       name: 'id',
       optional: false,
@@ -64,10 +74,10 @@ describe('rstoreMonospace', () => {
     const { rstoreMonospace } = await import('../src')
     const plugin = rstoreMonospace({})
 
-    await expect(runBuildStart(plugin)).rejects.toThrow('@rstore/vite-monospace requires url and project options')
+    await expect(runBuildStart(plugin)).rejects.toThrow('@rstore/vite-monospace requires url and project options to load the remote Monospace schema, or both input and metadataInput for local generation')
   })
 
-  it('loads local OpenAPI input without requiring remote schema options', async () => {
+  it('rejects local OpenAPI input without a metadata snapshot or remote options', async () => {
     const { rstoreMonospace } = await import('../src')
     const root = await createTempRoot()
     const plugin = rstoreMonospace({
@@ -76,10 +86,26 @@ describe('rstoreMonospace', () => {
     })
 
     runConfigResolved(plugin, root)
+    // Schema generation requires the metadata queries: a lone OpenAPI file
+    // is not sufficient anymore.
+    await expect(runBuildStart(plugin)).rejects.toThrow(/remote Monospace schema metadata, or both input and metadataInput/)
+  })
+
+  it('loads local OpenAPI and metadata inputs without requiring remote schema options', async () => {
+    const { rstoreMonospace } = await import('../src')
+    const root = await createTempRoot()
+    const plugin = rstoreMonospace({
+      input: './openapi.json',
+      metadataInput: './schema-metadata.json',
+      scopeId: 'test-scope',
+    })
+
+    runConfigResolved(plugin, root)
     await runBuildStart(plugin)
 
     expect(fixtures.loadMonospaceCollections).toHaveBeenCalledWith(expect.objectContaining({
       input: join(root, 'openapi.json'),
+      metadataInput: join(root, 'schema-metadata.json'),
       project: undefined,
       scopeId: 'test-scope',
       url: undefined,
@@ -114,6 +140,80 @@ describe('rstoreMonospace', () => {
     expect(pluginCode).not.toContain('secret-schema-token')
     expect(declarations).toContain('declare module \'virtual:rstore-monospace/schema\'')
     expect(declarations).toContain('export interface Todos')
+    expect(declarations).toContain('readonly relations: {"author":{"to":{"Profiles":{"on":{"id":"author$id"}}}}}')
+    expect(schemaCode).toContain('"author":{"to":{"Profiles":{"on":{"id":"author$id"}}}}')
+  })
+
+  it('watches the local schema inputs and reloads collections when they change', async () => {
+    const { rstoreMonospace } = await import('../src')
+    const root = await createTempRoot()
+    const input = join(root, 'openapi.json')
+    const metadataInput = join(root, 'schema-metadata.json')
+    const plugin = rstoreMonospace({
+      input: './openapi.json',
+      metadataInput: './schema-metadata.json',
+      scopeId: 'test-scope',
+    })
+
+    runConfigResolved(plugin, root)
+    const addWatchFile = vi.fn()
+    await runBuildStart(plugin, { addWatchFile })
+    expect(addWatchFile).toHaveBeenCalledWith(input)
+    expect(addWatchFile).toHaveBeenCalledWith(metadataInput)
+    expect(fixtures.loadMonospaceCollections).toHaveBeenCalledTimes(1)
+
+    const watchChange = plugin.watchChange
+    if (typeof watchChange === 'function') {
+      ;(watchChange as any).call({}, metadataInput, { event: 'update' })
+    }
+    await runLoad(plugin, 'virtual:rstore-monospace/schema')
+    expect(fixtures.loadMonospaceCollections).toHaveBeenCalledTimes(2)
+  })
+
+  it('invalidates virtual modules when the dev server sees input changes', async () => {
+    const { rstoreMonospace } = await import('../src')
+    const root = await createTempRoot()
+    const input = join(root, 'openapi.json')
+    const plugin = rstoreMonospace({
+      input: './openapi.json',
+      metadataInput: './schema-metadata.json',
+      scopeId: 'test-scope',
+    })
+
+    runConfigResolved(plugin, root)
+    await runBuildStart(plugin, { addWatchFile: vi.fn() })
+
+    const changeListeners: Array<(file: string) => void> = []
+    const invalidateModule = vi.fn()
+    const send = vi.fn()
+    const server = {
+      moduleGraph: {
+        getModuleById: vi.fn((id: string) => id.includes('schema') ? { id } : undefined),
+        invalidateModule,
+      },
+      watcher: {
+        add: vi.fn(),
+        on: vi.fn((event: string, listener: (file: string) => void) => {
+          if (event === 'change') {
+            changeListeners.push(listener)
+          }
+        }),
+      },
+      ws: { send },
+    }
+
+    const configureServer = plugin.configureServer
+    if (typeof configureServer === 'function') {
+      await (configureServer as any).call({}, server)
+    }
+
+    expect(server.watcher.add).toHaveBeenCalledWith(input)
+    changeListeners.forEach(listener => listener(input))
+
+    expect(invalidateModule).toHaveBeenCalled()
+    expect(send).toHaveBeenCalledWith({ type: 'full-reload' })
+    await runLoad(plugin, 'virtual:rstore-monospace/schema')
+    expect(fixtures.loadMonospaceCollections).toHaveBeenCalledTimes(2)
   })
 
   it('builds the virtual schema module as plain JavaScript', async () => {
@@ -168,12 +268,12 @@ function runConfigResolved(plugin: Plugin, root: string): void {
 }
 
 /**
- * Runs the Vite buildStart hook.
+ * Runs the Vite buildStart hook with an optional plugin context.
  */
-async function runBuildStart(plugin: Plugin): Promise<void> {
+async function runBuildStart(plugin: Plugin, context: Record<string, any> = { addWatchFile: vi.fn() }): Promise<void> {
   const hook = plugin.buildStart
   if (typeof hook === 'function') {
-    await (hook as any).call({} as any, {} as any)
+    await (hook as any).call(context as any, {} as any)
   }
 }
 

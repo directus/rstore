@@ -17,6 +17,21 @@ export interface RstoreMonospaceCollectionMeta {
    * Original Monospace collection name.
    */
   collection?: string
+
+  /**
+   * Generated relation metadata keyed by relation field.
+   */
+  relations?: Record<string, RstoreMonospaceRelationMeta>
+}
+
+/**
+ * Generated Monospace metadata for one relation field.
+ */
+export interface RstoreMonospaceRelationMeta {
+  /**
+   * Connect key columns accepted by Monospace `_connect` operations.
+   */
+  connectKeys?: string[]
 }
 
 declare module '@rstore/vue' {
@@ -47,15 +62,6 @@ declare module '@rstore/vue' {
 
 declare module '#app' {
   interface NuxtApp {
-    /**
-     * Monospace REST client registered by the rstore Monospace plugin.
-     */
-    $monospace: MonospaceRestClient
-  }
-}
-
-declare module 'vue' {
-  interface ComponentCustomProperties {
     /**
      * Monospace REST client registered by the rstore Monospace plugin.
      */

@@ -5,47 +5,37 @@ export interface OpenApiSchemaObject {
   /**
    * JSON schema type.
    */
-  'type'?: string | string[]
+  type?: string | string[]
 
   /**
    * JSON schema format.
    */
-  'format'?: string
+  format?: string
 
   /**
    * Object properties.
    */
-  'properties'?: Record<string, OpenApiSchema>
+  properties?: Record<string, OpenApiSchema>
 
   /**
    * Required object property names.
    */
-  'required'?: string[]
+  required?: string[]
 
   /**
    * Array item schema.
    */
-  'items'?: OpenApiSchema
+  items?: OpenApiSchema
 
   /**
    * Alternative schema list.
    */
-  'anyOf'?: OpenApiSchema[]
+  anyOf?: OpenApiSchema[]
 
   /**
    * Alternative schema list.
    */
-  'oneOf'?: OpenApiSchema[]
-
-  /**
-   * Monospace primary key marker extension.
-   */
-  'x-monospace-primary-key'?: boolean
-
-  /**
-   * Monospace primary key list extension.
-   */
-  'x-monospace-primary-keys'?: string | string[]
+  oneOf?: OpenApiSchema[]
 
   /**
    * Unknown OpenAPI extensions.

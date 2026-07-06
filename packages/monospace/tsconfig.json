@@ -14,5 +14,9 @@
   "include": [
     "src",
     "test"
+  ],
+  "exclude": [
+    // Imports @rstore/vue sources, which only type-check in their own package.
+    "test/store-integration.test.ts"
   ]
 }

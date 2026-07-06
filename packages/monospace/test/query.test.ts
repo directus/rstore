@@ -30,6 +30,33 @@ describe('createMonospaceQuery', () => {
     })
   })
 
+  it('copies deep and alias options from the top level', () => {
+    expect(createMonospaceQuery({
+      alias: { name: 'title' },
+      deep: {
+        comments: {
+          _limit: 2,
+        },
+      },
+    })).toEqual({
+      alias: { name: 'title' },
+      deep: {
+        comments: {
+          _limit: 2,
+        },
+      },
+    })
+  })
+
+  it('drops rstore function filters that only apply to the cache', () => {
+    expect(createMonospaceQuery({
+      filter: ((item: any) => item.completed) as any,
+      limit: 5,
+    })).toEqual({
+      limit: 5,
+    })
+  })
+
   it('maps rstore pageIndex/pageSize when explicit pagination is absent', () => {
     expect(createMonospaceQuery({
       pageIndex: 2,

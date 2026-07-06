@@ -1,17 +1,7 @@
-import type { PluginSetupApi } from '@rstore/shared'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMonospaceRstorePlugin } from '../src'
+import { createMockClient, createTodosCollection, runHook, setupPlugin } from './utils/plugin'
 
-const client = {
-  createMany: vi.fn(),
-  createOne: vi.fn(),
-  deleteMany: vi.fn(),
-  deleteOne: vi.fn(),
-  readMany: vi.fn(),
-  readOne: vi.fn(),
-  updateMany: vi.fn(),
-  updateOne: vi.fn(),
-}
+const client = createMockClient()
 
 beforeEach(() => {
   for (const fn of Object.values(client)) {
@@ -21,8 +11,8 @@ beforeEach(() => {
 
 describe('createMonospaceRstorePlugin', () => {
   it('handles fetches and mutations through the REST client', async () => {
-    const hooks = setupPlugin()
-    const collection = createCollection()
+    const hooks = setupPlugin(client)
+    const collection = createTodosCollection()
     client.readOne.mockResolvedValueOnce({ id: 1, title: 'Fetched' })
     client.createOne.mockResolvedValueOnce({ id: 2, title: 'Created' })
     client.updateOne.mockResolvedValueOnce({ id: 1, title: 'Updated' })
@@ -48,8 +38,8 @@ describe('createMonospaceRstorePlugin', () => {
   })
 
   it('deletes many items with a primary-key filter', async () => {
-    const hooks = setupPlugin()
-    const collection = createCollection()
+    const hooks = setupPlugin(client)
+    const collection = createTodosCollection()
     await hooks.deleteMany({
       abort: vi.fn(),
       collection,
@@ -65,12 +55,82 @@ describe('createMonospaceRstorePlugin', () => {
     })
   })
 
+  it('filters cached items with cacheFilterMany', () => {
+    const hooks = setupPlugin(client)
+    const items = [
+      { id: 1, completed: false },
+      { id: 2, completed: true },
+    ]
+    let result: unknown = items
+
+    hooks.cacheFilterMany({
+      collection: createTodosCollection(),
+      findOptions: {
+        filter: { completed: { _eq: false } },
+      },
+      getResult: () => result,
+      setResult: (value: unknown) => {
+        result = value
+      },
+    })
+
+    expect(result).toEqual([{ id: 1, completed: false }])
+  })
+
+  it('falls back to fetching when the cached filter is unsupported', () => {
+    const hooks = setupPlugin(client)
+    let firstResult: unknown = { id: 1 }
+    let manyResult: unknown = [{ id: 1 }]
+
+    hooks.cacheFilterFirst({
+      collection: createTodosCollection(),
+      findOptions: {
+        filter: { author: { name: { _eq: 'Jane' } } },
+      },
+      key: undefined,
+      readItemsFromCache: () => [{ id: 1 }],
+      getResult: () => firstResult,
+      setResult: (value: unknown) => {
+        firstResult = value
+      },
+    })
+    hooks.cacheFilterMany({
+      collection: createTodosCollection(),
+      findOptions: {
+        filter: { author: { name: { _eq: 'Jane' } } },
+      },
+      getResult: () => manyResult,
+      setResult: (value: unknown) => {
+        manyResult = value
+      },
+    })
+
+    expect(firstResult).toBeUndefined()
+    expect(manyResult).toEqual([])
+  })
+
+  it('keeps key-based cacheFilterFirst results untouched', () => {
+    const hooks = setupPlugin(client)
+    const setResult = vi.fn()
+
+    hooks.cacheFilterFirst({
+      collection: createTodosCollection(),
+      findOptions: {},
+      key: 1,
+      readItemsFromCache: () => [],
+      getResult: () => ({ id: 1 }),
+      setResult,
+    })
+
+    expect(setResult).not.toHaveBeenCalled()
+  })
+
   it('does not call Monospace when deleteMany receives no keys', async () => {
-    const hooks = setupPlugin()
+    const hooks = setupPlugin(client)
     const abort = vi.fn()
     await hooks.deleteMany({
       abort,
-      collection: createCollection(),
+      collection: createTodosCollection(),
       keys: [],
     } as any)
 
@@ -79,54 +139,3 @@ describe('createMonospaceRstorePlugin', () => {
     expect(abort).toHaveBeenCalled()
   })
 })
-
-/**
- * Creates a test plugin and captures registered rstore hooks.
- */
-function setupPlugin(): Record<string, any> {
-  const hooks: Record<string, any> = {}
-  const plugin = createMonospaceRstorePlugin({
-    client: client as any,
-    scopeId: 'test-scope',
-  })
-  plugin.setup({
-    addCollectionDefaults: vi.fn(),
-    hook: vi.fn((name, callback) => {
-      hooks[name] = callback
-      return vi.fn()
-    }),
-  } as unknown as PluginSetupApi)
-  return hooks
-}
-
-/**
- * Runs a data hook and returns the value passed to `setResult`.
- */
-async function runHook(callback: any, payload: Record<string, any>): Promise<unknown> {
-  let result: unknown
-  await callback({
-    abort: vi.fn(),
-    findOptions: {},
-    getResult: () => result,
-    setResult: (value: unknown) => {
-      result = value
-    },
-    ...payload,
-  })
-  return result
-}
-
-/**
- * Creates the resolved collection shape used by runtime plugin tests.
- */
-function createCollection(): any {
-  return {
-    name: 'Todos',
-    meta: {
-      primaryKeys: ['id'],
-      monospace: {
-        collection: 'Todos',
-      },
-    },
-  }
-}

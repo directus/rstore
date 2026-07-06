@@ -47,8 +47,9 @@ app.use(RstorePlugin, { store })
 | --- | --- |
 | `url` | Monospace API URL used for remote schema loading and runtime client code |
 | `project` | Monospace project identifier |
-| `schemaApiKey` | Build-time key for remote OpenAPI loading |
+| `schemaApiKey` | Build-time key for remote schema loading (needs `openApiSchema:read` + `dataModel:read`) |
 | `input` | Local OpenAPI JSON path, resolved from the Vite root |
+| `metadataInput` | Local schema metadata snapshot JSON path, resolved from the Vite root |
 | `runtimeApiKey` | Runtime API key emitted into generated client code |
 | `scopeId` | rstore plugin scope id, defaulting to `rstore-monospace` |
 | `primaryKeys` | Explicit primary key overrides by collection name |
@@ -60,17 +61,18 @@ app.use(RstorePlugin, { store })
 - `virtual:rstore-monospace/schema` exports the generated rstore schema.
 - `virtual:rstore-monospace/plugin` exports the Monospace REST client and rstore plugin.
 
-## Local OpenAPI Mode
+## Local Schema Mode
 
-Use `input` when the schema is checked into the project or generated separately:
+Use `input` plus `metadataInput` when the schema is checked into the project or generated separately. The metadata snapshot holds the raw items of the Monospace system schema meta collections keyed by collection name:
 
 ```ts
 rstoreMonospace({
-  url: 'https://your-monospace-instance.com',
-  project: 'your-project',
   input: './openapi.json',
+  metadataInput: './schema-metadata.json',
 })
 ```
+
+With only one local file, the other schema source is loaded remotely and `url`/`project` are required.
 
 ## Guardrails
 

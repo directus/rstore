@@ -112,6 +112,28 @@ describe('createMonospaceRestClient', () => {
     expect(fetchMock).not.toHaveBeenCalled()
   })
 
+  it('maps 422 responses to validation errors and surfaces error details', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({
+      message: 'Failed to execute query',
+      code: '4009',
+      source: { message: 'Query parsing failed' },
+      meta: { path: [] },
+    }, 422))
+    const client = createMonospaceRestClient({
+      url: 'https://example.monospace.io',
+      project: 'blog',
+      fetch: fetchMock,
+    })
+
+    const error = await client.readOne('Todos', 1).then(() => null, e => e)
+    expect(error).toBeInstanceOf(MonospaceValidationError)
+    expect(error.message).toBe('Failed to execute query')
+    expect(error.status).toBe(422)
+    expect(error.code).toBe('4009')
+    expect(error.source).toEqual({ message: 'Query parsing failed' })
+    expect(error.meta).toEqual({ path: [] })
+  })
+
   it.each([
     [400, MonospaceValidationError],
     [401, MonospaceAuthError],
