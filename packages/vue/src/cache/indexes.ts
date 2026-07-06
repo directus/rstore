@@ -45,7 +45,10 @@ export function updateItemIndexes<TCollection extends Collection>(
       }
     }
 
-    const newValues = indexFields.map(f => newData[f] ?? previousData?.[f])
+    // Fields absent from the partial write keep their previous value, but an
+    // explicit `null` write must not fall back to it: a nulled join field
+    // removes the item from the index bucket instead of re-adding it.
+    const newValues = indexFields.map(f => f in newData ? newData[f] : previousData?.[f])
     if (newValues.every(v => v != null)) {
       const newValue = newValues.join(':')
       let existingKeys = index.get(newValue)

@@ -368,6 +368,43 @@ describe('cache', () => {
     expect(state.collections.RelatedCollection[0]).toEqual({ id: 0, name: 'Related Item' })
   })
 
+  it('should remove items from index buckets when an indexed field is written as null', async () => {
+    const store = await createStore({
+      schema: [
+        {
+          name: 'Author',
+          relations: {
+            posts: { to: { Post: { on: { authorId: 'id' } } }, many: true },
+          },
+        },
+        { name: 'Post' },
+      ],
+      plugins: [],
+    })
+    const cache = store.$cache
+    const postCollection = store.$collections.find(collection => collection.name === 'Post')!
+
+    cache.writeItem({ collection: postCollection, key: 1, item: { id: 1, title: 'Post', authorId: 'a1' } })
+    expect(readPostsByAuthor()).toEqual([1])
+
+    // A partial write without the indexed field keeps the previous bucket.
+    cache.writeItem({ collection: postCollection, key: 1, item: { title: 'Renamed' } })
+    expect(readPostsByAuthor()).toEqual([1])
+
+    // An explicit null must remove the item from the bucket, not fall back
+    // to the previous value.
+    cache.writeItem({ collection: postCollection, key: 1, item: { authorId: null } })
+    expect(readPostsByAuthor()).toEqual([])
+
+    function readPostsByAuthor() {
+      return cache.readItems({
+        collection: postCollection,
+        indexKey: 'authorId',
+        indexValue: 'a1',
+      }).map(item => item.id)
+    }
+  })
+
   it('should mark a marker when writing items', async () => {
     const store = await createStore({
       schema: [{ name: 'TestCollection' }],
