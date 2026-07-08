@@ -1,6 +1,57 @@
 import { describe, expect, it } from 'vitest'
 import { applyTextChanges, createFieldTimestamps, diffFields, diffText, fieldValuesEqual, mergeItemFields, mergeText, rebaseTextPosition, rebaseTextRange, touchFields } from '../src/crdt'
 
+/** Supported Temporal object tags used by the equality regression tests. */
+type TemporalTestTag = 'Temporal.PlainDateTime' | 'Temporal.ZonedDateTime'
+
+/**
+ * Test double for Temporal objects whose data lives outside enumerable keys.
+ */
+class TemporalTestValue {
+  /** Temporal brand exposed through `Symbol.toStringTag`. */
+  readonly #tag: TemporalTestTag
+  /** Serialized value compared by `equals()`. */
+  readonly #value: string
+
+  /**
+   * Create a Temporal-like test value.
+   */
+  constructor(tag: TemporalTestTag, value: string) {
+    this.#tag = tag
+    this.#value = value
+  }
+
+  /**
+   * Return the branded object tag used by native and polyfilled Temporal values.
+   */
+  get [Symbol.toStringTag]() {
+    return this.#tag
+  }
+
+  /**
+   * Compare values through the same public protocol exposed by Temporal.
+   */
+  equals(other: unknown) {
+    return other instanceof TemporalTestValue
+      && other.#tag === this.#tag
+      && other.#value === this.#value
+  }
+}
+
+/**
+ * Create a PlainDateTime-shaped test value.
+ */
+function createPlainDateTime(value: string) {
+  return new TemporalTestValue('Temporal.PlainDateTime', value)
+}
+
+/**
+ * Create a ZonedDateTime-shaped test value.
+ */
+function createZonedDateTime(value: string) {
+  return new TemporalTestValue('Temporal.ZonedDateTime', value)
+}
+
 describe('mergeItemFields', () => {
   it('should keep local values when local timestamps are newer', () => {
     const local = { title: 'Local Title', description: 'Local Desc' }
@@ -268,6 +319,23 @@ describe('fieldValuesEqual', () => {
     expect(fieldValuesEqual(new Date(100), new Date(100))).toBe(true)
     expect(fieldValuesEqual(new Date(100), new Date(200))).toBe(false)
     expect(fieldValuesEqual(new Date('invalid'), new Date('invalid'))).toBe(true)
+  })
+
+  it('should compare Temporal-like values by their public equality protocol', () => {
+    const plainInitial = createPlainDateTime('2026-07-07T22:25')
+    const plainEqual = createPlainDateTime('2026-07-07T22:25')
+    const plainChanged = createPlainDateTime('2026-07-07T22:30')
+    const zonedInitial = createZonedDateTime('2026-07-07T22:25+02:00[Europe/Paris]')
+    const zonedEqual = createZonedDateTime('2026-07-07T22:25+02:00[Europe/Paris]')
+    const zonedChanged = createZonedDateTime('2026-07-07T22:30+02:00[Europe/Paris]')
+
+    expect(Object.keys(plainInitial)).toEqual([])
+    expect(fieldValuesEqual(plainInitial, plainEqual)).toBe(true)
+    expect(fieldValuesEqual(plainInitial, plainChanged)).toBe(false)
+    expect(fieldValuesEqual(zonedInitial, zonedEqual)).toBe(true)
+    expect(fieldValuesEqual(zonedInitial, zonedChanged)).toBe(false)
+    expect(fieldValuesEqual(plainInitial, zonedInitial)).toBe(false)
+    expect(diffFields({ publishedAt: plainInitial }, { publishedAt: plainChanged })).toContain('publishedAt')
   })
 
   it('should compare Map by entries', () => {

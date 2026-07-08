@@ -1,10 +1,34 @@
 const MAX_DEEP_EQUAL_DEPTH = 32
 
 /**
+ * Minimal public protocol shared by native and polyfilled Temporal values.
+ */
+interface TemporalComparable {
+  /** Compare this Temporal value with another value. */
+  equals: (other: unknown) => boolean
+}
+
+/**
  * Compare two field values for structural equality.
  */
 export function fieldValuesEqual(a: any, b: any): boolean {
   return deepEqual(a, b, new WeakMap(), 0)
+}
+
+/**
+ * Return the Temporal object tag for native or polyfilled Temporal values.
+ */
+function getTemporalObjectTag(value: unknown): string | undefined {
+  if (!value || typeof value !== 'object') {
+    return undefined
+  }
+
+  const tag = Object.prototype.toString.call(value)
+  const equals = (value as { equals?: unknown }).equals
+
+  return tag.startsWith('[object Temporal.') && typeof equals === 'function'
+    ? tag
+    : undefined
 }
 
 /**
@@ -73,6 +97,21 @@ function deepEqual(a: any, b: any, visited: WeakMap<object, WeakSet<object>>, de
       }
     }
     return true
+  }
+
+  const aTemporalTag = getTemporalObjectTag(a)
+  const bTemporalTag = getTemporalObjectTag(b)
+  if (aTemporalTag || bTemporalTag) {
+    if (!aTemporalTag || !bTemporalTag || aTemporalTag !== bTemporalTag) {
+      return false
+    }
+
+    try {
+      return (a as TemporalComparable).equals(b)
+    }
+    catch {
+      return false
+    }
   }
 
   const aKeys = Object.keys(a)
