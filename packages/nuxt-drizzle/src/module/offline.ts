@@ -28,7 +28,7 @@ export function setupOffline({
     getContents: () => {
       return `import { createOfflinePlugin } from '@rstore/offline'
 export default createOfflinePlugin({
-  filterCollections: ${offlineOptions.filterCollection ? offlineOptions.filterCollection.toString() : 'undefined'},
+  filterCollection: ${offlineOptions.filterCollection ? offlineOptions.filterCollection.toString() : 'undefined'},
   ...${JSON.stringify({
     ...offlineOptions,
   }, null, 2)}
