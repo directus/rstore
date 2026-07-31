@@ -17,7 +17,9 @@ await q.refresh()
 
 ## Behavior
 
-- Exposes `data`, `loading`, `error`, `refresh`, `pages`, `mainPage`, `fetchMore`, `getPage`, `meta`.
+- Exposes `data`, `loading`, `error`, `foreground`, `background`, `refresh`, `pages`, `mainPage`, `fetchMore`, `getPage`, `meta`.
+- `loading` is `foreground.loading || (background.loading && no data)`; `error` is `foreground.error ?? background.error`.
+- `foreground` covers blocking fetches (initial load, `refresh`, `fetchMore`), `background` covers the silent `cache-and-fetch` revalidation. Each exposes `loading`, `error`, `completed`, `lastUpdated` and a never-rejecting `promise`. Pages expose the same pair.
 - `resultMode: 'computed'` reads the result from the cache using the query options.
 - `resultMode: 'responseRefs'` preserves backend response order by mapping stored refs back to cached items.
 

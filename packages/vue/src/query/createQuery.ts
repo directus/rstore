@@ -9,6 +9,7 @@ import { onWindowFocus } from '../swr'
 import { useQueryTracking } from '../tracking'
 import { loadPage } from './load'
 import { createPage, getPageId, getPageOptions } from './page'
+import { createFetchState, getFetchStateError, isFetchStateLoading, toQueryFetchState } from './state'
 
 /**
  * Create a reactive query object.
@@ -28,11 +29,23 @@ export function createQuery<
     ? useQueryTracking({ store: ctx.store, result: ctx.result, cached: ctx.cached })
     : null
 
-  const loading = computed(() => ctx.loadingCount.value > 0)
+  // `data` is read by the `loading` aggregate, so it has to exist first.
+  const data = ctx.queryTracking?.filteredCached ?? ctx.cached
+  const loading = computed(() => isFetchStateLoading(ctx.foreground, ctx.background, () => data.value))
+  // Writable so `query.error.value = null` keeps dismissing the error like it used to.
+  const error = computed({
+    get: () => getFetchStateError(ctx.foreground, ctx.background),
+    set: (value: Error | null) => {
+      ctx.foreground.error.value = value
+      ctx.background.error.value = null
+    },
+  })
   const returnObject = ctx.returnObject = {
-    data: ctx.queryTracking?.filteredCached ?? ctx.cached,
+    data,
     loading,
-    error: ctx.error,
+    error,
+    foreground: toQueryFetchState(ctx.foreground),
+    background: toQueryFetchState(ctx.background),
     refresh,
     pages: ctx.pages,
     mainPage: ctx.mainPage,
@@ -134,8 +147,8 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     resultMode: initialResolvedOptions.resultMode,
     queryTrackingEnabled,
     pages: ref<any[]>([]),
-    loadingCount: ref(0),
-    error: ref<Error | null>(null),
+    foreground: createFetchState(),
+    background: createFetchState(),
     mainPage: null as any,
     mainPagePromise: null as Promise<unknown> | null,
     result: null as any,

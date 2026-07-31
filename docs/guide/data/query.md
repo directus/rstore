@@ -33,9 +33,11 @@ The `query` and `liveQuery` composables return an object with the following prop
 
 - `data`: a ref that contains the data.
 
-- `loading`: a ref that indicates whether the data is being fetched.
+- `loading`: a ref that indicates whether the user is waiting on data <Badge text="Changed in v0.9" type="warning" />. It is `true` while a blocking fetch is running, and also while a background refresh is running if there is nothing to display yet. See [Foreground and background fetch state](#foreground-and-background-fetch-state).
 
-- `error`: a ref that contains the error if the data could not be fetched.
+- `error`: a ref that contains the error if the data could not be fetched. A blocking failure takes precedence over a background one.
+
+- `foreground` / `background`: the state of each kind of fetch, to tell a first load apart from a silent refresh <Badge text="New in v0.9" />.
 
 - `refresh`: a function that can be called to refresh the data.
 
@@ -57,6 +59,61 @@ const store = useStore()
 // Plays nice with Nuxt SSR!
 const { data: todos } = await store.Todo.query(q => q.many())
 </script>
+```
+
+### Foreground and background fetch state <Badge text="New in v0.9" />
+
+A query fetches data in two ways, and each one has its own state object:
+
+- `foreground`: blocking fetches - the initial load, `refresh()`, `fetchMore()`, the window focus auto refresh, a cache reset and a live query reconnect.
+- `background`: the silent revalidation half of the [`cache-and-fetch`](#possible-fetch-policies) fetch policy. No other policy uses it.
+
+Both objects expose the same properties:
+
+| Property | Description |
+| --- | --- |
+| `loading` | Whether at least one fetch of that kind is in flight. |
+| `error` | Error of the latest settled fetch of that kind. |
+| `completed` | Whether a fetch of that kind settled and none is in flight. |
+| `lastUpdated` | `Date.now()` of the last *successful* fetch of that kind, or `null`. |
+| `promise` | Settles when the in-flight fetches of that kind are done. It never rejects - read `error` instead. |
+
+The top-level `loading` and `error` are aggregates over both, so most components don't need to think about this:
+
+```ts
+// `hasNothingToDisplay` is `true` when `data` is `null` or an empty array
+loading = foreground.loading || (background.loading && hasNothingToDisplay)
+error = foreground.error ?? background.error
+```
+
+Reach for the individual states when you want to tell the two apart - typically to show a discreet indicator while `cache-and-fetch` revalidates data that is already on screen:
+
+```vue
+<script setup>
+const { data: todos, loading, background } = await store.Todo.query(q => q.many({
+  fetchPolicy: 'cache-and-fetch',
+}))
+</script>
+
+<template>
+  <!-- Only when there is nothing to look at yet -->
+  <Spinner v-if="loading" />
+  <template v-else>
+    <!-- Discreet hint that the list is being refreshed in the background -->
+    <RefreshIndicator v-if="background.loading" />
+    <TodoList :todos="todos" />
+  </template>
+</template>
+```
+
+You can also wait for the background fetch to land:
+
+```ts
+await query.background.promise
+
+if (query.background.error) {
+  // The silent refresh failed, the displayed data is stale
+}
 ```
 
 ### Query first
@@ -264,9 +321,14 @@ watch(currentPage, (page) => {
 You can then access some useful properties of the `currentPage`:
 
 - `page.data`: the items for the page.
-- `page.loading`: whether the page is being fetched.
-- `page.completed`: whether the latest page fetch has completed.
+- `page.loading`: whether the page has nothing to display and something is being fetched for it.
+- `page.completed`: whether the latest blocking page fetch has completed.
 - `page.error`: the error if the page could not be fetched.
+- `page.foreground` / `page.background`: the same [fetch state objects](#foreground-and-background-fetch-state) as the query, scoped to this page <Badge text="New in v0.9" />.
+
+::: tip
+`fetchMore` is a blocking fetch, so the query-level `loading` turns `true` while an additional page loads. Use `mainPage.loading` or the page-scoped state above if you don't want to dim the already displayed items.
+:::
 
 ```vue
 <template>
@@ -473,7 +535,7 @@ const { data: todos } = store.Todo.query(q => q.many({
 ### Possible fetch policies
 
 * `cache-first` (default) means that the query will first try to fetch the data from the cache. If the data is not found in the cache, it will fetch the data from the adapter plugins.
-* `cache-and-fetch` means that the query will first try to fetch the data from the cache. It will then fetch the data from the adapter plugins and update the cache.
+* `cache-and-fetch` means that the query will first try to fetch the data from the cache. It will then fetch the data from the adapter plugins **in the background** and update the cache. Because cached data is displayed right away, `loading` stays `false` during that background fetch unless there is nothing cached to show - use `background.loading` for a discreet refresh indicator (see [Foreground and background fetch state](#foreground-and-background-fetch-state)).
 * `fetch-only` means that the query will only fetch the data from the adapter plugins. The data will be stored in the cache when the query is resolved.
 * `cache-only` means that the query will only fetch the data from the cache.
 * `no-cache` means that the query will not use the cache and only fetch the data from the adapter plugins. No data will be stored in the cache.

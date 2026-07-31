@@ -1,7 +1,7 @@
 import type { CustomHookMeta, FindOptions } from '@rstore/shared'
 import type { VueQueryPage } from './types'
 import { pickNonSpecialProps } from '@rstore/shared'
-import { setPageResult } from './page'
+import { isCurrentPageRequest, setPageResult } from './page'
 
 /**
  * Load a query page from cache or fetcher.
@@ -11,18 +11,21 @@ export async function loadPage(
   page: VueQueryPage<any, any, any, any, any>,
   forceFetch: boolean,
 ) {
-  page.completed = false
+  page._foreground.markIncomplete()
   if (ctx.isDisabled()) {
     return { page }
   }
 
-  ctx.loadingCount.value++
-  ctx.error.value = null
-  page.loading = true
-  page.error = null
+  ctx.foreground.start()
+  page._foreground.start()
+  // A new blocking load is authoritative, so it also drops any stale background failure.
+  ctx.background.clearError()
+  page._background.clearError()
+
   const savedPageRequestId = page.requestId
   const newQueryTracking = ctx.queryTracking?.createTrackingObject()
   let shouldHandleQueryTracking = true
+  let caughtError: Error | null = null
 
   try {
     const finalOptions = await resolvePageOptions(ctx, page, forceFetch, savedPageRequestId)
@@ -31,16 +34,15 @@ export async function loadPage(
     }
   }
   catch (e: any) {
-    ctx.error.value = e
-    page.error = e
-    console.error(e)
+    caughtError = e
   }
   finally {
-    ctx.loadingCount.value--
-    if (page.requestId === savedPageRequestId && ctx.pages.value.includes(page)) {
-      page.completed = true
+    const current = isCurrentPageRequest(ctx, page, savedPageRequestId)
+    ctx.foreground.settle({ error: caughtError, current })
+    page._foreground.settle({ error: caughtError, current })
+    if (caughtError && current) {
+      console.error(caughtError)
     }
-    page.loading = false
   }
   return { page }
 
@@ -110,10 +112,26 @@ function fetchCacheAndFetchBackground(
     ...ctx.meta.value,
     $queryTracking: ctx.queryTrackingEnabled ? newQueryTracking : undefined,
   }
+
+  ctx.background.start()
+  page._background.start()
+
+  /**
+   * Publish the outcome on the background lane only, so a failed silent refresh stays
+   * distinguishable from a failed blocking load.
+   */
+  function finish(error: Error | null) {
+    const current = isCurrentPageRequest(ctx, page, savedPageRequestId)
+    ctx.background.settle({ error, current })
+    page._background.settle({ error, current })
+    if (error && current) {
+      console.error(error)
+    }
+  }
+
   // Wrapped in an async function so a rejection coming from the fetch itself and one coming
-  // from the result handling (`setPageResult`, `updateQueryMeta`) are both caught below.
-  // The background fetch deliberately doesn't touch `ctx.loadingCount` / `page.loading`:
-  // `cache-and-fetch` displays cached data right away and refreshes silently.
+  // from the result handling (`setPageResult`, `updateQueryMeta`) are both handled below.
+  // `then(onFulfilled, onRejected)` keeps the chain from ever rejecting.
   void (async () => {
     const backgroundResult = await ctx.fetchMethod({ ...finalOptions, fetchPolicy: 'fetch-only' }, fetchMeta)
     const { valid } = await setPageResult(ctx, page, savedPageRequestId, backgroundResult)
@@ -123,16 +141,7 @@ function fetchCacheAndFetchBackground(
     if (ctx.queryTracking && newQueryTracking) {
       ctx.queryTracking.handleQueryTracking(page.id, newQueryTracking, undefined, finalOptions.include, page.main)
     }
-  })().catch((e: any) => {
-    // Mirror the staleness check done by `setPageResult`: an outdated failed request
-    // must not overwrite the state of a newer one.
-    if (page.requestId !== savedPageRequestId || !ctx.pages.value.includes(page)) {
-      return
-    }
-    ctx.error.value = e
-    page.error = e
-    console.error(e)
-  })
+  })().then(() => finish(null), (e: any) => finish(e))
 }
 
 /**

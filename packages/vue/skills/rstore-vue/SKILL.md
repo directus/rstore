@@ -72,7 +72,7 @@ app.use(RstorePlugin, { store })
 | --- | --- |
 | `peekFirst` / `peekMany` | Cache-only reads for computed/reactive derivations |
 | `findFirst` / `findMany` | One-shot async reads without long-lived query refs |
-| `query` | Reactive ref-based queries (`data`, `loading`, `error`, `refresh`) |
+| `query` | Reactive ref-based queries (`data`, `loading`, `error`, `foreground`, `background`, `refresh`) |
 | `liveQuery` | Query + subscription lifecycle for realtime adapters |
 | `fetchMore` | Adds page results to sparse `pages` and merged `data` |
 | `createForm` / `updateForm` | Preferred mutation UX; `updateForm` can prefetch item and send changed fields only |

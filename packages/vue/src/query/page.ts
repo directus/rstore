@@ -2,6 +2,7 @@ import type { FindOptions } from '@rstore/shared'
 import type { VueQueryPage, VueQueryPageOptions } from './types'
 import { isKeyDefined } from '@rstore/core'
 import { shallowReactive, toValue } from 'vue'
+import { createFetchState, getFetchStateError, isFetchStateLoading, toPageFetchState } from './state'
 
 /**
  * Create a query page object.
@@ -14,21 +15,47 @@ export function createPage(
   const index = optionsExtension.pageIndex != null ? optionsExtension.pageIndex : ctx.pages.value.length
   const id = getPageId(ctx, index)
   const cached = ctx.cache._private.state.pageRefs.get(id)
+  const foreground = createFetchState()
+  const background = createFetchState()
   const page = shallowReactive({
     id,
     requestId: crypto.randomUUID(),
     main,
     index,
-    loading: false,
-    completed: false,
-    error: null,
+    // Flat fields are derived from the lanes so there is a single source of truth.
+    // Return types are explicit because `loading` reads `data`, which reads `page` back.
+    get loading(): boolean {
+      return isFetchStateLoading(foreground, background, () => page.data)
+    },
+    get completed() {
+      return foreground.completed.value
+    },
+    get error() {
+      return getFetchStateError(foreground, background)
+    },
+    foreground: toPageFetchState(foreground),
+    background: toPageFetchState(background),
+    _foreground: foreground,
+    _background: background,
     options: optionsExtension,
     rawData: cached ?? { type: 'data', value: toValue(ctx.defaultValue) },
-    get data() {
+    get data(): any {
       return readPageData(ctx, page)
     },
   })
-  return page as VueQueryPage<any, any, any, any, any>
+  return page as unknown as VueQueryPage<any, any, any, any, any>
+}
+
+/**
+ * Whether a fetch started with `savedPageRequestId` is still the current one for this page.
+ * A superseded request must not publish its result, error or completion.
+ */
+export function isCurrentPageRequest(
+  ctx: any,
+  page: VueQueryPage<any, any, any, any, any>,
+  savedPageRequestId: string,
+): boolean {
+  return page.requestId === savedPageRequestId && ctx.pages.value.includes(page)
 }
 
 /**
@@ -57,7 +84,7 @@ export async function setPageResult(
   savedPageRequestId: string,
   pageResult: any,
 ): Promise<{ valid: boolean }> {
-  if (page.requestId !== savedPageRequestId || !ctx.pages.value.includes(page)) {
+  if (!isCurrentPageRequest(ctx, page, savedPageRequestId)) {
     return { valid: false }
   }
   if (!page.main && ctx.mainPagePromise) {
