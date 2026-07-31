@@ -1,6 +1,7 @@
 import { until } from '@vueuse/core'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
+import { trackUnhandledRejections } from '../../core/test/utils/unhandledRejections'
 import { createStore } from '../src/store'
 
 describe('query', () => {
@@ -257,6 +258,117 @@ describe('query', () => {
       await Promise.resolve()
 
       expect((query.meta.value as any).meow).toBe('waf')
+    })
+
+    it('should surface background fetch errors', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const rejections = trackUnhandledRejections()
+      try {
+        const store = await createStore({
+          schema: [
+            {
+              name: 'messages',
+              hooks: {
+                fetchMany: () => {
+                  throw new Error('Fetch failed')
+                },
+              },
+            },
+          ],
+          plugins: [],
+        })
+
+        const query = await store.messages.query(q => q.many({
+          fetchPolicy: 'cache-and-fetch',
+        }))
+
+        await until(() => query.error.value).toBeTruthy()
+
+        expect(query.error.value?.message).toBe('Fetch failed')
+        expect(query.mainPage.error?.message).toBe('Fetch failed')
+        expect(query.loading.value).toBe(false)
+        expect(await rejections.flush()).toEqual([])
+      }
+      finally {
+        rejections.stop()
+        consoleError.mockRestore()
+      }
+    })
+
+    it('should ignore background fetch errors from stale requests', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const rejections = trackUnhandledRejections()
+      try {
+        let rejectFetch: (error: Error) => void
+        const store = await createStore({
+          schema: [
+            {
+              name: 'messages',
+              hooks: {
+                fetchMany: () => new Promise<any[]>((_resolve, reject) => {
+                  rejectFetch = reject
+                }),
+              },
+            },
+          ],
+          plugins: [],
+        })
+
+        const query = await store.messages.query(q => q.many({
+          fetchPolicy: 'cache-and-fetch',
+        }))
+
+        // Simulate a newer request starting before the background fetch settles
+        query.mainPage.requestId = crypto.randomUUID()
+        rejectFetch!(new Error('Fetch failed'))
+
+        expect(await rejections.flush()).toEqual([])
+        expect(query.error.value).toBe(null)
+        expect(query.mainPage.error).toBe(null)
+      }
+      finally {
+        rejections.stop()
+        consoleError.mockRestore()
+      }
+    })
+
+    it('should clear the background fetch error after a successful refresh', async () => {
+      const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {})
+      try {
+        let shouldFail = true
+        const store = await createStore({
+          schema: [
+            {
+              name: 'messages',
+              hooks: {
+                fetchMany: () => {
+                  if (shouldFail) {
+                    throw new Error('Fetch failed')
+                  }
+                  return [{ id: '1', text: 'hello' }]
+                },
+              },
+            },
+          ],
+          plugins: [],
+        })
+
+        const query = await store.messages.query(q => q.many({
+          fetchPolicy: 'cache-and-fetch',
+        }))
+
+        await until(() => query.error.value).toBeTruthy()
+
+        shouldFail = false
+        await query.refresh()
+
+        expect(query.error.value).toBe(null)
+        expect(query.mainPage.error).toBe(null)
+        expect(query.data.value?.[0]?.text).toBe('hello')
+      }
+      finally {
+        consoleError.mockRestore()
+      }
     })
   })
 

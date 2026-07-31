@@ -2,6 +2,7 @@ import type { Collection, CollectionDefaults, ResolvedCollection, StoreCore, Wra
 import { createHooks } from '@rstore/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { findMany } from '../../src/query/findMany'
+import { trackUnhandledRejections } from '../utils/unhandledRejections'
 
 interface TestCollectionDefaults extends CollectionDefaults {
   name: string
@@ -149,6 +150,35 @@ describe('findMany', () => {
       } }],
       marker: expect.any(String),
     }))
+  })
+
+  it('should not emit an unhandled rejection if the cache-and-fetch background fetch fails', async () => {
+    mockStore.$hooks.hook('fetchMany', () => {
+      throw new Error('Fetch failed')
+    })
+
+    const rejections = trackUnhandledRejections()
+    try {
+      // The caller deliberately ignores `fetchPromise` here
+      const result = await findMany({
+        store: mockStore,
+        collection,
+        findOptions: {
+          params: {
+            email: '42',
+          },
+          fetchPolicy: 'cache-and-fetch',
+        },
+      })
+
+      expect(await rejections.flush()).toEqual([])
+
+      // The failure is still observable by callers that await the promise
+      await expect(result.fetchPromise).rejects.toThrow('Fetch failed')
+    }
+    finally {
+      rejections.stop()
+    }
   })
 
   it('should not write items to cache if fetch policy is no-cache', async () => {

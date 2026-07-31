@@ -110,7 +110,12 @@ function fetchCacheAndFetchBackground(
     ...ctx.meta.value,
     $queryTracking: ctx.queryTrackingEnabled ? newQueryTracking : undefined,
   }
-  ctx.fetchMethod({ ...finalOptions, fetchPolicy: 'fetch-only' }, fetchMeta).then(async (backgroundResult: any) => {
+  // Wrapped in an async function so a rejection coming from the fetch itself and one coming
+  // from the result handling (`setPageResult`, `updateQueryMeta`) are both caught below.
+  // The background fetch deliberately doesn't touch `ctx.loadingCount` / `page.loading`:
+  // `cache-and-fetch` displays cached data right away and refreshes silently.
+  void (async () => {
+    const backgroundResult = await ctx.fetchMethod({ ...finalOptions, fetchPolicy: 'fetch-only' }, fetchMeta)
     const { valid } = await setPageResult(ctx, page, savedPageRequestId, backgroundResult)
     if (!valid)
       return
@@ -118,6 +123,15 @@ function fetchCacheAndFetchBackground(
     if (ctx.queryTracking && newQueryTracking) {
       ctx.queryTracking.handleQueryTracking(page.id, newQueryTracking, undefined, finalOptions.include, page.main)
     }
+  })().catch((e: any) => {
+    // Mirror the staleness check done by `setPageResult`: an outdated failed request
+    // must not overwrite the state of a newer one.
+    if (page.requestId !== savedPageRequestId || !ctx.pages.value.includes(page)) {
+      return
+    }
+    ctx.error.value = e
+    page.error = e
+    console.error(e)
   })
 }
 

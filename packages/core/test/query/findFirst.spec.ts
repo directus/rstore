@@ -3,6 +3,7 @@ import type { MockInstance } from 'vitest'
 import { createHooks } from '@rstore/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { findFirst } from '../../src/query/findFirst'
+import { trackUnhandledRejections } from '../utils/unhandledRejections'
 
 interface TestCollectionDefaults extends CollectionDefaults {
   name: string
@@ -134,6 +135,33 @@ describe('findFirst', () => {
         id: '42',
       },
     }))
+  })
+
+  it('should not emit an unhandled rejection if the cache-and-fetch background fetch fails', async () => {
+    mockStore.$hooks.hook('fetchFirst', () => {
+      throw new Error('Fetch failed')
+    })
+
+    const rejections = trackUnhandledRejections()
+    try {
+      // The caller deliberately ignores `fetchPromise` here
+      const result = await findFirst({
+        store: mockStore,
+        collection,
+        findOptions: {
+          key: '42',
+          fetchPolicy: 'cache-and-fetch',
+        },
+      })
+
+      expect(await rejections.flush()).toEqual([])
+
+      // The failure is still observable by callers that await the promise
+      await expect(result.fetchPromise).rejects.toThrow('Fetch failed')
+    }
+    finally {
+      rejections.stop()
+    }
   })
 
   it('should not write item to cache if fetch policy is no-cache', async () => {

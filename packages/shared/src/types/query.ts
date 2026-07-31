@@ -235,6 +235,10 @@ export interface QueryResult<TResult> {
   /**
    * Promise that resolves when the (optional) fetch is complete.
    * Useful when fetchPolicy is `cache-and-fetch` to wait for the background fetch to complete.
+   *
+   * It rejects if the fetch failed. With `cache-and-fetch` the fetch happens in the background:
+   * rstore already marks the rejection as handled, so ignoring this promise is safe but the
+   * failure is then silent. Await it (or attach a `catch`) to observe the error.
    */
   fetchPromise?: Promise<void>
 }

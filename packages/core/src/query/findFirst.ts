@@ -178,6 +178,12 @@ async function _findFirst<
     if (fetchPolicy !== 'cache-and-fetch') {
       await fetchPromise
     }
+    else {
+      // Background fetch: callers may observe `fetchPromise` but are not required to.
+      // Attaching a handler marks the rejection as handled so an ignored failure doesn't
+      // become an unhandled rejection - the returned promise still rejects when awaited.
+      fetchPromise.catch(() => {})
+    }
   }
   else if (meta.$queryTracking) {
     meta.$queryTracking.skipped = true
