@@ -45,6 +45,7 @@ describe('isMultiplayerPeerStrict', () => {
   it('accepts a fully populated peer', () => {
     expect(isMultiplayerPeerStrict({
       id: 'u',
+      clientId: 'c',
       name: 'A',
       color: '#abc',
       lastSeen: 100,
@@ -55,6 +56,7 @@ describe('isMultiplayerPeerStrict', () => {
   it('rejects peer with bad cursor shape', () => {
     expect(isMultiplayerPeerStrict({
       id: 'u',
+      clientId: 'c',
       name: 'A',
       color: '#abc',
       lastSeen: 100,
@@ -62,7 +64,10 @@ describe('isMultiplayerPeerStrict', () => {
     })).toBe(false)
   })
   it('rejects peer with missing lastSeen', () => {
-    expect(isMultiplayerPeerStrict({ id: 'u', name: 'A', color: '#abc' })).toBe(false)
+    expect(isMultiplayerPeerStrict({ id: 'u', clientId: 'c', name: 'A', color: '#abc' })).toBe(false)
+  })
+  it('rejects peer with missing clientId', () => {
+    expect(isMultiplayerPeerStrict({ id: 'u', name: 'A', color: '#abc', lastSeen: 100 })).toBe(false)
   })
 })
 
@@ -72,6 +77,7 @@ describe('isMultiplayerMessage', () => {
       type: 'multiplayer:update',
       roomId: 'r',
       userId: 'u',
+      clientId: 'c',
       data: {},
     })).toBe(true)
   })
@@ -79,18 +85,33 @@ describe('isMultiplayerMessage', () => {
     expect(isMultiplayerMessage({
       type: 'multiplayer:presence',
       roomId: 'r',
+      clientId: 'c',
       user: { id: 'u', name: 'A', color: '#abc' },
       cursor: { start: 0, end: 1, direction: 'forward' },
     })).toBe(true)
   })
   it('accepts leave', () => {
-    expect(isMultiplayerMessage({ type: 'multiplayer:leave', roomId: 'r', userId: 'u' })).toBe(true)
+    expect(isMultiplayerMessage({ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' })).toBe(true)
   })
   it('rejects unknown type', () => {
-    expect(isMultiplayerMessage({ type: 'multiplayer:dance', roomId: 'r' })).toBe(false)
+    expect(isMultiplayerMessage({ type: 'multiplayer:dance', roomId: 'r', clientId: 'c' })).toBe(false)
   })
   it('rejects missing userId on update', () => {
-    expect(isMultiplayerMessage({ type: 'multiplayer:update', roomId: 'r', data: {} })).toBe(false)
+    expect(isMultiplayerMessage({ type: 'multiplayer:update', roomId: 'r', clientId: 'c', data: {} })).toBe(false)
+  })
+  it('rejects missing clientId', () => {
+    expect(isMultiplayerMessage({ type: 'multiplayer:leave', roomId: 'r', userId: 'u' })).toBe(false)
+  })
+  it('rejects update whose data is not a plain object', () => {
+    for (const data of [null, [], 'string', 42, true]) {
+      expect(isMultiplayerMessage({
+        type: 'multiplayer:update',
+        roomId: 'r',
+        userId: 'u',
+        clientId: 'c',
+        data,
+      })).toBe(false)
+    }
   })
 })
 
@@ -100,6 +121,7 @@ describe('validateMultiplayerMessage', () => {
       type: 'multiplayer:leave',
       roomId: 'r',
       userId: 'u',
+      clientId: 'c',
     }))
     expect(out?.type).toBe('multiplayer:leave')
   })

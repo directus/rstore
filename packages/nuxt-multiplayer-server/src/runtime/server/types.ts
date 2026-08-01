@@ -21,12 +21,16 @@ export interface MultiplayerUpdateMessage<TUpdate = Record<string, any>> {
   roomId: string
   data: TUpdate
   userId: string
+  /** Connection-scoped id — one per channel instance (browser tab). */
+  clientId: string
 }
 
 export interface MultiplayerPresenceMessage<TField extends string = string> {
   type: 'multiplayer:presence'
   roomId: string
   user: MultiplayerUser
+  /** Connection-scoped id — one per channel instance (browser tab). */
+  clientId: string
   field?: TField | null
   cursor?: MultiplayerTextCursor | null
 }
@@ -35,6 +39,8 @@ export interface MultiplayerLeaveMessage {
   type: 'multiplayer:leave'
   roomId: string
   userId: string
+  /** Connection-scoped id — one per channel instance (browser tab). */
+  clientId: string
 }
 
 export type MultiplayerMessage<

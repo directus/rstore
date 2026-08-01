@@ -15,7 +15,18 @@ const props = withDefaults(defineProps<{
 
 const safePeers = computed(() => {
   const peers = toValue(props.peers) ?? []
-  return peers.filter((peer): peer is MultiplayerPeer => !!peer && typeof peer.id === 'string')
+  const valid = peers.filter((peer): peer is MultiplayerPeer => !!peer && typeof peer.id === 'string')
+
+  // Peers are keyed per connection (clientId) — aggregate per user so a
+  // user with several tabs open shows up once, using the entry seen last.
+  const byUser = new Map<string, MultiplayerPeer>()
+  for (const peer of valid) {
+    const existing = byUser.get(peer.id)
+    if (!existing || (peer.lastSeen ?? 0) > (existing.lastSeen ?? 0)) {
+      byUser.set(peer.id, peer)
+    }
+  }
+  return Array.from(byUser.values())
 })
 </script>
 

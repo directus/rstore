@@ -2,6 +2,7 @@ import type { MultiplayerTextCursor } from '../types'
 import type { RstoreMultiplayerChannel } from './useRstoreMultiplayerChannel'
 import { nextTick, onUnmounted, watch } from 'vue'
 import { rebaseMultiplayerTextCursor } from '../utils/multiplayerTextCursor'
+import { sanitizeMultiplayerUpdate } from '../utils/sanitizeUpdate'
 
 type FormChangeTuple = [newValue: unknown, oldValue: unknown]
 type FormChanges<TData extends Record<string, any>, TField extends keyof TData & string> = Partial<Record<TField, FormChangeTuple | undefined>>
@@ -61,7 +62,15 @@ export function useRstoreMultiplayerForm<
     }
   })
 
-  watch(options.channel.remoteUpdate, async (update) => {
+  watch(options.channel.remoteUpdate, async (rawUpdate) => {
+    if (!rawUpdate) {
+      return
+    }
+
+    // Remote peers are untrusted: strip prototype-polluting keys and, when
+    // a tracked-field list is configured, drop any field outside it so a
+    // room member cannot overwrite arbitrary form/cache properties.
+    const update = sanitizeMultiplayerUpdate(rawUpdate, options.trackedFields)
     if (!update) {
       return
     }

@@ -3,6 +3,9 @@ import type { MultiplayerMessage, MultiplayerTextCursor, MultiplayerUser } from 
 /** Absolute ceiling on cursor positions accepted from a peer. */
 const MAX_CURSOR_POSITION = 1e7
 
+/** Ceiling on id strings (userId / clientId) accepted from a peer. */
+const MAX_ID_LENGTH = 128
+
 const CURSOR_DIRECTIONS = new Set<MultiplayerTextCursor['direction']>([
   'forward',
   'backward',
@@ -11,6 +14,11 @@ const CURSOR_DIRECTIONS = new Set<MultiplayerTextCursor['direction']>([
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+/** Non-empty bounded string — used for userId / clientId fields. */
+function isIdString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= MAX_ID_LENGTH
 }
 
 function isFiniteNonNegativeInt(value: unknown): value is number {
@@ -46,8 +54,7 @@ export function isMultiplayerUser(value: unknown): value is MultiplayerUser {
   if (!isRecord(value)) {
     return false
   }
-  return typeof value.id === 'string'
-    && value.id.length > 0
+  return isIdString(value.id)
     && typeof value.name === 'string'
     && typeof value.color === 'string'
 }
@@ -64,9 +71,16 @@ export function isMultiplayerMessage<TUpdate = Record<string, any>, TField exten
   if (typeof value.roomId !== 'string') {
     return false
   }
+  // Every frame carries a connection-scoped clientId so peers can be
+  // disambiguated across tabs of the same authenticated user.
+  if (!isIdString(value.clientId)) {
+    return false
+  }
   switch (value.type) {
     case 'multiplayer:update':
-      return typeof value.userId === 'string' && 'data' in value
+      // `data` must be a plain JSON object — arrays, primitives and null
+      // are rejected so downstream spreads always operate on records.
+      return isIdString(value.userId) && isRecord(value.data)
     case 'multiplayer:presence': {
       if (!isMultiplayerUser(value.user)) {
         return false
@@ -80,7 +94,7 @@ export function isMultiplayerMessage<TUpdate = Record<string, any>, TField exten
       return true
     }
     case 'multiplayer:leave':
-      return typeof value.userId === 'string'
+      return isIdString(value.userId)
     default:
       return false
   }

@@ -31,7 +31,19 @@ export interface RstoreMultiplayerChannel<
   TField extends string = string,
 > {
   user: MultiplayerUser
+  /**
+   * Connection-scoped id, unique per channel instance. Used to filter
+   * self-echoed frames so two tabs of the same user still see each other.
+   */
+  clientId: string
+  /**
+   * One entry per remote connection (keyed by `clientId`) — two tabs of
+   * the same user yield two peers sharing the same `id`. Use
+   * `presenceUsers` for a per-user aggregated list.
+   */
   peers: ComputedRef<MultiplayerPeer<TField>[]>
+  /** Peers deduplicated by user id — one entry per remote user. */
+  presenceUsers: ComputedRef<MultiplayerPeer<TField>[]>
   remoteUpdate: Ref<TUpdate | null>
   status: Ref<string>
   joinRoom: () => void
@@ -53,9 +65,18 @@ export function useRstoreMultiplayerChannel<
   const endpoint = (options.endpoint ?? runtimeConfig.public.wsEndpoint) as string | undefined
   const ws = useWebSocket(endpoint, {
     autoReconnect: true,
+    // `onMessage` fires for every frame — unlike watching `ws.data`,
+    // which skips consecutive identical payloads (Object.is) and would
+    // let idle peers' heartbeats go unseen until stale cleanup evicts them.
+    onMessage: (_ws, event) => {
+      handleIncomingMessage(event.data)
+    },
   })
 
   const user = createMultiplayerUser(options.user, options.colors)
+  // Connection-scoped id: two tabs of the same authenticated user get two
+  // distinct clientIds, so self-echo filtering never hides sibling tabs.
+  const clientId = crypto.randomUUID()
   const peers = shallowRef(new Map<string, MultiplayerPeer<TField>>()) as ShallowRef<Map<string, MultiplayerPeer<TField>>>
   const remoteUpdate = shallowRef<TUpdate | null>(null)
   const localField = shallowRef(null) as ShallowRef<TField | null>
@@ -70,6 +91,7 @@ export function useRstoreMultiplayerChannel<
       type: 'multiplayer:presence',
       roomId: options.roomId,
       user,
+      clientId,
       field: localField.value,
       cursor: localCursor.value,
     } satisfies MultiplayerPresenceMessage<TField>)
@@ -84,6 +106,7 @@ export function useRstoreMultiplayerChannel<
       type: 'multiplayer:leave',
       roomId: options.roomId,
       userId: user.id,
+      clientId,
     } satisfies MultiplayerLeaveMessage)
   }
 
@@ -93,6 +116,7 @@ export function useRstoreMultiplayerChannel<
       roomId: options.roomId,
       data: update,
       userId: user.id,
+      clientId,
     } satisfies MultiplayerUpdateMessage<TUpdate>)
   }
 
@@ -168,33 +192,38 @@ export function useRstoreMultiplayerChannel<
     }
   }, 5000)
 
-  watch(ws.data, (data) => {
+  /**
+   * Processes a raw incoming frame. Self-echo is filtered by `clientId`
+   * (not user id) so two tabs of the same user keep seeing each other.
+   */
+  function handleIncomingMessage(data: unknown) {
     if (!data) {
       return
     }
 
-    const message = validateMultiplayerMessage<TUpdate, TField>(data as unknown)
-    if (!message) {
+    const message = validateMultiplayerMessage<TUpdate, TField>(data)
+    if (!message || message.roomId !== options.roomId || message.clientId === clientId) {
       return
     }
 
-    if (message.type === 'multiplayer:update' && message.roomId === options.roomId && message.userId !== user.id) {
+    if (message.type === 'multiplayer:update') {
       remoteUpdate.value = message.data
     }
-    else if (message.type === 'multiplayer:presence' && message.roomId === options.roomId && message.user.id !== user.id) {
-      peers.value.set(message.user.id, {
+    else if (message.type === 'multiplayer:presence') {
+      peers.value.set(message.clientId, {
         ...message.user,
+        clientId: message.clientId,
         field: message.field ?? null,
         cursor: message.cursor ?? null,
         lastSeen: Date.now(),
       })
       triggerRef(peers)
     }
-    else if (message.type === 'multiplayer:leave' && message.roomId === options.roomId) {
-      peers.value.delete(message.userId)
+    else if (message.type === 'multiplayer:leave') {
+      peers.value.delete(message.clientId)
       triggerRef(peers)
     }
-  })
+  }
 
   const heartbeatInterval = setInterval(() => {
     if (ws.status.value === 'OPEN') {
@@ -214,9 +243,26 @@ export function useRstoreMultiplayerChannel<
     clearInterval(heartbeatInterval)
   })
 
+  const validPeers = computed(() => Array.from(peers.value.values()).filter(isMultiplayerPeerStrict<TField>))
+
+  // Aggregate per user for display purposes — a user active in several
+  // tabs collapses into their most recently seen connection.
+  const presenceUsers = computed(() => {
+    const byUser = new Map<string, MultiplayerPeer<TField>>()
+    for (const peer of validPeers.value) {
+      const existing = byUser.get(peer.id)
+      if (!existing || peer.lastSeen > existing.lastSeen) {
+        byUser.set(peer.id, peer)
+      }
+    }
+    return Array.from(byUser.values())
+  })
+
   return {
     user,
-    peers: computed(() => Array.from(peers.value.values()).filter(isMultiplayerPeerStrict<TField>)),
+    clientId,
+    peers: validPeers,
+    presenceUsers,
     remoteUpdate,
     status: ws.status,
     joinRoom,

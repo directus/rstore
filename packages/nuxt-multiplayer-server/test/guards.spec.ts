@@ -23,6 +23,7 @@ describe('isMultiplayerMessage', () => {
     expect(isMultiplayerMessage({
       type: 'multiplayer:presence',
       roomId: 'r',
+      clientId: 'c',
       user: { id: 'u', name: 'N', color: '#fff' },
     })).toBe(true)
   })
@@ -30,6 +31,7 @@ describe('isMultiplayerMessage', () => {
     expect(isMultiplayerMessage({
       type: 'multiplayer:presence',
       roomId: 'r',
+      clientId: 'c',
       user: { id: 'u', name: 'N', color: '#fff' },
       cursor: { start: 3, end: 1, direction: 'forward' },
     })).toBe(false)
@@ -39,11 +41,46 @@ describe('isMultiplayerMessage', () => {
       type: 'multiplayer:update',
       roomId: 'r',
       userId: 'u',
+      clientId: 'c',
       data: { foo: 1 },
     })).toBe(true)
   })
   it('rejects unknown type', () => {
-    expect(isMultiplayerMessage({ type: 'other', roomId: 'r' })).toBe(false)
+    expect(isMultiplayerMessage({ type: 'other', roomId: 'r', clientId: 'c' })).toBe(false)
+  })
+  it('rejects frames without clientId', () => {
+    expect(isMultiplayerMessage({
+      type: 'multiplayer:leave',
+      roomId: 'r',
+      userId: 'u',
+    })).toBe(false)
+  })
+  it('rejects update whose data is not a plain object', () => {
+    for (const data of [null, [], 'string', 42, true]) {
+      expect(isMultiplayerMessage({
+        type: 'multiplayer:update',
+        roomId: 'r',
+        userId: 'u',
+        clientId: 'c',
+        data,
+      })).toBe(false)
+    }
+  })
+  it('rejects update with missing data', () => {
+    expect(isMultiplayerMessage({
+      type: 'multiplayer:update',
+      roomId: 'r',
+      userId: 'u',
+      clientId: 'c',
+    })).toBe(false)
+  })
+  it('rejects oversized ids', () => {
+    expect(isMultiplayerMessage({
+      type: 'multiplayer:leave',
+      roomId: 'r',
+      userId: 'u'.repeat(200),
+      clientId: 'c',
+    })).toBe(false)
   })
 })
 
@@ -57,6 +94,7 @@ describe('parseMultiplayerMessage', () => {
       type: 'multiplayer:leave',
       roomId: 'r',
       userId: 'u',
+      clientId: 'c',
     }))
     expect(out?.type).toBe('multiplayer:leave')
   })

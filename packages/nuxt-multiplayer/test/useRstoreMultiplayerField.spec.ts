@@ -1,17 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { effectScope } from 'vue'
 import { useRstoreMultiplayerField } from '../src/runtime/composables/useRstoreMultiplayerField'
-
-/**
- * Run a composable inside an effect scope so its `onUnmounted` registers
- * without firing the "called outside setup()" warning. Returns the value
- * the composable produced and a `dispose()` to release the scope.
- */
-function withScope<T>(fn: () => T): { value: T, dispose: () => void } {
-  const scope = effectScope()
-  const value = scope.run(fn) as T
-  return { value, dispose: () => scope.stop() }
-}
+import { muteVueLifecycleWarnings, withScope } from './utils'
 
 /**
  * Build a stub channel with the surface useRstoreMultiplayerField touches.
@@ -32,20 +21,7 @@ describe('useRstoreMultiplayerField', () => {
     // Fake timers give us deterministic control over the setTimeout(0)
     // that `onBlur` schedules — no more racing the event loop.
     vi.useFakeTimers()
-    // Silence Vue's "onUnmounted called outside setup" warning that fires
-    // when a composable using lifecycle hooks runs outside a component.
-    // The effect-scope wrapper isn't a substitute for an instance — Vue
-    // only checks for a current instance, not a current scope.
-    // Silence Vue's "onUnmounted called outside setup" warning that fires
-    // when a composable using lifecycle hooks runs outside a component.
-    // The effect-scope wrapper isn't a substitute for an instance — Vue
-    // checks for a current instance, not a current scope.
-    const realWarn = console.warn
-    vi.spyOn(console, 'warn').mockImplementation((...args: unknown[]) => {
-      if (!String(args[0] ?? '').includes('onUnmounted')) {
-        realWarn(...args)
-      }
-    })
+    muteVueLifecycleWarnings()
   })
 
   afterEach(() => {

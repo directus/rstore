@@ -12,6 +12,9 @@ import type {
  */
 const MAX_CURSOR_POSITION = 1e7
 
+/** Ceiling on id strings (userId / clientId) accepted from a peer. */
+const MAX_ID_LENGTH = 128
+
 /** Allowed directions on the wire — must match `MultiplayerTextCursor`. */
 const CURSOR_DIRECTIONS = new Set<MultiplayerTextCursor['direction']>([
   'forward',
@@ -21,6 +24,11 @@ const CURSOR_DIRECTIONS = new Set<MultiplayerTextCursor['direction']>([
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
+/** Non-empty bounded string — used for userId / clientId fields. */
+function isIdString(value: unknown): value is string {
+  return typeof value === 'string' && value.length > 0 && value.length <= MAX_ID_LENGTH
 }
 
 function isFiniteNonNegativeInt(value: unknown): value is number {
@@ -60,8 +68,7 @@ export function isMultiplayerUser(value: unknown): value is MultiplayerUser {
   if (!isRecord(value)) {
     return false
   }
-  return typeof value.id === 'string'
-    && value.id.length > 0
+  return isIdString(value.id)
     && typeof value.name === 'string'
     && typeof value.color === 'string'
 }
@@ -76,6 +83,9 @@ export function isMultiplayerPeerStrict<TField extends string = string>(value: u
     return false
   }
   const peer = value as MultiplayerPeer<TField>
+  if (!isIdString(peer.clientId)) {
+    return false
+  }
   if (typeof peer.lastSeen !== 'number' || !Number.isFinite(peer.lastSeen)) {
     return false
   }
@@ -89,10 +99,12 @@ export function isMultiplayerPeerStrict<TField extends string = string>(value: u
 }
 
 function isUpdateMessage(msg: Record<string, unknown>): boolean {
+  // `data` must be a plain JSON object — arrays, primitives and null are
+  // rejected so downstream spreads always operate on records.
   return msg.type === 'multiplayer:update'
     && typeof msg.roomId === 'string'
-    && typeof msg.userId === 'string'
-    && 'data' in msg
+    && isIdString(msg.userId)
+    && isRecord(msg.data)
 }
 
 function isPresenceMessage(msg: Record<string, unknown>): boolean {
@@ -117,7 +129,7 @@ function isPresenceMessage(msg: Record<string, unknown>): boolean {
 function isLeaveMessage(msg: Record<string, unknown>): boolean {
   return msg.type === 'multiplayer:leave'
     && typeof msg.roomId === 'string'
-    && typeof msg.userId === 'string'
+    && isIdString(msg.userId)
 }
 
 /**
@@ -127,6 +139,11 @@ export function isMultiplayerMessage<TUpdate = Record<string, any>, TField exten
   value: unknown,
 ): value is MultiplayerMessage<TUpdate, TField> {
   if (!isRecord(value) || typeof value.type !== 'string') {
+    return false
+  }
+  // Every frame carries a connection-scoped clientId so peers can be
+  // disambiguated across tabs of the same authenticated user.
+  if (!isIdString(value.clientId)) {
     return false
   }
   switch (value.type) {

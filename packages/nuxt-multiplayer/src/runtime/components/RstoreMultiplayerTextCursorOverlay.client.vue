@@ -101,7 +101,8 @@ const cursors = computed(() => {
     }
 
     return [{
-      userId: peer.id,
+      // Key by connection so two tabs of one user render two cursors.
+      clientId: peer.clientId ?? peer.id,
       userName: peer.name,
       userColor: peer.color,
       selectionRects,
@@ -119,12 +120,12 @@ const cursors = computed(() => {
   <div class="pointer-events-none absolute inset-0 overflow-hidden">
     <div
       v-for="cursor in cursors"
-      :key="cursor.userId"
+      :key="cursor.clientId"
       class="absolute inset-0"
     >
       <div
         v-for="(selectionRect, index) in cursor.selectionRects"
-        :key="`${cursor.userId}:${index}`"
+        :key="`${cursor.clientId}:${index}`"
         class="absolute rounded-[3px]"
         :style="{
           left: `${selectionRect.left}px`,
