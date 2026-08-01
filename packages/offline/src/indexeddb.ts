@@ -37,6 +37,22 @@ async function readAllItems(db: IDBDatabase, storeName: string): Promise<any[]> 
   })
 }
 
+async function readItem(db: IDBDatabase, storeName: string, key: string): Promise<any> {
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([storeName], 'readonly')
+    const objectStore = transaction.objectStore(storeName)
+    const request = objectStore.get(key)
+
+    request.onsuccess = () => {
+      resolve(request.result)
+    }
+
+    request.onerror = () => {
+      reject(request.error)
+    }
+  })
+}
+
 async function writeItem(db: IDBDatabase, storeName: string, key: string, value: any): Promise<void> {
   return new Promise((resolve, reject) => {
     const transaction = db.transaction([storeName], 'readwrite')
@@ -95,6 +111,7 @@ export async function useIndexedDb(dbNamePrefix: string) {
 
   return {
     readAllItems: async (storeName: string) => readAllItems(await getDb(storeName), 'items'),
+    readItem: async (storeName: string, key: string) => readItem(await getDb(storeName), 'items', key),
     writeItem: async (storeName: string, key: string, value: any) => writeItem(await getDb(storeName), 'items', key, value),
     deleteItem: async (storeName: string, key: string) => deleteItem(await getDb(storeName), 'items', key),
     clearDatabase: async (storeName: string) => clearDatabase(await getDb(storeName)),

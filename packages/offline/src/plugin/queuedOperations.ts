@@ -28,7 +28,26 @@ async function processQueuedOperation(runtime: OfflinePluginRuntime, store: any,
   }
   catch (error) {
     console.error('[rstore/offline] Failed to process queued operation', op, error)
+    if (shouldDropFailedOperation(error)) {
+      await getOfflineDb(runtime).deleteItem(runtime.opsStoreName, op.id)
+    }
   }
+}
+
+/**
+ * Whether a failed operation should be removed from the queue instead of retried.
+ *
+ * Replay is sequential, so an operation the server will never accept is not just
+ * retried forever — it blocks everything queued behind it. Permanent client
+ * errors are dropped; `401` (a token refresh may fix it), `408` and `429`
+ * (explicit retry signals) and every server-side or network failure are kept.
+ */
+export function shouldDropFailedOperation(error: any): boolean {
+  const status = error?.statusCode ?? error?.status ?? error?.response?.status
+  if (typeof status !== 'number') {
+    return false
+  }
+  return status >= 400 && status < 500 && status !== 401 && status !== 408 && status !== 429
 }
 
 async function replayOperation(store: any, collection: any, op: OfflineQueuedOperation) {

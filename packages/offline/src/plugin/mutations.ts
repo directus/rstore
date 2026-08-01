@@ -24,25 +24,42 @@ function installCacheReadHooks(runtime: OfflinePluginRuntime, hook: any) {
 }
 
 function installCachePersistenceHook(runtime: OfflinePluginRuntime, hook: any) {
-  hook('afterMutation', async ({ collection, mutation, getResult }: any) => {
+  hook('afterMutation', async ({ collection, mutation, key, item, getResult }: any) => {
     if (!isCollectionIncluded(runtime, collection)) {
       return
     }
 
     const db = getOfflineDb(runtime)
+
+    // Deletes are handled before looking at the result: core emits them with a
+    // key but no result at all, so waiting on `getResult()` would leave the
+    // deleted item in the local database forever.
+    if (mutation === 'delete') {
+      const deleteKey = key ?? (item != null ? collection.getKey(item) : null)
+      if (deleteKey != null) {
+        await db.deleteItem(collection.name, String(deleteKey))
+      }
+      return
+    }
+
     const result = getResult()
     if (!result) {
       return
     }
-    const key = collection.getKey(result)
-    if (!key) {
+    // The server result may not echo the key fields back, so fall back to the
+    // key core resolved for the mutation.
+    const itemKey = collection.getKey(result) ?? key
+    if (itemKey == null) {
       return
     }
-    if (mutation === 'create' || mutation === 'update') {
-      await db.writeItem(collection.name, String(key), result)
+    if (mutation === 'create') {
+      await db.writeItem(collection.name, String(itemKey), result)
     }
-    else if (mutation === 'delete') {
-      await db.deleteItem(collection.name, String(key))
+    else if (mutation === 'update') {
+      // Update responses may only carry the changed columns; writing the result
+      // as-is would drop every field the server left out.
+      const existing = await db.readItem(collection.name, String(itemKey))
+      await db.writeItem(collection.name, String(itemKey), existing ? { ...existing, ...result } : result)
     }
   })
 }
