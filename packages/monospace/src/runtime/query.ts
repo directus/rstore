@@ -1,4 +1,7 @@
 import type { MonospaceRelationCollectionLike } from './relations'
+import { createConnectorQuery } from '@rstore/connector-toolkit'
+
+export { stripPrimaryKeys } from '@rstore/connector-toolkit'
 
 /**
  * Monospace REST query options supported by the rstore adapter.
@@ -72,30 +75,11 @@ export function createMonospaceQuery(
   findOptions?: MonospaceFindOptions,
   overrides: MonospaceQueryOptions = {},
 ): MonospaceQueryOptions {
-  const query: MonospaceQueryOptions = {}
-
-  assignQueryOptions(query, findOptions?.params, false)
-  assignQueryOptions(query, findOptions, true)
-
-  // rstore function filters are cache-side predicates that cannot be sent to Monospace.
-  if (typeof query.filter === 'function') {
-    delete query.filter
-  }
-
-  if (
-    findOptions?.pageIndex != null
-    && findOptions.pageSize != null
-    && query.limit == null
-    && query.offset == null
-  ) {
-    query.limit = findOptions.pageSize
-    query.offset = findOptions.pageIndex * findOptions.pageSize
-  }
-
-  return {
-    ...query,
-    ...overrides,
-  }
+  return createConnectorQuery<MonospaceQueryOptions>(findOptions, overrides, {
+    knownKeys: MONOSPACE_QUERY_KEYS,
+    // Monospace `params` accept arbitrary custom REST query keys.
+    mergeParams: true,
+  })
 }
 
 /**
@@ -180,45 +164,6 @@ export function serializeMonospaceQuery(query?: MonospaceQueryOptions): URLSearc
   }
 
   return params
-}
-
-/**
- * Removes generated primary key fields from a mutation body.
- */
-export function stripPrimaryKeys<TItem extends Record<string, any>>(
-  item: TItem,
-  primaryKeys: string[] | undefined,
-): TItem {
-  const result = { ...item }
-  for (const key of primaryKeys?.length ? primaryKeys : ['id']) {
-    delete result[key]
-  }
-  return result
-}
-
-/**
- * Copies known and custom Monospace query options into the target object.
- */
-function assignQueryOptions(
-  target: MonospaceQueryOptions,
-  source: MonospaceQueryOptions | MonospaceFindOptions | undefined,
-  knownOnly: boolean,
-): void {
-  if (!source) {
-    return
-  }
-
-  if (!knownOnly) {
-    Object.assign(target, source)
-    return
-  }
-
-  for (const key of MONOSPACE_QUERY_KEYS) {
-    const value = source[key]
-    if (value !== undefined) {
-      ;(target as Record<string, any>)[key] = value
-    }
-  }
 }
 
 /**

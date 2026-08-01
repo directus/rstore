@@ -1,4 +1,7 @@
+import { createBatchedRelationFilter, isRecord, toArray } from '@rstore/connector-toolkit'
 import { getMonospacePrimaryKeys } from './collection'
+
+export { toArray } from '@rstore/connector-toolkit'
 
 /**
  * rstore relation target shape used by generated Monospace collections.
@@ -125,16 +128,6 @@ export interface MonospaceRelationStoreLike {
    * rstore cache used to resolve relation joins.
    */
   $cache?: MonospaceRelationCacheLike
-}
-
-/**
- * Normalizes a possible single result to an array.
- */
-export function toArray<T>(value: T | T[] | undefined): T[] {
-  if (!value) {
-    return []
-  }
-  return Array.isArray(value) ? value : [value]
 }
 
 /**
@@ -287,22 +280,12 @@ function createPrimaryKeyFilter(
   collection: MonospaceRelationCollectionLike,
   items: Array<Record<string, any>>,
 ): Record<string, any> | undefined {
+  // Batching by primary keys is a relation join of each key onto itself.
   const primaryKeys = getMonospacePrimaryKeys(collection)
-
-  if (primaryKeys.length === 1) {
-    const primaryKey = primaryKeys[0]!
-    const keys = [...new Set(items.map(item => item[primaryKey]).filter(value => value != null))]
-    return keys.length ? { [primaryKey]: { _in: keys } } : undefined
-  }
-
-  const groups = items
-    .filter(item => primaryKeys.every(primaryKey => item[primaryKey] != null))
-    .map(item => ({
-      _and: primaryKeys.map(primaryKey => ({
-        [primaryKey]: { _eq: item[primaryKey] },
-      })),
-    }))
-  return groups.length ? { _or: groups } : undefined
+  return createBatchedRelationFilter(
+    Object.fromEntries(primaryKeys.map(primaryKey => [primaryKey, primaryKey])),
+    items,
+  )
 }
 
 /**
@@ -313,11 +296,4 @@ function unwrapItem(item: unknown): unknown {
     return item.$raw()
   }
   return item
-}
-
-/**
- * Returns whether a value is a plain record object.
- */
-function isRecord(value: unknown): value is Record<string, any> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }

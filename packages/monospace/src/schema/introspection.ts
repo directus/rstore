@@ -4,6 +4,7 @@ import type { MonospaceResolvedCollectionMetadata } from './metadata'
 import type { MonospaceSchemaMetadata } from './metadataTypes'
 import type { MonospaceRelationField } from './relations'
 import type { MonospaceGeneratedField, MonospaceOpenApiDocument, MonospacePrimaryKeyConfig, OpenApiSchema, OpenApiSchemaObject } from './types'
+import { collectionTypeName, createGetKeyExpression } from '@rstore/connector-toolkit'
 import { resolveMonospaceSchemaMetadata } from './metadata'
 import { applyMonospaceRelations, detectMonospaceRelationFields, mergeMonospaceRelationFieldMetadata } from './relations'
 
@@ -63,8 +64,6 @@ export interface MonospaceCollectionDefinition extends Collection {
   relations: NonNullable<Collection['relations']>
 }
 
-const IDENTIFIER_RE = /^[A-Z_$][\w$]*$/i
-
 /**
  * Builds rstore collection definitions from the Monospace OpenAPI document
  * and the Monospace schema metadata.
@@ -103,13 +102,7 @@ export function buildMonospaceCollections(
  * Creates a valid TypeScript interface name from a Monospace collection name.
  */
 export function monospaceCollectionTypeName(collectionName: string): string {
-  const name = collectionName
-    .split(/[^\w$]+/)
-    .filter(Boolean)
-    .map(part => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
-    .join('')
-
-  return IDENTIFIER_RE.test(name) ? name : `Monospace${name || 'Item'}`
+  return collectionTypeName(collectionName, 'Monospace')
 }
 
 /**
@@ -175,6 +168,8 @@ function createCollectionDefinition(
     'relations': {},
     'itemFields': itemFields,
     'typeName': monospaceCollectionTypeName(collectionName),
+    // `resolvePrimaryKeys` guarantees non-empty keys, so the toolkit's
+    // `item.id` fallback for empty key lists is never reached here.
     'getKeyExpression': createGetKeyExpression(primaryKeys),
   }
 }
@@ -270,22 +265,6 @@ function relationFieldTsType(relation: MonospaceRelationField): string {
     return `${typeName}[]`
   }
   return relation.nullable ? `${typeName} | null` : typeName
-}
-
-/**
- * Creates the generated `getKey` expression body.
- */
-function createGetKeyExpression(primaryKeys: string[]): string {
-  return primaryKeys
-    .map(key => itemAccessExpression(key))
-    .join(' + \'::\' + ')
-}
-
-/**
- * Creates a safe JavaScript item property access expression.
- */
-function itemAccessExpression(key: string): string {
-  return IDENTIFIER_RE.test(key) ? `item.${key}` : `item[${JSON.stringify(key)}]`
 }
 
 /**

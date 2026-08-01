@@ -1,4 +1,13 @@
+import type { CodegenCollection, RenderedItemField, VirtualModuleNames } from '@rstore/connector-toolkit'
 import type { MonospaceCollectionDefinition } from './introspection'
+import {
+  generateCollectionsTemplate as toolkitGenerateCollectionsTemplate,
+  generateItemsTemplate as toolkitGenerateItemsTemplate,
+  generateTypedCollectionsTemplate as toolkitGenerateTypedCollectionsTemplate,
+  generateViteDeclarations as toolkitGenerateViteDeclarations,
+  generateViteIndexTemplate as toolkitGenerateViteIndexTemplate,
+  generateViteSchemaTemplate as toolkitGenerateViteSchemaTemplate,
+} from '@rstore/connector-toolkit'
 
 /**
  * Options used by generated Monospace runtime config modules.
@@ -36,33 +45,51 @@ export interface GenerateTypedCollectionsTemplateOptions {
 }
 
 /**
+ * Names used by the generated Monospace Vite virtual modules.
+ */
+const MONOSPACE_MODULE_NAMES: VirtualModuleNames = {
+  virtualId: 'virtual:rstore-monospace',
+  clientBinding: 'monospace',
+  pluginBinding: 'monospacePlugin',
+  packageName: '@rstore/monospace',
+  clientTypeName: 'MonospaceRestClient',
+  pluginFactoryName: 'createMonospaceRstorePlugin',
+}
+
+/**
+ * Generated collection narrowed to the toolkit codegen shape.
+ *
+ * `buildMonospaceCollections` always assigns `scopeId`, which is optional on
+ * the base rstore `Collection` type.
+ */
+type MonospaceCodegenCollection = MonospaceCollectionDefinition & CodegenCollection
+
+/**
+ * Narrows generated collections to the toolkit codegen shape.
+ */
+function toCodegenCollections(collections: MonospaceCollectionDefinition[]): MonospaceCodegenCollection[] {
+  return collections as MonospaceCodegenCollection[]
+}
+
+/**
+ * Returns the rendered item interface fields of a generated collection.
+ */
+function getItemFields(collection: MonospaceCollectionDefinition): RenderedItemField[] {
+  return collection.itemFields
+}
+
+/**
  * Generates the runtime collection template consumed by `@rstore/nuxt`.
  */
 export function generateCollectionsTemplate(collections: MonospaceCollectionDefinition[]): string {
-  return collections.map((collection, index) => {
-    return `export const collection${index} = {
-  name: ${JSON.stringify(collection.name)},
-  scopeId: ${JSON.stringify(collection.scopeId)},
-  meta: ${JSON.stringify(collection.meta)},
-  relations: ${JSON.stringify(collection.relations)},
-  getKey: (item) => ${collection.getKeyExpression},
-}`
-  }).join('\n')
+  return toolkitGenerateCollectionsTemplate(toCodegenCollections(collections))
 }
 
 /**
  * Generates TypeScript item interfaces from Monospace OpenAPI metadata.
  */
 export function generateItemsTemplate(collections: MonospaceCollectionDefinition[]): string {
-  return collections.map((collection) => {
-    const fields = collection.itemFields.map((field) => {
-      return `  ${tsPropertyName(field.name)}${field.optional ? '?' : ''}: ${field.type}`
-    }).join('\n')
-
-    return `export interface ${collection.typeName} {
-${fields}
-}`
-  }).join('\n\n')
+  return toolkitGenerateItemsTemplate(toCodegenCollections(collections), getItemFields)
 }
 
 /**
@@ -72,28 +99,9 @@ export function generateTypedCollectionsTemplate(
   collections: MonospaceCollectionDefinition[],
   options: GenerateTypedCollectionsTemplateOptions = {},
 ): string {
-  if (!collections.length) {
-    return 'export {}\n'
-  }
-
-  const imports = collections.map(collection => collection.typeName).join(',\n  ')
-  const itemsImport = options.itemsImport ?? '#build/$rstore-monospace-items'
-
-  return `import { withItemType } from '@rstore/vue'
-import type {
-  ${imports}
-} from '${itemsImport}'
-
-${collections.map((collection, index) => {
-  return `export const collection${index} = withItemType<${collection.typeName}>().defineCollection({
-  name: ${JSON.stringify(collection.name)},
-  scopeId: ${JSON.stringify(collection.scopeId)},
-  meta: ${JSON.stringify(collection.meta)},
-  relations: ${JSON.stringify(collection.relations)},
-  getKey: (item) => ${collection.getKeyExpression},
-})`
-}).join('\n\n')}
-`
+  return toolkitGenerateTypedCollectionsTemplate(toCodegenCollections(collections), {
+    itemsImport: options.itemsImport ?? '#build/$rstore-monospace-items',
+  })
 }
 
 /**
@@ -111,16 +119,7 @@ export const scopeId = ${JSON.stringify(options.scopeId)}
  * Generates the runtime Vite virtual schema module.
  */
 export function generateViteSchemaTemplate(collections: MonospaceCollectionDefinition[]): string {
-  const collectionExports = generateCollectionsTemplate(collections)
-  const schemaItems = collections.map((_, index) => `collection${index}`).join(',\n  ')
-  const collectionsSection = collectionExports ? `${collectionExports}\n\n` : ''
-
-  return `${collectionsSection}export const schema = [
-  ${schemaItems}
-]
-
-export default schema
-`
+  return toolkitGenerateViteSchemaTemplate(toCodegenCollections(collections))
 }
 
 /**
@@ -148,63 +147,15 @@ export default monospacePlugin
  * Generates the Vite virtual module that re-exports schema and plugin modules.
  */
 export function generateViteIndexTemplate(): string {
-  return `export { schema } from 'virtual:rstore-monospace/schema'
-export { monospace, monospacePlugin } from 'virtual:rstore-monospace/plugin'
-`
+  return toolkitGenerateViteIndexTemplate(MONOSPACE_MODULE_NAMES)
 }
 
 /**
  * Generates TypeScript declarations for Vite virtual Monospace modules.
  */
 export function generateViteDeclarations(collections: MonospaceCollectionDefinition[]): string {
-  return `declare module 'virtual:rstore-monospace/schema' {
-  import type { Collection, StoreSchema } from '@rstore/vue'
-
-${indent(generateItemsTemplate(collections), 2)}
-${collections.map((collection, index) => {
-  return `  export const collection${index}: Collection<${collection.typeName}> & {
-    readonly '~type': undefined
-    readonly '~item': ${collection.typeName}
-    readonly name: ${JSON.stringify(collection.name)}
-    readonly relations: ${JSON.stringify(collection.relations)}
-  }`
-}).join('\n')}
-  export const schema: ${collections.length ? `[${collections.map((_, index) => `typeof collection${index}`).join(', ')}]` : 'StoreSchema'}
-  export default schema
-}
-
-declare module 'virtual:rstore-monospace/plugin' {
-  import type { MonospaceRestClient, createMonospaceRstorePlugin } from '@rstore/monospace'
-
-  export const monospace: MonospaceRestClient
-  export const monospacePlugin: ReturnType<typeof createMonospaceRstorePlugin>
-  export default monospacePlugin
-}
-
-declare module 'virtual:rstore-monospace' {
-  import type { MonospaceRestClient, createMonospaceRstorePlugin } from '@rstore/monospace'
-
-  export const schema: typeof import('virtual:rstore-monospace/schema').schema
-  export const monospace: MonospaceRestClient
-  export const monospacePlugin: ReturnType<typeof createMonospaceRstorePlugin>
-}
-`
-}
-
-/**
- * Formats a field as a TypeScript property name.
- */
-function tsPropertyName(name: string): string {
-  return /^[A-Z_$][\w$]*$/i.test(name) ? name : JSON.stringify(name)
-}
-
-/**
- * Indents generated source lines.
- */
-function indent(source: string, spaces: number): string {
-  const prefix = ' '.repeat(spaces)
-  return source
-    .split('\n')
-    .map(line => line ? `${prefix}${line}` : line)
-    .join('\n')
+  return toolkitGenerateViteDeclarations(toCodegenCollections(collections), MONOSPACE_MODULE_NAMES, {
+    getFields: getItemFields,
+    includeRelationsLine: true,
+  })
 }
