@@ -6,6 +6,7 @@ import type { RstoreDrizzleCondition } from '../../utils/types'
 import { collectionMetas, collectionRelations, dialect, tables, useDrizzles } from '$rstore-drizzle-server-utils.js'
 import * as drizzle from 'drizzle-orm'
 import { createError } from 'h3'
+import { coerceKeySegment } from './key'
 
 export type Dialect = 'postgresql' | 'mysql' | 'singlestore' | 'sqlite' | 'gel' | 'turso'
 
@@ -161,10 +162,14 @@ export function getDrizzleDialect(): Dialect {
 export function getDrizzleKeyWhere(key: string, primaryKeys: string[], table: Table) {
   const keys = key.split('::')
   if (primaryKeys.length > 1) {
-    return drizzle.and(...primaryKeys.map((pk, i) => drizzle.eq(table[pk as keyof typeof table] as Column, keys[i])))
+    return drizzle.and(...primaryKeys.map((pk, i) => {
+      const column = table[pk as keyof typeof table] as Column
+      return drizzle.eq(column, coerceKeySegment(column, keys[i]))
+    }))
   }
   else if (primaryKeys[0]) {
-    return drizzle.eq(table[primaryKeys[0] as keyof typeof table] as Column, keys[0])
+    const column = table[primaryKeys[0] as keyof typeof table] as Column
+    return drizzle.eq(column, coerceKeySegment(column, keys[0]))
   }
   else {
     throw createError({
