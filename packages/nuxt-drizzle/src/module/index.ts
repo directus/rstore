@@ -7,6 +7,7 @@ import path from 'pathe'
 import { registerRuntimeConfigTemplate } from './config'
 import { setupOffline } from './offline'
 import { setupRealtime } from './realtime'
+import { createRuntimeResolver } from './resolveRuntime'
 import { registerApiRoutes, registerRuntimeImports } from './routes'
 import { createCollectionsLoader } from './schema'
 import { registerDrizzleTemplates, registerRstoreNuxtImports } from './templates'
@@ -29,10 +30,10 @@ export default defineNuxtModule<ModuleOptions>({
   async setup(options, nuxt) {
     const log = useLogger('rstore-drizzle')
     const { resolve } = createResolver(import.meta.url)
-    const resolveRuntime = (id: string) => id.startsWith('./runtime') ? resolve(`..${id.slice(1)}`) : resolve(id)
+    const resolveRuntime = createRuntimeResolver(resolve)
 
     nuxt.hook('prepare:types', ({ references }) => {
-      references.push({ path: resolve('../runtime/types.ts') })
+      references.push({ path: resolveRuntime('./runtime/types.ts') })
     })
 
     const drizzleConfigPath = options.drizzleConfigPath ?? 'drizzle.config.ts'
