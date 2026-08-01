@@ -17,11 +17,22 @@ export type RstoreDrizzleDialect = 'postgresql' | 'mysql' | 'singlestore' | 'sql
  *   update's key (keys should be compared as strings — see
  *   `normalizeSubscriptionKey`),
  * - the subscription has no `where` filter, or the `where` filter accepts
- *   the update's record.
+ *   the update (see below).
+ *
+ * `where` matching depends on the frame type:
+ *
+ * - `created` and `deleted` frames match on `record` alone (`deleted`
+ *   frames carry the pre-delete row, so that IS the record the subscriber
+ *   may hold).
+ * - `updated` frames match when the new **or** the previous record
+ *   satisfies the filter — a subscriber whose filter matched the pre-update
+ *   record holds it in cache and must be told it left the filter. When no
+ *   `previousRecord` is available (custom publishes), the frame is
+ *   delivered unconditionally and the client-side filter decides.
  */
 export function subscriptionMatches(
   subscription: SubscriptionMessage,
-  update: { collection: string, key?: string, record: any },
+  update: { collection: string, key?: string, record: any, type?: 'created' | 'updated' | 'deleted', previousRecord?: any },
   dialect: RstoreDrizzleDialect,
 ): boolean {
   if (subscription.collection !== update.collection) {
@@ -30,8 +41,15 @@ export function subscriptionMatches(
   if (subscription.key != null && subscription.key !== update.key) {
     return false
   }
-  if (subscription.where && !filterWhere(update.record, subscription.where, dialect)) {
-    return false
+  if (subscription.where) {
+    if (update.type === 'updated') {
+      if (update.previousRecord === undefined) {
+        return true
+      }
+      return filterWhere(update.record, subscription.where, dialect)
+        || filterWhere(update.previousRecord, subscription.where, dialect)
+    }
+    return filterWhere(update.record, subscription.where, dialect)
   }
   return true
 }

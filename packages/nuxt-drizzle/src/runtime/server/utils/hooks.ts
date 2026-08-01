@@ -67,6 +67,16 @@ export interface RstoreDrizzleItemAfterHookPayload<TResult> extends RstoreDrizzl
   key: string
 }
 
+export interface RstoreDrizzleItemPatchAfterHookPayload<TResult> extends RstoreDrizzleItemAfterHookPayload<TResult> {
+  /**
+   * Row as it was just before the `UPDATE` ran, `undefined` when it could
+   * not be read. The realtime publisher forwards it so filtered
+   * subscriptions also receive updates for records that *left* their
+   * `where` filter.
+   */
+  previousRecord?: TResult
+}
+
 /**
  * Invoked **for every update frame** that matched at least one of the
  * peer's active subscriptions, just before the frame is forwarded to
@@ -117,7 +127,7 @@ export interface RstoreDrizzleHooks<
   'item.get.before': (payload: RstoreDrizzleItemBeforeHookPayload) => Awaitable<void>
   'item.get.after': (payload: RstoreDrizzleItemAfterHookPayload<TResult>) => Awaitable<void>
   'item.patch.before': (payload: RstoreDrizzleItemBeforeHookPayload) => Awaitable<void>
-  'item.patch.after': (payload: RstoreDrizzleItemAfterHookPayload<TResult>) => Awaitable<void>
+  'item.patch.after': (payload: RstoreDrizzleItemPatchAfterHookPayload<TResult>) => Awaitable<void>
   'item.delete.before': (payload: RstoreDrizzleItemBeforeHookPayload) => Awaitable<void>
   'item.delete.after': (payload: RstoreDrizzleItemAfterHookPayload<TResult>) => Awaitable<void>
   'realtime.filter': (payload: RstoreDrizzleRealtimeFilterPayload<TResult>) => Awaitable<void>

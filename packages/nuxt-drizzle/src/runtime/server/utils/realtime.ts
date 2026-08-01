@@ -55,6 +55,14 @@ export interface PublishRstoreDrizzleRealtimeChangedUpdateOptions<
    * fresh server HLC when omitted.
    */
   deletedAt?: FieldTimestampValue
+  /**
+   * Pre-update record for `updated` frames (ignored for `deleted`). Lets
+   * the fan-out deliver the frame to subscriptions whose `where` filter
+   * matched the record *before* the update. When omitted, filtered
+   * subscriptions receive the frame unconditionally (fail open) and the
+   * client-side filter decides. Never sent to peers.
+   */
+  previousRecord?: TRecord
 }
 
 export type PublishRstoreDrizzleRealtimeUpdateOptions<TRecord = any>
@@ -126,6 +134,9 @@ export function publishRstoreDrizzleRealtimeUpdate<TRecord = any>(
     const record = options.record as Record<string, any>
     payload.fieldTimestamps = options.fieldTimestamps
       ?? (record && typeof record === 'object' ? buildUniformFieldTimestamps(record, stamp) : undefined)
+    if (options.type === 'updated') {
+      payload.previousRecord = (options as PublishRstoreDrizzleRealtimeChangedUpdateOptions<TRecord, 'updated'>).previousRecord
+    }
   }
 
   getPubSub().publish('update', payload)

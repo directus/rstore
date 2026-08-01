@@ -59,6 +59,13 @@ export interface RstoreDrizzleRealtimePayload<
    * client-side so concurrent in-flight updates cannot resurrect the row.
    */
   deletedAt?: FieldTimestampValue
+  /**
+   * Pre-update record for `updated` frames. Server-side only: used to match
+   * subscriptions whose `where` filter accepted the record before the
+   * update (the record may be leaving the filter). Stripped before the
+   * frame is delivered to peers.
+   */
+  previousRecord?: TRecord
 }
 
 export interface SubscriptionMessage {

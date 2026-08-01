@@ -873,7 +873,9 @@ A server implementation should only deliver an update frame to a peer when **all
 
 - `subscription.collection === update.collection`
 - `subscription.key == null` **or** `subscription.key === update.key`
-- `subscription.where == null` **or** the updated `record` satisfies the `where` filter
+- `subscription.where == null` **or** the `where` filter accepts the update:
+  - `created` and `deleted` frames: the `record` satisfies the filter (`deleted` frames carry the pre-delete row).
+  - `updated` frames: the new **or** the previous record satisfies the filter — a subscriber whose filter matched the pre-update record still holds it and must be told the record left the filter. When the previous record is unknown (e.g. a custom `publishRstoreDrizzleRealtimeUpdate` call without `previousRecord`), deliver the frame unconditionally and let the client-side filter decide.
 
 The `where` payload uses the same JSON operator tree as client-side queries (see [`RstoreDrizzleCondition`](https://github.com/Akryum/rstore/blob/main/packages/nuxt-drizzle/src/runtime/utils/types.ts)).
 

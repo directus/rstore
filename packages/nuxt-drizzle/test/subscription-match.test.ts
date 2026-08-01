@@ -113,6 +113,115 @@ describe('subscriptionMatches', () => {
     )).toBe(false)
   })
 
+  describe('updated frames against a where filter', () => {
+    const subscription = {
+      action: 'subscribe' as const,
+      collection: 'todos',
+      where: { operator: 'eq' as const, field: 'done', value: true },
+    }
+
+    it('delivers when the record left the filter (previous matched, new does not)', () => {
+      // The subscriber holds the pre-update record in its cache — it must
+      // receive the frame to learn the record no longer matches.
+      expect(subscriptionMatches(
+        subscription,
+        {
+          collection: 'todos',
+          key: '1',
+          type: 'updated',
+          record: { id: 1, done: false },
+          previousRecord: { id: 1, done: true },
+        },
+        'sqlite',
+      )).toBe(true)
+    })
+
+    it('delivers when the record entered the filter (new matches, previous did not)', () => {
+      expect(subscriptionMatches(
+        subscription,
+        {
+          collection: 'todos',
+          key: '1',
+          type: 'updated',
+          record: { id: 1, done: true },
+          previousRecord: { id: 1, done: false },
+        },
+        'sqlite',
+      )).toBe(true)
+    })
+
+    it('skips when neither the new nor the previous record matches', () => {
+      expect(subscriptionMatches(
+        subscription,
+        {
+          collection: 'todos',
+          key: '1',
+          type: 'updated',
+          record: { id: 1, done: false },
+          previousRecord: { id: 1, done: false },
+        },
+        'sqlite',
+      )).toBe(false)
+    })
+
+    it('fails open when the previous record is unknown (custom publish)', () => {
+      // A custom `publishRstoreDrizzleRealtimeUpdate` call may not provide a
+      // pre-image — deliver and let the client-side filter decide.
+      expect(subscriptionMatches(
+        subscription,
+        {
+          collection: 'todos',
+          key: '1',
+          type: 'updated',
+          record: { id: 1, done: false },
+        },
+        'sqlite',
+      )).toBe(true)
+    })
+  })
+
+  it('matches created frames on the new record only', () => {
+    const subscription = {
+      action: 'subscribe' as const,
+      collection: 'todos',
+      where: { operator: 'eq' as const, field: 'done', value: true },
+    }
+
+    expect(subscriptionMatches(
+      subscription,
+      { collection: 'todos', key: '1', type: 'created', record: { id: 1, done: true } },
+      'sqlite',
+    )).toBe(true)
+
+    expect(subscriptionMatches(
+      subscription,
+      { collection: 'todos', key: '1', type: 'created', record: { id: 1, done: false } },
+      'sqlite',
+    )).toBe(false)
+  })
+
+  it('matches deleted frames on the pre-delete record', () => {
+    const subscription = {
+      action: 'subscribe' as const,
+      collection: 'todos',
+      where: { operator: 'eq' as const, field: 'done', value: true },
+    }
+
+    // `deleted` frames carry the pre-image as `record` (the delete operation
+    // reads the row before removing it), so record-only matching is correct.
+    expect(subscriptionMatches(
+      subscription,
+      { collection: 'todos', key: '1', type: 'deleted', record: { id: 1, done: true } },
+      'sqlite',
+    )).toBe(true)
+
+    expect(subscriptionMatches(
+      subscription,
+      { collection: 'todos', key: '1', type: 'deleted', record: { id: 1, done: false } },
+      'sqlite',
+    )).toBe(false)
+  })
+
   it('matches created events (no key) when only a where filter is set', () => {
     const matched = subscriptionMatches(
       {

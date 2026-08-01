@@ -102,6 +102,13 @@ async function fanOutUpdate(peer: any, state: PeerState, payload: any) {
     if (await isFilteredOut(peer, payload)) {
       return
     }
+    // `previousRecord` only exists for subscription matching — never send
+    // it over the wire.
+    if (payload.previousRecord !== undefined) {
+      const { previousRecord: _previousRecord, ...framePayload } = payload
+      enqueueUpdate(peer, state, framePayload)
+      return
+    }
     enqueueUpdate(peer, state, payload)
   }
   catch (error) {

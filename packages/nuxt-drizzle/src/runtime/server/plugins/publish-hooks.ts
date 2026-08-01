@@ -31,12 +31,13 @@ export default defineNitroPlugin((nitroApp) => {
     })
   })
 
-  rstoreDrizzleHooks.hook('item.patch.after', async ({ event, collection, key, result }) => {
+  rstoreDrizzleHooks.hook('item.patch.after', async ({ event, collection, key, result, previousRecord }) => {
     publishRstoreDrizzleRealtimeUpdate({
       type: 'updated',
       collection,
       key,
       record: result,
+      previousRecord,
       originClientId: getHeader(event, CLIENT_ID_HEADER),
     })
   })
