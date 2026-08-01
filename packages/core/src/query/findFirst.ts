@@ -5,6 +5,7 @@ import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { unwrapItem } from '../item'
 import { isKeyDefined } from '../key'
+import { stringifyFindOptions } from '../utils/findOptions'
 import { peekFirst } from './peekFirst'
 
 export interface FindFirstParams<
@@ -40,7 +41,9 @@ export async function findFirst<
     })
   }
 
-  const dedupeKey = typeof keyOrOptions === 'string' ? keyOrOptions : JSON.stringify(keyOrOptions)
+  // Function-aware serialization: queries that differ only by a function
+  // option (e.g. `filter`) must not share the same in-flight promise
+  const dedupeKey = typeof keyOrOptions === 'string' ? keyOrOptions : stringifyFindOptions(keyOrOptions)
   return dedupePromise(store.$dedupePromises, `findFirst:${collection.name}:${dedupeKey}`, () => _findFirst({
     store,
     meta,

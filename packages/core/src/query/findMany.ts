@@ -4,6 +4,7 @@ import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { unwrapItem } from '../item'
 import { isKeyDefined } from '../key'
+import { stringifyFindOptions } from '../utils/findOptions'
 import { peekMany } from './peekMany'
 
 export interface FindManyParams<
@@ -39,7 +40,9 @@ export async function findMany<
     })
   }
 
-  const dedupeKey = JSON.stringify(findOptions)
+  // Function-aware serialization: queries that differ only by a function
+  // option (e.g. `filter`) must not share the same in-flight promise
+  const dedupeKey = stringifyFindOptions(findOptions)
   return dedupePromise(store.$dedupePromises, `findMany:${collection.name}:${dedupeKey}`, () => _findMany({
     store,
     meta,

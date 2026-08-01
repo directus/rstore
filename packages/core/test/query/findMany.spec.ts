@@ -278,9 +278,10 @@ describe('findMany', () => {
       ])
     })
 
-    it('should ignore filter function', async () => {
+    it('should not dedupe findMany with different filter functions', async () => {
+      let fetchCount = 0
       const fn = vi.fn((payload) => {
-        payload.setResult([{ foo: payload.findOptions.params.id.eq }])
+        payload.setResult([{ foo: payload.findOptions.params.id.eq, fetchCount: ++fetchCount }])
       })
       mockStore.$hooks.hook('fetchMany', fn)
 
@@ -294,6 +295,35 @@ describe('findMany', () => {
           store: mockStore,
           collection,
           findOptions: { filter: () => {}, params: { id: { eq: '42' } } },
+        }),
+      ])
+
+      // Different filter functions must not share the same in-flight promise
+      expect(fn).toHaveBeenCalledTimes(2)
+      expect(result.map(r => r.result)).toEqual([
+        [{ foo: '42', fetchCount: 1 }],
+        [{ foo: '42', fetchCount: 2 }],
+      ])
+    })
+
+    it('should dedupe findMany with the same filter function reference', async () => {
+      const fn = vi.fn((payload) => {
+        payload.setResult([{ foo: payload.findOptions.params.id.eq }])
+      })
+      mockStore.$hooks.hook('fetchMany', fn)
+
+      const filter = () => {}
+
+      const result = await Promise.all([
+        findMany({
+          store: mockStore,
+          collection,
+          findOptions: { filter, params: { id: { eq: '42' } } },
+        }),
+        findMany({
+          store: mockStore,
+          collection,
+          findOptions: { filter, params: { id: { eq: '42' } } },
         }),
       ])
 
