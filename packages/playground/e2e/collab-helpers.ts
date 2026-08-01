@@ -150,11 +150,16 @@ export async function openMultiplayerPeer(
     color: '#ef4444',
   }
 
+  // The wire protocol requires a connection-scoped `clientId` on every
+  // frame — frames without it are dropped by `validateMultiplayerMessage`.
+  const clientId = crypto.randomUUID()
+
   return {
     user,
     sendPresence(field) {
       socket.send(JSON.stringify({
         type: 'multiplayer:presence',
+        clientId,
         roomId,
         user,
         field,
@@ -163,6 +168,7 @@ export async function openMultiplayerPeer(
     sendUpdate(data) {
       socket.send(JSON.stringify({
         type: 'multiplayer:update',
+        clientId,
         roomId,
         userId: user.id,
         data,
@@ -178,6 +184,7 @@ export async function openMultiplayerPeer(
         if (socket.readyState === WebSocket.OPEN) {
           socket.send(JSON.stringify({
             type: 'multiplayer:leave',
+            clientId,
             roomId,
             userId: user.id,
           }))
