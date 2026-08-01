@@ -1,7 +1,8 @@
 import type { BatchWireOperation, BatchWireRequest, BatchWireResponse, BatchWireResult } from '../../utils/batch'
-import { defineEventHandler, readRawBody, setResponseHeader } from 'h3'
+import { createError, defineEventHandler, readRawBody, setResponseHeader } from 'h3'
 import SuperJSON from 'superjson'
 import { toBatchWireError } from '../../utils/batch'
+import { getQueryLimits } from '../utils/limits'
 import { drizzleCreate, drizzleDelete, drizzleFindOne, drizzleUpdate } from '../utils/operations'
 
 /**
@@ -17,6 +18,14 @@ import { drizzleCreate, drizzleDelete, drizzleFindOne, drizzleUpdate } from '../
 export default defineEventHandler(async (event): Promise<string> => {
   const raw = (await readRawBody(event, 'utf-8')) ?? ''
   const { operations } = SuperJSON.parse(raw) as BatchWireRequest
+
+  if (!Array.isArray(operations)) {
+    throw createError({ statusCode: 400, statusMessage: 'Invalid batch request' })
+  }
+  const { maxBatchSize } = getQueryLimits()
+  if (maxBatchSize !== false && operations.length > maxBatchSize) {
+    throw createError({ statusCode: 400, statusMessage: `Too many operations in batch (max ${maxBatchSize})` })
+  }
 
   const results = await Promise.all(operations.map(op => dispatchOne(event, op)))
 

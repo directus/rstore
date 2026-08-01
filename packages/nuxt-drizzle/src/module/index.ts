@@ -71,6 +71,7 @@ export default defineNuxtModule<ModuleOptions>({
       drizzleSchemaPath,
       drizzleConfig,
       drizzleImport: options.drizzleImport,
+      queryLimits: options.queryLimits,
       getCollections,
     })
     const { addPluginImport } = await registerRstoreNuxtImports(nuxt, resolveRuntime)

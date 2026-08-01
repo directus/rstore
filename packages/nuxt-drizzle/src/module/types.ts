@@ -36,6 +36,33 @@ export interface ModuleOptions {
   })
   /** Scope id under which the realtime plugin registers. */
   scopeId?: string
+  /**
+   * Bounds enforced on client-supplied queries by the generated REST/batch
+   * API. Each bound can be set to `false` to disable it (not recommended).
+   */
+  queryLimits?: {
+    /**
+     * Default `limit` when a list query sends none, and clamp when the
+     * client asks for more.
+     * @default 1000
+     */
+    maxLimit?: number | false
+    /**
+     * Maximum number of `keys` accepted by a fetchMany request.
+     * @default 1000
+     */
+    maxKeys?: number | false
+    /**
+     * Maximum nesting depth of the `include` tree.
+     * @default 5
+     */
+    maxIncludeDepth?: number | false
+    /**
+     * Maximum number of operations accepted by one `_batch` request.
+     * @default 100
+     */
+    maxBatchSize?: number | false
+  }
 }
 
 export type AllTableConfig = TableConfig & (

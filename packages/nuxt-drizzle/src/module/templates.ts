@@ -10,12 +10,14 @@ export function registerDrizzleTemplates({
   drizzleSchemaPath,
   drizzleConfig,
   drizzleImport,
+  queryLimits,
   getCollections,
 }: {
   nuxt: Nuxt
   drizzleSchemaPath: string
   drizzleConfig: DrizzleKitConfig
   drizzleImport: ModuleOptions['drizzleImport']
+  queryLimits: ModuleOptions['queryLimits']
   getCollections: () => Promise<Collection[]>
 }) {
   addServerTemplate({
@@ -24,6 +26,7 @@ export function registerDrizzleTemplates({
       drizzleSchemaPath,
       drizzleConfig,
       drizzleImport,
+      queryLimits,
       collections: await getCollections(),
     }),
   })
@@ -61,11 +64,13 @@ function createServerUtilsTemplate({
   drizzleSchemaPath,
   drizzleConfig,
   drizzleImport,
+  queryLimits,
   collections,
 }: {
   drizzleSchemaPath: string
   drizzleConfig: DrizzleKitConfig
   drizzleImport: ModuleOptions['drizzleImport']
+  queryLimits: ModuleOptions['queryLimits']
   collections: Collection[]
 }) {
   const collectionMetas: Record<string, CustomCollectionMeta | undefined> = {}
@@ -82,6 +87,7 @@ export const tables = schema
 export const collectionMetas = ${JSON.stringify(collectionMetas, null, 2)}
 export const collectionRelations = ${JSON.stringify(collectionRelations, null, 2)}
 export const dialect = '${drizzleConfig.dialect}'
+export const queryLimits = ${JSON.stringify(queryLimits ?? {})}
 export const useDrizzles = {
   default: _drizzleDefault,
 }`

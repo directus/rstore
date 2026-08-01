@@ -36,7 +36,9 @@ export async function drizzleFindOne({ event, collection, key, params, query, se
   applyTransforms(transforms, whereConditions, extras)
 
   const dbQuery = rstoreUseDrizzle().query as unknown as Record<string, RelationalQueryBuilder<any, any>>
-  const withRelations = searchQuery.with ?? convertIncludeToDrizzleWith(collection, searchQuery.include)
+  // `with` is deliberately NOT read from the wire: relations must go through
+  // `include` so they are sanitized and allow-list checked.
+  const withRelations = convertIncludeToDrizzleWith(collection, searchQuery.include)
 
   let result: any = await dbQuery[collection]!.findFirst({
     where: and(getDrizzleKeyWhere(key, primaryKeys, table), ...whereConditions),
