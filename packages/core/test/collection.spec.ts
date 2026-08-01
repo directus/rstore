@@ -176,6 +176,76 @@ describe('collection', () => {
   })
 })
 
+describe('collection fields isolation', () => {
+  it('should not leak field configs between collections', () => {
+    const parseA = (value: any) => `A:${value}`
+    const serializeB = (value: any) => `B:${value}`
+    const collectionTypes: StoreSchema = [
+      {
+        name: 'CollectionA',
+        fields: {
+          createdAt: {
+            parse: parseA,
+          },
+        },
+      },
+      {
+        name: 'CollectionB',
+        fields: {
+          createdAt: {
+            serialize: serializeB,
+          },
+        },
+      },
+    ]
+    const defaults: CollectionDefaults = {
+      fields: {
+        createdAt: {
+          parse: (value: any) => `default:${value}`,
+        },
+      },
+    }
+
+    const resolved = resolveCollections(collectionTypes, defaults)
+
+    // CollectionA keeps its own parse, no serialize leaked from CollectionB
+    expect(resolved[0]!.fields!.createdAt!.parse).toBe(parseA)
+    expect(resolved[0]!.fields!.createdAt!.serialize).toBeUndefined()
+    // CollectionB keeps the default parse and its own serialize, not CollectionA's parse
+    expect(resolved[1]!.fields!.createdAt!.parse).toBe(defaults.fields!.createdAt!.parse)
+    expect(resolved[1]!.fields!.createdAt!.serialize).toBe(serializeB)
+  })
+
+  it('should not mutate the defaults fields object', () => {
+    const collectionTypes: StoreSchema = [
+      {
+        name: 'TestCollection',
+        fields: {
+          createdAt: {
+            serialize: (value: any) => value,
+          },
+          extraField: {
+            parse: (value: any) => value,
+          },
+        },
+      },
+    ]
+    const defaults: CollectionDefaults = {
+      fields: {
+        createdAt: {
+          parse: (value: any) => value,
+        },
+      },
+    }
+
+    resolveCollections(collectionTypes, defaults)
+
+    // Defaults untouched: no serialize merged in, no extra path added
+    expect(defaults.fields!.createdAt!.serialize).toBeUndefined()
+    expect(defaults.fields!.extraField).toBeUndefined()
+  })
+})
+
 describe('normalizeCollectionRelations', () => {
   it('should normalize relations defined with collection function', () => {
     const collections = [

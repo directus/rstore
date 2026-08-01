@@ -67,6 +67,9 @@ export const emptySchemas: Full<CollectionSchemas> = {
   update: emptySchema(),
 }
 
+/**
+ * Resolve a collection definition by merging it with the collection defaults.
+ */
 export function resolveCollection<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -76,14 +79,20 @@ export function resolveCollection<
     throw new Error(`Collection name "${collection.name}" cannot start with "$"`)
   }
 
-  const fields = defaults?.fields ?? {}
+  // Merge default field configs with the collection-specific ones into fresh
+  // objects so no collection shares (and can mutate) the defaults or another
+  // collection's field configs
+  const fields: NonNullable<Collection['fields']> = {}
+  if (defaults?.fields) {
+    for (const path in defaults.fields) {
+      fields[path] = { ...defaults.fields[path] }
+    }
+  }
   if (collection.fields) {
     for (const path in collection.fields) {
-      if (fields[path]) {
-        Object.assign(fields[path], collection.fields[path])
-      }
-      else {
-        fields[path] = collection.fields[path]
+      fields[path] = {
+        ...fields[path],
+        ...collection.fields[path],
       }
     }
   }
@@ -112,6 +121,33 @@ export function resolveCollection<
       ...defaults?.meta,
       ...collection.meta,
     },
+  }
+}
+
+/**
+ * Merge collection default field configs into already-resolved collections.
+ *
+ * This must be called after plugin setup so that field defaults registered by
+ * plugins through `addCollectionDefaults` reach the collections that were
+ * resolved earlier (collections are resolved before plugins run). Field
+ * configs already present on a collection win over the defaults.
+ */
+export function mergeCollectionDefaultsFields(
+  collections: ResolvedCollection[],
+  defaults: CollectionDefaults | undefined,
+): void {
+  if (!defaults?.fields) {
+    return
+  }
+  for (const collection of collections) {
+    collection.fields ??= {}
+    for (const path in defaults.fields) {
+      // Clone so collections never share field config objects with the defaults
+      collection.fields[path] = {
+        ...defaults.fields[path],
+        ...collection.fields[path],
+      }
+    }
   }
 }
 

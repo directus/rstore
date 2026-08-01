@@ -2,10 +2,11 @@ import type { BatchingConfig, Cache, CollectionDefaults, CustomHookMeta, FindOpt
 import { get, set } from '@rstore/shared'
 import { createBatchScheduler } from './batch'
 import { builtinCollectionHooksPlugin } from './builtin/collectionHooks'
-import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollectionOppositeRelations, resolveCollections } from './collection'
+import { addCollectionRelations, isCollectionRelations, mergeCollectionDefaultsFields, normalizeCollectionRelations, resolveCollectionOppositeRelations, resolveCollections } from './collection'
 import { defaultFetchPolicy } from './fetchPolicy'
 import { mutate } from './mutation/mutate'
 import { setupPlugin, sortPlugins } from './plugin'
+import { createSync, getLastSyncedAt } from './sync'
 
 export interface CreateStoreCoreOptions<
   TSchema extends StoreSchema = StoreSchema,
@@ -132,63 +133,13 @@ export async function createStoreCore<
     $dedupePromises: new Map(),
     $registeredModules: new Map(),
     $wrapMutation: mutation => mutation as typeof mutation & MutationSpecialProps,
-    async $sync() {
-      store.$syncState.isSyncing = true
-      store.$syncState.error = undefined
-      store.$syncState.loadedCollections.clear()
-      store.$syncState.syncedCollections.clear()
-      try {
-        const meta: CustomHookMeta = {}
-
-        await store.$hooks.callHookWith('sync', async (callbacks) => {
-          let globalProgress = 0
-          for (const { callback } of callbacks) {
-            let callbackProgress = 0
-            await callback({
-              store: store as any,
-              meta,
-              setProgress: ({ percent, message }) => {
-                callbackProgress = percent
-                store.$syncState.progress = globalProgress + (callbackProgress / callbacks.length)
-                store.$syncState.progressMessage = message
-              },
-              setCollectionLoaded: (collectionName) => {
-                store.$syncState.loadedCollections.add(collectionName)
-              },
-              setCollectionSynced: (collectionName) => {
-                store.$syncState.syncedCollections.add(collectionName)
-              },
-            })
-            globalProgress += 1 / callbacks.length
-            store.$syncState.progress = globalProgress
-          }
-        })
-
-        store.$syncState.lastSyncAt = new Date()
-        window.localStorage.setItem('rstore-last-sync-at', store.$syncState.lastSyncAt.toISOString())
-      }
-      catch (error) {
-        store.$syncState.error = error as Error
-      }
-      finally {
-        store.$syncState.isSyncing = false
-      }
-    },
+    $sync: createSync(() => store),
     $syncState: {
       isSyncing: false,
       lastSyncAt: getLastSyncedAt(),
       loadedCollections: new Set(),
       syncedCollections: new Set(),
     },
-  }
-
-  function getLastSyncedAt(): Date | undefined {
-    if (typeof window != 'undefined') {
-      const timestamp = window.localStorage.getItem('rstore-last-sync-at')
-      if (timestamp) {
-        return new Date(Number(timestamp))
-      }
-    }
   }
 
   // Initialize batch scheduler if batching is enabled
@@ -213,6 +164,10 @@ export async function createStoreCore<
   // Setup plugins
 
   store.$plugins.forEach(plugin => setupPlugin(store, plugin))
+
+  // Propagate field defaults added by plugins (via `addCollectionDefaults`)
+  // to the collections that were resolved before the plugins ran
+  mergeCollectionDefaultsFields(store.$collections, store.$collectionDefaults)
 
   // Init store hook
 

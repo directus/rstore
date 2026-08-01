@@ -1,7 +1,7 @@
 import type { Cache, CollectionDefaults, Plugin, StoreSchema } from '@rstore/shared'
 import type { CreateStoreCoreOptions } from '../src/store'
 import { createHooks } from '@rstore/shared'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { defaultFetchPolicy } from '../src'
 import { createStoreCore } from '../src/store'
 
@@ -196,6 +196,99 @@ describe('createStoreCore', () => {
       store.$processItemSerialization(store.$collections[0]!, item)
 
       expect(item.metadata.createdAt).toBe('2023-01-01T00:00:00.000Z')
+    })
+  })
+
+  describe('plugin collection defaults fields', () => {
+    it('should propagate plugin field defaults when user provided collectionDefaults.fields', async () => {
+      const pluginParse = (value: any) => `plugin:${value}`
+      options.schema = [{ name: 'messages' }]
+      options.collectionDefaults = {
+        fields: {
+          createdAt: {
+            serialize: (value: Date) => value.toISOString(),
+          },
+        },
+      }
+      options.plugins = [{
+        name: 'test-plugin',
+        setup: ({ addCollectionDefaults }) => {
+          addCollectionDefaults({
+            fields: {
+              createdAt: {
+                parse: pluginParse,
+              },
+            },
+          })
+        },
+      }]
+
+      const store = await createStoreCore(options)
+      const collection = store.$collections.find(c => c.name === 'messages')!
+
+      // Both the user default and the plugin default reach the collection
+      expect(collection.fields!.createdAt!.serialize).toBeTypeOf('function')
+      expect(collection.fields!.createdAt!.parse).toBe(pluginParse)
+    })
+
+    it('should propagate plugin field defaults when user did not provide collectionDefaults', async () => {
+      const pluginParse = (value: any) => `plugin:${value}`
+      options.schema = [{ name: 'messages' }]
+      options.collectionDefaults = undefined
+      options.plugins = [{
+        name: 'test-plugin',
+        setup: ({ addCollectionDefaults }) => {
+          addCollectionDefaults({
+            fields: {
+              createdAt: {
+                parse: pluginParse,
+              },
+            },
+          })
+        },
+      }]
+
+      const store = await createStoreCore(options)
+      const collection = store.$collections.find(c => c.name === 'messages')!
+
+      expect(collection.fields!.createdAt!.parse).toBe(pluginParse)
+    })
+
+    it('should not let plugin field defaults override collection-specific field configs nor leak between collections', async () => {
+      const collectionParse = (value: any) => `collection:${value}`
+      const pluginParse = (value: any) => `plugin:${value}`
+      options.schema = [
+        {
+          name: 'messages',
+          fields: {
+            createdAt: {
+              parse: collectionParse,
+            },
+          },
+        },
+        { name: 'users' },
+      ]
+      options.plugins = [{
+        name: 'test-plugin',
+        setup: ({ addCollectionDefaults }) => {
+          addCollectionDefaults({
+            fields: {
+              createdAt: {
+                parse: pluginParse,
+              },
+            },
+          })
+        },
+      }]
+
+      const store = await createStoreCore(options)
+      const messages = store.$collections.find(c => c.name === 'messages')!
+      const users = store.$collections.find(c => c.name === 'users')!
+
+      // Collection-specific config wins over the plugin default
+      expect(messages.fields!.createdAt!.parse).toBe(collectionParse)
+      // Other collections get the plugin default, not the messages-specific config
+      expect(users.fields!.createdAt!.parse).toBe(pluginParse)
     })
   })
 
@@ -602,6 +695,97 @@ describe('createStoreCore', () => {
       const testItem = { username: 'toto' }
 
       expect(store.$getCollection(testItem, ['Foo'])).toBe(store.$collections[2])
+    })
+  })
+
+  describe('sync', () => {
+    /**
+     * Create a window global stub exposing a localStorage backed by a Map.
+     */
+    function stubWindowLocalStorage() {
+      const storage = new Map<string, string>()
+      vi.stubGlobal('window', {
+        localStorage: {
+          getItem: (key: string) => storage.get(key) ?? null,
+          setItem: (key: string, value: string) => {
+            storage.set(key, String(value))
+          },
+          removeItem: (key: string) => {
+            storage.delete(key)
+          },
+        },
+      })
+      return storage
+    }
+
+    beforeEach(() => {
+      options.hooks = createHooks()
+      options.syncImmediately = false
+    })
+
+    afterEach(() => {
+      vi.unstubAllGlobals()
+    })
+
+    it('should persist lastSyncAt and parse it back across a simulated reload', async () => {
+      const storage = stubWindowLocalStorage()
+
+      const store = await createStoreCore(options)
+      await store.$sync()
+
+      expect(store.$syncState.error).toBeUndefined()
+      expect(store.$syncState.lastSyncAt).toBeInstanceOf(Date)
+      expect(storage.get('rstore-last-sync-at')).toBe(store.$syncState.lastSyncAt!.toISOString())
+
+      // Simulated reload: a new store reads the persisted value back
+      const reloadedStore = await createStoreCore({ ...options, hooks: createHooks() })
+      expect(reloadedStore.$syncState.lastSyncAt).toBeInstanceOf(Date)
+      expect(Number.isNaN(reloadedStore.$syncState.lastSyncAt!.getTime())).toBe(false)
+      expect(reloadedStore.$syncState.lastSyncAt!.getTime()).toBe(store.$syncState.lastSyncAt!.getTime())
+    })
+
+    it('should parse legacy epoch-ms persisted values', async () => {
+      const storage = stubWindowLocalStorage()
+      const date = new Date('2023-01-01T00:00:00Z')
+      storage.set('rstore-last-sync-at', String(date.getTime()))
+
+      const store = await createStoreCore(options)
+
+      expect(store.$syncState.lastSyncAt).toBeInstanceOf(Date)
+      expect(store.$syncState.lastSyncAt!.getTime()).toBe(date.getTime())
+    })
+
+    it('should not fail in non-browser contexts', async () => {
+      // No window global in the node test environment
+      expect(typeof window).toBe('undefined')
+
+      const store = await createStoreCore(options)
+      await store.$sync()
+
+      expect(store.$syncState.error).toBeUndefined()
+      expect(store.$syncState.lastSyncAt).toBeInstanceOf(Date)
+    })
+
+    it('should not run sync callbacks twice for concurrent $sync calls', async () => {
+      const syncCallback = vi.fn(async () => {
+        // Simulate an async sync operation spanning multiple ticks
+        await new Promise(resolve => setTimeout(resolve, 10))
+      })
+      options.hooks.hook('sync', syncCallback)
+
+      const store = await createStoreCore(options)
+
+      const promise1 = store.$sync()
+      const promise2 = store.$sync()
+
+      // The second call returns the in-flight promise instead of re-running
+      expect(promise2).toBe(promise1)
+      await Promise.all([promise1, promise2])
+      expect(syncCallback).toHaveBeenCalledTimes(1)
+
+      // A new sync can run once the previous one settled
+      await store.$sync()
+      expect(syncCallback).toHaveBeenCalledTimes(2)
     })
   })
 })
