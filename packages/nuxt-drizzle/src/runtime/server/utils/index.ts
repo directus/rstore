@@ -1,12 +1,16 @@
 import type { CustomCollectionMeta } from '@rstore/vue'
 import type { Column, Table } from 'drizzle-orm'
 import type { PgDatabase } from 'drizzle-orm/pg-core'
-import type { RstoreDrizzleCondition } from '../../utils/types'
 // @ts-expect-error virtual file
 import { collectionMetas, collectionRelations, dialect, tables, useDrizzles } from '$rstore-drizzle-server-utils.js'
 import * as drizzle from 'drizzle-orm'
 import { createError } from 'h3'
+import { assertCollectionAllowed } from './allow-list'
+import { getDrizzleCondition, getDrizzleOrderBy } from './conditions'
 import { coerceKeySegment } from './key'
+import { getQueryLimits } from './limits'
+
+export { getDrizzleCondition, getDrizzleOrderBy } from './conditions'
 
 export type Dialect = 'postgresql' | 'mysql' | 'singlestore' | 'sqlite' | 'gel' | 'turso'
 
@@ -16,14 +20,30 @@ export interface RstoreDrizzleQueryParams {
   offset?: number
   orderBy?: string | string[]
   include?: any
-  with?: any
   columns?: any
   keys?: Array<string | number>
 }
 
 export type RstoreDrizzleQueryParamsOne = Omit<RstoreDrizzleQueryParams, 'limit' | 'offset' | 'orderBy'>
 
-export function getDrizzleTableFromCollection(collectionName: string) {
+/**
+ * Resolves a collection name to its drizzle table and primary keys.
+ *
+ * Single choke point for the `allowTables` allow-list: every client-reachable
+ * path (REST routes, `_batch` operations, relation `include`s) resolves its
+ * table here, so a non-allowed collection is rejected with a `403` no matter
+ * how the request came in.
+ *
+ * @param collectionName The collection name from the request.
+ * @param options Internal options.
+ * @param options.skipAllowCheck Skip the allow-list check — reserved for
+ * server-initiated work (e.g. publishing realtime updates); never pass it
+ * for client-supplied collection names.
+ */
+export function getDrizzleTableFromCollection(collectionName: string, options?: { skipAllowCheck?: boolean }) {
+  if (!options?.skipAllowCheck) {
+    assertCollectionAllowed(collectionName)
+  }
   const table = (tables as any)[collectionName] as Table
   if (!table) {
     throw createError({
@@ -47,25 +67,28 @@ export function getDrizzleCollectionRelations(collectionName: string) {
   return (collectionRelations as Record<string, Record<string, any>>)[collectionName] ?? {}
 }
 
-export function getDrizzleOrderBy(table: Table, orderByData: string | string[]) {
-  const list = typeof orderByData === 'string' ? [orderByData] : orderByData as Array<`${string}.${'asc' | 'desc'}`>
-  return list.map((rawOrderBy) => {
-    const parts = rawOrderBy.split('.')
-    if (parts.length !== 2) {
-      throw createError({
-        statusCode: 400,
-        statusMessage: 'Invalid orderBy',
-      })
-    }
-    const [columnName, order] = parts
-    const operator = order === 'asc' ? drizzle.asc : drizzle.desc
-    return operator((table as any)[columnName!] ?? drizzle.sql`${columnName}`.as(columnName!))
-  })
-}
-
-export function convertIncludeToDrizzleWith(collectionName: string, include: unknown): Record<string, any> | undefined {
+/**
+ * Converts a client-supplied `include` tree into a drizzle `with` object.
+ *
+ * Every included relation resolves its target collection through
+ * `getDrizzleTableFromCollection`, so the `allowTables` allow-list applies to
+ * related tables too, and recursion is capped at `maxIncludeDepth`.
+ *
+ * @param collectionName The collection the include tree starts from.
+ * @param include The client-supplied include tree.
+ * @param depth Current recursion depth (internal).
+ */
+export function convertIncludeToDrizzleWith(collectionName: string, include: unknown, depth = 0): Record<string, any> | undefined {
   if (!isRecord(include)) {
     return undefined
+  }
+
+  const { maxIncludeDepth } = getQueryLimits()
+  if (maxIncludeDepth !== false && depth >= maxIncludeDepth) {
+    throw createError({
+      statusCode: 400,
+      statusMessage: `Include tree is too deep (max ${maxIncludeDepth} levels)`,
+    })
   }
 
   const relations = getDrizzleCollectionRelations(collectionName)
@@ -79,6 +102,12 @@ export function convertIncludeToDrizzleWith(collectionName: string, include: unk
 
     const relation = relations[relationKey]
     const targetCollectionName = relation?.to ? Object.keys(relation.to)[0] : undefined
+
+    if (targetCollectionName) {
+      // Enforce the allow-list even for `include: { relation: true }`
+      // shortcuts that don't need the table itself.
+      assertCollectionAllowed(targetCollectionName)
+    }
 
     if (relationInclude === true || !isRecord(relationInclude)) {
       result[relationKey] = true
@@ -96,7 +125,7 @@ export function convertIncludeToDrizzleWith(collectionName: string, include: unk
       if ('orderBy' in relationInclude && relationInclude.orderBy != null) {
         relationWith.orderBy = getDrizzleOrderBy(table, relationInclude.orderBy)
       }
-      const nestedWith = convertIncludeToDrizzleWith(targetCollectionName, nestedInclude)
+      const nestedWith = convertIncludeToDrizzleWith(targetCollectionName, nestedInclude, depth + 1)
       if (nestedWith && Object.keys(nestedWith).length) {
         relationWith.with = nestedWith
       }
@@ -124,35 +153,6 @@ export function getDrizzleCollectionNameFromTable(table: Table) {
     })
   }
   return collectionName
-}
-
-export function getDrizzleCondition(table: Table, condition: RstoreDrizzleCondition): any {
-  if (condition == null) {
-    return undefined
-  }
-  if ('field' in condition) {
-    if ('value' in condition) {
-      if (condition.operator !== 'arrayContained' && condition.operator !== 'arrayContains' && condition.operator !== 'arrayOverlaps' && condition.operator !== 'inArray' && condition.operator !== 'notInArray') {
-        return drizzle[condition.operator](table[condition.field as keyof typeof table] as Column ?? drizzle.sql`${condition.field}`.as(condition.field), condition.value)
-      }
-      else {
-        // @ts-expect-error drizzle typing issue?
-        return drizzle[condition.operator]<typeof condition.value>(table[condition.field as keyof typeof table] as Column ?? drizzle.sql`${condition.field}`.as(condition.field), condition.value)
-      }
-    }
-    else if ('value1' in condition) {
-      return drizzle[condition.operator](table[condition.field as keyof typeof table] as Column ?? drizzle.sql`${condition.field}`.as(condition.field), condition.value1, condition.value2)
-    }
-    else {
-      return drizzle[condition.operator](table[condition.field as keyof typeof table] as Column ?? drizzle.sql`${condition.field}`.as(condition.field))
-    }
-  }
-  else if ('condition' in condition) {
-    return drizzle[condition.operator](getDrizzleCondition(table, condition.condition))
-  }
-  else if ('conditions' in condition) {
-    return drizzle[condition.operator](...condition.conditions.map(c => getDrizzleCondition(table, c)))
-  }
 }
 
 export function getDrizzleDialect(): Dialect {
