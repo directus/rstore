@@ -1,20 +1,9 @@
-import type { DirectusFilterContext, DirectusUnsupportedEvaluation } from './types'
+import type { ResolvedFilterValue } from '@rstore/connector-toolkit'
+import type { DirectusFilterContext } from './types'
 import { unsupported } from './types'
 
-/**
- * Resolved filter value that can be evaluated locally.
- */
-export type ResolvedFilterValue = {
-  /**
-   * Whether the value was resolved successfully.
-   */
-  supported: true
-
-  /**
-   * Static value to use in operator comparison.
-   */
-  value: any
-} | DirectusUnsupportedEvaluation
+export type { ResolvedFilterValue } from '@rstore/connector-toolkit'
+export { comparableValue } from '@rstore/connector-toolkit'
 
 /**
  * Resolves Directus dynamic variables that are cache-safe.
@@ -75,22 +64,6 @@ export function readItemValue(item: Record<string, any>, key: string): any {
     default:
       return undefined
   }
-}
-
-/**
- * Converts values into a stable primitive for ordering comparisons.
- */
-export function comparableValue(value: any): any {
-  if (value instanceof Date) {
-    return value.valueOf()
-  }
-  if (typeof value === 'string') {
-    const timestamp = Date.parse(value)
-    if (!Number.isNaN(timestamp) && /^\d{4}-\d{2}-\d{2}/.test(value)) {
-      return timestamp
-    }
-  }
-  return value
 }
 
 /**

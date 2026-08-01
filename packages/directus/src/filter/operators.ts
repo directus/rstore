@@ -1,37 +1,26 @@
-/* eslint-disable eqeqeq */
-
+import type { ExtraOperatorEvaluator } from '@rstore/connector-toolkit'
 import type { DirectusFilterEvaluation } from './types'
+import {
+  normalizeSortStrings,
+  evaluateOperator as toolkitEvaluateOperator,
+  paginateItems as toolkitPaginateItems,
+  sortItems as toolkitSortItems,
+} from '@rstore/connector-toolkit'
 import { supported, unsupported } from './types'
-import { comparableValue, readItemValue } from './values'
+import { readItemValue } from './values'
 
 /**
- * Evaluates one Directus field operator.
+ * Directus-specific operators layered on top of the core operator set:
+ * case-insensitive prefix/suffix matching, emptiness, regex, the
+ * boolean-validated `_nnull` mirror, and array-aware containment.
  */
-export function evaluateOperator(itemValue: any, operator: string, value: any): DirectusFilterEvaluation {
-  const comparableItem = comparableValue(itemValue)
-  const comparableFilter = comparableValue(value)
-
+export const directusExtraOperators: ExtraOperatorEvaluator = (itemValue, operator, value) => {
   switch (operator) {
-    case '_eq':
-      return supported(itemValue == value)
-    case '_neq':
-      return supported(itemValue != value)
-    case '_lt':
-      return supported(comparableItem < comparableFilter)
-    case '_lte':
-      return supported(comparableItem <= comparableFilter)
-    case '_gt':
-      return supported(comparableItem > comparableFilter)
-    case '_gte':
-      return supported(comparableItem >= comparableFilter)
-    case '_in':
-      return supported(Array.isArray(value) && value.some(v => itemValue == v))
-    case '_nin':
-      return supported(Array.isArray(value) && !value.some(v => itemValue == v))
-    case '_null':
-      return supported(itemValue == null)
     case '_nnull':
-      return supported(itemValue != null)
+      // `_nnull` takes a boolean: true matches non-null, false matches null.
+      return typeof value === 'boolean'
+        ? supported(value ? itemValue != null : itemValue == null)
+        : unsupported('_nnull expects a boolean value')
     case '_contains':
       return supported(contains(itemValue, value, false))
     case '_icontains':
@@ -40,26 +29,14 @@ export function evaluateOperator(itemValue: any, operator: string, value: any): 
       return supported(!contains(itemValue, value, false))
     case '_nicontains':
       return supported(!contains(itemValue, value, true))
-    case '_starts_with':
-      return supported(startsWith(itemValue, value, false))
     case '_istarts_with':
       return supported(startsWith(itemValue, value, true))
-    case '_nstarts_with':
-      return supported(!startsWith(itemValue, value, false))
     case '_nistarts_with':
       return supported(!startsWith(itemValue, value, true))
-    case '_ends_with':
-      return supported(endsWith(itemValue, value, false))
     case '_iends_with':
       return supported(endsWith(itemValue, value, true))
-    case '_nends_with':
-      return supported(!endsWith(itemValue, value, false))
     case '_niends_with':
       return supported(!endsWith(itemValue, value, true))
-    case '_between':
-      return supported(Array.isArray(value) && value.length === 2 && comparableItem >= comparableValue(value[0]) && comparableItem <= comparableValue(value[1]))
-    case '_nbetween':
-      return supported(Array.isArray(value) && value.length === 2 && (comparableItem < comparableValue(value[0]) || comparableItem > comparableValue(value[1])))
     case '_empty':
       return supported(!itemValue)
     case '_nempty':
@@ -67,53 +44,36 @@ export function evaluateOperator(itemValue: any, operator: string, value: any): 
     case '_regex':
       return supported(typeof itemValue === 'string' && typeof value === 'string' && new RegExp(value).test(itemValue))
     default:
-      return unsupported(`Filter operator not supported: ${operator}`)
+      // Fall through to the core operator switch.
+      return undefined
   }
 }
 
 /**
- * Applies Directus sort expressions to an item list.
+ * Evaluates one Directus field operator.
+ */
+export function evaluateOperator(itemValue: any, operator: string, value: any): DirectusFilterEvaluation {
+  return toolkitEvaluateOperator(itemValue, operator, value, { extra: directusExtraOperators })
+}
+
+/**
+ * Applies Directus sort expressions (`-field` for descending) to an item
+ * list, reading function-parameter fields like `year(created_at)`.
  */
 export function sortItems<TItem extends Record<string, any>>(items: TItem[], sort: string | string[] | undefined): TItem[] {
-  if (!sort) {
-    return items
-  }
-  const sortFields = Array.isArray(sort) ? sort : [sort]
-  return [...items].sort((a, b) => {
-    for (const rawField of sortFields) {
-      const desc = rawField.startsWith('-')
-      const field = desc ? rawField.slice(1) : rawField
-      const aValue = comparableValue(readItemValue(a, field))
-      const bValue = comparableValue(readItemValue(b, field))
-      if (aValue < bValue) {
-        return desc ? 1 : -1
-      }
-      if (aValue > bValue) {
-        return desc ? -1 : 1
-      }
-    }
-    return 0
-  })
+  return toolkitSortItems(items, normalizeSortStrings(sort), { readValue: readItemValue })
 }
 
 /**
- * Applies Directus limit, offset, and page options to an item list.
+ * Applies Directus limit, offset, and 1-based page options to an item list.
  */
 export function paginateItems<TItem>(items: TItem[], query: Record<string, any> | undefined): TItem[] {
-  if (!query) {
-    return items
-  }
-  const limit = typeof query.limit === 'number' ? query.limit : undefined
-  const offset = typeof query.offset === 'number'
-    ? query.offset
-    : typeof query.page === 'number' && limit != null
-      ? Math.max(0, query.page - 1) * limit
-      : 0
-  return limit == null ? items.slice(offset) : items.slice(offset, offset + limit)
+  return toolkitPaginateItems(items, query, { supportsPage: true })
 }
 
 /**
- * Tests string containment with optional case folding.
+ * Tests string containment with optional case folding; array item values
+ * match when any entry contains the searched string.
  */
 function contains(itemValue: any, value: any, ignoreCase: boolean): boolean {
   if (Array.isArray(itemValue)) {

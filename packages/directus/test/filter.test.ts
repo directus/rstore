@@ -82,6 +82,24 @@ describe('evaluateDirectusFilter', () => {
     })
   })
 
+  it('requires boolean operands for _null and _nnull', () => {
+    const item = { title: 'Todo', description: null }
+
+    expect(evaluateDirectusFilter(item, { description: { _null: true } }, { collection })).toEqual({ supported: true, matches: true })
+    expect(evaluateDirectusFilter(item, { description: { _null: false } }, { collection })).toEqual({ supported: true, matches: false })
+    expect(evaluateDirectusFilter(item, { title: { _nnull: true } }, { collection })).toEqual({ supported: true, matches: true })
+    expect(evaluateDirectusFilter(item, { description: { _nnull: false } }, { collection })).toEqual({ supported: true, matches: true })
+    // Non-boolean operands fall back to a remote fetch.
+    expect(evaluateDirectusFilter(item, { description: { _null: 1 } }, { collection })).toEqual({
+      supported: false,
+      reason: '_null expects a boolean value',
+    })
+    expect(evaluateDirectusFilter(item, { title: { _nnull: 'yes' } }, { collection })).toEqual({
+      supported: false,
+      reason: '_nnull expects a boolean value',
+    })
+  })
+
   it('marks relation and geometry filters as unsupported', () => {
     expect(evaluateDirectusFilter({ id: 1 }, {
       owner: {
@@ -124,6 +142,24 @@ describe('applyDirectusQuery', () => {
         { id: 1, title: 'Later', completed: false, priority: 1 },
       ],
     })
+  })
+
+  it('sorts nulls last ascending, nulls first descending, and strings by locale', () => {
+    const items = [
+      { id: 1, title: 'bravo', priority: 2 },
+      { id: 2, title: 'Alpha', priority: null },
+      { id: 3, title: 'charlie', priority: 1 },
+    ]
+
+    const ascending = applyDirectusQuery(items, { sort: ['priority'] }, { collection })
+    expect(ascending.supported && ascending.items.map(item => item.id)).toEqual([3, 1, 2])
+
+    const descending = applyDirectusQuery(items, { sort: ['-priority'] }, { collection })
+    expect(descending.supported && descending.items.map(item => item.id)).toEqual([2, 1, 3])
+
+    // `localeCompare` orders strings case-insensitively unlike `<`/`>`.
+    const byTitle = applyDirectusQuery(items, { sort: 'title' }, { collection })
+    expect(byTitle.supported && byTitle.items.map(item => item.id)).toEqual([2, 1, 3])
   })
 
   it('marks search as unsupported for cache-side evaluation', () => {

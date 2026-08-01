@@ -1,4 +1,13 @@
+import type { CodegenCollection, RenderedItemField, VirtualModuleNames } from '@rstore/connector-toolkit'
 import type { DirectusCollectionDefinition } from './introspection'
+import {
+  generateCollectionsTemplate as toolkitGenerateCollectionsTemplate,
+  generateItemsTemplate as toolkitGenerateItemsTemplate,
+  generateTypedCollectionsTemplate as toolkitGenerateTypedCollectionsTemplate,
+  generateViteDeclarations as toolkitGenerateViteDeclarations,
+  generateViteIndexTemplate as toolkitGenerateViteIndexTemplate,
+  generateViteSchemaTemplate as toolkitGenerateViteSchemaTemplate,
+} from '@rstore/connector-toolkit'
 import { directusFieldToTsType } from './introspection'
 
 /**
@@ -27,33 +36,54 @@ export interface GenerateTypedCollectionsTemplateOptions {
 }
 
 /**
+ * Names used by the generated Directus Vite virtual modules.
+ */
+const DIRECTUS_MODULE_NAMES: VirtualModuleNames = {
+  virtualId: 'virtual:rstore-directus',
+  clientBinding: 'directus',
+  pluginBinding: 'directusPlugin',
+  packageName: '@rstore/directus',
+  clientTypeName: 'DirectusRstoreClient',
+  pluginFactoryName: 'createDirectusRstorePlugin',
+}
+
+/**
+ * Generated collection narrowed to the toolkit codegen shape.
+ *
+ * `buildDirectusCollections` always assigns `scopeId`, which is optional on
+ * the base rstore `Collection` type.
+ */
+type DirectusCodegenCollection = DirectusCollectionDefinition & CodegenCollection
+
+/**
+ * Narrows generated collections to the toolkit codegen shape.
+ */
+function toCodegenCollections(collections: DirectusCollectionDefinition[]): DirectusCodegenCollection[] {
+  return collections as DirectusCodegenCollection[]
+}
+
+/**
+ * Returns the rendered item interface fields of a generated collection.
+ */
+function getItemFields(collection: DirectusCollectionDefinition): RenderedItemField[] {
+  return collection.directusFields.map(field => ({
+    name: field.field,
+    type: directusFieldToTsType(field),
+  }))
+}
+
+/**
  * Generates the runtime collection template consumed by `@rstore/nuxt`.
  */
 export function generateCollectionsTemplate(collections: DirectusCollectionDefinition[]): string {
-  return collections.map((collection, index) => {
-    return `export const collection${index} = {
-  name: ${JSON.stringify(collection.name)},
-  scopeId: ${JSON.stringify(collection.scopeId)},
-  meta: ${JSON.stringify(collection.meta)},
-  relations: ${JSON.stringify(collection.relations)},
-  getKey: (item) => ${collection.getKeyExpression},
-}`
-  }).join('\n')
+  return toolkitGenerateCollectionsTemplate(toCodegenCollections(collections))
 }
 
 /**
  * Generates TypeScript item interfaces from Directus field metadata.
  */
 export function generateItemsTemplate(collections: DirectusCollectionDefinition[]): string {
-  return collections.map((collection) => {
-    const fields = collection.directusFields.map((field) => {
-      return `  ${tsPropertyName(field.field)}: ${directusFieldToTsType(field)}`
-    }).join('\n')
-
-    return `export interface ${collection.typeName} {
-${fields}
-}`
-  }).join('\n\n')
+  return toolkitGenerateItemsTemplate(toCodegenCollections(collections), getItemFields)
 }
 
 /**
@@ -63,28 +93,9 @@ export function generateTypedCollectionsTemplate(
   collections: DirectusCollectionDefinition[],
   options: GenerateTypedCollectionsTemplateOptions = {},
 ): string {
-  if (!collections.length) {
-    return 'export {}\n'
-  }
-
-  const imports = collections.map(collection => collection.typeName).join(',\n  ')
-  const itemsImport = options.itemsImport ?? '#build/$rstore-directus-items'
-
-  return `import { withItemType } from '@rstore/vue'
-import type {
-  ${imports}
-} from '${itemsImport}'
-
-${collections.map((collection, index) => {
-  return `export const collection${index} = withItemType<${collection.typeName}>().defineCollection({
-  name: ${JSON.stringify(collection.name)},
-  scopeId: ${JSON.stringify(collection.scopeId)},
-  meta: ${JSON.stringify(collection.meta)},
-  relations: ${JSON.stringify(collection.relations)},
-  getKey: (item) => ${collection.getKeyExpression},
-})`
-}).join('\n\n')}
-`
+  return toolkitGenerateTypedCollectionsTemplate(toCodegenCollections(collections), {
+    itemsImport: options.itemsImport ?? '#build/$rstore-directus-items',
+  })
 }
 
 /**
@@ -100,16 +111,7 @@ export const scopeId = ${JSON.stringify(options.scopeId)}
  * Generates the runtime Vite virtual schema module.
  */
 export function generateViteSchemaTemplate(collections: DirectusCollectionDefinition[]): string {
-  const collectionExports = generateCollectionsTemplate(collections)
-  const schemaItems = collections.map((_, index) => `collection${index}`).join(',\n  ')
-  const collectionsSection = collectionExports ? `${collectionExports}\n\n` : ''
-
-  return `${collectionsSection}export const schema = [
-  ${schemaItems}
-]
-
-export default schema
-`
+  return toolkitGenerateViteSchemaTemplate(toCodegenCollections(collections))
 }
 
 /**
@@ -135,62 +137,14 @@ export default directusPlugin
  * Generates the Vite virtual module that re-exports schema and plugin modules.
  */
 export function generateViteIndexTemplate(): string {
-  return `export { schema } from 'virtual:rstore-directus/schema'
-export { directus, directusPlugin } from 'virtual:rstore-directus/plugin'
-`
+  return toolkitGenerateViteIndexTemplate(DIRECTUS_MODULE_NAMES)
 }
 
 /**
  * Generates TypeScript declarations for Vite virtual Directus modules.
  */
 export function generateViteDeclarations(collections: DirectusCollectionDefinition[]): string {
-  return `declare module 'virtual:rstore-directus/schema' {
-  import type { Collection, StoreSchema } from '@rstore/vue'
-
-${indent(generateItemsTemplate(collections), 2)}
-${collections.map((collection, index) => {
-  return `  export const collection${index}: Collection<${collection.typeName}> & {
-    readonly '~type': undefined
-    readonly '~item': ${collection.typeName}
-    readonly name: ${JSON.stringify(collection.name)}
-  }`
-}).join('\n')}
-  export const schema: ${collections.length ? `[${collections.map((_, index) => `typeof collection${index}`).join(', ')}]` : 'StoreSchema'}
-  export default schema
-}
-
-declare module 'virtual:rstore-directus/plugin' {
-  import type { DirectusRstoreClient, createDirectusRstorePlugin } from '@rstore/directus'
-
-  export const directus: DirectusRstoreClient
-  export const directusPlugin: ReturnType<typeof createDirectusRstorePlugin>
-  export default directusPlugin
-}
-
-declare module 'virtual:rstore-directus' {
-  import type { DirectusRstoreClient, createDirectusRstorePlugin } from '@rstore/directus'
-
-  export const schema: typeof import('virtual:rstore-directus/schema').schema
-  export const directus: DirectusRstoreClient
-  export const directusPlugin: ReturnType<typeof createDirectusRstorePlugin>
-}
-`
-}
-
-/**
- * Formats a Directus field as a TypeScript property name.
- */
-function tsPropertyName(name: string): string {
-  return /^[A-Z_$][\w$]*$/i.test(name) ? name : JSON.stringify(name)
-}
-
-/**
- * Indents generated source lines.
- */
-function indent(source: string, spaces: number): string {
-  const prefix = ' '.repeat(spaces)
-  return source
-    .split('\n')
-    .map(line => line ? `${prefix}${line}` : line)
-    .join('\n')
+  return toolkitGenerateViteDeclarations(toCodegenCollections(collections), DIRECTUS_MODULE_NAMES, {
+    getFields: getItemFields,
+  })
 }

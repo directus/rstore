@@ -1,4 +1,7 @@
 import type { Query } from '@directus/sdk'
+import { createConnectorQuery } from '@rstore/connector-toolkit'
+
+export { stripPrimaryKeys } from '@rstore/connector-toolkit'
 
 /**
  * Directus REST query options supported by the Directus adapter.
@@ -68,57 +71,9 @@ export function createDirectusQuery(
   findOptions?: DirectusFindOptions,
   overrides: DirectusQueryOptions = {},
 ): DirectusQueryOptions {
-  const query: DirectusQueryOptions = {}
-
-  assignDirectusQueryOptions(query, findOptions?.params)
-  assignDirectusQueryOptions(query, findOptions)
-
-  if (
-    findOptions?.pageIndex != null
-    && findOptions.pageSize != null
-    && query.limit == null
-    && query.offset == null
-    && query.page == null
-  ) {
-    query.limit = findOptions.pageSize
-    query.offset = findOptions.pageIndex * findOptions.pageSize
-  }
-
-  return {
-    ...query,
-    ...overrides,
-  }
-}
-
-/**
- * Removes Directus primary key fields from a mutation body.
- */
-export function stripPrimaryKeys<TItem extends Record<string, any>>(
-  item: TItem,
-  primaryKeys: string[] | undefined,
-): TItem {
-  const result = { ...item }
-  for (const key of primaryKeys?.length ? primaryKeys : ['id']) {
-    delete result[key]
-  }
-  return result
-}
-
-/**
- * Copies known Directus query options into the target query object.
- */
-function assignDirectusQueryOptions(
-  target: DirectusQueryOptions,
-  source?: DirectusQueryOptions | DirectusFindOptions,
-): void {
-  if (!source) {
-    return
-  }
-
-  for (const key of DIRECTUS_QUERY_KEYS) {
-    const value = source[key]
-    if (value !== undefined) {
-      ;(target as any)[key] = value
-    }
-  }
+  return createConnectorQuery<DirectusQueryOptions>(findOptions, overrides, {
+    knownKeys: DIRECTUS_QUERY_KEYS,
+    // An explicit Directus `page` option already paginates the query.
+    respectPageOption: true,
+  })
 }

@@ -1,6 +1,7 @@
 import type { DirectusCollection, DirectusField, DirectusRelation } from '@directus/sdk'
 import type { Collection } from '@rstore/shared'
 import type { DirectusGeneratedCollectionMeta } from '../runtime'
+import { collectionTypeName, createGetKeyExpression } from '@rstore/connector-toolkit'
 
 /**
  * Options used to transform Directus system metadata into rstore collections.
@@ -57,8 +58,6 @@ export interface DirectusCollectionDefinition extends Collection {
   relations: NonNullable<Collection['relations']>
 }
 
-const IDENTIFIER_RE = /^[A-Z_$][\w$]*$/i
-
 /**
  * Builds rstore collection definitions from Directus introspection metadata.
  */
@@ -89,13 +88,7 @@ export function directusFieldToTsType(field: DirectusField): string {
  * Creates a valid TypeScript interface name from a Directus collection name.
  */
 export function directusCollectionTypeName(collectionName: string): string {
-  const name = collectionName
-    .split(/[^\w$]+/)
-    .filter(Boolean)
-    .map(part => `${part[0]?.toUpperCase() ?? ''}${part.slice(1)}`)
-    .join('')
-
-  return IDENTIFIER_RE.test(name) ? name : `Directus${name || 'Item'}`
+  return collectionTypeName(collectionName, 'Directus')
 }
 
 /**
@@ -136,7 +129,7 @@ function createCollectionDefinition(
     'relations': {},
     'directusFields': directusFields,
     'typeName': directusCollectionTypeName(collection.collection),
-    'getKeyExpression': createGetKeyExpression(primaryKeys, meta.directus.singleton),
+    'getKeyExpression': createGetKeyExpression(primaryKeys, { singleton: meta.directus.singleton }),
   }
 }
 
@@ -176,28 +169,6 @@ function addAliasSideRelation(
       },
     },
   }
-}
-
-/**
- * Creates the generated `getKey` expression body.
- */
-function createGetKeyExpression(primaryKeys: string[], singleton: boolean): string {
-  if (singleton) {
-    return '\'singleton\''
-  }
-  if (!primaryKeys.length) {
-    return 'item.id'
-  }
-  return primaryKeys
-    .map(key => itemAccessExpression(key))
-    .join(' + \'::\' + ')
-}
-
-/**
- * Creates a safe JavaScript item property access expression.
- */
-function itemAccessExpression(key: string): string {
-  return IDENTIFIER_RE.test(key) ? `item.${key}` : `item[${JSON.stringify(key)}]`
 }
 
 /**

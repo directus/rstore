@@ -34,6 +34,15 @@ describe('createDirectusQuery', () => {
     })
   })
 
+  it('drops rstore function filters that only apply to the cache', () => {
+    expect(createDirectusQuery({
+      filter: ((item: any) => item.completed) as any,
+      limit: 5,
+    })).toEqual({
+      limit: 5,
+    })
+  })
+
   it('maps rstore pageIndex/pageSize to Directus offset/limit', () => {
     expect(createDirectusQuery({
       pageIndex: 3,
