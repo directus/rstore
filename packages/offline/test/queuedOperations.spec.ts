@@ -1,8 +1,8 @@
 import type { OfflineQueuedOperation } from '../src/plugin/types'
 import { deleteItem, updateItem } from '@rstore/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { installQueuedOperationSyncHook, shouldDropFailedOperation } from '../src/plugin/queuedOperations'
-import { createHookCollector, createRuntime } from './utils/plugin'
+import { replayQueuedOperations, shouldDropFailedOperation } from '../src/plugin/queuedOperations'
+import { createRuntime } from './utils/plugin'
 
 // Queued mutations are replayed in order on reconnect. An operation that can
 // never succeed — the row is gone, the payload is rejected — would otherwise be
@@ -50,7 +50,6 @@ describe('shouldDropFailedOperation', () => {
 })
 
 describe('queued operation replay', () => {
-  let collector: ReturnType<typeof createHookCollector>
   let runtime: ReturnType<typeof createRuntime>['runtime']
   let db: ReturnType<typeof createRuntime>['db']
   let store: any
@@ -58,15 +57,13 @@ describe('queued operation replay', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubGlobal('navigator', { onLine: true })
-    // The sync hook logs every failure; keep the test output readable.
+    // The replay logs every failure; keep the test output readable.
     vi.spyOn(console, 'error').mockImplementation(() => {})
 
-    collector = createHookCollector()
     const created = createRuntime()
     runtime = created.runtime
     db = created.db
     store = { $collections: [{ name: 'Todos' }] }
-    installQueuedOperationSyncHook(runtime, collector.hook)
   })
 
   afterEach(() => {
@@ -95,7 +92,7 @@ describe('queued operation replay', () => {
   it('removes an operation once it replays successfully', async () => {
     queueOperation()
 
-    await collector.run('sync', { store })
+    await replayQueuedOperations(runtime, store)
 
     expect(updateItem).toHaveBeenCalled()
     expect(queuedIds()).toEqual([])
@@ -105,7 +102,7 @@ describe('queued operation replay', () => {
     queueOperation()
     vi.mocked(updateItem).mockRejectedValue({ statusCode: 422 })
 
-    await collector.run('sync', { store })
+    await replayQueuedOperations(runtime, store)
 
     expect(queuedIds()).toEqual([])
   })
@@ -114,7 +111,7 @@ describe('queued operation replay', () => {
     queueOperation()
     vi.mocked(updateItem).mockRejectedValue({ statusCode: 503 })
 
-    await collector.run('sync', { store })
+    await replayQueuedOperations(runtime, store)
 
     expect(queuedIds()).toEqual(['op-1'])
   })
@@ -123,7 +120,7 @@ describe('queued operation replay', () => {
     queueOperation()
     vi.stubGlobal('navigator', { onLine: false })
 
-    await collector.run('sync', { store })
+    await replayQueuedOperations(runtime, store)
 
     expect(updateItem).not.toHaveBeenCalled()
     expect(queuedIds()).toEqual(['op-1'])
@@ -133,7 +130,7 @@ describe('queued operation replay', () => {
     queueOperation({ type: 'delete', item: undefined })
     vi.mocked(deleteItem).mockRejectedValue({ response: { status: 404 } })
 
-    await collector.run('sync', { store })
+    await replayQueuedOperations(runtime, store)
 
     expect(queuedIds()).toEqual([])
   })

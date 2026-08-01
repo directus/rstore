@@ -2,16 +2,21 @@ import type { OfflinePluginRuntime, OfflineQueuedOperation } from './types'
 import { createItem, createMany, deleteItem, deleteMany, updateItem, updateMany } from '@rstore/core'
 import { getOfflineDb } from './metadata'
 
-/** Register the hook that replays queued mutations during sync. */
-export function installQueuedOperationSyncHook(runtime: OfflinePluginRuntime, hook: any) {
-  hook('sync', async ({ store }: any) => {
-    const db = getOfflineDb(runtime)
-    const queuedOperations: OfflineQueuedOperation[] = await db.readAllItems(runtime.opsStoreName)
-    queuedOperations.sort((a, b) => a.time.getTime() - b.time.getTime())
-    for (const op of queuedOperations) {
-      await processQueuedOperation(runtime, store, op)
-    }
-  })
+/**
+ * Replay the queued offline mutations against the remote source, oldest first.
+ *
+ * Must run BEFORE the remote collection pull (see `syncOrchestrator.ts`):
+ * consumers of the `syncCollection` hook delete local keys missing on the
+ * server, so pulling first would wipe offline-created items before their
+ * queued create is ever sent.
+ */
+export async function replayQueuedOperations(runtime: OfflinePluginRuntime, store: any): Promise<void> {
+  const db = getOfflineDb(runtime)
+  const queuedOperations: OfflineQueuedOperation[] = await db.readAllItems(runtime.opsStoreName)
+  queuedOperations.sort((a, b) => a.time.getTime() - b.time.getTime())
+  for (const op of queuedOperations) {
+    await processQueuedOperation(runtime, store, op)
+  }
 }
 
 async function processQueuedOperation(runtime: OfflinePluginRuntime, store: any, op: OfflineQueuedOperation) {

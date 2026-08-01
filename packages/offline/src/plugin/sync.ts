@@ -2,50 +2,44 @@ import type { OfflineCollectionMetadata, OfflineMetadata, OfflinePluginRuntime }
 import { getLocalStorageItem, setLocalStorageItem } from '../localStorage'
 import { getMetadataKey, getOfflineDb, isCollectionIncluded } from './metadata'
 
-/** Register storage version cleanup and collection sync hooks. */
-export function installSyncHooks(runtime: OfflinePluginRuntime, hook: any) {
-  hook('init', async ({ store }: any) => {
-    const db = getOfflineDb(runtime)
-    if (runtime.options.version && runtime.globalMetadata?.version !== runtime.options.version) {
-      for (const collection of store.$collections) {
-        if (isCollectionIncluded(runtime, collection)) {
-          await db.clearDatabase(collection.name)
-        }
+/**
+ * Load locally persisted items into the cache, then pull remote changes for
+ * every included collection.
+ *
+ * Called by the sync orchestrator AFTER the queued offline mutations were
+ * replayed, so `syncCollection` consumers see offline-created items on the
+ * server and do not delete them locally.
+ */
+export async function pullCollections(runtime: OfflinePluginRuntime, { store, setProgress, setCollectionLoaded, setCollectionSynced }: any): Promise<void> {
+  store.$cache.pause()
+  try {
+    let completed = 0
+    await Promise.all(store.$collections.map(async (collection: any) => {
+      if (!isCollectionIncluded(runtime, collection)) {
+        return
       }
-    }
-  })
+      await syncCollection(runtime, {
+        store,
+        collection,
+        setCollectionLoaded,
+        setCollectionSynced,
+      })
+      completed++
+      setProgress({
+        percent: completed / store.$collections.length,
+      })
+    }))
 
-  hook('sync', async ({ store, setProgress, setCollectionLoaded, setCollectionSynced }: any) => {
-    store.$cache.pause()
-    try {
-      let completed = 0
-      await Promise.all(store.$collections.map(async (collection: any) => {
-        if (!isCollectionIncluded(runtime, collection)) {
-          return
-        }
-        await syncCollection(runtime, {
-          store,
-          collection,
-          setCollectionLoaded,
-          setCollectionSynced,
-        })
-        completed++
-        setProgress({
-          percent: completed / store.$collections.length,
-        })
-      }))
-
-      if (runtime.options.version) {
-        const newGlobalMetadata: OfflineMetadata = {
-          version: runtime.options.version,
-        }
-        setLocalStorageItem(runtime.globalMetadataKey, newGlobalMetadata)
+    if (runtime.options.version) {
+      const newGlobalMetadata: OfflineMetadata = {
+        version: runtime.options.version,
       }
+      setLocalStorageItem(runtime.globalMetadataKey, newGlobalMetadata)
     }
-    finally {
-      store.$cache.resume()
-    }
-  })
+  }
+  finally {
+    store.$cache.resume()
+  }
 }
 
 async function syncCollection(runtime: OfflinePluginRuntime, {

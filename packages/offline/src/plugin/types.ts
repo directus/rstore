@@ -8,6 +8,14 @@ export interface CreateOfflinePluginOptions {
   dbName?: string
   /** Allows cleaning up the data from the offline storage by version. */
   version?: number | string
+  /**
+   * Whether to also drop the queued offline mutations when `version` changes.
+   *
+   * Defaults to `false`: queued mutations are user data recorded while
+   * offline, so they are kept and replayed as-is (with a console warning),
+   * even though they were captured under the previous storage version.
+   */
+  clearQueueOnVersionChange?: boolean
 }
 
 /** Global offline storage metadata. */
@@ -66,6 +74,11 @@ export interface OfflinePluginRuntime {
   globalMetadata: OfflineMetadata | null
   /** Lazily initialized IndexedDB helper. */
   db?: Awaited<ReturnType<typeof useIndexedDb>>
+  /**
+   * In-flight offline sync run. Overlapping `sync` hook invocations share it
+   * instead of replaying the queued operations twice.
+   */
+  pendingSync?: Promise<void>
 }
 
 export type OfflineQueuedOperation = QueuedMutation | QueuedManyMutation

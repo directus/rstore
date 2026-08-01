@@ -3,9 +3,9 @@ import { definePlugin } from '@rstore/core'
 import { useIndexedDb } from '../indexeddb'
 import { createOfflineRuntime } from './metadata'
 import { installMutationHooks } from './mutations'
-import { installQueuedOperationSyncHook } from './queuedOperations'
 import { installReconnectHook } from './reconnect'
-import { installSyncHooks } from './sync'
+import { installOfflineSyncHook } from './syncOrchestrator'
+import { installVersionCleanupHook } from './versionCleanup'
 
 export type { CreateOfflinePluginOptions } from './types'
 
@@ -24,9 +24,10 @@ export function createOfflinePlugin(options: CreateOfflinePluginOptions = {}) {
         runtime.db = await useIndexedDb(options.dbName || 'rstore-offline')
       })
 
-      installSyncHooks(runtime, hook)
+      installVersionCleanupHook(runtime, hook)
       installMutationHooks(runtime, hook)
-      installQueuedOperationSyncHook(runtime, hook)
+      // Single ordered `sync` hook: queue replay first, then remote pull.
+      installOfflineSyncHook(runtime, hook)
       installReconnectHook(hook)
     },
   })
