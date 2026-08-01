@@ -8,6 +8,7 @@ import { useWebSocket } from '@vueuse/core'
 import { watch } from 'vue'
 import { getRstoreDrizzleClientId } from './utils/client-id'
 import { getSubscriptionId, RSTORE_DRIZZLE_PROTOCOL_VERSION } from './utils/realtime'
+import { createRealtimeReadyGate } from './utils/realtime-ready'
 import { maxPayloadStamp, stampToDate } from './utils/realtime-stamps'
 
 export default definePlugin({
@@ -39,25 +40,18 @@ export default definePlugin({
       })
 
       let connectCount = 0
-      // `awaitRealtimeReady()` resolves once the server has ack'd the init
-      // frame (or bound our clientId from the upgrade header). Mutations
-      // issued via `beforeMutation` await this so our own echoes are
-      // reliably suppressed for the originating tab.
-      let readyResolve: (() => void) | undefined
-      let readyPromise = new Promise<void>((resolve) => {
-        readyResolve = resolve
+      // The gate resolves once the server has ack'd the init frame (or
+      // bound our clientId from the upgrade header). Mutations issued via
+      // `beforeMutation` await it so our own echoes are reliably suppressed
+      // for the originating tab. It always settles — on ack, on handshake
+      // failure, or after a timeout — so a broken handshake (proxy strips
+      // the upgrade, endpoint down) degrades to "no echo suppression"
+      // instead of hanging every mutation forever.
+      const readyGate = createRealtimeReadyGate({
+        onTimeout: () => {
+          console.warn('[Realtime] Timed out waiting for the realtime handshake — mutations will proceed without echo suppression.')
+        },
       })
-      function resetReady() {
-        readyPromise = new Promise<void>((resolve) => {
-          readyResolve = resolve
-        })
-      }
-      function markReady() {
-        readyResolve?.()
-      }
-      function awaitRealtimeReady() {
-        return readyPromise
-      }
 
       hook('beforeMutation', async () => {
         // Offline: skip the realtime-ready wait — the socket will never
@@ -67,7 +61,7 @@ export default definePlugin({
           return
         }
         // Block mutations until we know the server has our clientId.
-        await awaitRealtimeReady()
+        await readyGate.wait()
       })
 
       hook('subscribe', ({ collection, key, findOptions }) => {
@@ -174,7 +168,7 @@ export default definePlugin({
               subscription?: SubscriptionRejectedMessage
             }
             if (message.init?.ok === true) {
-              markReady()
+              readyGate.markReady()
               return
             }
             if (message.init && message.init.ok === false) {
@@ -186,6 +180,10 @@ export default definePlugin({
                 message.init.error,
                 `(server v=${message.init.v}, client v=${RSTORE_DRIZZLE_PROTOCOL_VERSION})`,
               )
+              // Permanently settle the gate: realtime is down for good, so
+              // mutations must proceed (without echo suppression) instead of
+              // hanging — and the close below must not re-arm the gate.
+              readyGate.disable()
               ws.close()
               return
             }
@@ -259,9 +257,10 @@ export default definePlugin({
         if (status !== 'OPEN') {
           // Any drop (CLOSED/CONNECTING) re-arms readiness so mutations
           // issued before the next init-ack hold until the server
-          // re-registers our clientId.
+          // re-registers our clientId. The gate's built-in timeout keeps
+          // this from ever blocking mutations forever.
           if (status === 'CLOSED' || status === 'CONNECTING') {
-            resetReady()
+            readyGate.reset()
           }
           return
         }
