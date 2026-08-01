@@ -21,7 +21,7 @@
     "test:types": "pnpm run --parallel -r test:types",
     "copy-readme": "echo ./packages/* | xargs -n 1 cp README.md",
     "sync-skills": "node scripts/sync-dep-skills.mjs packages/vue packages/nuxt packages/nuxt-drizzle packages/directus packages/vite-directus packages/monospace packages/vite-monospace packages/nuxt-monospace",
-    "release": "pnpm run copy-readme && pnpm run lint && pnpm run test && pnpm run test:types && pnpm run build && sheep release -b main --force",
+    "release": "pnpm run copy-readme && pnpm run lint && pnpm run build && pnpm run test && pnpm run test:types && sheep release -b main --force",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs",

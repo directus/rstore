@@ -30,6 +30,7 @@
     "dev:prepare": "nuxi prepare ../playground",
     "dev:playground": "nuxi dev ../playground",
     "dev:build": "nuxi build ../playground",
+    "test": "vitest run",
     "test:types": "vue-tsc --noEmit"
   },
   "peerDependencies": {
