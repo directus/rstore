@@ -207,7 +207,7 @@ describe('updateMany', () => {
     await expect(updateMany({ ...options, items: [{ name: 'updated-item1' }] })).rejects.toThrow('Item update failed: key is not defined')
   })
 
-  it('should serialize items before processing', async () => {
+  it('should serialize copies of the items, not the original items', async () => {
     const resultItems = [{ id: '1', name: 'updated-item1' }] as Array<ResolvedCollectionItem<Collection, CollectionDefaults, StoreSchema>>
 
     mockStore.$hooks.hook('updateMany', vi.fn(({ setResult }) => setResult(resultItems)))
@@ -216,8 +216,39 @@ describe('updateMany', () => {
     await updateMany(options)
 
     expect(mockStore.$processItemSerialization).toHaveBeenCalledTimes(2)
-    expect(mockStore.$processItemSerialization).toHaveBeenCalledWith(mockCollection, mockItems[0])
-    expect(mockStore.$processItemSerialization).toHaveBeenCalledWith(mockCollection, mockItems[1])
+    const serializationCalls = vi.mocked(mockStore.$processItemSerialization).mock.calls
+    // Serialization receives copies with the same content...
+    expect(serializationCalls[0]![1]).toEqual(mockItems[0])
+    expect(serializationCalls[1]![1]).toEqual(mockItems[1])
+    // ...but never the original caller items (they must not be mutated)
+    expect(serializationCalls[0]![1]).not.toBe(mockItems[0])
+    expect(serializationCalls[1]![1]).not.toBe(mockItems[1])
+  })
+
+  it('should pass serialized values to hooks without mutating the original items', async () => {
+    const date = new Date('2023-01-01T00:00:00Z')
+    const items = [{ id: '1', name: 'updated-item1', updatedAt: date }] as Array<Partial<ResolvedCollectionItem<Collection, CollectionDefaults, StoreSchema>>>
+
+    // Simulate a field `serialize` config (e.g. Date -> ISO string)
+    mockStore.$processItemSerialization = vi.fn((_collection, item: any) => {
+      if (item.updatedAt instanceof Date) {
+        item.updatedAt = item.updatedAt.toISOString()
+      }
+    })
+
+    const beforeManyMutation = vi.fn()
+    const updateManyHook = vi.fn(({ items, setResult }) => setResult(items.map(({ item }: any) => item)))
+    mockStore.$hooks.hook('beforeManyMutation', beforeManyMutation)
+    mockStore.$hooks.hook('updateMany', updateManyHook)
+    mockStore.$cache.readItem = vi.fn(() => null as any)
+
+    await updateMany({ ...options, items })
+
+    // The serialized value reaches the hooks/adapter payload
+    expect(beforeManyMutation.mock.calls[0]![0].items[0].item.updatedAt).toBe('2023-01-01T00:00:00.000Z')
+    expect(updateManyHook.mock.calls[0]![0].items[0].item.updatedAt).toBe('2023-01-01T00:00:00.000Z')
+    // The caller's original item is not mutated
+    expect(items[0]!.updatedAt).toBe(date)
   })
 
   it('should call beforeManyMutation and afterManyMutation hooks', async () => {

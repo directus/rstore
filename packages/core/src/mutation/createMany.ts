@@ -30,8 +30,10 @@ export async function createMany<
   const originalItems = items
 
   items = items.map((item) => {
+    // Serialize the cloned copy so the caller's original item is not mutated
+    // and the serialized values are the ones sent to hooks/adapters
     const processedItem = pickNonSpecialProps(item, true) as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
-    store.$processItemSerialization(collection, item)
+    store.$processItemSerialization(collection, processedItem)
     return processedItem
   })
 
