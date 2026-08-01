@@ -38,7 +38,7 @@ describe('room', () => {
     room.add(a)
     room.add(b)
     room.add(c)
-    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u' }, 'b')
+    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' }, 'b')
     expect(a.sent).toHaveLength(1)
     expect(b.sent).toHaveLength(0)
     expect(c.sent).toHaveLength(1)
@@ -54,7 +54,7 @@ describe('room', () => {
     room.add(bad)
     room.add(good)
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u' })
+    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' })
     expect(good.sent).toHaveLength(1)
     expect(spy).toHaveBeenCalled()
     spy.mockRestore()
@@ -75,7 +75,7 @@ describe('room', () => {
     room.add(middle)
     room.add(last)
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
-    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u' })
+    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' })
     spy.mockRestore()
     expect(first.sent).toHaveLength(1)
     expect(last.sent).toHaveLength(1)
@@ -92,6 +92,7 @@ describe('room', () => {
       type: 'multiplayer:update' as const,
       roomId: 'r',
       userId: 'u',
+      clientId: 'c',
       data: { cursor: { line: 1, ch: 5 } },
     }
     room.broadcast(message)
@@ -118,7 +119,7 @@ describe('room', () => {
       },
     }
     room.add(triggering)
-    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u' })
+    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' })
     // The late joiner must not have received the in-flight message.
     expect(lateJoiner.sent).toHaveLength(0)
     expect(attemptedAdd).toBe(true)
@@ -130,7 +131,7 @@ describe('room', () => {
     const ab = makePeer('ab') // substring overlap with 'a'
     room.add(a)
     room.add(ab)
-    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u' }, 'a')
+    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' }, 'a')
     expect(a.sent).toHaveLength(0)
     // Exact string equality only — 'ab' must still receive.
     expect(ab.sent).toHaveLength(1)
@@ -143,7 +144,7 @@ describe('room', () => {
     room.add(a)
     room.add(b)
     room.remove('a')
-    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u' })
+    room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' })
     expect(a.sent).toHaveLength(0)
     expect(b.sent).toHaveLength(1)
   })

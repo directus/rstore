@@ -13,6 +13,15 @@ export interface MultiplayerAuthorizePayload {
   peer: Peer
   roomId: string
   reject: (reason?: string) => void
+  /**
+   * Bind a server-verified user id to this connection (e.g. from the
+   * session cookie available on `peer.request`). Once bound, every frame
+   * the peer sends is stamped with this id — client-supplied
+   * `userId` / `user.id` values are overwritten, so peers cannot
+   * impersonate other users. When no handler calls this, the first
+   * client-supplied id is bound instead (trust-on-first-frame).
+   */
+  setUserId: (userId: string) => void
 }
 
 /**
@@ -74,6 +83,11 @@ class MultiplayerHooks {
     for (const handler of handlers) {
       await handler(payload)
     }
+  }
+
+  /** True when at least one handler is registered for `name`. */
+  hasHook(name: HookName): boolean {
+    return (this.handlers.get(name)?.length ?? 0) > 0
   }
 }
 

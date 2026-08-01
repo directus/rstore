@@ -2,6 +2,8 @@ import { addServerHandler, addServerImports, addTemplate, createResolver, define
 
 export * from './runtime/server/guards'
 export * from './runtime/server/hooks'
+export * from './runtime/server/identity'
+export * from './runtime/server/origin'
 export * from './runtime/server/rooms'
 export * from './runtime/server/types'
 
@@ -32,9 +34,21 @@ export interface RstoreMultiplayerServerModuleOptions {
    * @default { capacity: 60, refillPerSecond: 30 }
    */
   rateLimit?: { capacity: number, refillPerSecond: number } | false | null
+  /**
+   * Origins accepted at WebSocket upgrade time. By default only
+   * same-origin upgrades are allowed (the `Origin` header host must match
+   * the request `Host`) — this blocks cross-site WebSocket hijacking.
+   * Provide an array of extra allowed origins (e.g.
+   * `['https://app.example.com']`) or `false` to disable the check.
+   *
+   * @default undefined (same-origin only)
+   */
+  allowedOrigins?: string[] | false
 }
 
-const DEFAULT_OPTIONS: Required<Omit<RstoreMultiplayerServerModuleOptions, 'rateLimit'>> & {
+// `allowedOrigins` intentionally has no default entry — `undefined` means
+// "same-origin only", which is the safe default enforced at runtime.
+const DEFAULT_OPTIONS: Required<Omit<RstoreMultiplayerServerModuleOptions, 'rateLimit' | 'allowedOrigins'>> & {
   rateLimit: { capacity: number, refillPerSecond: number } | null
 } = {
   endpoint: '/api/rstore-multiplayer/ws',
@@ -63,6 +77,7 @@ export default defineNuxtModule<RstoreMultiplayerServerModuleOptions>({
         options.rateLimit === false || options.rateLimit === null
           ? null
           : (options.rateLimit ?? DEFAULT_OPTIONS.rateLimit),
+      allowedOrigins: options.allowedOrigins,
     }
 
     const nitro = ((nuxt.options as unknown as Record<string, any>).nitro ??= {}) as Record<string, any>
@@ -74,6 +89,7 @@ export default defineNuxtModule<RstoreMultiplayerServerModuleOptions>({
       getContents: () => `export const maxRoomSize = ${JSON.stringify(resolved.maxRoomSize)}
 export const maxMessageBytes = ${JSON.stringify(resolved.maxMessageBytes)}
 export const rateLimit = ${JSON.stringify(resolved.rateLimit)}
+export const allowedOrigins = ${JSON.stringify(resolved.allowedOrigins)}
 `,
     })
 
