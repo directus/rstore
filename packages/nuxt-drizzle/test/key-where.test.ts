@@ -9,7 +9,7 @@ vi.mock('$rstore-drizzle-server-utils.js', () => ({
   dialect: 'sqlite',
 }))
 
-const { getDrizzleKeyWhere } = await import('../src/runtime/server/utils/index')
+const { getDrizzleKeyWhere, getDrizzleKeyWhereFromBody } = await import('../src/runtime/server/utils/index')
 
 const sqliteDialect = new SQLiteSyncDialect()
 const pgDialect = new PgDialect()
@@ -76,5 +76,32 @@ describe('getDrizzleKeyWhere', () => {
 
   it('throws when the collection has no primary key', () => {
     expect(() => getDrizzleKeyWhere('1', [], todos)).toThrow(/No key in route parameters/)
+  })
+})
+
+describe('getDrizzleKeyWhereFromBody', () => {
+  // Body values arrive through SuperJSON, so they already have the type the
+  // client authored — coercing them like a route segment would be wrong.
+  it('binds body values as authored', () => {
+    expect(params(getDrizzleKeyWhereFromBody({ id: 42 }, ['id'], todos))).toEqual([42])
+    expect(params(getDrizzleKeyWhereFromBody({ slug: 'abc' }, ['slug'], todos))).toEqual(['abc'])
+  })
+
+  it('binds every segment of a composite key', () => {
+    expect(params(getDrizzleKeyWhereFromBody({ id: 1, slug: 'abc' }, ['id', 'slug'], todos))).toEqual([1, 'abc'])
+  })
+
+  // Without this guard a create on an auto-increment table that fails for an
+  // unrelated reason (NOT NULL, foreign key) would be probed with a partial
+  // key and could be mislabeled as a duplicate.
+  it('returns undefined unless the body pins every primary key', () => {
+    expect(getDrizzleKeyWhereFromBody({}, ['id'], todos)).toBeUndefined()
+    expect(getDrizzleKeyWhereFromBody({ id: null }, ['id'], todos)).toBeUndefined()
+    expect(getDrizzleKeyWhereFromBody({ id: 1 }, ['id', 'slug'], todos)).toBeUndefined()
+    expect(getDrizzleKeyWhereFromBody({ id: 1 }, [], todos)).toBeUndefined()
+  })
+
+  it('returns undefined when a primary key is not a column on the table', () => {
+    expect(getDrizzleKeyWhereFromBody({ missing: 1 }, ['missing'], todos)).toBeUndefined()
   })
 })

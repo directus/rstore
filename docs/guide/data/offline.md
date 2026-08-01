@@ -164,3 +164,17 @@ For a robust offline experience, each collection should have:
 While offline, mutations are queued and replayed when the connection is restored. The plugin handles queue execution automatically.
 
 Conflicts are application-specific. If multiple clients can edit the same records, implement conflict strategy on the backend (for example last-write-wins, merge rules, or version checks) and return canonical records so rstore can converge correctly.
+
+### Replay failures
+
+Queued mutations are replayed **in order**, so an operation the server will never accept doesn't just fail repeatedly — it blocks everything queued behind it. The plugin decides what to do from the HTTP status of the failure:
+
+| Status | Behavior |
+| ------ | -------- |
+| `4xx`, except `401`, `408` and `429` | Dropped from the queue |
+| `401`, `408`, `429` | Kept — a token refresh or a later retry may fix it |
+| `5xx`, network errors, no status at all | Kept and retried on every sync |
+
+This is what "idempotent mutation endpoints" means in practice. The common case is a create whose request reached the server and committed, but whose response was lost (the page was closed mid-replay, or two tabs replayed the same queue). On replay the row already exists, and if the backend lets the primary key constraint surface as a `500` the operation is retried forever. **Answer a duplicate create with `409`** so it is dropped and the queue converges.
+
+The [Nuxt Drizzle plugin](../../plugins/nuxt-drizzle.md#duplicate-create-replays) does this for you.

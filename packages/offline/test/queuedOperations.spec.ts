@@ -20,7 +20,10 @@ vi.mock('@rstore/core', () => ({
 
 describe('shouldDropFailedOperation', () => {
   it('drops permanent client errors', () => {
-    for (const status of [400, 403, 404, 410, 422]) {
+    // 409 is load-bearing: a backend answers a replayed create whose first
+    // attempt already committed with a conflict, and the replay converges only
+    // if that drops the operation.
+    for (const status of [400, 403, 404, 409, 410, 422]) {
       expect(shouldDropFailedOperation({ statusCode: status })).toBe(true)
     }
   })

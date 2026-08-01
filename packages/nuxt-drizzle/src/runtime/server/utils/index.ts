@@ -179,6 +179,35 @@ export function getDrizzleKeyWhere(key: string, primaryKeys: string[], table: Ta
   }
 }
 
+/**
+ * Builds the `where` matching the primary key carried by a request body, or
+ * `undefined` when the body doesn't pin every primary key column.
+ *
+ * Unlike `getDrizzleKeyWhere` these are not route segments: bodies travel
+ * through SuperJSON, so each value still has the type the client authored
+ * (number, string, `Date`) and must *not* go through `coerceKeySegment`.
+ *
+ * @param body The request body.
+ * @param primaryKeys The collection primary key column names.
+ * @param table The drizzle table.
+ * @returns A drizzle condition, or `undefined` when the key is incomplete.
+ */
+export function getDrizzleKeyWhereFromBody(body: Record<string, any>, primaryKeys: string[], table: Table) {
+  if (!primaryKeys.length) {
+    return undefined
+  }
+  const conditions: any[] = []
+  for (const primaryKey of primaryKeys) {
+    const value = body?.[primaryKey]
+    const column = table[primaryKey as keyof typeof table] as Column | undefined
+    if (value == null || !column) {
+      return undefined
+    }
+    conditions.push(drizzle.eq(column, value))
+  }
+  return conditions.length > 1 ? drizzle.and(...conditions) : conditions[0]
+}
+
 // for the type, I picked PgDatabase but it can be any
 // afaik drizzle-orm doesn't have a generic type for the database
 export function rstoreUseDrizzle(): PgDatabase<any> {

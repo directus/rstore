@@ -378,6 +378,14 @@ export default defineNuxtConfig({
 })
 ```
 
+### Duplicate create replays <Badge text="New in v0.9" />
+
+A `POST` targeting a row whose primary key already exists responds with `409 Conflict` (`Item already exists in collection <name>`) instead of letting the database constraint surface as a `500`.
+
+This matters for offline replay: the queue [drops a permanent `4xx` but retries every `5xx` forever](../guide/data/offline.md#replay-failures), so a create whose first attempt committed but whose response was lost would otherwise block the queue behind it. You don't need to add an existence check of your own in an `index.post.before` hook.
+
+The check only runs *after* the insert fails, so a successful create costs no extra query. It covers primary keys only — a collision on some other unique index still surfaces as the driver error.
+
 ## Batching <Badge text="New in v0.9" />
 
 The module ships with built-in support for rstore's [batching](../guide/data/batching.md) layer. When you enable batching on the store, every eligible `findFirst`-by-key, `create`, `update` and `delete` from the same tick is folded into a single round-trip to a generated `POST {apiPath}/_batch` endpoint. The server dispatches each op in parallel and returns per-op results, so one failing op never blocks its siblings.
@@ -398,6 +406,8 @@ export default defineNuxtConfig({
 ```
 
 All the usual `before` / `after` hooks (`item.get.before`, `index.post.before`, etc.) still fire per-op inside a batch, so permission checks and query transforms keep working unchanged.
+
+A failing op carries its HTTP status back to the client, so an error thrown with `createError` in a hook behaves identically batched and unbatched.
 
 ## Hooks
 

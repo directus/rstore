@@ -98,6 +98,8 @@ Before adding a `server/api/*.ts` handler, a `defineEventHandler`, or any custom
 - `offline` enables offline plugin generation and sync config wiring.
 - Offline sync expects stable keys and usable `updatedAt` comparison values.
 - `offline.serializeDateValue` exists for non-default date comparison serialization.
+- A create whose primary key already exists returns `409`, so a replayed create is dropped from the offline queue instead of being retried forever. The check runs only after the insert fails and covers primary keys only, not other unique indexes.
+- Failed operations inside a `_batch` request carry their HTTP status back to the client, so `createError` in a hook behaves the same batched and unbatched.
 
 ## Server extension points
 
@@ -116,7 +118,8 @@ Before adding a `server/api/*.ts` handler, a `defineEventHandler`, or any custom
 5. Composite keys serialize as `value1::value2`; mismatches here cause lookup/update issues.
 6. `params.where` is deprecated; use `findOptions.where`.
 7. `allowTables` flips the default from "all tables exposed" to "deny by default". After the first call, every new Drizzle table you add to the schema must also be added to `allowTables` — otherwise endpoints throw `Collection "<name>" is not allowed.` at runtime.
-8. Do not hand-write `server/api/<table>/*` CRUD routes for tables already exposed by the generated `apiPath`. Duplicate code paths drift, bypass `allowTables` / `hooksForTable`, and miss realtime publishing — extend behavior through hooks or use `publishRstoreDrizzleRealtimeUpdate` from a justified custom route.
+8. Do not add a pre-insert existence check in an `index.post.before` hook to guard against duplicate creates — the module already answers a duplicate primary key with `409`, and the extra `SELECT` costs a round-trip on every create while still racing concurrent inserts.
+9. Do not hand-write `server/api/<table>/*` CRUD routes for tables already exposed by the generated `apiPath`. Duplicate code paths drift, bypass `allowTables` / `hooksForTable`, and miss realtime publishing — extend behavior through hooks or use `publishRstoreDrizzleRealtimeUpdate` from a justified custom route.
 
 ## References
 

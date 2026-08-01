@@ -1,6 +1,7 @@
 import type { BatchWireOperation, BatchWireRequest, BatchWireResponse, BatchWireResult } from '../../utils/batch'
 import { defineEventHandler, readRawBody, setResponseHeader } from 'h3'
 import SuperJSON from 'superjson'
+import { toBatchWireError } from '../../utils/batch'
 import { drizzleCreate, drizzleDelete, drizzleFindOne, drizzleUpdate } from '../utils/operations'
 
 /**
@@ -27,7 +28,9 @@ export default defineEventHandler(async (event): Promise<string> => {
 
 /**
  * Dispatch a single wire op and return its success/failure envelope.
- * Does not throw — any dispatch error becomes `{ ok: false, error }`.
+ * Does not throw — any dispatch error becomes `{ ok: false, error }`,
+ * carrying its HTTP status so the client can tell a permanent failure
+ * (a `409` duplicate create, a `403` from a hook) from a retryable one.
  */
 async function dispatchOne(event: any, op: BatchWireOperation): Promise<BatchWireResult> {
   try {
@@ -35,7 +38,7 @@ async function dispatchOne(event: any, op: BatchWireOperation): Promise<BatchWir
     return { ok: true, result }
   }
   catch (error: any) {
-    return { ok: false, error: error?.message ?? String(error) }
+    return toBatchWireError(error)
   }
 }
 

@@ -1,6 +1,7 @@
 import type { BatchWireOperation, BatchWireResponse } from '../utils/batch'
 import type { DrizzlePluginContext } from './context'
 import SuperJSON from 'superjson'
+import { fromBatchWireError } from '../utils/batch'
 import { clientIdHeaders } from './context'
 import { stripPrimaryKeys } from './mutationHooks'
 
@@ -38,7 +39,7 @@ export function installBatchHook(ctx: DrizzlePluginContext, hook: any) {
         op.setResult(op.type === 'delete' ? undefined : entry.result ?? undefined)
       }
       else {
-        op.setError(new Error(entry.error))
+        op.setError(fromBatchWireError(entry))
       }
     })
   })
