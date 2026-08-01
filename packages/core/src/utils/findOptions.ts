@@ -6,13 +6,6 @@
 const functionIds = new WeakMap<(...args: any[]) => any, string>()
 
 /**
- * Random per-process prefix ensuring function ids never collide across
- * processes (e.g. cache markers serialized on the server then hydrated on the
- * client), since function identity cannot be transferred between processes.
- */
-const processId = Math.random().toString(36).slice(2)
-
-/**
  * Counter used to generate unique function ids.
  */
 let nextFunctionId = 0
@@ -23,21 +16,45 @@ let nextFunctionId = 0
 function getFunctionId(fn: (...args: any[]) => any): string {
   let id = functionIds.get(fn)
   if (id == null) {
-    id = `${processId}-${++nextFunctionId}`
+    id = String(++nextFunctionId)
     functionIds.set(fn, id)
   }
   return id
+}
+
+export interface StringifyFindOptionsOptions {
+  /**
+   * Omit function-valued properties instead of serializing them to a
+   * per-process id.
+   *
+   * Required for cache markers: markers are serialized into the SSR payload
+   * and recomputed on the client, and no function id can survive that
+   * boundary — reference identity is process-local, and even source-based
+   * hashes diverge because server and client bundles transform the same
+   * code differently (minification, ref unwrapping). Omission is safe for
+   * markers because function options only filter the cache client-side —
+   * what a fetch returns is driven by the serializable options, which stay
+   * in the marker.
+   */
+  omitFunctions?: boolean
 }
 
 /**
  * Serialize find options for dedupe keys and cache markers.
  *
  * Unlike plain `JSON.stringify`, function-valued properties (e.g. a `filter`
- * function) are not silently dropped: each function is replaced by a unique
- * per-process id, so two queries that differ only by their function options
- * never produce the same key, while repeated calls with the same function
- * reference do.
+ * function) are not silently dropped by default: each function is replaced
+ * by a unique per-process id, so two queries that differ only by their
+ * function options never share a key, while repeated calls with the same
+ * function reference do. Pass `omitFunctions: true` for keys that must be
+ * stable across processes (see {@link StringifyFindOptionsOptions}).
  */
-export function stringifyFindOptions(findOptions: unknown): string {
-  return JSON.stringify(findOptions, (_key, value) => typeof value === 'function' ? `$fn:${getFunctionId(value)}` : value)
+export function stringifyFindOptions(findOptions: unknown, options?: StringifyFindOptionsOptions): string {
+  const omitFunctions = options?.omitFunctions ?? false
+  return JSON.stringify(findOptions, (_key, value) => {
+    if (typeof value === 'function') {
+      return omitFunctions ? undefined : `$fn:${getFunctionId(value)}`
+    }
+    return value
+  })
 }

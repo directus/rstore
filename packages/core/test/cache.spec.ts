@@ -46,25 +46,20 @@ describe('defaultMarker', () => {
     expect(result).toBe(defaultMarker(collection, { params: { foo: 'bar' } } as any))
   })
 
-  it('should not collide markers for queries with different function filters', () => {
+  it('should omit function options from the marker', () => {
     const collection = createCollection()
-    const filterA = () => true
-    const filterB = () => true
-    const markerA = defaultMarker(collection, { filter: filterA, params: { foo: 'bar' } })
-    const markerB = defaultMarker(collection, { filter: filterB, params: { foo: 'bar' } })
+    // Markers must be identical across processes: they are computed during
+    // SSR, serialized into the payload and recomputed on the client — no
+    // function id survives that boundary (reference identity is
+    // process-local and server/client bundles transform the same source
+    // differently). A fresh closure per options-getter evaluation must not
+    // mint a fresh marker either.
+    const markerA = defaultMarker(collection, { filter: () => true, params: { foo: 'bar' } })
+    const markerB = defaultMarker(collection, { filter: () => true, params: { foo: 'bar' } })
     const markerNoFilter = defaultMarker(collection, { params: { foo: 'bar' } })
 
-    expect(markerA).not.toBe(markerB)
-    expect(markerA).not.toBe(markerNoFilter)
-    expect(markerB).not.toBe(markerNoFilter)
-  })
-
-  it('should generate a stable marker for the same function filter reference', () => {
-    const collection = createCollection()
-    const filter = () => true
-    const marker1 = defaultMarker(collection, { filter, params: { foo: 'bar' } })
-    const marker2 = defaultMarker(collection, { filter, params: { foo: 'bar' } })
-    expect(marker1).toBe(marker2)
+    expect(markerA).toBe(markerB)
+    expect(markerA).toBe(markerNoFilter)
   })
 })
 
