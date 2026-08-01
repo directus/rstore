@@ -1,12 +1,16 @@
 import type { CollectionDefaults, StoreSchema } from '../types/collection.js'
 import type { HookDefinitions } from '../types/hooks.js'
-import { createHooks as _createHooks } from './hookable.js'
+import { createHookable } from './hookable.js'
 
+/**
+ * Create a hookable instance typed with the rstore hook definitions for the
+ * given schema and collection defaults.
+ */
 export function createHooks<
-  TSchema extends StoreSchema,
-  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema = StoreSchema,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 >() {
-  return _createHooks<HookDefinitions<TSchema, TCollectionDefaults>>()
+  return createHookable<HookDefinitions<TSchema, TCollectionDefaults>>()
 }
 
 export type Hooks<

@@ -1,5 +1,5 @@
 export * from './dedupe.js'
-export { createHooks } from './hookable.js'
+export { createHookable, Hookable } from './hookable.js'
 export * from './hooks.js'
 export * from './mutation.js'
 export * from './obj.js'

@@ -4,8 +4,8 @@ import type { InferSelectModel, Table, TableConfig } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { QueryObject } from 'ufo'
 import type { RstoreDrizzleRealtimePayload } from '../../utils/realtime'
+import { createHookable } from '@rstore/shared'
 import { registerAllowedCollections } from './allow-list'
-import { createHooks } from './hookable'
 import { getDrizzleCollectionNameFromTable } from './index'
 
 export type { RstoreDrizzleRealtimePayload } from '../../utils/realtime'
@@ -124,7 +124,7 @@ export interface RstoreDrizzleHooks<
   'realtime.authorize': (payload: RstoreDrizzleRealtimeAuthorizePayload) => Awaitable<void>
 }
 
-export const rstoreDrizzleHooks = createHooks<RstoreDrizzleHooks>()
+export const rstoreDrizzleHooks = createHookable<RstoreDrizzleHooks>()
 
 export function hooksForTable<TTableConfig extends TableConfig, TTable extends Table<TTableConfig>>(table: TTable, hooks: Partial<RstoreDrizzleHooks<InferSelectModel<TTable, TTableConfig & { dbColumnNames: false }>>>) {
   const collectionName = getDrizzleCollectionNameFromTable(table)

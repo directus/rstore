@@ -109,7 +109,7 @@ export async function createStore<
       tombstoneGc: options.tombstoneGc,
       isServer: options.isServer,
     }),
-    hooks: createHooks(),
+    hooks: createHooks<TSchema, TCollectionDefaults>(),
     findDefaults: options.findDefaults,
     isServer: options.isServer,
     syncImmediately: options.syncImmediately,

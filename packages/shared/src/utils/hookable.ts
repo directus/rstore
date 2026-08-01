@@ -95,6 +95,12 @@ export class Hookable<
   }
 }
 
-export function createHooks<T extends Record<string, any>>(): Hookable<T> {
+/**
+ * Create a raw hookable instance for an arbitrary hook map.
+ *
+ * Use this for custom hook systems; for store hooks prefer the typed
+ * `createHooks` from `./hooks.js` which binds the rstore hook definitions.
+ */
+export function createHookable<T extends Record<string, any>>(): Hookable<T> {
   return new Hookable<T>()
 }
