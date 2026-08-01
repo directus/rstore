@@ -47,12 +47,14 @@ function registerRealtimeServerImports(resolve: (path: string) => string) {
     name: 'publishRstoreDrizzleRealtimeUpdate',
     from: resolve('./runtime/server/utils/realtime'),
   })
+  // `type: true` — these are type-only exports; registering them as runtime
+  // imports would inject imports of names that don't exist in the built JS.
   addServerImports([
     'RstoreDrizzlePubSubChannels',
     'RstoreDrizzlePubSub',
-  ].map(name => ({ from: resolve('./runtime/server/utils/pubsub'), name })))
+  ].map(name => ({ from: resolve('./runtime/server/utils/pubsub'), name, type: true })))
   addServerImports([
     'RstoreDrizzleRealtimeUpdateType',
     'PublishRstoreDrizzleRealtimeUpdateOptions',
-  ].map(name => ({ from: resolve('./runtime/server/utils/realtime'), name })))
+  ].map(name => ({ from: resolve('./runtime/server/utils/realtime'), name, type: true })))
 }
