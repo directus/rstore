@@ -1,8 +1,8 @@
 import type { MonospaceCollectionDefinition, MonospacePrimaryKeyConfig } from '@rstore/monospace/schema'
 import type { Plugin, ResolvedConfig } from 'vite'
-import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname, isAbsolute, resolve } from 'node:path'
+import { isAbsolute, resolve } from 'node:path'
 import process from 'node:process'
+import { createRstoreVirtualModulePlugin } from '@rstore/connector-toolkit/vite'
 import { DEFAULT_MONOSPACE_SCOPE_ID } from '@rstore/monospace'
 import {
   generateMonospacePluginTemplate,
@@ -15,7 +15,6 @@ import {
 const VIRTUAL_MODULE_ID = 'virtual:rstore-monospace'
 const VIRTUAL_SCHEMA_ID = 'virtual:rstore-monospace/schema'
 const VIRTUAL_PLUGIN_ID = 'virtual:rstore-monospace/plugin'
-const RESOLVED_PREFIX = '\0'
 
 /**
  * Options accepted by the rstore Monospace Vite plugin.
@@ -77,98 +76,32 @@ export interface RstoreMonospaceViteOptions {
  * Creates the Nuxt-free Vite plugin for generated rstore Monospace modules.
  */
 export function rstoreMonospace(options: RstoreMonospaceViteOptions): Plugin {
-  let config: ResolvedConfig | undefined
-  let collectionsPromise: Promise<MonospaceCollectionDefinition[]> | undefined
+  const scopeId = options.scopeId ?? DEFAULT_MONOSPACE_SCOPE_ID
 
-  return {
+  return createRstoreVirtualModulePlugin<MonospaceCollectionDefinition>({
     name: 'rstore-vite-monospace',
-
-    configResolved(resolvedConfig) {
-      config = resolvedConfig
+    virtualIds: {
+      index: VIRTUAL_MODULE_ID,
+      schema: VIRTUAL_SCHEMA_ID,
+      plugin: VIRTUAL_PLUGIN_ID,
     },
-
-    configureServer(server) {
-      const inputs = resolveLocalInputPaths(config, options)
-      if (!inputs.length) {
-        return
-      }
-
-      // Regenerate the virtual modules when a local schema file changes.
-      for (const input of inputs) {
-        server.watcher.add(input)
-      }
-      server.watcher.on('change', (file) => {
-        if (!inputs.includes(file)) {
-          return
-        }
-
-        collectionsPromise = undefined
-        for (const id of [VIRTUAL_MODULE_ID, VIRTUAL_SCHEMA_ID, VIRTUAL_PLUGIN_ID]) {
-          const module = server.moduleGraph.getModuleById(`${RESOLVED_PREFIX}${id}`)
-          if (module) {
-            server.moduleGraph.invalidateModule(module)
-          }
-        }
-        server.ws.send({ type: 'full-reload' })
+    loadCollections: ({ config }) => loadCollections(config, options),
+    generateIndex: () => generateViteIndexTemplate(),
+    generateSchema: collections => generateViteSchemaTemplate(collections),
+    generatePlugin: () => {
+      assertRuntimeOptions(options)
+      return generateMonospacePluginTemplate({
+        apiKey: options.runtimeApiKey,
+        project: options.project!,
+        scopeId,
+        url: options.url!,
       })
     },
-
-    resolveId(id) {
-      if (isVirtualModuleId(id)) {
-        return `${RESOLVED_PREFIX}${id}`
-      }
-    },
-
-    async buildStart() {
-      for (const input of resolveLocalInputPaths(config, options)) {
-        this.addWatchFile(input)
-      }
-      await getCollections()
-    },
-
-    watchChange(id) {
-      // Reload the local schema files on the next rebuild in watch mode.
-      if (resolveLocalInputPaths(config, options).includes(id)) {
-        collectionsPromise = undefined
-      }
-    },
-
-    async load(id) {
-      const virtualId = unwrapVirtualModuleId(id)
-      if (!virtualId) {
-        return
-      }
-
-      const collections = await getCollections()
-      const scopeId = options.scopeId ?? DEFAULT_MONOSPACE_SCOPE_ID
-
-      switch (virtualId) {
-        case VIRTUAL_MODULE_ID:
-          return generateViteIndexTemplate()
-        case VIRTUAL_SCHEMA_ID:
-          return generateViteSchemaTemplate(collections)
-        case VIRTUAL_PLUGIN_ID:
-          assertRuntimeOptions(options)
-          return generateMonospacePluginTemplate({
-            apiKey: options.runtimeApiKey,
-            project: options.project!,
-            scopeId,
-            url: options.url!,
-          })
-      }
-    },
-  }
-
-  /**
-   * Loads Monospace collections once per plugin instance.
-   */
-  async function getCollections(): Promise<MonospaceCollectionDefinition[]> {
-    collectionsPromise ??= loadCollections(config, options).then(async (collections) => {
-      await writeDeclarationFile(config, options, collections)
-      return collections
-    })
-    return collectionsPromise
-  }
+    generateDeclarations: collections => generateViteDeclarations(collections),
+    dts: options.dts,
+    defaultDtsFileName: 'rstore-monospace.d.ts',
+    resolveWatchFiles: ({ config }) => resolveLocalInputPaths(config, options),
+  })
 }
 
 /**
@@ -235,35 +168,6 @@ function assertRuntimeOptions(options: RstoreMonospaceViteOptions): void {
 }
 
 /**
- * Writes generated virtual-module declarations when enabled.
- */
-async function writeDeclarationFile(
-  config: ResolvedConfig | undefined,
-  options: RstoreMonospaceViteOptions,
-  collections: MonospaceCollectionDefinition[],
-): Promise<void> {
-  if (options.dts === false) {
-    return
-  }
-
-  const dtsPath = resolveDeclarationPath(config, options.dts)
-  await mkdir(dirname(dtsPath), { recursive: true })
-  await writeFile(dtsPath, generateViteDeclarations(collections))
-}
-
-/**
- * Resolves the declaration file output path.
- */
-function resolveDeclarationPath(
-  config: ResolvedConfig | undefined,
-  dts: RstoreMonospaceViteOptions['dts'],
-): string {
-  const root = config?.root ?? process.cwd()
-  const path = typeof dts === 'string' ? dts : 'rstore-monospace.d.ts'
-  return isAbsolute(path) ? path : resolve(root, path)
-}
-
-/**
  * Resolves the configured local schema file paths.
  */
 function resolveLocalInputPaths(
@@ -288,21 +192,4 @@ function resolveInputPath(
   }
 
   return isAbsolute(input) ? input : resolve(config?.root ?? process.cwd(), input)
-}
-
-/**
- * Returns whether an id is one of the public Monospace virtual modules.
- */
-function isVirtualModuleId(id: string): boolean {
-  return id === VIRTUAL_MODULE_ID
-    || id === VIRTUAL_SCHEMA_ID
-    || id === VIRTUAL_PLUGIN_ID
-}
-
-/**
- * Converts a resolved virtual id back to its public module id.
- */
-function unwrapVirtualModuleId(id: string): string | null {
-  const virtualId = id.startsWith(RESOLVED_PREFIX) ? id.slice(RESOLVED_PREFIX.length) : id
-  return isVirtualModuleId(virtualId) ? virtualId : null
 }
