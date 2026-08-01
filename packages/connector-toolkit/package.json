@@ -1,20 +1,15 @@
 {
-  "name": "@rstore/vite-directus",
+  "name": "@rstore/connector-toolkit",
   "type": "module",
   "version": "0.8.4",
-  "description": "Vite plugin for rstore + Directus",
+  "description": "Shared building blocks for rstore REST connectors",
+  "license": "MIT",
   "repository": {
     "url": "https://github.com/Akryum/rstore.git",
     "type": "git",
-    "directory": "packages/vite-directus"
+    "directory": "packages/connector-toolkit"
   },
   "sideEffects": false,
-  "rstore": {
-    "skillDependencies": [
-      "@rstore/directus",
-      "@rstore/vue"
-    ]
-  },
   "publishConfig": {
     "access": "public"
   },
@@ -25,29 +20,35 @@
         "default": "./dist/index.mjs"
       },
       "default": "./dist/index.mjs"
+    },
+    "./vite": {
+      "import": {
+        "types": "./dist/vite/index.d.ts",
+        "default": "./dist/vite/index.mjs"
+      },
+      "default": "./dist/vite/index.mjs"
     }
   },
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist",
-    "skills"
+    "dist"
   ],
   "scripts": {
     "build": "unbuild",
     "dev": "unbuild --stub",
     "dev:prepare": "pnpm run dev",
-    "prepack": "node ../../scripts/sync-dep-skills.mjs .",
     "test": "vitest run",
     "test:types": "tsc --noEmit"
   },
   "peerDependencies": {
     "vite": "^7.0.0"
   },
-  "dependencies": {
-    "@rstore/connector-toolkit": "workspace:^",
-    "@rstore/directus": "workspace:^"
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    }
   },
   "devDependencies": {
     "@types/node": "catalog:",

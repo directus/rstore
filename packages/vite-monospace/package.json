@@ -46,6 +46,7 @@
     "vite": "^7.0.0"
   },
   "dependencies": {
+    "@rstore/connector-toolkit": "workspace:^",
     "@rstore/monospace": "workspace:^"
   },
   "devDependencies": {

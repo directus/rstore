@@ -44,6 +44,7 @@
     "test:types": "tsc --noEmit"
   },
   "dependencies": {
+    "@rstore/connector-toolkit": "workspace:^",
     "@rstore/core": "workspace:^",
     "@rstore/shared": "workspace:^"
   },

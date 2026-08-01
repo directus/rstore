@@ -1,0 +1,127 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`codegen templates > generates item interfaces with optional flags and quoted names 1`] = `
+"export interface Posts {
+  id: number
+  title?: string
+  "kebab-field": string | null
+}
+
+export interface Users {
+  id: number
+  email: string
+}"
+`;
+
+exports[`codegen templates > generates runtime collection modules 1`] = `
+"export const collection0 = {
+  name: "posts",
+  scopeId: "test-scope",
+  meta: {"primaryKeys":["id"]},
+  relations: {"author":{"to":{"users":{"on":{"id":"author_id"}}}}},
+  getKey: (item) => item.id,
+}
+export const collection1 = {
+  name: "users",
+  scopeId: "test-scope",
+  meta: {"primaryKeys":["id"],"singleton":false},
+  relations: {},
+  getKey: (item) => item.id,
+}"
+`;
+
+exports[`codegen templates > generates the vite schema module 1`] = `
+"export const collection0 = {
+  name: "posts",
+  scopeId: "test-scope",
+  meta: {"primaryKeys":["id"]},
+  relations: {"author":{"to":{"users":{"on":{"id":"author_id"}}}}},
+  getKey: (item) => item.id,
+}
+export const collection1 = {
+  name: "users",
+  scopeId: "test-scope",
+  meta: {"primaryKeys":["id"],"singleton":false},
+  relations: {},
+  getKey: (item) => item.id,
+}
+
+export const schema = [
+  collection0,
+  collection1
+]
+
+export default schema
+"
+`;
+
+exports[`codegen templates > generates typed collection modules 1`] = `
+"import { withItemType } from '@rstore/vue'
+import type {
+  Posts,
+  Users
+} from "#build/$rstore-directus-items"
+
+export const collection0 = withItemType<Posts>().defineCollection({
+  name: "posts",
+  scopeId: "test-scope",
+  meta: {"primaryKeys":["id"]},
+  relations: {"author":{"to":{"users":{"on":{"id":"author_id"}}}}},
+  getKey: (item) => item.id,
+})
+
+export const collection1 = withItemType<Users>().defineCollection({
+  name: "users",
+  scopeId: "test-scope",
+  meta: {"primaryKeys":["id"],"singleton":false},
+  relations: {},
+  getKey: (item) => item.id,
+})
+"
+`;
+
+exports[`codegen templates > generates vite declarations without the relations line 1`] = `
+"declare module 'virtual:rstore-directus/schema' {
+  import type { Collection, StoreSchema } from '@rstore/vue'
+
+  export interface Posts {
+    id: number
+    title?: string
+    "kebab-field": string | null
+  }
+
+  export interface Users {
+    id: number
+    email: string
+  }
+  export const collection0: Collection<Posts> & {
+    readonly '~type': undefined
+    readonly '~item': Posts
+    readonly name: "posts"
+  }
+  export const collection1: Collection<Users> & {
+    readonly '~type': undefined
+    readonly '~item': Users
+    readonly name: "users"
+  }
+  export const schema: [typeof collection0, typeof collection1]
+  export default schema
+}
+
+declare module 'virtual:rstore-directus/plugin' {
+  import type { DirectusRstoreClient, createDirectusRstorePlugin } from '@rstore/directus'
+
+  export const directus: DirectusRstoreClient
+  export const directusPlugin: ReturnType<typeof createDirectusRstorePlugin>
+  export default directusPlugin
+}
+
+declare module 'virtual:rstore-directus' {
+  import type { DirectusRstoreClient, createDirectusRstorePlugin } from '@rstore/directus'
+
+  export const schema: typeof import('virtual:rstore-directus/schema').schema
+  export const directus: DirectusRstoreClient
+  export const directusPlugin: ReturnType<typeof createDirectusRstorePlugin>
+}
+"
+`;

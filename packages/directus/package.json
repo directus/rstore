@@ -45,6 +45,7 @@
   },
   "dependencies": {
     "@directus/sdk": "^19.0.1",
+    "@rstore/connector-toolkit": "workspace:^",
     "@rstore/core": "workspace:^",
     "@rstore/shared": "workspace:^"
   },
