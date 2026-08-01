@@ -4,6 +4,7 @@ import type { InferSelectModel, Table, TableConfig } from 'drizzle-orm'
 import type { H3Event } from 'h3'
 import type { QueryObject } from 'ufo'
 import type { RstoreDrizzleRealtimePayload } from '../../utils/realtime'
+import { registerAllowedCollections } from './allow-list'
 import { createHooks } from './hookable'
 import { getDrizzleCollectionNameFromTable } from './index'
 
@@ -138,25 +139,19 @@ export function hooksForTable<TTableConfig extends TableConfig, TTable extends T
   }
 }
 
-let allowedCollections: Set<string> | null = null
-
+/**
+ * Restricts the collections exposed to clients to the given tables.
+ *
+ * The allow-list is enforced at a single choke point
+ * (`getDrizzleTableFromCollection` + relation resolution in
+ * `convertIncludeToDrizzleWith`), which covers the REST routes, `_batch`
+ * operations and relation `include`s with a `403`; realtime subscriptions to
+ * non-allowed collections are rejected at subscribe time.
+ *
+ * Can be called multiple times — collections accumulate.
+ *
+ * @param tables The drizzle tables that clients may access.
+ */
 export function allowTables(tables: Table[]) {
-  const collectionNames = tables.map(getDrizzleCollectionNameFromTable)
-
-  if (!allowedCollections) {
-    allowedCollections = new Set(collectionNames)
-
-    for (const hookName of ['index.get.before', 'index.post.before', 'item.get.before', 'item.patch.before', 'item.delete.before'] as (keyof RstoreDrizzleHooks)[]) {
-      rstoreDrizzleHooks.hook(hookName, async (payload: RstoreDrizzleBeforeHookPayload) => {
-        if (!allowedCollections!.has(payload.collection)) {
-          throw new Error(`Collection "${payload.collection}" is not allowed.`)
-        }
-      })
-    }
-  }
-  else {
-    for (const name of collectionNames) {
-      allowedCollections.add(name)
-    }
-  }
+  registerAllowedCollections(tables.map(getDrizzleCollectionNameFromTable))
 }

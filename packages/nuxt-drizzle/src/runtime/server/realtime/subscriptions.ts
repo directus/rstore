@@ -4,6 +4,7 @@ import type { PeerState } from './utils/peerState'
 import { dialect } from '$rstore-drizzle-server-utils.js'
 import { getSubscriptionId } from '../../utils/realtime'
 import { subscriptionMatches } from '../../utils/subscription-match'
+import { isCollectionAllowed } from '../utils/allow-list'
 import { rstoreDrizzleHooks } from '../utils/hooks'
 import { getPubSub } from '../utils/pubsub'
 import { enqueueUpdate } from './utils/outbound'
@@ -21,6 +22,13 @@ export async function handleSubscription(peer: any, state: PeerState, subscripti
 
 async function subscribePeer(peer: any, state: PeerState, subscriptionId: string, subscription: SubscriptionMessage) {
   if (state.subscriptions.has(subscriptionId)) {
+    return
+  }
+  // `allowTables` allow-list applies to realtime too: a subscription to a
+  // non-allowed collection is rejected before the authorize hook runs, so
+  // denied tables are never streamed even when no authorize hook exists.
+  if (!isCollectionAllowed(subscription.collection)) {
+    sendRejectedSubscription(peer, subscription, 'collection-not-allowed')
     return
   }
   const rejectedReason = await authorizeSubscription(peer, subscription)

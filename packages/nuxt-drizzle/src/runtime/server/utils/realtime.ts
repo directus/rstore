@@ -69,7 +69,9 @@ function normalizeKey(key: RealtimeKeyInput): string {
 }
 
 function inferRecordKey(collection: string, record: Record<string, any>): string {
-  const { primaryKeys } = getDrizzleTableFromCollection(collection)
+  // Server-initiated publish: the allow-list gates client exposure at
+  // subscribe time, so an internal publish must not throw a 403 here.
+  const { primaryKeys } = getDrizzleTableFromCollection(collection, { skipAllowCheck: true })
   if (!primaryKeys.length) {
     throw new Error(`Cannot infer realtime key for collection "${collection}" because no primary key is configured.`)
   }
