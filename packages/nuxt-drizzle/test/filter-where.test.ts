@@ -151,9 +151,25 @@ describe('filterWhere — like / ilike pattern matching', () => {
 
   it('like _ matches a single char', () => {
     expect(filterWhere({ name: 'ab' }, { operator: 'like', field: 'name', value: 'a_' }, DIALECT)).toBe(true)
-    // `_` is translated to `.` (any single char), but the anchor-free regex
-    // also matches longer strings — lock in the current behavior.
     expect(filterWhere({ name: 'a' }, { operator: 'like', field: 'name', value: 'a_' }, DIALECT)).toBe(false)
+    // SQL LIKE is a full-string match — a longer string must NOT match `a_`.
+    expect(filterWhere({ name: 'abc' }, { operator: 'like', field: 'name', value: 'a_' }, DIALECT)).toBe(false)
+  })
+
+  it('like is anchored to the whole string (SQL semantics)', () => {
+    expect(filterWhere({ name: 'hello world' }, { operator: 'like', field: 'name', value: 'world' }, DIALECT)).toBe(false)
+    expect(filterWhere({ name: 'hello world' }, { operator: 'like', field: 'name', value: '%world' }, DIALECT)).toBe(true)
+  })
+
+  it('like treats regex metacharacters as literals and never builds a RegExp', () => {
+    expect(filterWhere({ name: 'abc' }, { operator: 'like', field: 'name', value: 'a.c' }, DIALECT)).toBe(false)
+    expect(filterWhere({ name: 'a.c' }, { operator: 'like', field: 'name', value: 'a.c' }, DIALECT)).toBe(true)
+    // Unbalanced regex syntax must not throw a SyntaxError.
+    expect(filterWhere({ name: '(' }, { operator: 'like', field: 'name', value: '(' }, DIALECT)).toBe(true)
+    // A classic ReDoS pattern is handled as literal text, quickly.
+    const start = Date.now()
+    expect(filterWhere({ name: `${'a'.repeat(100)}!` }, { operator: 'like', field: 'name', value: '(a+)+$' }, DIALECT)).toBe(false)
+    expect(Date.now() - start).toBeLessThan(1000)
   })
 
   it('like is case-insensitive on sqlite only', () => {

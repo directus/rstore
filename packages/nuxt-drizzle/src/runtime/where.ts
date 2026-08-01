@@ -1,4 +1,5 @@
 import type { RstoreDrizzleCondition } from './utils/types'
+import { likeMatch } from './utils/like'
 
 /**
  * Drizzle JSON-mode columns (e.g. `text({ mode: 'json' })`) are stored as
@@ -59,16 +60,18 @@ export function filterWhere(
         return condition.value.includes(item[condition.field])
       case 'notInArray':
         return !condition.value.includes(item[condition.field])
+      // LIKE patterns are matched with `likeMatch` (never a RegExp) so
+      // client-supplied patterns cannot inject regex metacharacters (ReDoS)
+      // and the match is anchored to the whole string like SQL LIKE.
+      // SQLite's LIKE is case-insensitive for ASCII by default.
       case 'like':
-        // Including `%` in the pattern matches zero or more characters, and including `_` will match a single character.
-        return new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), dialect === 'sqlite' ? 'i' : undefined).test(coerceForLike(item[condition.field]))
+        return likeMatch(condition.value, coerceForLike(item[condition.field]), dialect === 'sqlite')
       case 'notLike':
-        return !new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), dialect === 'sqlite' ? 'i' : undefined).test(coerceForLike(item[condition.field]))
+        return !likeMatch(condition.value, coerceForLike(item[condition.field]), dialect === 'sqlite')
       case 'ilike':
-        // Including `%` in the pattern matches zero or more characters, and including `_` will match a single character.
-        return new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), 'i').test(coerceForLike(item[condition.field]))
+        return likeMatch(condition.value, coerceForLike(item[condition.field]), true)
       case 'notIlike':
-        return !new RegExp(condition.value.replace(/%/g, '.*').replace(/_/g, '.'), 'i').test(coerceForLike(item[condition.field]))
+        return !likeMatch(condition.value, coerceForLike(item[condition.field]), true)
       case 'arrayContains':
         return Array.isArray(item[condition.field]) && item[condition.field].includes(condition.value)
       case 'arrayContained':
