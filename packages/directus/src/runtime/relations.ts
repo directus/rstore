@@ -1,3 +1,7 @@
+import { createBatchedRelationFilter } from '@rstore/connector-toolkit'
+
+export { toArray } from '@rstore/connector-toolkit'
+
 /**
  * rstore relation target shape used by generated Directus collections.
  */
@@ -59,26 +63,20 @@ export interface DirectusRelationStoreLike {
 }
 
 /**
- * Normalizes a possible single result to an array.
- */
-export function toArray<T>(value: T | T[] | undefined): T[] {
-  if (!value) {
-    return []
-  }
-  return Array.isArray(value) ? value : [value]
-}
-
-/**
- * Fetches included rstore relations through Directus filters.
+ * Fetches included rstore relations through batched Directus filters.
+ *
+ * All parent items are matched with one filter per relation target (`_in`
+ * for single-field joins, `_or`/`_and` groups for composite joins) so each
+ * included relation costs a single request instead of one per parent item.
  */
 export async function fetchIncludedRelations(
   store: DirectusRelationStoreLike,
   collection: DirectusRelationCollectionLike,
-  item: Record<string, any>,
+  items: Array<Record<string, any>>,
   include: Record<string, any>,
 ): Promise<void> {
-  const itemKey = collection.getKey(item)
-  if (itemKey == null) {
+  const keyed = items.filter(item => collection.getKey(item) != null)
+  if (!keyed.length) {
     return
   }
 
@@ -92,13 +90,17 @@ export async function fetchIncludedRelations(
       throw new Error(`Relation "${relationKey}" does not exist on collection "${collection.name}"`)
     }
 
-    await Promise.all(relation.to.map((target) => {
-      const filter = createRelationFilter(target.on, item)
+    await Promise.all(relation.to.map(async (target) => {
+      const filter = createBatchedRelationFilter(target.on, keyed)
+      if (!filter) {
+        return
+      }
+
       const options = typeof include[relationKey] === 'object' && 'include' in include[relationKey]
         ? { filter, include: include[relationKey].include }
         : { filter }
 
-      return store.$collection(target.collection).findMany(options)
+      await store.$collection(target.collection).findMany(options)
     }))
   }
 }

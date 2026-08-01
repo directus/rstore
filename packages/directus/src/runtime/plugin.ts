@@ -60,7 +60,7 @@ export function createDirectusRstorePlugin(options: CreateDirectusRstorePluginOp
         if (isDirectusSingleton(payload.collection)) {
           payload.setResult(await directus.request(readSingleton(payload.collection.name as any, query as any)) as any)
         }
-        else if (payload.key) {
+        else if (payload.key != null) {
           payload.setResult(await directus.request(readItem(payload.collection.name as any, payload.key, query as any)) as any)
         }
         else {
@@ -82,14 +82,16 @@ export function createDirectusRstorePlugin(options: CreateDirectusRstorePluginOp
       })
 
       hook('fetchRelations', async (payload) => {
-        const items = toArray(payload.getResult() as any)
-        await Promise.all(items.map((item) => {
-          return fetchIncludedRelations(payload.store as any, payload.collection as any, item, payload.findOptions.include as any)
-        }))
+        await fetchIncludedRelations(
+          payload.store as any,
+          payload.collection as any,
+          toArray(payload.getResult() as any),
+          payload.findOptions.include as any,
+        )
       })
 
       hook('cacheFilterFirst', (payload) => {
-        if (payload.key) {
+        if (payload.key != null) {
           return
         }
 
