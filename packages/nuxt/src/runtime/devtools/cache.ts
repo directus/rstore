@@ -20,7 +20,13 @@ export function installCacheDevtoolsHooks(nuxtApp: any, hook: any) {
     cacheUpdated.trigger()
   })
   setTimeout(() => {
-    watch(() => (nuxtApp.$rstore as any).$cache._private.layers.value, () => {
+    // Store injection may be absent when the watcher fires (e.g. app
+    // errored before the rstore plugin ran) — bail out instead of throwing.
+    const store = nuxtApp.$rstore
+    if (!store) {
+      return
+    }
+    watch(() => (store as any).$cache._private.layers.value, () => {
       cacheUpdated.trigger()
     }, {
       deep: true,
