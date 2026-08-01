@@ -60,6 +60,12 @@ export default definePlugin({
       }
 
       hook('beforeMutation', async () => {
+        // Offline: skip the realtime-ready wait — the socket will never
+        // handshake without a network, and awaiting it forever would block
+        // offline plugins (e.g. @rstore/offline) from queueing the mutation.
+        if (typeof navigator !== 'undefined' && !navigator.onLine) {
+          return
+        }
         // Block mutations until we know the server has our clientId.
         await awaitRealtimeReady()
       })
