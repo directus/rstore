@@ -25,7 +25,8 @@ export function createCollectionApi<
     findMany: findOptions => findMany({ store, collection: getCollection(), findOptions }).then(r => r.result),
     query: optionsGetter => runApiQuery(runtime, optionsGetter, false) as ReturnType<Api['query']>,
     liveQuery: optionsGetter => runApiQuery(runtime, optionsGetter, true) as ReturnType<Api['liveQuery']>,
-    subscribe: optionsGetter => subscribeToApiQuery(runtime, optionsGetter(c => c)),
+    // Pass a getter (not a snapshot) so the subscription tracks reactive options.
+    subscribe: optionsGetter => subscribeToApiQuery(runtime, () => optionsGetter(c => c)),
     create: (item, options) => createItem({ ...options, store, collection: getCollection(), item }),
     createMany: (items, options) => createMany({ ...options, store, collection: getCollection(), items }),
     createForm: formOptions => createCreateForm(api, getCollection, store, formOptions),

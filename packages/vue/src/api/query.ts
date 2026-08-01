@@ -3,6 +3,7 @@ import type { MaybeRefOrGetter } from 'vue'
 import type { QueryManyOptions, QueryType } from './types'
 import { findFirst, findMany, peekFirst, peekMany, subscribe, unsubscribe } from '@rstore/core'
 import { tryOnScopeDispose } from '@vueuse/core'
+import { deepEqual } from 'fast-equals'
 import { ref, toValue, watch } from 'vue'
 import { realtimeReconnectEventHook } from '../events'
 import { createQuery } from '../query'
@@ -22,18 +23,25 @@ export function runApiQuery(
   isLive: boolean,
 ) {
   const { boundOptionsGetter, type } = bindQueryOptionsGetter(optionsGetter)
-  let meta: CustomHookMeta | undefined
-  if (isLive) {
-    const subResult = subscribeToApiQuery(runtime, boundOptionsGetter())
-    meta = subResult.meta.value
-  }
+  // Pass the getter itself (not a snapshot) so the realtime subscription
+  // follows reactive option changes along with the query.
+  const subResult = isLive ? subscribeToApiQuery(runtime, boundOptionsGetter) : undefined
 
   const query = createApiQuery(runtime, boundOptionsGetter, type)
-  if (meta) {
-    Object.assign(query.meta.value, meta)
+  if (subResult) {
+    // Share a single meta object between the subscription and the query so
+    // meta written by (async) subscribe hooks is visible to query fetches.
+    // Copying synchronously here would only see an empty object because the
+    // subscribe hooks have not resolved yet.
+    Object.assign(subResult.meta.value, query.meta.value)
+    query.meta.value = subResult.meta.value
   }
-  if (isLive) {
-    realtimeReconnectEventHook.on(() => query.refresh())
+  if (isLive && !runtime.store.$isServer) {
+    // `realtimeReconnectEventHook` is module-level: skip registration on the
+    // server (server scopes are never disposed, so every SSR request would
+    // leak the query graph) and detach the listener on scope dispose.
+    const { off } = realtimeReconnectEventHook.on(() => query.refresh())
+    tryOnScopeDispose(off)
   }
   if (runtime.onInvalidate) {
     const { off } = runtime.onInvalidate(() => query.refresh())
@@ -60,14 +68,27 @@ export function subscribeToApiQuery(
   let subscriptionId: string | undefined
   let previousKey: string | number | undefined
   let previousFindOptions: FindOptions<any, any, any> | undefined
+  let previousCollection: any
 
-  async function unsub() {
+  // All subscribe/unsubscribe work is chained on this promise so rapid
+  // option changes cannot interleave their async steps and orphan a
+  // server-side subscription.
+  let queue: Promise<void> = Promise.resolve()
+
+  /** Chain a task after all pending subscription work, errors included. */
+  function enqueue(task: () => Promise<void>): Promise<void> {
+    queue = queue.then(task, task)
+    return queue
+  }
+
+  /** Unsubscribe the current subscription (must run inside the queue). */
+  async function unsubNow() {
     if (!subscriptionId)
       return
-    unsubscribe({
+    await unsubscribe({
       store: runtime.store,
       meta: meta.value,
-      collection: runtime.getCollection(),
+      collection: previousCollection ?? runtime.getCollection(),
       subscriptionId,
       key: previousKey,
       findOptions: previousFindOptions,
@@ -75,27 +96,48 @@ export function subscribeToApiQuery(
     subscriptionId = undefined
     previousKey = undefined
     previousFindOptions = undefined
+    previousCollection = undefined
   }
 
-  async function sub(optionsValue: string | number | FindOptions<any, any, any> | undefined) {
-    await unsub()
+  /**
+   * (Re)subscribe with new options (must run inside the queue).
+   * @param optionsValue key or find options for the new subscription
+   * @param force resubscribe even when options are unchanged (e.g. the collection changed)
+   */
+  async function subNow(optionsValue: string | number | FindOptions<any, any, any> | undefined, force: boolean) {
+    const key = typeof optionsValue === 'string' || typeof optionsValue === 'number' ? optionsValue : undefined
+    const findOptions = typeof optionsValue === 'object' && optionsValue !== null ? optionsValue : undefined
+    // The options getter may produce a new object identity on unrelated
+    // reactive updates - skip when already subscribed with equivalent options.
+    if (!force && subscriptionId && key === previousKey && deepEqual(findOptions, previousFindOptions)) {
+      return
+    }
+    await unsubNow()
     subscriptionId = crypto.randomUUID()
-    previousKey = typeof optionsValue === 'string' || typeof optionsValue === 'number' ? optionsValue : undefined
-    previousFindOptions = typeof optionsValue === 'object' ? optionsValue : undefined
+    previousKey = key
+    previousFindOptions = findOptions
+    previousCollection = runtime.getCollection()
     await subscribe({
       store: runtime.store,
       meta: meta.value,
-      collection: runtime.getCollection(),
+      collection: previousCollection,
       subscriptionId,
       key: previousKey,
       findOptions: previousFindOptions,
     })
   }
 
-  watch(() => toValue(keyOrFindOptions), value => sub(value), { immediate: true })
+  /** Serialized unsubscribe, safe to call from anywhere. */
+  const unsub = () => enqueue(unsubNow)
+  /** Serialized (re)subscribe, safe to call from anywhere. */
+  const sub = (optionsValue: string | number | FindOptions<any, any, any> | undefined, force = false) =>
+    enqueue(() => subNow(optionsValue, force))
+
+  watch(() => toValue(keyOrFindOptions), value => void sub(value), { immediate: true, deep: true })
   tryOnScopeDispose(unsub)
   if (runtime.onInvalidate) {
-    const { off } = runtime.onInvalidate(() => sub(toValue(keyOrFindOptions)))
+    // Force: the collection may have changed even though options are equal.
+    const { off } = runtime.onInvalidate(() => sub(toValue(keyOrFindOptions), true))
     tryOnScopeDispose(() => off())
   }
   return { unsubscribe: unsub, meta }
