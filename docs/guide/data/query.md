@@ -39,7 +39,7 @@ The `query` and `liveQuery` composables return an object with the following prop
 
 - `foreground` / `background`: the state of each kind of fetch, to tell a first load apart from a silent refresh <Badge text="New in v0.9" />.
 
-- `refresh`: a function that can be called to refresh the data.
+- `refresh`: a function that can be called to refresh the data. It reloads every page held in `pages`, not just the main one <Badge text="Changed in v0.9" type="warning" />, and the returned promise settles once they all have. Pass `pages` to reload a subset: `refresh({ pages: [0] })` reloads the page at index `0` only, and `refresh({ pages: [] })` reloads none.
 
 - `pages`: a ref containing the query pages.
 
@@ -328,6 +328,12 @@ You can then access some useful properties of the `currentPage`:
 
 ::: tip
 `fetchMore` is a blocking fetch, so the query-level `loading` turns `true` while an additional page loads. Use `mainPage.loading` or the page-scoped state above if you don't want to dim the already displayed items.
+:::
+
+::: info
+`refresh()` reloads those pages too, so a page keeps reporting its `error` until its own re-attempt settles <Badge text="Changed in v0.9" type="warning" />. Pass `pages` to narrow it down — `refresh({ pages: [0, pageIndex] })` reloads the first page and the displayed one, and a page left out keeps both its data and its fetch state, since nothing is reset for a page that is not loaded again.
+
+Changing the query options is a different query instead: the pages of the previous one are dropped, and the main page is loaded again from scratch.
 :::
 
 ```vue

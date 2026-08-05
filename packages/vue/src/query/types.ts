@@ -50,6 +50,16 @@ export interface FetchStateController {
   markIncomplete: () => void
 }
 
+/** Options of {@link VueQueryReturn.refresh}: find options for the main page, plus which pages to reload. */
+export type VueQueryRefreshOptions<TOptions> = Partial<TOptions> & {
+  /**
+   * Indexes of the pages to reload. Defaults to every page the query holds, `[0]` reloads the page
+   * at index 0 only, and `[]` reloads none. A page left out keeps its data and its fetch state -
+   * nothing is reset for a page that is not loaded again.
+   */
+  pages?: number[]
+}
+
 export interface VueQueryReturn<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -67,7 +77,7 @@ export interface VueQueryReturn<
   /** State of the silent `cache-and-fetch` revalidation fetches. */
   background: VueQueryFetchState
   /** Force refreshing the query. */
-  refresh: () => HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
+  refresh: (options?: VueQueryRefreshOptions<TOptions>) => HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
   /** Sparse array of pages of the query. */
   pages: Ref<Array<VueQueryPage<TCollection, TCollectionDefaults, TSchema, any, TResult> | undefined>>
   /** Main page of the query. */

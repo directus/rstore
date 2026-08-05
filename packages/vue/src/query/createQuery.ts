@@ -1,6 +1,6 @@
 import type { Cache, Collection, CollectionDefaults, FindOptions, HybridPromise, StoreSchema } from '@rstore/shared'
 import type { VueCachePrivate } from '../cache'
-import type { VueCreateQueryOptions, VueQueryReturn } from './types'
+import type { VueCreateQueryOptions, VueQueryRefreshOptions, VueQueryReturn } from './types'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { deepEqual } from 'fast-equals'
 import { klona } from 'klona'
@@ -60,16 +60,46 @@ export function createQuery<
   let promise = loadMainPage() as unknown as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
   Object.assign(promise, returnObject)
 
-  function loadMainPage(forceFetch = false) {
+  function loadMainPage(forceFetch = false, pageIndexes?: number[]) {
+    // A forced load is a refresh of this very query, so the other pages are kept and reloaded with
+    // the main one: resetting the state of a page without fetching it again would leave it claiming
+    // it was never loaded. Any other load means the options changed, which makes those pages
+    // meaningless.
+    const otherPages = forceFetch
+      ? ctx.pages.value.filter(page => page && page !== ctx.mainPage)
+      : []
+    // A page the caller left out is re-registered untouched: not loading it is precisely the reason
+    // not to reset it.
+    const shouldLoad = (index: number) => pageIndexes == null || pageIndexes.includes(index)
     ctx.pages.value = []
     const pageOptions = getPageOptions(ctx, ctx.mainPage)
     const index = pageOptions.pageIndex ?? 0
     ctx.mainPage.index = index
     ctx.pages.value[index] = ctx.mainPage
     ctx.mainPage.id = getPageId(ctx, index)
-    ctx.mainPage.requestId = crypto.randomUUID()
-    ctx.mainPagePromise = loadPage(ctx, ctx.mainPage, forceFetch)
-    return ctx.mainPagePromise.then(() => returnObject)
+    const promises: Array<Promise<unknown>> = []
+    if (shouldLoad(index)) {
+      ctx.mainPage.requestId = crypto.randomUUID()
+      // Kept as the main page promise even when it is not reloaded: `setPageResult` awaits it so the
+      // main page result always lands first, and the previous one has already settled.
+      ctx.mainPagePromise = loadPage(ctx, ctx.mainPage, forceFetch)
+      promises.push(ctx.mainPagePromise)
+    }
+    // Started after `mainPagePromise` is assigned, for the same reason.
+    for (const page of otherPages) {
+      // The main page may have moved onto this slot, and it owns it.
+      if (ctx.pages.value[page.index]) {
+        continue
+      }
+      ctx.pages.value[page.index] = page
+      if (!shouldLoad(page.index)) {
+        continue
+      }
+      // Supersedes any fetch still in flight for the page, like the main page above.
+      page.requestId = crypto.randomUUID()
+      promises.push(loadPage(ctx, page, forceFetch))
+    }
+    return Promise.all(promises).then(() => returnObject)
   }
 
   function getPage(optionsExtension: Partial<TOptions>) {
@@ -97,9 +127,11 @@ export function createQuery<
     return nextPromise
   }
 
-  function refresh(optionsExtension?: Partial<TOptions>) {
-    ctx.mainPage.options = optionsExtension ?? {}
-    promise = loadMainPage(true) as unknown as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
+  function refresh(options?: VueQueryRefreshOptions<TOptions>) {
+    // `pages` selects what to reload; the rest is the main page's find options.
+    const { pages, ...optionsExtension } = options ?? {}
+    ctx.mainPage.options = optionsExtension
+    promise = loadMainPage(true, pages) as unknown as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
     Object.assign(promise, returnObject)
     return promise
   }
