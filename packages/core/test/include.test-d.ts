@@ -31,8 +31,17 @@ describe('typed include options', () => {
       postId: string
     }
 
+    interface Profile {
+      id: string
+      userId: string
+    }
+
     const _comments = withItemType<Comment>().defineCollection({
       name: 'comments',
+    })
+
+    const _profiles = withItemType<Profile>().defineCollection({
+      name: 'profiles',
     })
 
     const _posts = withItemType<Post>().defineCollection({
@@ -64,10 +73,19 @@ describe('typed include options', () => {
           },
           many: true,
         },
+        profile: {
+          to: {
+            profiles: {
+              on: {
+                userId: 'id',
+              },
+            },
+          },
+        },
       },
     })
 
-    type Schema = [typeof _users, typeof _posts, typeof _comments]
+    type Schema = [typeof _users, typeof _posts, typeof _comments, typeof _profiles]
     type UserFindManyOptions = FindManyOptions<typeof _users, CollectionDefaults, Schema>
 
     const customOptions = {
@@ -78,6 +96,7 @@ describe('typed include options', () => {
             comments: true,
           },
         },
+        profile: true,
       },
     } satisfies UserFindManyOptions
 
@@ -86,6 +105,7 @@ describe('typed include options', () => {
         posts: {
           comments: true,
         },
+        profile: true,
       },
     } satisfies UserFindManyOptions
 

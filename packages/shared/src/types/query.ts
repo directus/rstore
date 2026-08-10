@@ -77,9 +77,9 @@ export type FindOptionsInclude<
   TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > = {
-  [K in keyof TCollection['relations']]?:
+  [K in keyof NonNullable<TCollection['relations']>]?:
   K extends string
-    ? TCollection['relations'] extends Record<string, infer TRelation extends CollectionRelation>
+    ? NonNullable<TCollection['relations']>[K] extends infer TRelation extends CollectionRelation
       ? TRelation['to'] extends Record<infer TTargetCollectionName extends string, any>
         ? CollectionByName<TSchema, TTargetCollectionName> extends infer TTargetCollection extends Collection
           ? FindOptionsIncludeItem<TTargetCollection, TCollectionDefaults, TSchema>
