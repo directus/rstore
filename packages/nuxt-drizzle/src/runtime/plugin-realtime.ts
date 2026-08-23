@@ -198,9 +198,17 @@ export default definePlugin({
 
             // Fan-out a batched `{ updates: [...] }` frame back through the
             // same single-update handler used for legacy `{ update }` frames.
+            // Each is isolated: one unusable frame (e.g. a `realtime.filter`
+            // handler that narrowed away the primary key) must not discard the
+            // rest of the batch.
             if (Array.isArray(message.updates)) {
               for (const u of message.updates) {
-                applyUpdate(u)
+                try {
+                  applyUpdate(u)
+                }
+                catch (e) {
+                  console.error('[Realtime] Failed to apply update', u?.collection, e)
+                }
               }
               return
             }

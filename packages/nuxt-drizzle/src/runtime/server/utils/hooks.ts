@@ -80,7 +80,8 @@ export interface RstoreDrizzleItemPatchAfterHookPayload<TResult> extends RstoreD
 /**
  * Invoked **for every update frame** that matched at least one of the
  * peer's active subscriptions, just before the frame is forwarded to
- * the client. Call `reject()` to suppress the frame for this peer.
+ * the client. Call `reject()` to suppress the frame for this peer, or
+ * `narrowRecord()` to deliver only a subset of its columns.
  *
  * Because this runs per-message, it is the right place for permission
  * checks that depend on mutable state (current role, ACL membership,
@@ -90,6 +91,31 @@ export interface RstoreDrizzleItemPatchAfterHookPayload<TResult> extends RstoreD
 export interface RstoreDrizzleRealtimeFilterPayload<TResult> extends RstoreDrizzleRealtimePayload<TResult> {
   peer: Peer
   reject: () => void
+  /**
+   * Delivers a column subset of `record` to **this peer only**, leaving the
+   * frame every other peer receives untouched.
+   *
+   * Semantics worth knowing before using it:
+   *
+   * - It narrows, never widens. Keys absent from the published `record` are
+   *   dropped, and successive calls intersect — so two independent handlers
+   *   compose to the columns they both kept, whatever order they ran in.
+   *   Values come from the last call, so a handler may also redact in place.
+   * - `record` on this payload always stays the **full** published row, for
+   *   every handler. Never mutate it: one object is shared by all peers.
+   * - `reject()` wins, whichever is called first.
+   * - `fieldTimestamps` is narrowed to match automatically. Do not pass your
+   *   own: a stamp left behind for an omitted field resolves that field to
+   *   `undefined` in the client's per-field merge, erasing its cached value.
+   * - **Keep the primary key columns.** The client derives the cache key from
+   *   the record, and a frame without it throws on arrival.
+   * - Narrowing runs *after* `where` matching, so a subscription filtering on
+   *   a column you narrow away still receives the frame. Gate those in
+   *   `realtime.authorize`, where `subscription.where` is available.
+   *
+   * @param record Column subset to deliver to this peer.
+   */
+  narrowRecord: (record: Partial<TResult>) => void
 }
 
 /**

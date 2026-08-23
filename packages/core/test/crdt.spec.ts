@@ -136,6 +136,25 @@ describe('mergeItemFields', () => {
     expect(result.mergedTimestamps.extra).toBe(100)
   })
 
+  it('should erase a local field the remote omits but still stamps as newer', () => {
+    const local: Record<string, any> = { title: 'Title', email: 'leia@example.com' }
+    const remote: Record<string, any> = { title: 'Title' }
+    const localTs = { title: 100, email: 100 }
+    const remoteTs = { title: 100, email: 200 }
+
+    const result = mergeItemFields(local, remote, localTs, remoteTs)
+
+    // A newer stamp for an absent field wins, so the merge reads `undefined`
+    // off the remote. This is why a server narrowing a realtime frame's record
+    // MUST narrow its `fieldTimestamps` to match — see `buildPeerFrame` in
+    // `@rstore/nuxt-drizzle`. Dropping the stamp alongside the field is what
+    // keeps the branch above ("present only in local") applicable instead.
+    expect(result.merged.email).toBeUndefined()
+
+    const narrowedTs = { title: 100 }
+    expect(mergeItemFields(local, remote, localTs, narrowedTs).merged.email).toBe('leia@example.com')
+  })
+
   it('should handle fields present only in remote', () => {
     const local: Record<string, any> = { title: 'Title' }
     const remote: Record<string, any> = { title: 'Title', newField: 'remote-only' }
