@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 import { integer, SQLiteSyncDialect, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { describe, expect, it, vi } from 'vitest'
 
@@ -133,5 +134,53 @@ describe('getDrizzleOrderBy', () => {
   it('rejects malformed or unknown directions', () => {
     expect400(() => getDrizzleOrderBy(todos, 'id'))
     expect400(() => getDrizzleOrderBy(todos, 'id.bogus'))
+  })
+})
+
+// `findMany` attaches the `extras` built by `before` hooks to the query but
+// used to withhold them from the ordering, so `orderBy=<extra>.desc` 400ed on
+// a column the response actually contains.
+//
+// The assertions rely on how drizzle renders each kind of chunk: an
+// `SQL.Aliased` becomes a bare escaped alias (`"score"`) while a column is
+// table-qualified (`"todos"."id"`), so the compiled SQL says which of the two
+// resolved.
+describe('getDrizzleOrderBy — extras', () => {
+  const extras = {
+    score: sql<number>`(select count(*) from comments where comments.todo_id = ${todos.id})`.as('score'),
+    // Deliberately shadows the `title` column to pin down precedence.
+    title: sql<string>`lower(${todos.title})`.as('title'),
+  }
+
+  it('orders by an extra in both directions', () => {
+    expect(toQuery(getDrizzleOrderBy(todos, 'score.asc', extras)[0]).sql).toBe('"score" asc')
+    expect(toQuery(getDrizzleOrderBy(todos, 'score.desc', extras)[0]).sql).toBe('"score" desc')
+  })
+
+  it('still orders by a real column when extras are passed', () => {
+    expect(toQuery(getDrizzleOrderBy(todos, 'id.asc', extras)[0]).sql).toBe('"todos"."id" asc')
+  })
+
+  // An extra selected under a column's name replaces that field in the result
+  // rows, so ordering by the name must follow what the client sees.
+  it('prefers an extra over a column of the same name', () => {
+    expect(toQuery(getDrizzleOrderBy(todos, 'title.asc', extras)[0]).sql).toBe('"title" asc')
+  })
+
+  // A plain `columnName in extras` lookup walks the prototype chain, so
+  // `orderBy=constructor.asc` resolves to `Object`, which drizzle then binds
+  // as an order-by parameter (`order by ? asc`) instead of the request being
+  // rejected like any other unknown field.
+  it('rejects orderings inherited from Object.prototype', () => {
+    expect400(() => getDrizzleOrderBy(todos, 'constructor.asc', extras))
+    expect400(() => getDrizzleOrderBy(todos, 'toString.desc', extras))
+    expect400(() => getDrizzleOrderBy(todos, '__proto__.asc', extras))
+  })
+
+  // The parameter is optional: callers that build no extras (relation
+  // ordering) must keep rejecting anything that is not a column.
+  it('rejects an extra name when no extras are passed', () => {
+    expect400(() => getDrizzleOrderBy(todos, 'score.asc'))
+    expect(toQuery(getDrizzleOrderBy(todos, 'title.asc')[0]).sql).toBe('"todos"."title" asc')
   })
 })

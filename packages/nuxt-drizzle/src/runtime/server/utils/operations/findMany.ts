@@ -95,7 +95,9 @@ export async function drizzleFindMany({ event, collection, params, query, search
     q.columns = searchQuery.columns
   q.extras = extras
   if (searchQuery.orderBy)
-    q.orderBy = getDrizzleOrderBy(table, searchQuery.orderBy)
+    // `extras` is passed so the query can also be ordered by the computed
+    // expressions hooks added to it, not just by real table columns.
+    q.orderBy = getDrizzleOrderBy(table, searchQuery.orderBy, extras)
 
   let result = await dbQuery[collection]!.findMany(q)
   result ??= []

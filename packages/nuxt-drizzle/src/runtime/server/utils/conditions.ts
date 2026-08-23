@@ -1,4 +1,4 @@
-import type { Column, Table } from 'drizzle-orm'
+import type { Column, SQL, Table } from 'drizzle-orm'
 import type { RstoreDrizzleCondition } from '../../utils/types'
 import * as drizzle from 'drizzle-orm'
 import { createError } from 'h3'
@@ -56,14 +56,24 @@ export function resolveTableColumn(table: Table, field: unknown): Column {
 }
 
 /**
+ * Extra SQL expressions selected alongside the table columns (drizzle
+ * `extras`), keyed by the alias they are exposed under in the result rows.
+ * They are authored server-side by `before` hooks (`transformQuery`), never
+ * by the client — same shape drizzle's relational query builder expects.
+ */
+export type RstoreDrizzleExtras = Record<string, SQL.Aliased>
+
+/**
  * Converts wire `orderBy` entries (`'column.asc' | 'column.desc'`) into
  * drizzle order expressions. Unknown columns and malformed directions are
  * rejected with a `400` — never interpolated as raw SQL.
  *
  * @param table The drizzle table being ordered.
  * @param orderByData The client-supplied orderBy value(s).
+ * @param extras Extra SQL expressions attached to the same query, if any.
+ * Optional so existing callers that build no extras are unaffected.
  */
-export function getDrizzleOrderBy(table: Table, orderByData: string | string[]) {
+export function getDrizzleOrderBy(table: Table, orderByData: string | string[], extras?: RstoreDrizzleExtras) {
   const list = typeof orderByData === 'string' ? [orderByData] : orderByData
   return list.map((rawOrderBy) => {
     const parts = String(rawOrderBy).split('.')
@@ -73,8 +83,20 @@ export function getDrizzleOrderBy(table: Table, orderByData: string | string[]) 
         statusMessage: 'Invalid orderBy',
       })
     }
-    const [columnName, order] = parts
+    // The cast is what the length/direction check above just proved.
+    const [columnName, order] = parts as [string, 'asc' | 'desc']
     const operator = order === 'asc' ? drizzle.asc : drizzle.desc
+    // Extras take precedence over a same-named column: the alias is what the
+    // client sees in the result rows, so ordering by that name must order by
+    // the expression behind it (which is also how SQL itself resolves an
+    // output alias in `ORDER BY`).
+    // Same `hasOwnProperty` guard as `resolveTableColumn`: `columnName in extras`
+    // would resolve inherited names such as `constructor` or `toString` to
+    // non-SQL values, which drizzle would bind as an order-by parameter instead
+    // of rejecting the unknown field with a `400`.
+    if (extras && Object.prototype.hasOwnProperty.call(extras, columnName)) {
+      return operator(extras[columnName] as SQL.Aliased)
+    }
     return operator(resolveTableColumn(table, columnName))
   })
 }
