@@ -70,6 +70,35 @@ describe('getDrizzleKeyWhere', () => {
     expect(params(getDrizzleKeyWhere('1::false', ['id', 'done'], pgTodos), pgDialect)).toEqual([1, false])
   })
 
+  // `::` only separates *columns*, so a collection with one primary key has
+  // nothing to separate: splitting there would match on the first segment
+  // alone and silently hit the wrong row (or none) for any value that
+  // legitimately contains `::` — a URL, a namespaced id, a slug.
+  it('keeps a single primary key whole when the value contains ::', () => {
+    expect(params(getDrizzleKeyWhere('a::b', ['slug'], todos))).toEqual(['a::b'])
+    expect(params(getDrizzleKeyWhere('https://example.com/x', ['slug'], todos))).toEqual(['https://example.com/x'])
+    expect(params(getDrizzleKeyWhere('::', ['slug'], todos))).toEqual(['::'])
+    expect(params(getDrizzleKeyWhere('a::b::c', ['slug'], todos))).toEqual(['a::b::c'])
+  })
+
+  // Extra segments belong to the last column: it is the only one with nothing
+  // after it, so it is the only one that can carry a `::` without shifting
+  // every following column. A `::` in an earlier column is not representable.
+  it('folds overflow segments into the last column of a composite key', () => {
+    expect(params(getDrizzleKeyWhere('1::a::b', ['id', 'slug'], todos))).toEqual([1, 'a::b'])
+    expect(params(getDrizzleKeyWhere('1::::b', ['id', 'slug'], todos))).toEqual([1, '::b'])
+    expect(params(getDrizzleKeyWhere('1::a::b::c', ['id', 'slug'], todos))).toEqual([1, 'a::b::c'])
+  })
+
+  // Folding overflow into the last column must not also *invent* a value for
+  // it: a key that doesn't pin every column leaves the missing segments
+  // `undefined` rather than `''`, which a real row could match.
+  it('leaves the missing segments unbound when a composite key is too short', () => {
+    expect(params(getDrizzleKeyWhere('1', ['id', 'slug'], todos))).toEqual([1, undefined])
+    // Same for an empty key: the trailing column stays unbound.
+    expect(params(getDrizzleKeyWhere('', ['slug', 'id'], todos))).toEqual(['', undefined])
+  })
+
   it('leaves a malformed numeric key as a string', () => {
     expect(params(getDrizzleKeyWhere('abc', ['id'], todos))).toEqual(['abc'])
   })

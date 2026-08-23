@@ -159,17 +159,47 @@ export function getDrizzleDialect(): Dialect {
   return dialect
 }
 
+/**
+ * Builds the `where` matching a key coming from a route parameter.
+ *
+ * Composite keys are `::`-joined, which makes `::` a reserved sequence — but
+ * only for the columns that have another column after them. The key is
+ * therefore split as little as possible:
+ *
+ * - A **single** primary key is matched against the whole key, unsplit: there
+ *   is nothing to separate, so a value that legitimately contains `::` (a URL,
+ *   a namespaced id, a slug) must survive the round-trip intact. Splitting it
+ *   would match on the first segment alone and silently hit the wrong row, or
+ *   none.
+ * - A **composite** key is split, and any segments beyond the primary key count
+ *   are folded back into the **last** column. Only the final primary key column
+ *   may contain `::` and still round-trip; a `::` in any earlier column shifts
+ *   every following segment and cannot be recovered.
+ *
+ * A key with *fewer* segments than primary keys leaves the trailing columns
+ * unbound (`undefined`) rather than pinned to `''`, so a malformed key can't
+ * match an unintended row.
+ *
+ * @param key The `::`-joined key from the route (or `String(key)` in findMany).
+ * @param primaryKeys The collection primary key column names.
+ * @param table The drizzle table.
+ */
 export function getDrizzleKeyWhere(key: string, primaryKeys: string[], table: Table) {
-  const keys = key.split('::')
   if (primaryKeys.length > 1) {
+    const segments = key.split('::')
+    // Overflow segments belong to the last column, which is the only one that
+    // can carry a `::` without shifting the columns after it.
+    const values = segments.length > primaryKeys.length
+      ? [...segments.slice(0, primaryKeys.length - 1), segments.slice(primaryKeys.length - 1).join('::')]
+      : segments
     return drizzle.and(...primaryKeys.map((pk, i) => {
       const column = table[pk as keyof typeof table] as Column
-      return drizzle.eq(column, coerceKeySegment(column, keys[i]))
+      return drizzle.eq(column, coerceKeySegment(column, values[i]))
     }))
   }
   else if (primaryKeys[0]) {
     const column = table[primaryKeys[0] as keyof typeof table] as Column
-    return drizzle.eq(column, coerceKeySegment(column, keys[0]))
+    return drizzle.eq(column, coerceKeySegment(column, key))
   }
   else {
     throw createError({
