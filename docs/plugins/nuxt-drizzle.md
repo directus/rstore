@@ -348,6 +348,48 @@ export default defineEventHandler(async () => {
 })
 ```
 
+### Narrowing a frame per peer <Badge text="New in v0.9" />
+
+A published record is serialized once and fanned out to every matching
+subscriber, so a table that mixes public and private columns has to choose
+between broadcasting the private ones and having no realtime at all. Call
+`narrowRecord()` from `realtime.filter` to deliver a column subset to one peer
+instead — every other peer still receives the frame as published.
+
+```ts
+// server/plugins/realtime-permissions.ts
+export default defineNitroPlugin(() => {
+  hooksForTable(tables.users, {
+    'realtime.filter': async ({ peer, record, narrowRecord }) => {
+      const userId = await getPeerUserId(peer)
+      if (record.id !== userId) {
+        // Everyone may follow a profile; only its owner sees the full row.
+        narrowRecord({ id: record.id, username: record.username, avatar: record.avatar })
+      }
+    },
+  })
+})
+```
+
+Things to know:
+
+- **Keep the primary key columns.** The client derives the cache key from the
+  record, and a frame missing it cannot be applied.
+- `fieldTimestamps` is narrowed automatically to the keys you kept. Never build
+  your own: a stamp left behind for an omitted field is newer than the client's,
+  so the per-field merge resolves that field to `undefined` and erases the value
+  the peer legitimately holds.
+- Narrowing intersects. Keys absent from the published record are dropped, and
+  successive calls keep only the columns every handler kept — so two independent
+  policies compose to the same result whatever order they ran in. Values come
+  from the last call, so a handler may also redact one in place.
+- `reject()` still wins, whichever is called first.
+- Narrowing runs **after** `where` matching, which is evaluated against the full
+  record. A subscription filtering on a column you narrow away therefore still
+  receives the frame — and "did a frame arrive" leaks whether the filter
+  matched. Reject those subscriptions in `realtime.authorize`, where
+  `subscription.where` is available.
+
 ## Offline Mode <Badge text="New in v0.8" />
 
 Turn on the offline mode by setting the `rstoreDrizzle.offline` option in your Nuxt config:
@@ -429,7 +471,7 @@ You can use the following hooks:
 - `item.patch.after` - after updating a single item
 - `item.delete.before` - before deleting a single item
 - `item.delete.after` - after deleting a single item
-- `realtime.filter` - before sending a realtime update, allows to reject the update by calling `payload.reject()`
+- `realtime.filter` - before sending a realtime update, allows to reject the update by calling `payload.reject()`, or to deliver only a subset of its columns to that peer by calling `payload.narrowRecord()` (see [Narrowing a frame per peer](#narrowing-a-frame-per-peer))
 
 If you throw an error in a `before` hook, the action will be aborted and the error will be returned to the client.
 
@@ -452,6 +494,10 @@ export default defineNitroPlugin(() => {
       if (payload.record.title === 'Error') {
         console.log('Rejecting realtime update for todo with title "Error"')
         payload.reject()
+      }
+      // ...or keep delivering the frame with the private columns removed.
+      if (payload.record.ownerId !== getPeerUserId(payload.peer)) {
+        payload.narrowRecord({ id: payload.record.id, title: payload.record.title })
       }
     },
   })
@@ -1168,5 +1214,5 @@ export default defineNuxtConfig({
 ```
 
 ::: tip Hooks stay Nitro-only
-The `realtime.filter` hook, `publishRstoreDrizzleRealtimeUpdate`, and `hooksForTable` rely on the generated collection metadata and the H3 peer object, so they are only available as Nitro server auto-imports. A standalone server is expected to enforce permissions inline (typically inside the `subscribe` handler shown above, before forwarding the `update` frame to the socket).
+The `realtime.filter` hook, `publishRstoreDrizzleRealtimeUpdate`, and `hooksForTable` rely on the generated collection metadata and the H3 peer object, so they are only available as Nitro server auto-imports. A standalone server is expected to enforce permissions inline (typically inside the `subscribe` handler shown above, before forwarding the `update` frame to the socket). If it narrows a frame's `record` for one socket, it must narrow that frame's `fieldTimestamps` to the same keys — otherwise the client merges a newer stamp for a field it did not receive and erases its cached value.
 :::

@@ -107,7 +107,7 @@ Before adding a `server/api/*.ts` handler, a `defineEventHandler`, or any custom
 - Use `rstoreDrizzleHooks.hook(...)` when the extension needs to work across multiple tables.
 - `*.before` hooks can call `transformQuery(({ where, extras }) => ...)` to add constraints before execution.
 - Use `allowTables([...])` to deny access to unlisted generated collections.
-- Use the `realtime.filter` hook to reject websocket updates for a peer when row-level rules apply.
+- Use the `realtime.filter` hook to reject websocket updates for a peer when row-level rules apply, or `payload.narrowRecord({ ... })` to deliver only a column subset to that peer (keep the primary key; `fieldTimestamps` is narrowed for you).
 
 ## Guardrails
 
