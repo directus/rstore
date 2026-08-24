@@ -87,7 +87,7 @@ export function wrapItem<
           }) satisfies WrappedItemBase<TCollection, TCollectionDefaults, TSchema>['$delete']
 
         case '$isOptimistic':
-          return item.value.$layer?.optimistic
+          return item.value.$layer?.optimistic ?? false
 
         case '$meta':
           return metadata

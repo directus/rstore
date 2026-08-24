@@ -194,6 +194,18 @@ describe('createFormObject - operation log', () => {
     expect(obj.$hasChanges()).toBe(true)
   })
 
+  it('reports undefined initial values for newly assigned fields', async () => {
+    const obj = createFormObject<{ name: string, age?: number }>({
+      defaultValues: () => ({ name: 'John' }),
+      submit: async data => ({ name: data.name!, age: data.age }),
+    })
+
+    obj.age = 31
+    await nextTick()
+
+    expect(obj.$changedProps.age).toEqual([31, undefined])
+  })
+
   it('handles reverting a field back to initial value', async () => {
     const obj = createFormObject({
       defaultValues: () => ({ name: 'John' }),

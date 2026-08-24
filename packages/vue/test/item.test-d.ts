@@ -39,5 +39,8 @@ describe('wrapped item typing', () => {
     expectTypeOf(updateForm.$getRaw('name')).toEqualTypeOf<string | undefined>()
     expectTypeOf(createForm.$getRawData().name).toEqualTypeOf<string | undefined>()
     expectTypeOf(updateForm.$getRawData({ clone: true }).name).toEqualTypeOf<string | undefined>()
+    expectTypeOf<UserWrappedItem['$getKey']>().returns.toEqualTypeOf<string | number>()
+    expectTypeOf<NonNullable<UserCreateFormObject['$changedProps']['name']>>()
+      .toEqualTypeOf<[newValue: string | undefined, oldValue: string | undefined]>()
   })
 })

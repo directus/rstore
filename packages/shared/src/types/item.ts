@@ -30,7 +30,7 @@ export interface WrappedItemBase<
    */
   $delete: () => Promise<void>
 
-  $getKey: () => string
+  $getKey: () => string | number
 
   $isOptimistic: boolean
 

@@ -56,6 +56,27 @@ describe('wrapItem', () => {
     expect(wrappedItem.$getKey()).toBe('itemKey')
   })
 
+  it('should return numeric keys and false for non-optimistic items', async () => {
+    const store = await createStore({
+      schema: [
+        { name: 'testCollection', getKey: (item: { id: number }) => item.id },
+        { name: 'relatedCollection' },
+      ],
+      plugins: [],
+    })
+    const wrappedItem = wrapItem<any, any, Schema>({
+      store,
+      collection: store.$collections[0]!,
+      item: ref({
+        id: 7,
+      }),
+      metadata: createMetadata(),
+    })
+
+    expect(wrappedItem.$getKey()).toBe(7)
+    expect(wrappedItem.$isOptimistic).toBe(false)
+  })
+
   it('should throw an error if key is undefined in $getKey', async () => {
     const store = await createStore({
       schema: [

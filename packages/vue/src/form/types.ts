@@ -67,8 +67,8 @@ export interface CreateFormObjectOptions<
 
 export type FormObjectChanged<TData> = {
   [TKey in keyof TData]?: [
-    newValue: TData[TKey],
-    oldValue: TData[TKey],
+    newValue: TData[TKey] | undefined,
+    oldValue: TData[TKey] | undefined,
   ] | undefined
 }
 
