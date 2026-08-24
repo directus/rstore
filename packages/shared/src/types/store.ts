@@ -77,7 +77,7 @@ export interface StoreCore<
   /**
    * @private
    */
-  $wrapMutation: <TMutation> (mutation: TMutation) => TMutation & MutationSpecialProps
+  $wrapMutation: <TMutation extends (...args: any[]) => unknown> (mutation: TMutation) => TMutation & MutationSpecialProps
   /**
    * Batch scheduler instance. Present when batching is enabled.
    * @private

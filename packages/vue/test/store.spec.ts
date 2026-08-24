@@ -4,6 +4,32 @@ import { nextTick, ref } from 'vue'
 import { createStore } from '../src/store'
 
 describe('store', () => {
+  it('should preserve wrapped mutation return values', async () => {
+    const store = await createStore({
+      schema: [],
+      plugins: [],
+    })
+
+    const syncMutation = store.$wrapMutation((value: number) => value * 2)
+    let resolveAsync!: () => void
+    const asyncMutation = store.$wrapMutation(async (value: number) => {
+      await new Promise<void>((resolve) => {
+        resolveAsync = resolve
+      })
+      return value * 3
+    })
+
+    expect(syncMutation(2)).toBe(4)
+    expect(syncMutation.$loading).toBe(false)
+
+    const result = asyncMutation(2)
+    expect(asyncMutation.$loading).toBe(true)
+    resolveAsync()
+    await expect(result).resolves.toBe(6)
+    expect(asyncMutation.$loading).toBe(false)
+    expect(asyncMutation.$error).toBeNull()
+  })
+
   it('should allow using a collection API directly', async () => {
     const store = await createStore({
       schema: [

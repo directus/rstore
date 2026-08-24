@@ -4,10 +4,11 @@ import type { VueCollectionApi } from './api'
 import { createStoreCore, normalizeCollectionRelations, resolveCollection, resolveCollectionOppositeRelations } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
-import { reactive, ref, toValue, watch } from 'vue'
+import { reactive, toValue, watch } from 'vue'
 import { createCollectionApi } from './api'
 import { createCache } from './cache'
 import { cacheWriteEventHook } from './events'
+import { wrapMutation } from './wrapMutation'
 
 export interface CreateStoreOptions<
   TSchema extends StoreSchema = StoreSchema,
@@ -82,7 +83,7 @@ export type VueStore<
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > = StoreCore<TSchema, TCollectionDefaults> & VueStoreCollectionApiProxy<TSchema, TCollectionDefaults> & {
   $collection: (collectionName: MaybeRefOrGetter<string>) => VueCollectionApi<any, TCollectionDefaults, TSchema, WrappedItem<any, TCollectionDefaults, TSchema>>
-  $onCacheReset: (callback: () => void) => () => void
+  $onCacheReset: (callback: () => void) => { off: () => void }
   $experimentalGarbageCollection?: boolean
   $modulesCache: WeakMap<(...args: any[]) => ResolvedModule<any, any>, ResolvedModule<any, any>>
 }
@@ -193,48 +194,7 @@ export async function createStore<
           }
 
           if (key === '$wrapMutation') {
-            return <TMutation extends (...args: any[]) => unknown>(mutation: TMutation) => {
-              const $loading = ref(false)
-              const $error = ref<Error | null>(null)
-              const $time = ref(0)
-              const wrappedMutation = async (...args: Parameters<TMutation>) => {
-                $loading.value = true
-                const start = performance.now()
-                try {
-                  await mutation(...args)
-                  $error.value = null
-                }
-                catch (e) {
-                  $error.value = e as Error
-                  throw e
-                }
-                finally {
-                  $loading.value = false
-                  $time.value = performance.now() - start
-                }
-              }
-              return new Proxy(wrappedMutation, {
-                get(target, prop) {
-                  if (prop === '$loading') {
-                    return $loading.value
-                  }
-                  else if (prop === '$error') {
-                    return $error.value
-                  }
-                  else if (prop === '$time') {
-                    return $time.value
-                  }
-                  return Reflect.get(target, prop)
-                },
-                set(target, prop, value) {
-                  if (prop === '$error') {
-                    $error.value = value
-                    return true
-                  }
-                  return Reflect.set(target, prop, value)
-                },
-              })
-            }
+            return wrapMutation
           }
 
           if (key === '$modulesCache') {
