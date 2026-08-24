@@ -92,8 +92,8 @@ export interface VueCollectionApi<
     optionsGetter: (queryBuilder: LiveQueryBuilder<TCollection, TCollectionDefaults, TSchema>) => TOptions,
   ) => LiveQueryResult<TCollection, TCollectionDefaults, TSchema, TItem, TOptions>
   /** Start a realtime subscription for an item or query. */
-  subscribe: (
-    optionsGetter: (queryBuilder: SubscriptionQueryBuilder<TCollection, TCollectionDefaults, TSchema>) => FindOptions<TCollection, TCollectionDefaults, TSchema>,
+  subscribe: <TOptions extends string | number | FindOptions<TCollection, TCollectionDefaults, TSchema> | undefined = undefined> (
+    optionsGetter?: (queryBuilder: SubscriptionQueryBuilder<TCollection, TCollectionDefaults, TSchema>) => TOptions,
   ) => SubscribeResult
   /** Create an item directly. */
   create: (

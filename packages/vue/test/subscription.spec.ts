@@ -115,7 +115,7 @@ describe('realtime subscription', () => {
     const scope = effectScope()
     let sub: any
     scope.run(() => {
-      sub = store.messages.subscribe((s: any) => s(keyRef.value))
+      sub = store.messages.subscribe(s => s(keyRef.value))
     })
 
     await vi.waitFor(() => expect(calls).toHaveLength(1))
@@ -144,6 +144,29 @@ describe('realtime subscription', () => {
     scope.stop()
     await nextTick()
     expect(calls).toHaveLength(4)
+  })
+
+  it('subscribe() subscribes to the entire collection without options', async () => {
+    const calls: SubscriptionCall[] = []
+    const { storePromise } = createMessagesStore(calls)
+    const store = await storePromise
+
+    const sub = store.messages.subscribe()
+
+    await vi.waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0]).toMatchObject({
+      type: 'subscribe',
+      collection: 'messages',
+      key: undefined,
+      findOptions: undefined,
+    })
+
+    await sub.unsubscribe()
+    expect(calls).toHaveLength(2)
+    expect(calls[1]).toMatchObject({
+      type: 'unsubscribe',
+      subscriptionId: calls[0]!.subscriptionId,
+    })
   })
 
   it('does not subscribe nor register reconnect listener on the server', async () => {

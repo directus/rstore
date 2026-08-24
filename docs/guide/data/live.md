@@ -9,7 +9,7 @@ Subscriptions are a way to listen for data changes. You can subscribe to a speci
 ```ts
 const store = useStore()
 
-store.ChatMessage.subscribe(q => q.many({
+store.ChatMessage.subscribe(q => q({
   params: {
     filter: {
       roomId: 'room1',
@@ -20,7 +20,7 @@ store.ChatMessage.subscribe(q => q.many({
 
 ## Unsubscribe
 
-The `subscribe` method returns a function you can call to stop listening. The subscription is also automatically removed when the current component is unmounted.
+The `subscribe` method returns an object with an `unsubscribe` function. The subscription is also automatically removed when the current component is unmounted.
 
 ```ts
 const { unsubscribe } = store.ChatMessage.subscribe()
