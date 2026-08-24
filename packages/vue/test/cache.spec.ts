@@ -446,7 +446,12 @@ describe('cache', () => {
 
   it('should filter the items', async () => {
     const store = await createStore({
-      schema: [{ name: 'TestCollection' }],
+      schema: [{
+        name: 'TestCollection',
+        computed: {
+          upperLabel: (item: { label: string }) => item.label.toUpperCase(),
+        },
+      }],
       plugins: [],
     })
     const cache = store.$cache
@@ -458,10 +463,17 @@ describe('cache', () => {
     const items2 = cache.readItems({ collection, marker: 'testMarker', filter: item => item.label === 'Woof' })
 
     expect(items).toHaveLength(1)
-    expect(items[0]).toEqual({ id: 1, label: 'Meow' })
+    expect(items[0]).toMatchObject({ id: 1, label: 'Meow' })
 
     expect(items2).toHaveLength(1)
-    expect(items2[0]).toEqual({ id: 2, label: 'Woof' })
+    expect(items2[0]).toMatchObject({ id: 2, label: 'Woof' })
+
+    const wrappedItems = cache.readItems({
+      collection,
+      marker: 'testMarker',
+      filter: item => item.$getKey() === 1 && item.upperLabel === 'MEOW',
+    })
+    expect(wrappedItems).toHaveLength(1)
   })
 
   it('should limit the number of items', async () => {

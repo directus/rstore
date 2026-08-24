@@ -134,16 +134,17 @@ function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit,
 
   for (const key of keys ?? Object.keys(data)) {
     const item = data[key]
-    if (!item || (filter && !filter(item))) {
+    if (!item) {
       continue
     }
     const wrappedItem = getWrappedItem(ctx, collection, item)
-    if (wrappedItem) {
-      result.push(wrappedItem)
-      count++
-      if (limit != null && count >= limit) {
-        break
-      }
+    if (!wrappedItem || (filter && !filter(wrappedItem))) {
+      continue
+    }
+    result.push(wrappedItem)
+    count++
+    if (limit != null && count >= limit) {
+      break
     }
   }
   return result
