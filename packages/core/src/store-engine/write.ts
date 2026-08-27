@@ -4,39 +4,39 @@ import { pickNonSpecialProps } from '@rstore/shared'
 import { mergeItemFields } from '../crdt/index.js'
 import { isKeyDefined } from '../key.js'
 import { shouldResurrect } from '../tombstone.js'
-import { removeKeyFromIndexes, updateItemIndexes } from './resolve.js'
+import { getPublicKey, registerKey, releaseUnusedKey, toKeyId } from './identity.js'
+import { reconcileItemIndexes } from './indexes.js'
+import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
 
-/**
- * Get (creating if needed) the per-collection field-timestamp map used by the
- * CRDT field-level merge.
- */
-function ensureCollectionTimestamps(ctx: EngineContext, collectionName: string): Map<string | number, FieldTimestamps> {
-  let map = ctx.fieldTimestamps.get(collectionName)
-  if (!map) {
-    map = new Map()
-    ctx.fieldTimestamps.set(collectionName, map)
+/** Get or create field timestamps for one collection. */
+function ensureCollectionTimestamps(ctx: EngineContext, collectionName: string): Map<string, FieldTimestamps> {
+  let timestamps = ctx.fieldTimestamps.get(collectionName)
+  if (!timestamps) {
+    timestamps = new Map()
+    ctx.fieldTimestamps.set(collectionName, timestamps)
   }
-  return map
+  return timestamps
 }
 
-/** Read a key's stored field timestamps, or `undefined`. */
+/** Read field timestamps using canonical string/number key identity. */
 export function getFieldTimestamps(ctx: EngineContext, collectionName: string, key: string | number): FieldTimestamps | undefined {
-  return ctx.fieldTimestamps.get(collectionName)?.get(key)
+  return ctx.fieldTimestamps.get(collectionName)?.get(toKeyId(key))
 }
 
-/** Store a key's field timestamps. */
+/** Store field timestamps using canonical string/number key identity. */
 export function setFieldTimestamps(ctx: EngineContext, collectionName: string, key: string | number, timestamps: FieldTimestamps): void {
-  ensureCollectionTimestamps(ctx, collectionName).set(key, timestamps)
+  const id = toKeyId(key)
+  const state = ctx.collections.get(collectionName)
+  if (state && !state.keyValues.has(id)) {
+    state.keyValues.set(id, key)
+  }
+  ensureCollectionTimestamps(ctx, collectionName).set(id, timestamps)
 }
 
-/**
- * Resolve and write a related child item, recursing through {@link writeItemNow}.
- * The child collection is resolved from the relation's candidate target names.
- */
+/** Resolve and write a nested relation item into its target collection. */
 export function writeItemForRelationNow(ctx: EngineContext, params: WriteItemForRelationParams): void {
   const { parentCollection, relationKey, relation, childItem, meta } = params
-  const possibleCollections = Object.keys(relation.to)
-  const nestedItemCollection = ctx.callbacks.resolveChildCollection(childItem, possibleCollections)
+  const nestedItemCollection = ctx.callbacks.resolveChildCollection(childItem, Object.keys(relation.to))
   if (!nestedItemCollection) {
     throw new Error(`Could not determine type for relation ${parentCollection.name}.${String(relationKey)}`)
   }
@@ -44,174 +44,138 @@ export function writeItemForRelationNow(ctx: EngineContext, params: WriteItemFor
   if (!isKeyDefined(nestedKey)) {
     throw new Error(`Could not determine key for relation ${parentCollection.name}.${String(relationKey)}`)
   }
-
-  writeItemNow(ctx, {
-    collection: nestedItemCollection,
-    key: nestedKey,
-    item: childItem,
-    meta,
-  })
+  writeItemNow(ctx, { collection: nestedItemCollection, key: nestedKey, item: childItem, meta })
 }
 
-/**
- * Apply a single item write to the canonical base store, maintaining indexes,
- * tombstones, CRDT timestamps and observer notifications.
- *
- * Observer granularity is the core perf win: a field update to an existing
- * item touches only that item's observer, never the collection list — so a
- * 1000-item live list does not re-run when one of its members changes a field.
- * Inserts (new keys) and markers touch the list because they change the
- * visible-key set / gating of list reads.
- */
+/** Write a non-frozen item after extracting and caching its nested relations. */
+function writeMutableItem(ctx: EngineContext, params: WriteItemParams, existing: any): any {
+  const { collection, item, meta } = params
+  const rawData = pickNonSpecialProps(item, true)
+  const data: Record<string, any> = {}
+
+  for (const field in rawData) {
+    if (!(field in collection.relations)) {
+      data[field] = rawData[field]
+      continue
+    }
+    const relation = collection.relations[field]
+    const rawItem = rawData[field]
+    if (!rawItem || !relation) {
+      continue
+    }
+    if (relation.many && !Array.isArray(rawItem)) {
+      throw new Error(`Expected array for relation ${collection.name}.${field}`)
+    }
+    if (!relation.many && Array.isArray(rawItem)) {
+      throw new Error(`Expected object for relation ${collection.name}.${field}`)
+    }
+    for (const childItem of Array.isArray(rawItem) ? rawItem : [rawItem]) {
+      writeItemForRelationNow(ctx, {
+        parentCollection: collection,
+        relationKey: field,
+        relation,
+        childItem,
+        meta,
+      })
+    }
+  }
+
+  if (!existing) {
+    if (params.fieldTimestamps) {
+      setFieldTimestamps(ctx, collection.name, params.key, { ...params.fieldTimestamps })
+    }
+    return data
+  }
+  if (!params.fieldTimestamps) {
+    return { ...existing, ...data }
+  }
+
+  const localTimestamps = getFieldTimestamps(ctx, collection.name, params.key) ?? {}
+  const { merged, mergedTimestamps, conflicts } = mergeItemFields(
+    existing,
+    data,
+    localTimestamps,
+    params.fieldTimestamps,
+  )
+  setFieldTimestamps(ctx, collection.name, params.key, mergedTimestamps)
+  if (conflicts.length > 0) {
+    ctx.callbacks.onConflict?.({ collection, key: params.key, conflicts })
+  }
+  return merged
+}
+
+/** Apply one item write and reconcile indexes against its final visible value. */
 export function writeItemNow(ctx: EngineContext, params: WriteItemParams): void {
   const { collection, key, item, marker, fromWriteItems, meta } = params
-  const collectionState = ctx.ensureCollection(collection.name)
-
-  // Tombstone guard: a write with per-field timestamps is dropped when the
-  // tombstone is newer; writes without timestamps always resurrect (explicit
-  // user intent). A surviving tombstone is cleared so the item comes back.
-  const tomb = ctx.tombstones.get(collection.name, key)
-  if (tomb) {
-    if (params.fieldTimestamps && !shouldResurrect(tomb, params.fieldTimestamps)) {
+  const state = ctx.ensureCollection(collection.name)
+  const previousPublicKey = state.keyValues.get(toKeyId(key))
+  const id = registerKey(state, collection, key, item)
+  const publicKey = getPublicKey(state, id)
+  const tombstone = ctx.tombstones.get(collection.name, publicKey)
+  if (tombstone) {
+    if (params.fieldTimestamps && !shouldResurrect(tombstone, params.fieldTimestamps)) {
       return
     }
-    ctx.tombstones.clear(collection.name, key)
+    ctx.tombstones.clear(collection.name, publicKey)
   }
 
-  const isNew = !collectionState.base.has(key)
-  const isFrozen = Object.isFrozen(item)
-  if (isFrozen) {
-    // Frozen items are stored verbatim (no relation extraction / index work).
-    collectionState.base.set(key, item)
-  }
-  else {
-    const rawData = pickNonSpecialProps(item, true)
+  const previous = resolveItemById(state, id)
+  const existing = state.base.get(id)
+  const nextBase = Object.isFrozen(item)
+    ? item
+    : writeMutableItem(ctx, { ...params, key: publicKey }, existing)
+  state.base.set(id, nextBase)
 
-    // Split out relation fields and write nested items recursively.
-    const data: Record<string, any> = {}
-    for (const field in rawData) {
-      if (field in collection.relations) {
-        const relation = collection.relations[field]
-        const rawItem = rawData[field]
-        if (!rawItem || !relation) {
-          continue
-        }
-        if (relation.many && !Array.isArray(rawItem)) {
-          throw new Error(`Expected array for relation ${collection.name}.${field}`)
-        }
-        else if (!relation.many && Array.isArray(rawItem)) {
-          throw new Error(`Expected object for relation ${collection.name}.${field}`)
-        }
-        if (Array.isArray(rawItem)) {
-          for (const nestedItem of rawItem as any[]) {
-            writeItemForRelationNow(ctx, {
-              parentCollection: collection,
-              relationKey: field,
-              relation,
-              childItem: nestedItem,
-              meta,
-            })
-          }
-        }
-        else {
-          writeItemForRelationNow(ctx, {
-            parentCollection: collection,
-            relationKey: field,
-            relation,
-            childItem: rawItem,
-            meta,
-          })
-        }
-      }
-      else {
-        data[field] = rawData[field]
-      }
-    }
-
-    const existing = collectionState.base.get(key)
-    updateItemIndexes(ctx, collection, key, existing, data)
-
-    if (!existing) {
-      collectionState.base.set(key, data)
-      if (params.fieldTimestamps) {
-        setFieldTimestamps(ctx, collection.name, key, { ...params.fieldTimestamps })
-      }
-    }
-    else if (params.fieldTimestamps) {
-      // CRDT field-level LWW merge against the existing item.
-      const localTimestamps = getFieldTimestamps(ctx, collection.name, key) ?? {}
-      const { merged, mergedTimestamps, conflicts } = mergeItemFields(
-        existing,
-        data,
-        localTimestamps,
-        params.fieldTimestamps,
-      )
-      setFieldTimestamps(ctx, collection.name, key, mergedTimestamps)
-      collectionState.base.set(key, merged)
-      if (conflicts.length > 0) {
-        ctx.callbacks.onConflict?.({ collection, key, conflicts })
-      }
-    }
-    else {
-      collectionState.base.set(key, { ...existing, ...data })
-    }
-  }
-
-  // Notify: the item always; the list only when the visible-key set changed.
-  ctx.observers.touchItem(collection.name, key)
-  if (isNew) {
+  invalidateResolvedItem(state, id)
+  const next = resolveItemById(state, id)
+  reconcileItemIndexes(ctx, collection, id, previous, next)
+  ctx.observers.touchItem(collection.name, id)
+  const visibilityChanged = (previous !== undefined) !== (next !== undefined)
+  const visibleKeyFormChanged = previousPublicKey !== undefined
+    && previousPublicKey !== publicKey
+    && (previous !== undefined || next !== undefined)
+  if (visibilityChanged || visibleKeyFormChanged) {
+    invalidateVisibleKeys(state)
     ctx.observers.touchList(collection.name)
   }
 
   if (marker) {
     ctx.markers[marker] = true
-    // A marker flip un-gates list reads short-circuited on `!markers[marker]`.
     ctx.observers.touchList(collection.name)
   }
-
   if (meta?.$queryTracking) {
     meta.$queryTracking.items[collection.name] ??= new Set()
-    meta.$queryTracking.items[collection.name]!.add(key)
+    meta.$queryTracking.items[collection.name]!.add(publicKey)
   }
-
   if (!fromWriteItems) {
-    ctx.callbacks.onAfterWrite?.({
-      collection,
-      key,
-      result: [item],
-      marker,
-      operation: 'write',
-    })
+    ctx.callbacks.onAfterWrite?.({ collection, key: publicKey, result: [item], marker, operation: 'write' })
   }
 }
 
-/**
- * Remove a key from the canonical base store and its indexes, notifying the
- * item and list observers. Field timestamps and tombstones are handled by the
- * queue's delete path, not here (this mirrors the previous internal
- * `deleteItem`). Returns `true` if an item was actually removed.
- */
+/** Delete one base item and reconcile indexes against its next visible value. */
 export function deleteItemFromBase(ctx: EngineContext, params: DeleteItemParams): boolean {
   const { collection, key } = params
-  const collectionState = ctx.collections.get(collection.name)
-  if (!collectionState) {
+  const state = ctx.collections.get(collection.name)
+  if (!state) {
     return false
   }
-  const item = collectionState.base.get(key)
-  if (item === undefined) {
+  const id = toKeyId(key)
+  if (state.base.get(id) === undefined) {
     return false
   }
 
-  removeKeyFromIndexes(ctx, collection, key, item)
-  collectionState.base.delete(key)
-
-  ctx.observers.touchItem(collection.name, key)
-  ctx.observers.touchList(collection.name)
-
-  ctx.callbacks.onAfterWrite?.({
-    collection,
-    key,
-    operation: 'delete',
-  })
+  const previous = resolveItemById(state, id)
+  const publicKey = getPublicKey(state, id)
+  state.base.delete(id)
+  invalidateResolvedItem(state, id)
+  const next = resolveItemById(state, id)
+  reconcileItemIndexes(ctx, collection, id, previous, next)
+  ctx.observers.touchItem(collection.name, id)
+  if ((previous !== undefined) !== (next !== undefined)) {
+    invalidateVisibleKeys(state)
+    ctx.observers.touchList(collection.name)
+  }
+  ctx.callbacks.onAfterWrite?.({ collection, key: publicKey, operation: 'delete' })
+  releaseUnusedKey(state, id)
   return true
 }

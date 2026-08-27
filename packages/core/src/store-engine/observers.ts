@@ -1,181 +1,146 @@
-import type { ObserverCallback, ObserverRegistry, Unsubscribe } from './types.js'
+import type { ObserverChanges } from './observer-changes.js'
+import type { KeyId, ObserverCallback, ObserverRegistry, Unsubscribe } from './types.js'
+import { toKeyId } from './identity.js'
 
-/** Pending change accumulator, deduped per scope until the next flush. */
+/** Pending observer invalidations, deduplicated until the next queue flush. */
 interface PendingChange {
-  items: Map<string, Set<string | number>>
+  items: Map<string, Set<KeyId>>
   lists: Set<string>
   indexes: Map<string, Map<string, Set<string>>>
 }
 
-/**
- * Create the fine-grained observer registry.
- *
- * Three independent registries track per-item, per-list (collection) and
- * per-index-bucket subscriptions. Mutating code records touched scopes via
- * `touch*`; {@link ObserverRegistry.flush} then invokes each matching
- * callback exactly once and clears the accumulated change.
- *
- * Callbacks run synchronously inside a try/catch so one faulty subscriber
- * can't break the notification fan-out for the others.
- */
-export function createObserverRegistry(): ObserverRegistry {
-  // collection -> key -> callbacks
-  const itemObservers = new Map<string, Map<string | number, Set<ObserverCallback>>>()
-  // collection -> callbacks
-  const listObservers = new Map<string, Set<ObserverCallback>>()
-  // collection -> indexKey -> indexValue -> callbacks
-  const indexObservers = new Map<string, Map<string, Map<string, Set<ObserverCallback>>>>()
+/** Create an empty pending-change accumulator. */
+function createPending(): PendingChange {
+  return { items: new Map(), lists: new Set(), indexes: new Map() }
+}
 
-  let change = createPending()
-
-  function createPending(): PendingChange {
-    return {
-      items: new Map(),
-      lists: new Set(),
-      indexes: new Map(),
+/** Invoke callbacks independently so one failure cannot block other readers. */
+function runAll(callbacks: Set<ObserverCallback> | undefined): void {
+  for (const callback of callbacks ? [...callbacks] : []) {
+    try {
+      callback()
+    }
+    catch (error) {
+      console.error('[rstore] observer callback failed', error)
     }
   }
+}
 
-  function observeItem(collection: string, key: string | number, cb: ObserverCallback): Unsubscribe {
-    let byKey = itemObservers.get(collection)
-    if (!byKey) {
-      byKey = new Map()
-      itemObservers.set(collection, byKey)
-    }
-    let set = byKey.get(key)
-    if (!set) {
-      set = new Set()
-      byKey.set(key, set)
-    }
-    set.add(cb)
+/** Create fine-grained item, list and index observer registries. */
+export function createObserverRegistry(onFlush?: (changes: ObserverChanges) => void): ObserverRegistry {
+  const itemObservers = new Map<string, Map<KeyId, Set<ObserverCallback>>>()
+  const listObservers = new Map<string, Set<ObserverCallback>>()
+  const indexObservers = new Map<string, Map<string, Map<string, Set<ObserverCallback>>>>()
+  let pending = createPending()
+
+  function observeItem(collection: string, key: string | number, callback: ObserverCallback): Unsubscribe {
+    const id = toKeyId(key)
+    const byKey = itemObservers.get(collection) ?? new Map<KeyId, Set<ObserverCallback>>()
+    itemObservers.set(collection, byKey)
+    const callbacks = byKey.get(id) ?? new Set<ObserverCallback>()
+    byKey.set(id, callbacks)
+    callbacks.add(callback)
     return () => {
-      set!.delete(cb)
-      if (set!.size === 0) {
-        byKey!.delete(key)
+      callbacks.delete(callback)
+      if (callbacks.size === 0) {
+        byKey.delete(id)
+      }
+      if (byKey.size === 0) {
+        itemObservers.delete(collection)
       }
     }
   }
 
-  function observeList(collection: string, cb: ObserverCallback): Unsubscribe {
-    let set = listObservers.get(collection)
-    if (!set) {
-      set = new Set()
-      listObservers.set(collection, set)
-    }
-    set.add(cb)
+  function observeList(collection: string, callback: ObserverCallback): Unsubscribe {
+    const callbacks = listObservers.get(collection) ?? new Set<ObserverCallback>()
+    listObservers.set(collection, callbacks)
+    callbacks.add(callback)
     return () => {
-      set!.delete(cb)
+      callbacks.delete(callback)
+      if (callbacks.size === 0) {
+        listObservers.delete(collection)
+      }
     }
   }
 
-  function observeIndex(collection: string, indexKey: string, indexValue: string, cb: ObserverCallback): Unsubscribe {
-    let byIndexKey = indexObservers.get(collection)
-    if (!byIndexKey) {
-      byIndexKey = new Map()
-      indexObservers.set(collection, byIndexKey)
-    }
-    let byValue = byIndexKey.get(indexKey)
-    if (!byValue) {
-      byValue = new Map()
-      byIndexKey.set(indexKey, byValue)
-    }
-    let set = byValue.get(indexValue)
-    if (!set) {
-      set = new Set()
-      byValue.set(indexValue, set)
-    }
-    set.add(cb)
+  function observeIndex(collection: string, indexKey: string, indexValue: string, callback: ObserverCallback): Unsubscribe {
+    const byIndex = indexObservers.get(collection) ?? new Map<string, Map<string, Set<ObserverCallback>>>()
+    indexObservers.set(collection, byIndex)
+    const byValue = byIndex.get(indexKey) ?? new Map<string, Set<ObserverCallback>>()
+    byIndex.set(indexKey, byValue)
+    const callbacks = byValue.get(indexValue) ?? new Set<ObserverCallback>()
+    byValue.set(indexValue, callbacks)
+    callbacks.add(callback)
     return () => {
-      set!.delete(cb)
-      if (set!.size === 0) {
-        byValue!.delete(indexValue)
+      callbacks.delete(callback)
+      if (callbacks.size === 0) {
+        byValue.delete(indexValue)
+      }
+      if (byValue.size === 0) {
+        byIndex.delete(indexKey)
+      }
+      if (byIndex.size === 0) {
+        indexObservers.delete(collection)
       }
     }
   }
 
   function touchItem(collection: string, key: string | number): void {
-    let set = change.items.get(collection)
-    if (!set) {
-      set = new Set()
-      change.items.set(collection, set)
-    }
-    set.add(key)
+    const keys = pending.items.get(collection) ?? new Set<KeyId>()
+    pending.items.set(collection, keys)
+    keys.add(toKeyId(key))
   }
 
   function touchList(collection: string): void {
-    change.lists.add(collection)
+    pending.lists.add(collection)
   }
 
   function touchIndex(collection: string, indexKey: string, indexValue: string): void {
-    let byIndexKey = change.indexes.get(collection)
-    if (!byIndexKey) {
-      byIndexKey = new Map()
-      change.indexes.set(collection, byIndexKey)
-    }
-    let values = byIndexKey.get(indexKey)
-    if (!values) {
-      values = new Set()
-      byIndexKey.set(indexKey, values)
-    }
+    const byIndex = pending.indexes.get(collection) ?? new Map<string, Set<string>>()
+    pending.indexes.set(collection, byIndex)
+    const values = byIndex.get(indexKey) ?? new Set<string>()
+    byIndex.set(indexKey, values)
     values.add(indexValue)
   }
 
-  /** Invoke a set of callbacks, isolating failures. */
-  function runAll(callbacks: Set<ObserverCallback> | undefined): void {
-    if (!callbacks || callbacks.size === 0) {
-      return
+  function invalidateCollection(collection: string): void {
+    for (const key of itemObservers.get(collection)?.keys() ?? []) {
+      touchItem(collection, key)
     }
-    // Copy so observers can (un)subscribe during notification.
-    for (const cb of [...callbacks]) {
-      try {
-        cb()
-      }
-      catch (error) {
-        console.error('[rstore] observer callback failed', error)
+    touchList(collection)
+    for (const [indexKey, byValue] of indexObservers.get(collection) ?? []) {
+      for (const indexValue of byValue.keys()) {
+        touchIndex(collection, indexKey, indexValue)
       }
     }
   }
 
   function flush(): void {
-    if (change.items.size === 0 && change.lists.size === 0 && change.indexes.size === 0) {
+    if (pending.items.size === 0 && pending.lists.size === 0 && pending.indexes.size === 0) {
       return
     }
-    const flushing = change
-    change = createPending()
-
-    for (const [collection, keys] of flushing.items) {
+    const change = pending
+    pending = createPending()
+    onFlush?.(change)
+    for (const [collection, keys] of change.items) {
       const byKey = itemObservers.get(collection)
-      if (byKey) {
-        for (const key of keys) {
-          runAll(byKey.get(key))
-        }
+      for (const key of keys) {
+        runAll(byKey?.get(key))
       }
     }
-    for (const collection of flushing.lists) {
+    for (const collection of change.lists) {
       runAll(listObservers.get(collection))
     }
-    for (const [collection, byIndexKey] of flushing.indexes) {
-      const obsByIndexKey = indexObservers.get(collection)
-      if (obsByIndexKey) {
-        for (const [indexKey, values] of byIndexKey) {
-          const obsByValue = obsByIndexKey.get(indexKey)
-          if (obsByValue) {
-            for (const value of values) {
-              runAll(obsByValue.get(value))
-            }
-          }
+    for (const [collection, byIndex] of change.indexes) {
+      const observedIndexes = indexObservers.get(collection)
+      for (const [indexKey, values] of byIndex) {
+        const observedValues = observedIndexes?.get(indexKey)
+        for (const value of values) {
+          runAll(observedValues?.get(value))
         }
       }
     }
   }
 
-  return {
-    observeItem,
-    observeList,
-    observeIndex,
-    touchItem,
-    touchList,
-    touchIndex,
-    flush,
-  }
+  return { observeItem, observeList, observeIndex, touchItem, touchList, touchIndex, invalidateCollection, flush }
 }

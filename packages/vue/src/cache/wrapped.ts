@@ -1,8 +1,29 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Ref } from 'vue'
 import type { CacheRuntime } from './types'
-import { computed, shallowRef } from 'vue'
+import { shallowRef } from 'vue'
 import { wrapItem } from '../item'
-import { addWrappedItemKeyToLayer, getItemKey, getItemWrapKey } from './context'
+import { addWrappedItemKeyToLayer, getItemKey, getItemWrapKey, readRawCacheItem } from './context'
+
+/**
+ * Read engine data on every wrapped-field access. Vue effects receive the
+ * matching item signal, while plain reads stay fresh without subscriptions.
+ */
+function createEngineItemSource(
+  ctx: CacheRuntime,
+  collection: ResolvedCollection<any, any, any>,
+  key: string | number,
+  fallback: any,
+): Ref<any> {
+  return {
+    get value() {
+      if (!ctx.signals.trackItem(collection.name, key)) {
+        ctx.versions.trackItem(collection.name)
+      }
+      return readRawCacheItem(ctx, collection, key) ?? fallback
+    },
+  } as Ref<any>
+}
 
 /** Return the cached wrapped proxy for an item, creating it when needed. */
 export function getWrappedItem<
@@ -47,12 +68,10 @@ export function getWrappedItem<
     wrappedItem = wrapItem({
       store: ctx.getStore(),
       collection,
-      item: layer
-        ? shallowRef(item)
-        : computed(() => {
-            ctx.signals.trackItem(collection.name, key)
-            return ctx.engine.readItemRaw({ collection, key }) ?? item
-          }),
+      // Layered values can still inherit fields from base state. This source
+      // re-reads on field access, so base writes refresh without recreating
+      // wrappers and plain non-reactive reads cannot cache stale values.
+      item: createEngineItemSource(ctx, collection, key, item),
       metadata,
       seed: item,
     })

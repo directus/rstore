@@ -4,13 +4,14 @@ import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from '../item'
 import type { VueStore } from '../store'
 import type { SignalRegistry } from './signals'
+import type { CacheVersionRegistry } from './versions'
 
 /** Bridge-owned state surfaced to Vue internals. */
 export interface VueCacheState {
   /** Cached raw page data keyed by page id, used by query pagination. */
   pageRefs: Map<string, any>
   /** Live per-query metadata, backed by the engine for SSR round-trips. */
-  queryMeta: Record<string, CustomHookMeta>
+  readonly queryMeta: Record<string, CustomHookMeta>
 }
 
 /** Options used to create the Vue cache bridge. */
@@ -41,6 +42,8 @@ export interface CacheRuntime<
   state: VueCacheState
   /** Vue signal registry subscribed to engine observers. */
   signals: SignalRegistry
+  /** Reactive fallback for Vue computed getters without a scope owner. */
+  versions: CacheVersionRegistry
   /** Devtools layer mirror by collection name. */
   layers: Record<string, Ref<CacheLayer[]>>
   /** Devtools layer id to collection lookup. */
@@ -51,6 +54,8 @@ export interface CacheRuntime<
   wrappedItemsMetadata: Map<string, WrappedItemMetadata<Collection, TCollectionDefaults, TSchema>>
   /** Wrap keys created for each layer. */
   wrappedItemKeysPerLayer: Map<string, Set<string>>
+  /** Stable visible-list wrappers reused until cache membership can change. */
+  visibleListCache: Map<string, Array<WrappedItem<Collection, TCollectionDefaults, TSchema>>>
 }
 
 /** Private Vue cache surface consumed by existing Vue internals and devtools. */

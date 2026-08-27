@@ -1,40 +1,92 @@
-import type { CacheLayer } from '@rstore/shared'
-import type { EngineContext } from './types.js'
-import { resolveItem, updateItemIndexes } from './resolve.js'
+import type { CacheLayer, ResolvedCollection } from '@rstore/shared'
+import type { EngineCollectionState, EngineContext, EngineLayer, KeyId } from './types.js'
+import { getPublicKey, registerKey, releaseUnusedKey, toKeyId } from './identity.js'
+import { reconcileItemIndexes } from './indexes.js'
+import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
 
-/** Find a layer by id across the collection it was registered against. */
+/** Layer metadata plus public key forms changed during normalization. */
+interface NormalizedLayer extends EngineLayer {
+  keyFormsChanged: Set<KeyId>
+}
+
+/** Find a public layer by id. */
 export function getLayerNow(ctx: EngineContext, layerId: string): CacheLayer | undefined {
   const collectionName = ctx.layerIdToCollection.get(layerId)
-  if (!collectionName) {
-    return undefined
-  }
-  const collectionState = ctx.collections.get(collectionName)
-  return collectionState?.layers.find(l => l.id === layerId)
+  return collectionName
+    ? ctx.collections.get(collectionName)?.layers.find(entry => entry.layer.id === layerId)?.layer
+    : undefined
 }
 
-/**
- * Touch the item observers for every key a layer affects (inserts, modifies
- * and deletes) plus the collection list, so a layer add/remove re-runs exactly
- * the dependent reactive scopes.
- */
-function touchLayerScopes(ctx: EngineContext, layer: CacheLayer): void {
+/** Normalize a public layer once so hot reads never coerce its keys again. */
+function normalizeLayer(
+  state: EngineCollectionState,
+  collection: ResolvedCollection<any, any, any>,
+  layer: CacheLayer,
+): NormalizedLayer {
+  const patches = new Map<KeyId, any>()
+  const deletedItems = new Set<KeyId>()
+  const affectedKeys = new Set<KeyId>()
+  const keyValues = new Map<KeyId, string | number>()
+  const keyFormsChanged = new Set<KeyId>()
+
   for (const key of Object.keys(layer.state)) {
-    ctx.observers.touchItem(layer.collectionName, key)
+    const previousKey = state.keyValues.get(toKeyId(key))
+    const id = registerKey(state, collection, key, layer.state[key])
+    if (previousKey !== undefined && previousKey !== getPublicKey(state, id)) {
+      keyFormsChanged.add(id)
+    }
+    patches.set(id, layer.state[key])
+    affectedKeys.add(id)
+    keyValues.set(id, getPublicKey(state, id))
   }
   for (const key of layer.deletedItems) {
-    ctx.observers.touchItem(layer.collectionName, key)
+    const id = toKeyId(key)
+    const previousKey = state.keyValues.get(id)
+    if (!state.keyValues.has(id)) {
+      registerKey(state, collection, key)
+    }
+    if (previousKey !== undefined && previousKey !== getPublicKey(state, id)) {
+      keyFormsChanged.add(id)
+    }
+    deletedItems.add(id)
+    affectedKeys.add(id)
+    keyValues.set(id, getPublicKey(state, id))
   }
-  ctx.observers.touchList(layer.collectionName)
+
+  return { layer, state: patches, deletedItems, affectedKeys, keyValues, keyFormsChanged }
 }
 
-/**
- * Add an optimistic layer to its collection and reconcile relation indexes so
- * that layer-inserted/modified items are findable by relation lookups.
- *
- * An existing layer with the same id is removed first (replace semantics).
- * Index entries are computed against the pre-layer resolved item so the diff
- * is correct, then applied after the layer is in place.
- */
+/** Capture resolved values before changing a set of layer inputs. */
+function captureResolved(state: EngineCollectionState, keys: Set<KeyId>): Map<KeyId, any | undefined> {
+  return new Map(Array.from(keys, id => [id, resolveItemById(state, id)]))
+}
+
+/** Reconcile indexes and reactive scopes after a layer transition. */
+function reconcileLayerChange(
+  ctx: EngineContext,
+  collection: ResolvedCollection<any, any, any>,
+  state: EngineCollectionState,
+  keys: Set<KeyId>,
+  previous: Map<KeyId, any | undefined>,
+  keyFormsChanged: Set<KeyId> = new Set(),
+): void {
+  let visibilityChanged = false
+  for (const id of keys) {
+    invalidateResolvedItem(state, id)
+    const next = resolveItemById(state, id)
+    const before = previous.get(id)
+    reconcileItemIndexes(ctx, collection, id, before, next)
+    ctx.observers.touchItem(collection.name, id)
+    visibilityChanged ||= Boolean(before) !== Boolean(next)
+      || (keyFormsChanged.has(id) && (before !== undefined || next !== undefined))
+  }
+  if (visibilityChanged) {
+    invalidateVisibleKeys(state)
+    ctx.observers.touchList(collection.name)
+  }
+}
+
+/** Add an optimistic layer and update only its effective records. */
 export function addLayerNow(ctx: EngineContext, layer: CacheLayer): void {
   const collection = ctx.callbacks.getCollection(layer.collectionName)
   if (!collection) {
@@ -43,57 +95,42 @@ export function addLayerNow(ctx: EngineContext, layer: CacheLayer): void {
 
   removeLayerNow(ctx, layer.id)
 
-  // Capture the pre-layer resolved item per affected key for index diffing.
-  const queuedIndexUpdates: Array<[string | number, any, any]> = []
-  for (const key in layer.state) {
-    const existing = resolveItem(ctx, collection.name, key)
-    queuedIndexUpdates.push([key, existing, layer.state[key]])
+  const state = ctx.ensureCollection(collection.name)
+  const entry = normalizeLayer(state, collection, layer)
+  const previous = captureResolved(state, entry.affectedKeys)
+  const hadNoLayers = state.layers.length === 0
+  state.layers = [...state.layers, entry]
+  ctx.layerIdToCollection.set(layer.id, collection.name)
+  if (hadNoLayers) {
+    state.resolvedItems.clear()
   }
 
-  const collectionState = ctx.ensureCollection(collection.name)
-  collectionState.layers = [...collectionState.layers, layer]
-  ctx.layerIdToCollection.set(layer.id, layer.collectionName)
-
-  for (const [key, existing, newData] of queuedIndexUpdates) {
-    updateItemIndexes(ctx, collection, key, existing, newData)
-  }
-
-  touchLayerScopes(ctx, layer)
+  reconcileLayerChange(ctx, collection, state, entry.affectedKeys, previous, entry.keyFormsChanged)
   ctx.callbacks.onLayerAdd?.(layer)
 }
 
-/**
- * Remove a layer and revert the relation indexes its state contributed, so
- * lookups again reflect the underlying base items.
- */
+/** Remove an optimistic layer and restore its underlying effective records. */
 export function removeLayerNow(ctx: EngineContext, layerId: string): void {
   const collectionName = ctx.layerIdToCollection.get(layerId)
-  if (!collectionName) {
-    return
-  }
-  const collectionState = ctx.collections.get(collectionName)
-  if (!collectionState) {
-    return
-  }
-  const layer = collectionState.layers.find(l => l.id === layerId)
-  if (!layer) {
+  const state = collectionName ? ctx.collections.get(collectionName) : undefined
+  const entry = state?.layers.find(candidate => candidate.layer.id === layerId)
+  if (!collectionName || !state || !entry) {
     return
   }
 
-  collectionState.layers = collectionState.layers.filter(l => l.id !== layerId)
+  const collection = ctx.callbacks.getCollection(collectionName)
+  const previous = captureResolved(state, entry.affectedKeys)
+  state.layers = state.layers.filter(candidate => candidate !== entry)
   ctx.layerIdToCollection.delete(layerId)
-
-  const collection = ctx.callbacks.getCollection(layer.collectionName)
-  if (collection) {
-    // With the layer gone, `currentData` is the reverted (base) item; rebuild
-    // the pre-removal value to move the index entry back.
-    for (const key in layer.state) {
-      const currentData = resolveItem(ctx, collection.name, key)
-      const previousData = { ...currentData, ...layer.state[key] }
-      updateItemIndexes(ctx, collection, key, previousData, currentData)
-    }
+  if (state.layers.length === 0) {
+    state.resolvedItems.clear()
   }
 
-  touchLayerScopes(ctx, layer)
-  ctx.callbacks.onLayerRemove?.(layer)
+  if (collection) {
+    reconcileLayerChange(ctx, collection, state, entry.affectedKeys, previous)
+  }
+  for (const id of entry.affectedKeys) {
+    releaseUnusedKey(state, id)
+  }
+  ctx.callbacks.onLayerRemove?.(entry.layer)
 }
