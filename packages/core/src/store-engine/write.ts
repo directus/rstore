@@ -1,9 +1,11 @@
 import type { FieldTimestamps } from '@rstore/shared'
+import type { MutableEngineChangeSet } from './change-set.js'
 import type { EngineContext, EngineEffect, WriteCommitResult } from './internal-types.js'
 import type { PlannedWrite } from './relations.js'
 import type { DeleteItemParams, EngineWriteChange, WriteItemParams } from './types.js'
 import { mergeItemFields } from '../crdt/index.js'
 import { shouldResurrect } from '../tombstone.js'
+import { touchItem, touchList } from './change-set.js'
 import { getPublicKey, refreshPublicKey, registerBaseKey, releaseUnusedKey, toKeyId } from './identity.js'
 import { reconcileItemIndexes } from './indexes.js'
 import { planWriteTree } from './relations.js'
@@ -45,11 +47,11 @@ export function setFieldTimestamps(ctx: EngineContext, collectionName: string, k
 }
 
 /** Commit a preflighted write tree and collect callbacks in legacy order. */
-export function writeItemNow(ctx: EngineContext, params: WriteItemParams): WriteCommitResult {
+export function writeItemNow(ctx: EngineContext, changes: MutableEngineChangeSet, params: WriteItemParams): WriteCommitResult {
   const effects: EngineEffect[] = []
   let rootChange: EngineWriteChange | undefined
   for (const planned of planWriteTree(ctx, params)) {
-    const change = commitPlannedWrite(ctx, planned, effects)
+    const change = commitPlannedWrite(ctx, changes, planned, effects)
     if (planned.root) {
       rootChange = change
     }
@@ -60,6 +62,7 @@ export function writeItemNow(ctx: EngineContext, params: WriteItemParams): Write
 /** Commit one validated child or root write. */
 function commitPlannedWrite(
   ctx: EngineContext,
+  changes: MutableEngineChangeSet,
   planned: PlannedWrite,
   effects: EngineEffect[],
 ): EngineWriteChange | undefined {
@@ -86,8 +89,9 @@ function commitPlannedWrite(
 
   invalidateResolvedItem(state, id)
   const next = resolveItemById(state, id)
-  reconcileItemIndexes(ctx, collection, id, previous, next)
-  ctx.observers.touchItem(collection.name, id)
+  if (existing === undefined || !planned.mutable || touchesIndexedField(collection, planned.data))
+    reconcileItemIndexes(ctx, changes, collection, id, next)
+  touchItem(changes, collection.name, id)
   const change: EngineWriteChange = {
     key: publicKey,
     previousKey: previousPublicKey,
@@ -98,12 +102,12 @@ function commitPlannedWrite(
   }
   if (change.visibilityChanged || change.keyFormChanged) {
     invalidateVisibleKeys(state)
-    ctx.observers.touchList(collection.name)
+    touchList(changes, collection.name)
   }
 
   if (marker !== undefined) {
     ctx.markers[marker] = true
-    ctx.observers.touchList(collection.name)
+    touchList(changes, collection.name)
   }
   if (meta?.$queryTracking) {
     meta.$queryTracking.items[collection.name] ??= new Set()
@@ -116,6 +120,17 @@ function commitPlannedWrite(
     })
   }
   return change
+}
+
+/** Check whether one mutable patch can change any materialized membership. */
+function touchesIndexedField(collection: PlannedWrite['params']['collection'], data: any): boolean {
+  for (const fields of collection.indexes.values()) {
+    for (const field of fields) {
+      if (Object.hasOwn(data, field))
+        return true
+    }
+  }
+  return false
 }
 
 /** Merge relation-free mutable data and defer any CRDT conflict hook. */
@@ -152,7 +167,7 @@ function mergeMutableItem(
 }
 
 /** Delete one base item and collect its post-commit hook. */
-export function deleteItemFromBase(ctx: EngineContext, params: DeleteItemParams): DeleteCommitResult {
+export function deleteItemFromBase(ctx: EngineContext, changes: MutableEngineChangeSet, params: DeleteItemParams): DeleteCommitResult {
   const { collection, key } = params
   const state = ctx.collections.get(collection.name)
   if (!state) {
@@ -170,8 +185,8 @@ export function deleteItemFromBase(ctx: EngineContext, params: DeleteItemParams)
   refreshPublicKey(state, id)
   invalidateResolvedItem(state, id)
   const next = resolveItemById(state, id)
-  reconcileItemIndexes(ctx, collection, id, previous, next)
-  ctx.observers.touchItem(collection.name, id)
+  reconcileItemIndexes(ctx, changes, collection, id, next)
+  touchItem(changes, collection.name, id)
   const change: EngineWriteChange = {
     key: next === undefined ? publicKey : getPublicKey(state, id),
     previousKey: publicKey,
@@ -180,7 +195,7 @@ export function deleteItemFromBase(ctx: EngineContext, params: DeleteItemParams)
   }
   if (change.visibilityChanged || change.keyFormChanged) {
     invalidateVisibleKeys(state)
-    ctx.observers.touchList(collection.name)
+    touchList(changes, collection.name)
   }
   releaseUnusedKey(state, id)
   return {

@@ -128,6 +128,35 @@ describe('store-engine: transactional queue', () => {
     expect(observer).toHaveBeenCalledTimes(2)
   })
 
+  it('runs hooks and final observers after immediate state synchronization fails', () => {
+    const error = new Error('state bridge failed')
+    let shouldThrow = true
+    const hooks: Array<string | number | undefined> = []
+    const observer = vi.fn()
+    const { engine, user } = createEngine({
+      onStateChange() {
+        if (shouldThrow)
+          throw error
+      },
+      onAfterWrite(payload) {
+        hooks.push(payload.key)
+      },
+    })
+    engine.observeItem('User', 1, observer)
+    engine.pause()
+    engine.writeItem({ collection: user, key: 1, item: { id: 1 } })
+    engine.writeItem({ collection: user, key: 2, item: { id: 2 } })
+
+    expect(() => engine.resume()).toThrow(error)
+    expect(hooks).toEqual([1])
+    expect(observer).toHaveBeenCalledTimes(1)
+    expect(engine.readItemRaw({ collection: user, key: 2 })).toBeUndefined()
+
+    shouldThrow = false
+    engine.resume()
+    expect(hooks).toEqual([1, 2])
+  })
+
   it('consumes a layer operation before its callback throws', () => {
     const error = new Error('layer hook failed')
     let calls = 0

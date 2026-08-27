@@ -4,8 +4,12 @@ import type { CacheImplementation } from './runtime'
 import type { Scenario, ScenarioCounts, ScenarioOptions } from './scenario-harness'
 import process from 'node:process'
 import { Bench } from 'tinybench'
+import { classifyComparison, createBenchmarkReport, speedupInterval } from './report'
+
+export { createBenchmarkReport, speedupInterval } from './report'
 
 const operationIndexes = new WeakMap<Scenario, number>()
+const RETRY_DURATION_MULTIPLIERS = [4, 16, 32] as const
 
 /** One implementation's normalized Tinybench result. */
 export interface BenchmarkMeasurement {
@@ -29,23 +33,64 @@ export interface BenchmarkMeasurement {
   moeMs: number
 }
 
+/** One fully measured scenario used by console and JSON reporters. */
+export interface BenchmarkScenarioResult {
+  /** Stable scenario definition. */
+  scenario: BenchmarkScenario
+  /** Concrete workload dimensions. */
+  options: ScenarioOptions
+  /** Legacy and Data Core measurements. */
+  measurements: readonly [BenchmarkMeasurement, BenchmarkMeasurement]
+  /** Number of longer retries performed after initial measurement. */
+  reruns: number
+}
+
+/** Serializable benchmark report for local and release comparison. */
+export interface BenchmarkReport {
+  /** Machine and benchmark configuration. */
+  environment: {
+    node: string
+    platform: string
+    arch: string
+    profile: BenchmarkProfile['name']
+    timeMs: number
+    maxRme: number
+  }
+  /** Normalized scenario comparisons. */
+  rows: Array<{
+    scenarioId: string
+    scenarioName: string
+    dimensions: { items: number, watchers: number, observer?: BenchmarkScenario['observer'] }
+    implementations: Record<string, Pick<BenchmarkMeasurement, 'meanMicroseconds' | 'operationsPerSecond' | 'rme' | 'samples' | 'batchSize' | 'counts'>>
+    reruns: number
+    speedupInterval: readonly [number, number]
+    speedup: number
+    verdict: 'engine faster' | 'legacy faster' | 'no clear difference' | 'noisy'
+  }>
+}
+
 /** Run all profile workloads and print normalized comparison rows. */
 export async function runBenchmarks(
   profile: BenchmarkProfile,
   implementations: readonly [CacheImplementation, CacheImplementation],
-): Promise<void> {
+): Promise<BenchmarkReport> {
   printEnvironment(profile)
   const rows: BenchmarkMeasurement[] = []
+  const results: BenchmarkScenarioResult[] = []
   for (let scenarioIndex = 0; scenarioIndex < profile.scenarios.length; scenarioIndex++) {
     const scenario = profile.scenarios[scenarioIndex]!
     for (const items of resolveScenarioItemCounts(profile, scenario)) {
       const options = { items, watchers: profile.watchers }
       const result = await measureScenario(profile, scenario, options, implementations, scenarioIndex)
-      rows.push(...result)
-      printScenario(profile, scenario, options, result)
+      rows.push(...result.measurements)
+      results.push(result)
+      printScenario(profile, scenario, options, result.measurements)
     }
   }
   console.log(`\nMeasured ${rows.length} implementation rows.`)
+  const report = createBenchmarkReport(profile, results)
+  console.log(JSON.stringify(report, null, 2))
+  return report
 }
 
 /** Resolve one workload's focused size matrix or inherit its profile default. */
@@ -53,20 +98,32 @@ export function resolveScenarioItemCounts(profile: BenchmarkProfile, scenario: B
   return scenario.itemCounts ?? profile.itemCounts
 }
 
-/** Measure one equivalent scenario pair, retrying once when variance stays high. */
+/** Measure one equivalent scenario pair with escalating bounded retries. */
 async function measureScenario(
   profile: BenchmarkProfile,
   scenario: BenchmarkScenario,
   options: ScenarioOptions,
   implementations: readonly [CacheImplementation, CacheImplementation],
   scenarioIndex: number,
-): Promise<readonly [BenchmarkMeasurement, BenchmarkMeasurement]> {
+): Promise<BenchmarkScenarioResult> {
   const verificationCounts = verifyScenario(scenario, options, implementations)
   let measurements = await runPair(profile, scenario, options, implementations, scenarioIndex, verificationCounts, 1)
-  if (measurements.some(measurement => measurement.rme > profile.maxRme)) {
-    measurements = await runPair(profile, scenario, options, implementations, scenarioIndex, verificationCounts, 2)
+  let reruns = 0
+  for (const durationMultiplier of RETRY_DURATION_MULTIPLIERS) {
+    if (!shouldRetryMeasurements(profile, measurements))
+      break
+    measurements = await runPair(profile, scenario, options, implementations, scenarioIndex, verificationCounts, durationMultiplier)
+    reruns++
   }
-  return measurements
+  return { scenario, options, measurements, reruns }
+}
+
+/** Return whether any paired row exceeds configured uncertainty threshold. */
+export function shouldRetryMeasurements(
+  profile: BenchmarkProfile,
+  measurements: readonly BenchmarkMeasurement[],
+): boolean {
+  return measurements.some(measurement => measurement.rme > profile.maxRme)
 }
 
 /** Validate bounded workload semantics outside all timed regions. */
@@ -216,8 +273,7 @@ function printEnvironment(profile: BenchmarkProfile): void {
 function printScenario(profile: BenchmarkProfile, scenario: BenchmarkScenario, options: ScenarioOptions, measurements: readonly [BenchmarkMeasurement, BenchmarkMeasurement]): void {
   const [legacy, engine] = measurements
   const interval = speedupInterval(legacy, engine)
-  const noisy = measurements.some(measurement => measurement.rme > profile.maxRme)
-  const verdict = noisy ? 'noisy' : interval[0] > 1 ? 'engine faster' : interval[1] < 1 ? 'legacy faster' : 'no clear difference'
+  const verdict = classifyComparison(profile, measurements, interval)
   console.table(measurements.map(measurement => ({
     'scenario': scenario.name,
     'items': options.items,
@@ -228,7 +284,7 @@ function printScenario(profile: BenchmarkProfile, scenario: BenchmarkScenario, o
     'ops/s': Math.round(measurement.operationsPerSecond),
     'rme': `${measurement.rme.toFixed(2)}%`,
     'samples': measurement.samples,
-    'reruns': JSON.stringify(measurement.counts),
+    'counts': JSON.stringify(measurement.counts),
     'comparison': measurement.implementation === 'engine' ? `${(legacy.meanMs / engine.meanMs).toFixed(2)}x [${interval[0].toFixed(2)}, ${interval[1].toFixed(2)}] ${verdict}` : '',
   })))
 }
@@ -239,11 +295,4 @@ function formatObservers(scenario: BenchmarkScenario, options: ScenarioOptions):
     return '1 relation reader'
   }
   return scenario.observer ? `${options.watchers} ${scenario.observer} watchers` : ''
-}
-
-/** Compute conservative speedup bounds from independent Tinybench mean margins. */
-export function speedupInterval(legacy: BenchmarkMeasurement, engine: BenchmarkMeasurement): readonly [number, number] {
-  const legacyLow = Math.max(0, legacy.meanMs - legacy.moeMs)
-  const engineLow = Math.max(Number.EPSILON, engine.meanMs - engine.moeMs)
-  return [legacyLow / (engine.meanMs + engine.moeMs), (legacy.meanMs + legacy.moeMs) / engineLow]
 }

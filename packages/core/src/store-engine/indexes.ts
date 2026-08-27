@@ -1,145 +1,145 @@
 import type { CacheIndexValue, ResolvedCollection } from '@rstore/shared'
-import type { EngineCollectionState, EngineContext, EngineIndexState, IndexValueId, KeyId } from './internal-types.js'
+import type { MutableEngineChangeSet } from './change-set.js'
+import type { EngineCollectionState, EngineContext, EngineIndexState, IndexedValue, IndexValueId, KeyId } from './internal-types.js'
+import { getIndexDependencyId } from './change-set.js'
 import { getPublicKey } from './identity.js'
+import { encodeIndexLookup, encodeLegacyValue, getLiveAliasTargets, readIndexedValue } from './index-value.js'
 import { getVisibleKeyIds, resolveItemById } from './view.js'
 
-/** Normalized values and identities for one indexed item. */
-interface IndexedValue {
-  /** Canonical collision-free bucket id. */
-  id: IndexValueId
-  /** Legacy delimiter-joined alias. */
-  legacy: string
-}
-
-/** Normalize complete item fields through intentional `String()` coercion. */
-function readIndexedValue(item: any, fields: readonly string[]): IndexedValue | undefined {
-  if (!item) {
-    return undefined
-  }
-  const raw = fields.map(field => item[field])
-  if (!raw.every(value => value != null)) {
-    return undefined
-  }
-  const values = raw.map(String)
-  return {
-    id: encodeCanonicalValue(fields.length, values),
-    legacy: values.join(':'),
-  }
-}
-
-/** Encode a scalar or tuple with an explicit shape namespace. */
-function encodeCanonicalValue(fieldCount: number, values: readonly string[]): IndexValueId {
-  return fieldCount === 1
-    ? `scalar:${JSON.stringify(values[0])}`
-    : `tuple:${JSON.stringify(values)}`
-}
-
-/** Encode a legacy composite observer independently from canonical tuples. */
-function encodeLegacyObserver(value: string): IndexValueId {
-  return `legacy:${JSON.stringify(value)}`
-}
+const EMPTY_BUCKET_SWEEP_THRESHOLD = 256
 
 /** Get or create one materialized index. */
 function ensureIndex(state: EngineCollectionState, indexKey: string): EngineIndexState {
   let index = state.indexes.get(indexKey)
   if (!index) {
-    index = { buckets: new Map(), legacyAliases: new Map() }
+    index = {
+      buckets: new Map(),
+      emptyBucketCount: 0,
+      legacyAliases: new Map(),
+      dependencyIds: new Map(),
+      scalarValues: new Map(),
+      tupleValues: new Map(),
+    }
     state.indexes.set(indexKey, index)
   }
   return index
 }
 
-/** Add one item id and register its legacy composite alias. */
+/** Add one item id while reusing retained buckets and alias containers. */
 function addIndexKey(index: EngineIndexState, value: IndexedValue, id: KeyId, composite: boolean): void {
   let keys = index.buckets.get(value.id)
   if (!keys) {
-    keys = new Set()
+    keys = new Set<KeyId>()
     index.buckets.set(value.id, keys)
-    if (composite) {
-      const aliases = index.legacyAliases.get(value.legacy) ?? new Set<IndexValueId>()
-      aliases.add(value.id)
-      index.legacyAliases.set(value.legacy, aliases)
-    }
+  }
+  else if (!keys.size) {
+    index.emptyBucketCount--
   }
   keys.add(id)
+  if (composite) {
+    const aliases = index.legacyAliases.get(value.legacy) ?? new Set<IndexValueId>()
+    index.legacyAliases.set(value.legacy, aliases)
+    aliases.add(value.id)
+  }
 }
 
-/** Remove one item id and release an empty bucket's alias. */
-function removeIndexKey(index: EngineIndexState, value: IndexedValue, id: KeyId, composite: boolean): boolean {
+/** Remove one membership while retaining its empty storage for hot reuse. */
+function removeIndexKey(index: EngineIndexState, value: IndexedValue, id: KeyId): boolean {
   const keys = index.buckets.get(value.id)
-  if (!keys?.delete(id)) {
+  if (!keys?.delete(id))
     return false
-  }
-  if (keys.size > 0) {
-    return true
-  }
-  index.buckets.delete(value.id)
-  if (composite) {
-    const aliases = index.legacyAliases.get(value.legacy)
-    aliases?.delete(value.id)
-    if (aliases?.size === 0) {
-      index.legacyAliases.delete(value.legacy)
-    }
-  }
+  if (!keys.size)
+    index.emptyBucketCount++
   return true
 }
 
-/** Touch canonical and legacy observers affected by one bucket. */
-function touchIndexedValue(ctx: EngineContext, collection: string, indexKey: string, value: IndexedValue, composite: boolean): void {
-  ctx.observers.touchIndex(collection, indexKey, value.id)
-  if (composite) {
-    ctx.observers.touchIndex(collection, indexKey, encodeLegacyObserver(value.legacy))
-  }
+/** Record exact tuple and legacy joined-string dependency changes. */
+function touchIndexedValue(
+  changes: MutableEngineChangeSet,
+  collection: string,
+  indexKey: string,
+  index: EngineIndexState,
+  value: IndexedValue,
+  composite: boolean,
+): void {
+  addDependency(changes, index, collection, indexKey, value.id)
+  if (composite)
+    addDependency(changes, index, collection, indexKey, value.legacyId)
 }
 
-/** Reconcile indexes against two fully resolved visible values. */
+/** Reuse one opaque dependency string across alternating writes. */
+function addDependency(
+  changes: MutableEngineChangeSet,
+  index: EngineIndexState,
+  collection: string,
+  indexKey: string,
+  valueId: IndexValueId,
+): void {
+  let dependency = index.dependencyIds.get(valueId)
+  if (!dependency) {
+    dependency = getIndexDependencyId(collection, indexKey, valueId)
+    index.dependencyIds.set(valueId, dependency)
+  }
+  changes.indexes.add(dependency)
+}
+
+/** Reconcile one item's indexes from cached previous memberships. */
 export function reconcileItemIndexes(
   ctx: EngineContext,
+  changes: MutableEngineChangeSet,
   collection: ResolvedCollection<any, any, any>,
   id: KeyId,
-  previous: any | undefined,
   next: any | undefined,
 ): void {
   const state = ctx.ensureCollection(collection.name)
+  const memberships = state.indexMemberships.get(id) ?? new Map<string, IndexedValue>()
   for (const [indexKey, fields] of collection.indexes) {
-    const previousValue = readIndexedValue(previous, fields)
-    const nextValue = readIndexedValue(next, fields)
-    if (previousValue?.id === nextValue?.id) {
+    const index = ensureIndex(state, indexKey)
+    const previousValue = memberships.get(indexKey)
+    const nextValue = readIndexedValue(next, fields, index)
+    if (previousValue?.id === nextValue?.id)
       continue
-    }
     const composite = fields.length > 1
-    const index = state.indexes.get(indexKey)
-    if (previousValue && index && removeIndexKey(index, previousValue, id, composite)) {
-      touchIndexedValue(ctx, collection.name, indexKey, previousValue, composite)
-      if (index.buckets.size === 0) {
-        state.indexes.delete(indexKey)
-      }
+    if (previousValue && removeIndexKey(index, previousValue, id)) {
+      touchIndexedValue(changes, collection.name, indexKey, index, previousValue, composite)
     }
     if (nextValue) {
-      addIndexKey(ensureIndex(state, indexKey), nextValue, id, composite)
-      touchIndexedValue(ctx, collection.name, indexKey, nextValue, composite)
+      addIndexKey(index, nextValue, id, composite)
+      memberships.set(indexKey, nextValue)
+      touchIndexedValue(changes, collection.name, indexKey, index, nextValue, composite)
+    }
+    else {
+      memberships.delete(indexKey)
     }
   }
+  if (memberships.size)
+    state.indexMemberships.set(id, memberships)
+  else state.indexMemberships.delete(id)
 }
 
-/** Rebuild indexes from one staged or active collection view. */
+/** Rebuild buckets and membership caches from one resolved collection view. */
 export function rebuildIndexes(collection: ResolvedCollection<any, any, any>, state: EngineCollectionState): void {
   state.indexes.clear()
+  state.indexMemberships.clear()
   for (const id of getVisibleKeyIds(state)) {
     const item = resolveItemById(state, id)
-    if (!item) {
+    if (!item)
       continue
-    }
+    const memberships = new Map<string, IndexedValue>()
     for (const [indexKey, fields] of collection.indexes) {
-      const value = readIndexedValue(item, fields)
-      if (value) {
-        addIndexKey(ensureIndex(state, indexKey), value, id, fields.length > 1)
-      }
+      const index = ensureIndex(state, indexKey)
+      const value = readIndexedValue(item, fields, index)
+      if (!value)
+        continue
+      memberships.set(indexKey, value)
+      addIndexKey(index, value, id, fields.length > 1)
     }
+    if (memberships.size)
+      state.indexMemberships.set(id, memberships)
   }
 }
 
-/** Validate and encode a public lookup for direct observer subscription. */
+/** Validate and encode a public lookup for subscription or dependency identity. */
 export function getIndexObserverId(
   state: EngineCollectionState | undefined,
   collection: ResolvedCollection<any, any, any> | undefined,
@@ -147,70 +147,109 @@ export function getIndexObserverId(
   indexValue: CacheIndexValue,
 ): IndexValueId {
   const fields = collection?.indexes.get(indexKey) ?? [indexKey]
-  if (fields.length === 1) {
-    if (Array.isArray(indexValue)) {
-      throw new TypeError(`Single-field index "${indexKey}" expects a scalar value`)
-    }
-    return encodeCanonicalValue(1, [String(indexValue)])
-  }
-  if (Array.isArray(indexValue)) {
+  const index = state?.indexes.get(indexKey)
+  if (Array.isArray(indexValue))
     validateTupleLength(collection?.name, indexKey, fields.length, indexValue.length)
-    return encodeCanonicalValue(fields.length, indexValue.map(String))
+  const id = encodeIndexLookup(indexKey, fields.length, indexValue, index)
+  if (fields.length > 1 && !Array.isArray(indexValue)) {
+    assertLegacyAliasIsUnambiguous(index, collection?.name, indexKey, String(indexValue))
   }
-  const legacy = String(indexValue)
-  assertLegacyAliasIsUnambiguous(state?.indexes.get(indexKey), collection?.name, indexKey, legacy)
-  return encodeLegacyObserver(legacy)
+  return id
 }
 
-/** Return public keys for one canonical or unambiguous legacy bucket. */
+/** Return canonical key ids for one exact or unambiguous legacy bucket. */
+export function getIndexBucketIds(
+  state: EngineCollectionState | undefined,
+  collection: ResolvedCollection<any, any, any> | undefined,
+  indexKey: string,
+  indexValue: CacheIndexValue,
+): ReadonlySet<KeyId> | undefined {
+  const fields = collection?.indexes.get(indexKey) ?? [indexKey]
+  const index = state?.indexes.get(indexKey)
+  if (Array.isArray(indexValue))
+    validateTupleLength(collection?.name, indexKey, fields.length, indexValue.length)
+  let valueId = encodeIndexLookup(indexKey, fields.length, indexValue, index)
+  if (fields.length > 1 && !Array.isArray(indexValue)) {
+    valueId = assertLegacyAliasIsUnambiguous(index, collection?.name, indexKey, String(indexValue))?.[0] ?? valueId
+  }
+  const ids = index?.buckets.get(valueId)
+  return ids?.size ? ids : undefined
+}
+
+/** Return public keys for the public index-bucket API. */
 export function getIndexBucket(
   state: EngineCollectionState | undefined,
   collection: ResolvedCollection<any, any, any> | undefined,
   indexKey: string,
   indexValue: CacheIndexValue,
 ): ReadonlySet<string | number> | undefined {
-  const fields = collection?.indexes.get(indexKey) ?? [indexKey]
-  const index = state?.indexes.get(indexKey)
-  let valueId: IndexValueId | undefined
-  if (fields.length === 1) {
-    if (Array.isArray(indexValue)) {
-      throw new TypeError(`Single-field index "${indexKey}" expects a scalar value`)
-    }
-    valueId = encodeCanonicalValue(1, [String(indexValue)])
-  }
-  else if (Array.isArray(indexValue)) {
-    validateTupleLength(collection?.name, indexKey, fields.length, indexValue.length)
-    valueId = encodeCanonicalValue(fields.length, indexValue.map(String))
-  }
-  else {
-    const legacy = String(indexValue)
-    const aliases = assertLegacyAliasIsUnambiguous(index, collection?.name, indexKey, legacy)
-    valueId = aliases?.values().next().value
-  }
-  const ids = valueId ? index?.buckets.get(valueId) : undefined
-  if (!state || !ids?.size) {
+  const ids = getIndexBucketIds(state, collection, indexKey, indexValue)
+  if (!state || !ids)
     return undefined
-  }
-  return new Set(Array.from(ids, id => getPublicKey(state, id)))
+  const keys = new Set<string | number>()
+  for (const id of ids) keys.add(getPublicKey(state, id))
+  return keys
 }
 
-/** Reject a tuple with the wrong index arity. */
+/** Sweep excessive retained empty buckets after a complete queue flush. */
+export function sweepEmptyIndexBuckets(ctx: EngineContext): void {
+  for (const state of ctx.collections.values()) {
+    for (const index of state.indexes.values()) sweepIndex(index)
+  }
+}
+
+/** Apply bounded retention policy to one index. */
+function sweepIndex(index: EngineIndexState): void {
+  const live = index.buckets.size - index.emptyBucketCount
+  if (index.emptyBucketCount <= EMPTY_BUCKET_SWEEP_THRESHOLD || index.emptyBucketCount <= live * 2)
+    return
+  const empty: IndexValueId[] = []
+  for (const [id, keys] of index.buckets) {
+    if (!keys.size)
+      empty.push(id)
+  }
+  const removed = new Set(empty)
+  for (const id of empty) index.buckets.delete(id)
+  index.emptyBucketCount = 0
+  for (const id of empty) index.dependencyIds.delete(id)
+  for (const [value, indexed] of index.scalarValues) {
+    if (removed.has(indexed.id))
+      index.scalarValues.delete(value)
+  }
+  for (const [first, bySecond] of index.tupleValues) {
+    for (const [second, indexed] of bySecond) {
+      if (removed.has(indexed.id))
+        bySecond.delete(second)
+    }
+    if (!bySecond.size)
+      index.tupleValues.delete(first)
+  }
+  for (const [legacy, aliases] of index.legacyAliases) {
+    for (const id of removed) aliases.delete(id)
+    if (!aliases.size) {
+      index.legacyAliases.delete(legacy)
+      index.dependencyIds.delete(encodeLegacyValue(legacy))
+    }
+  }
+}
+
+/** Reject a tuple with wrong index arity. */
 function validateTupleLength(collection: string | undefined, indexKey: string, expected: number, actual: number): void {
   if (actual !== expected) {
     throw new TypeError(`Composite index "${collection ?? 'unknown'}.${indexKey}" expects ${expected} values, received ${actual}`)
   }
 }
 
-/** Return alias targets or throw when a joined lookup can select two tuples. */
+/** Return live alias targets or reject ambiguous joined composite input. */
 function assertLegacyAliasIsUnambiguous(
   index: EngineIndexState | undefined,
   collection: string | undefined,
   indexKey: string,
   legacy: string,
-): Set<IndexValueId> | undefined {
-  const aliases = index?.legacyAliases.get(legacy)
-  if (aliases && aliases.size > 1) {
+): IndexValueId[] | undefined {
+  const aliases = getLiveAliasTargets(index, legacy)
+  if (aliases.length > 1) {
     throw new Error(`Ambiguous legacy composite index value "${legacy}" for "${collection ?? 'unknown'}.${indexKey}"; pass a value tuple instead`)
   }
-  return aliases
+  return aliases.length ? aliases : undefined
 }

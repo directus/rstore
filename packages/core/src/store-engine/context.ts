@@ -10,6 +10,7 @@ export function createCollectionState(): EngineCollectionState {
     baseKeyValues: new Map(),
     keyValues: new Map(),
     indexes: new Map(),
+    indexMemberships: new Map(),
     layers: [],
     resolvedItems: new Map(),
     visibleKeys: undefined,

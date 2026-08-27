@@ -210,6 +210,52 @@ describe('store-engine: indexes', () => {
     expect(engine.resolveKeys({ collection, indexKey: 'venue', indexValue: 'paris:A' })).toEqual([1])
   })
 
+  it('keeps stable dependency ids across bucket recreation', () => {
+    const collection = buildCollection('Event', {
+      indexes: new Map([['venue', ['city', 'room']]]),
+    })
+    const { engine } = createTestEngine([collection])
+    const before = engine.getIndexDependencyId('Event', 'venue', ['paris', 'A'])
+    engine.writeItem({ collection, key: 1, item: { id: 1, city: 'paris', room: 'A' } })
+    engine.writeItem({ collection, key: 1, item: { id: 1, city: 'lyon', room: 'B' } })
+
+    expect(engine.getIndexDependencyId('Event', 'venue', ['paris', 'A'])).toBe(before)
+    expect(engine.getIndexDependencyId('Event', 'venue', ['paris:A', ''])).not.toBe(before)
+  })
+
+  it('resolves legacy ambiguity from live buckets only', () => {
+    const collection = buildCollection('Event', {
+      indexes: new Map([['venue', ['city', 'room']]]),
+    })
+    const { engine } = createTestEngine([collection])
+    engine.writeItem({ collection, key: 1, item: { id: 1, city: 'a:b', room: 'c' } })
+    engine.writeItem({ collection, key: 2, item: { id: 2, city: 'a', room: 'b:c' } })
+    expect(() => engine.resolveKeys({ collection, indexKey: 'venue', indexValue: 'a:b:c' })).toThrow(/Ambiguous/)
+
+    engine.writeItem({ collection, key: 2, item: { id: 2, city: 'other', room: 'room' } })
+
+    expect(engine.resolveKeys({ collection, indexKey: 'venue', indexValue: 'a:b:c' })).toEqual([1])
+  })
+
+  it('preserves observer identity when retained empty buckets are swept', () => {
+    const collection = buildCollection('Event', {
+      indexes: new Map([['venue', ['city', 'room']]]),
+    })
+    const { engine } = createTestEngine([collection])
+    const observer = vi.fn()
+    engine.observeIndex('Event', 'venue', ['city-0', 'room'], observer)
+    engine.writeItem({ collection, key: 1, item: { id: 1, city: 'city-0', room: 'room' } })
+    for (let index = 1; index <= 300; index++) {
+      engine.writeItem({ collection, key: 1, item: { id: 1, city: `city-${index}`, room: 'room' } })
+    }
+    const callsBeforeRecreation = observer.mock.calls.length
+
+    engine.writeItem({ collection, key: 1, item: { id: 1, city: 'city-0', room: 'room' } })
+
+    expect(engine.resolveKeys({ collection, indexKey: 'venue', indexValue: ['city-0', 'room'] })).toEqual([1])
+    expect(observer).toHaveBeenCalledTimes(callsBeforeRecreation + 1)
+  })
+
   it('invalidates only the exact composite tuple observer', () => {
     const collection = buildCollection('Event', {
       indexes: new Map([['venue', ['city', 'room']]]),
@@ -227,5 +273,20 @@ describe('store-engine: indexes', () => {
     engine.writeItem({ collection, key: 2, item: { id: 2, city: 'a', room: 'b:c' } })
     expect(firstTuple).toHaveBeenCalledTimes(1)
     expect(secondTuple).toHaveBeenCalledTimes(1)
+  })
+
+  it('invalidates exact and legacy dependencies for one composite membership', () => {
+    const collection = buildCollection('Event', { indexes: new Map([['venue', ['city', 'room']]]) })
+    const { engine } = createTestEngine([collection])
+    const exact = vi.fn()
+    const legacy = vi.fn()
+    engine.observeIndex('Event', 'venue', ['paris', 'A'], exact)
+    engine.observeIndex('Event', 'venue', 'paris:A', legacy)
+
+    engine.writeItem({ collection, key: 1, item: { id: 1, city: 'paris', room: 'A' } })
+    engine.writeItem({ collection, key: 1, item: { id: 1, city: 'lyon', room: 'B' } })
+
+    expect(exact).toHaveBeenCalledTimes(2)
+    expect(legacy).toHaveBeenCalledTimes(2)
   })
 })

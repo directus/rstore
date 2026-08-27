@@ -1,5 +1,5 @@
 export { createStoreEngine } from './engine.js'
-export type { ObserverChanges } from './observer-changes.js'
+export type { EngineChangeSet, ObserverChanges } from './observer-changes.js'
 export type {
   DeleteItemParams,
   EngineAfterWritePayload,

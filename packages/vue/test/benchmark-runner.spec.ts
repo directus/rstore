@@ -2,7 +2,7 @@ import type { TaskResult } from 'tinybench'
 import type { ScenarioCounts } from '../benchmark/scenario-harness'
 import { describe, expect, it } from 'vitest'
 import { QUICK_PROFILE } from '../benchmark/profiles'
-import { normalizeMeasurement, resolveScenarioItemCounts, speedupInterval } from '../benchmark/runner'
+import { createBenchmarkReport, normalizeMeasurement, resolveScenarioItemCounts, shouldRetryMeasurements, speedupInterval } from '../benchmark/runner'
 
 const COUNTS: ScenarioCounts = { list: 0, item: 0, relation: 0 }
 
@@ -35,6 +35,47 @@ describe('benchmark runner metrics', () => {
 
     expect(resolveScenarioItemCounts(QUICK_PROFILE, inherited)).toBe(QUICK_PROFILE.itemCounts)
     expect(resolveScenarioItemCounts(QUICK_PROFILE, focused)).toBe(focused.itemCounts)
+  })
+
+  it('keeps every known regression workload in the quick profile', () => {
+    expect(QUICK_PROFILE.scenarios.map(scenario => scenario.id)).toEqual(expect.arrayContaining([
+      'layer-field-read',
+      'item-read',
+      'composite-index-membership-write',
+    ]))
+  })
+
+  it('creates stable structured benchmark reports', () => {
+    const legacy = normalizeMeasurement('legacy', result({ mean: 2, moe: 0.1, rme: 2 }), 1, COUNTS)
+    const engine = normalizeMeasurement('engine', result({ mean: 1, moe: 0.05, rme: 3 }), 1, COUNTS)
+    const report = createBenchmarkReport(QUICK_PROFILE, [{
+      scenario: QUICK_PROFILE.scenarios[0]!,
+      options: { items: 1000, watchers: 20 },
+      measurements: [legacy, engine],
+      reruns: 1,
+    }])
+
+    expect(report.environment.node).toBe(process.version)
+    expect(report.rows[0]).toMatchObject({
+      scenarioId: 'field-write-list-watchers',
+      dimensions: { items: 1000, watchers: 20, observer: 'list' },
+      reruns: 1,
+      verdict: 'engine faster',
+    })
+    expect(report.rows[0]!.implementations.engine).toMatchObject({
+      meanMicroseconds: 1000,
+      rme: 3,
+      samples: 2,
+    })
+    expect(report.rows[0]!.speedupInterval).toHaveLength(2)
+  })
+
+  it('retries only when one measurement exceeds configured RME', () => {
+    const stable = normalizeMeasurement('legacy', result({ rme: QUICK_PROFILE.maxRme }), 1, COUNTS)
+    const noisy = normalizeMeasurement('engine', result({ rme: QUICK_PROFILE.maxRme + 0.01 }), 1, COUNTS)
+
+    expect(shouldRetryMeasurements(QUICK_PROFILE, [stable])).toBe(false)
+    expect(shouldRetryMeasurements(QUICK_PROFILE, [stable, noisy])).toBe(true)
   })
 })
 

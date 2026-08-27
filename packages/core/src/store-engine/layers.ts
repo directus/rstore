@@ -1,5 +1,7 @@
 import type { CacheLayer, ResolvedCollection } from '@rstore/shared'
+import type { MutableEngineChangeSet } from './change-set.js'
 import type { EngineCollectionState, EngineContext, EngineEffect, EngineLayer, KeyId } from './internal-types.js'
+import { touchItem, touchList } from './change-set.js'
 import { isEntityKey, refreshPublicKey, releaseUnusedKey, toKeyId } from './identity.js'
 import { reconcileItemIndexes } from './indexes.js'
 import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
@@ -68,6 +70,7 @@ function captureResolved(state: EngineCollectionState, keys: Set<KeyId>): Map<Ke
 /** Reconcile indexes and reactive scopes after a layer transition. */
 function reconcileLayerChange(
   ctx: EngineContext,
+  changes: MutableEngineChangeSet,
   collection: ResolvedCollection<any, any, any>,
   state: EngineCollectionState,
   keys: Set<KeyId>,
@@ -80,20 +83,20 @@ function reconcileLayerChange(
     const next = resolveItemById(state, id)
     const before = previous.get(id)
     if (before !== next) {
-      reconcileItemIndexes(ctx, collection, id, before, next)
-      ctx.observers.touchItem(collection.name, id)
+      reconcileItemIndexes(ctx, changes, collection, id, next)
+      touchItem(changes, collection.name, id)
     }
     visibilityChanged ||= (before !== undefined) !== (next !== undefined)
       || (keyFormsChanged.has(id) && (before !== undefined || next !== undefined))
   }
   if (visibilityChanged) {
     invalidateVisibleKeys(state)
-    ctx.observers.touchList(collection.name)
+    touchList(changes, collection.name)
   }
 }
 
 /** Add an optimistic layer and update only its effective records. */
-export function addLayerNow(ctx: EngineContext, layer: CacheLayer): EngineEffect[] {
+export function addLayerNow(ctx: EngineContext, changes: MutableEngineChangeSet, layer: CacheLayer): EngineEffect[] {
   const collection = ctx.callbacks.getCollection(layer.collectionName)
   if (!collection) {
     throw new Error(`Collection not found for layer: ${layer.collectionName}`)
@@ -103,7 +106,7 @@ export function addLayerNow(ctx: EngineContext, layer: CacheLayer): EngineEffect
   // Normalize before replacing a same-id layer so malformed patches cannot
   // remove an already-committed layer as a partial side effect.
   const entry = normalizeLayer(state, collection, layer)
-  const effects = removeLayerNow(ctx, layer.id)
+  const effects = removeLayerNow(ctx, changes, layer.id)
   const previous = captureResolved(state, entry.affectedKeys)
   const hadNoLayers = state.layers.length === 0
   state.layers = [...state.layers, entry]
@@ -113,13 +116,13 @@ export function addLayerNow(ctx: EngineContext, layer: CacheLayer): EngineEffect
     state.resolvedItems.clear()
   }
 
-  reconcileLayerChange(ctx, collection, state, entry.affectedKeys, previous, keyFormsChanged)
+  reconcileLayerChange(ctx, changes, collection, state, entry.affectedKeys, previous, keyFormsChanged)
   effects.push({ type: 'layerAdd', layer })
   return effects
 }
 
 /** Remove an optimistic layer and restore its underlying effective records. */
-export function removeLayerNow(ctx: EngineContext, layerId: string): EngineEffect[] {
+export function removeLayerNow(ctx: EngineContext, changes: MutableEngineChangeSet, layerId: string): EngineEffect[] {
   const collectionName = ctx.layerIdToCollection.get(layerId)
   const state = collectionName === undefined ? undefined : ctx.collections.get(collectionName)
   const entry = state?.layers.find(candidate => candidate.layer.id === layerId)
@@ -137,7 +140,7 @@ export function removeLayerNow(ctx: EngineContext, layerId: string): EngineEffec
   }
 
   if (collection) {
-    reconcileLayerChange(ctx, collection, state, entry.affectedKeys, previous, keyFormsChanged)
+    reconcileLayerChange(ctx, changes, collection, state, entry.affectedKeys, previous, keyFormsChanged)
   }
   for (const id of entry.affectedKeys) {
     releaseUnusedKey(state, id)

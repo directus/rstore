@@ -14,7 +14,7 @@ import type {
   StoreSchema,
 } from '@rstore/shared'
 import type { TombstoneStore } from '../tombstone.js'
-import type { ObserverChanges } from './observer-changes.js'
+import type { EngineChangeSet, ObserverChanges } from './observer-changes.js'
 
 /** Unsubscribe handle returned by engine observer methods. */
 export type Unsubscribe = () => void
@@ -74,6 +74,8 @@ export interface EngineCallbacks {
   getCollection: (name: string) => ResolvedCollection<any, any, any> | undefined
   /** Resolve a related child item among candidate collection names. */
   resolveChildCollection: (item: any, possibleNames: string[]) => ResolvedCollection<any, any, any> | null
+  /** Synchronize framework state immediately after each committed operation. */
+  onStateChange?: (changes: EngineChangeSet) => void
   /** Fired after a write or delete commits. */
   onAfterWrite?: (payload: EngineAfterWritePayload) => void
   /** Fired when a CRDT merge reports field conflicts. */
@@ -189,6 +191,8 @@ export interface StoreEngine<
   resolveKeys: (params: ResolveKeysParams) => Array<string | number>
   /** Read one reconciled index bucket. */
   getIndexBucket: (collection: string, indexKey: string, indexValue: CacheIndexValue) => ReadonlySet<string | number> | undefined
+  /** Return stable opaque identity for one index dependency. */
+  getIndexDependencyId: (collection: string, indexKey: string, indexValue: CacheIndexValue) => string
   /** Check whether a query marker exists. */
   hasMarker: (marker: string) => boolean
   /** Queue one item write. */
