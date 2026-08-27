@@ -1,7 +1,7 @@
 import type { Cache, CollectionDefaults, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CacheRuntime, VueCachePrivate } from './types'
 import { reactive } from 'vue'
-import { ensureLayersForCollection } from './context'
+import { ensureLayersForCollection, readRawCacheItem } from './context'
 import { applyMutationToCache } from './mutations'
 import { clearAllQueryState, clearQueryStateForCollection } from './queryState'
 import { garbageCollectItem, getWrappedItem } from './wrapped'
@@ -16,8 +16,10 @@ export function createCacheApi<
       return getWrappedItem(ctx, collection, item, noCache)!
     },
     readItem({ collection, key }) {
-      ctx.signals.trackItem(collection.name, key)
-      return getWrappedItem(ctx, collection, ctx.engine.readItemRaw({ collection, key }))
+      if (!ctx.signals.trackItem(collection.name, key)) {
+        ctx.versions.trackItem(collection.name)
+      }
+      return getWrappedItem(ctx, collection, readRawCacheItem(ctx, collection, key))
     },
     readItems(params) {
       return readItems(ctx, params)
@@ -108,21 +110,35 @@ export function createCacheApi<
 
 function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit, indexKey, indexValue }: Parameters<Cache['readItems']>[0]) {
   if (keys == null && indexKey != null) {
-    ctx.signals.trackIndex(collection.name, indexKey, String(indexValue))
+    if (!ctx.signals.trackIndex(collection.name, indexKey, String(indexValue))) {
+      ctx.versions.trackIndex(collection.name)
+    }
   }
   else {
-    ctx.signals.trackList(collection.name)
+    if (!ctx.signals.trackList(collection.name)) {
+      ctx.versions.trackList(collection.name)
+    }
   }
 
   if (marker && !ctx.engine.hasMarker(marker)) {
     return []
   }
 
+  const canReuseVisibleList = keys == null && indexKey == null && !filter && limit == null
+  if (canReuseVisibleList) {
+    const cached = ctx.visibleListCache.get(collection.name)
+    if (cached) {
+      // Keep cache-owned ordering private. Callers have always received a
+      // mutable result array, so a local copy preserves that contract.
+      return cached.slice()
+    }
+  }
+
   const candidateKeys = ctx.engine.resolveKeys({ collection, marker, keys, indexKey, indexValue })
   const result: Array<WrappedItem<any, any, any>> = []
   let count = 0
   for (const key of candidateKeys) {
-    const wrappedItem = getWrappedItem(ctx, collection, ctx.engine.readItemRaw({ collection, key }))
+    const wrappedItem = getWrappedItem(ctx, collection, readRawCacheItem(ctx, collection, key))
     if (!wrappedItem || (filter && !filter(wrappedItem))) {
       continue
     }
@@ -132,6 +148,10 @@ function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit,
       break
     }
   }
+  if (canReuseVisibleList) {
+    ctx.visibleListCache.set(collection.name, result)
+    return result.slice()
+  }
   return result
 }
 
@@ -139,7 +159,7 @@ function garbageCollect(ctx: CacheRuntime) {
   const store = ctx.getStore()
   for (const collection of store.$collections) {
     ctx.engine.forEachKey(collection.name, (key) => {
-      const wrappedItem = getWrappedItem(ctx, collection, ctx.engine.readItemRaw({ collection, key }))
+      const wrappedItem = getWrappedItem(ctx, collection, readRawCacheItem(ctx, collection, key))
       if (wrappedItem) {
         garbageCollectItem(ctx, collection, wrappedItem)
       }

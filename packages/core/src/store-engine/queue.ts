@@ -1,14 +1,10 @@
 import type { EngineContext, QueuedOperation, Staggering } from './types.js'
+import { getPublicKey, toKeyId } from './identity.js'
 import { addLayerNow, removeLayerNow } from './layers.js'
 import { clearNow, setStateNow } from './serialize.js'
 import { deleteItemFromBase, writeItemNow } from './write.js'
 
-/**
- * Create the write-staggering controller. When `cacheStaggering > 0`, at most
- * that many writes are applied per 10ms window so a flood of cache writes does
- * not block the main thread; the budget refills on a timer that re-runs the
- * flush. `0` disables staggering entirely (writes apply immediately).
- */
+/** Create the cache write-staggering controller. */
 export function createStaggering(cacheStaggering: number): Staggering {
   const budgetMax = Math.max(0, Math.floor(cacheStaggering))
   let budget = budgetMax
@@ -29,27 +25,22 @@ export function createStaggering(cacheStaggering: number): Staggering {
   return {
     enabled: budgetMax > 0,
     canProcess() {
-      if (!budgetMax) {
-        return true
-      }
-      if (budget > 0) {
+      if (!budgetMax || budget > 0) {
         return true
       }
       scheduleReset()
       return false
     },
     consume() {
-      if (!budgetMax) {
-        return
+      if (budgetMax) {
+        scheduleReset()
+        budget = Math.max(0, budget - 1)
       }
-      scheduleReset()
-      budget = Math.max(0, budget - 1)
     },
     setFlush(fn) {
       flush = fn
     },
     dispose() {
-      // Cancel a pending budget refill so it can't re-drive a torn-down engine.
       if (resetTimer) {
         clearTimeout(resetTimer)
         resetTimer = undefined
@@ -58,9 +49,7 @@ export function createStaggering(cacheStaggering: number): Staggering {
   }
 }
 
-/**
- * Push an operation onto the FIFO queue and, unless paused, drain it.
- */
+/** Add an operation and immediately drain unless the cache is paused. */
 export function enqueueOperation(ctx: EngineContext, operation: QueuedOperation): void {
   ctx.queue.push(operation)
   if (!ctx.paused) {
@@ -68,14 +57,24 @@ export function enqueueOperation(ctx: EngineContext, operation: QueuedOperation)
   }
 }
 
-/**
- * Drain the operation queue in FIFO order, applying each op to the engine
- * state. Honors the staggering budget: when exhausted, returns early leaving
- * the remainder queued (the budget-reset timer re-invokes this). Observer
- * notifications accumulated during applied ops are dispatched once in the
- * `finally`, after the flush guard is released so reactive callbacks may
- * safely enqueue further work.
- */
+/** Advance past a fully processed operation without shifting the array. */
+function advance(ctx: EngineContext): void {
+  ctx.queueHead++
+}
+
+/** Compact consumed queue storage at amortized O(1) cost. */
+function compact(ctx: EngineContext): void {
+  if (ctx.queueHead === ctx.queue.length) {
+    ctx.queue.length = 0
+    ctx.queueHead = 0
+  }
+  else if (ctx.queueHead >= 1024 && ctx.queueHead * 2 >= ctx.queue.length) {
+    ctx.queue.splice(0, ctx.queueHead)
+    ctx.queueHead = 0
+  }
+}
+
+/** Apply queued operations in FIFO order and flush observers once per drain. */
 export function flushQueuedOperations(ctx: EngineContext): void {
   if (ctx.isFlushingQueue || ctx.paused) {
     return
@@ -83,8 +82,8 @@ export function flushQueuedOperations(ctx: EngineContext): void {
 
   ctx.isFlushingQueue = true
   try {
-    while (ctx.queue.length) {
-      const operation = ctx.queue[0]!
+    while (ctx.queueHead < ctx.queue.length) {
+      const operation = ctx.queue[ctx.queueHead]!
       switch (operation.type) {
         case 'writeItem':
           if (!ctx.staggering.canProcess()) {
@@ -92,7 +91,7 @@ export function flushQueuedOperations(ctx: EngineContext): void {
           }
           writeItemNow(ctx, operation.params)
           ctx.staggering.consume()
-          ctx.queue.shift()
+          advance(ctx)
           break
         case 'writeItems':
           while (operation.index < operation.params.items.length) {
@@ -110,8 +109,6 @@ export function flushQueuedOperations(ctx: EngineContext): void {
             operation.index++
             ctx.staggering.consume()
           }
-          // Marker + the single batch-level write callback fire only after the
-          // whole batch has been applied.
           if (operation.params.marker) {
             ctx.markers[operation.params.marker] = true
             ctx.observers.touchList(operation.params.collection.name)
@@ -122,44 +119,43 @@ export function flushQueuedOperations(ctx: EngineContext): void {
             marker: operation.params.marker,
             operation: 'write',
           })
-          ctx.queue.shift()
+          advance(ctx)
           break
         case 'deleteItem': {
           const { collection, key, deletedAt } = operation.params
-          // Field timestamps are always cleared on delete; a tombstone is only
-          // recorded when an explicit delete time is provided.
-          const collectionTs = ctx.fieldTimestamps.get(collection.name)
-          if (collectionTs) {
-            collectionTs.delete(key)
-          }
+          const state = ctx.collections.get(collection.name)
+          const id = toKeyId(key)
+          const publicKey = state ? getPublicKey(state, id) : key
+          ctx.fieldTimestamps.get(collection.name)?.delete(id)
           if (deletedAt != null) {
-            ctx.tombstones.set({ collection: collection.name, key, deletedAt })
+            ctx.tombstones.set({ collection: collection.name, key: publicKey, deletedAt })
           }
           deleteItemFromBase(ctx, operation.params)
-          ctx.queue.shift()
+          advance(ctx)
           break
         }
         case 'addLayer':
           addLayerNow(ctx, operation.layer)
-          ctx.queue.shift()
+          advance(ctx)
           break
         case 'removeLayer':
           removeLayerNow(ctx, operation.layerId)
-          ctx.queue.shift()
+          advance(ctx)
           break
         case 'setState':
           setStateNow(ctx, operation.state)
-          ctx.queue.shift()
+          advance(ctx)
           break
         case 'clear':
           clearNow(ctx)
-          ctx.queue.shift()
+          advance(ctx)
           break
       }
     }
   }
   finally {
     ctx.isFlushingQueue = false
+    compact(ctx)
     ctx.observers.flush()
   }
 }

@@ -48,6 +48,17 @@ describe('store-engine: serialize', () => {
     expect(engine.resolveKeys({ collection, indexKey: 'authorId', indexValue: 'a' }).map(String).sort()).toEqual(['1', '2'])
   })
 
+  it('keeps query metadata when hydrating its own live snapshot', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+    const queryId = '["User-many",{}]'
+    engine._getQueryMeta()[queryId] = { $queryTracking: { items: {}, skipped: true } }
+
+    engine.setState(engine.getState())
+
+    expect(engine._getQueryMeta()).toEqual({ [queryId]: { $queryTracking: { items: {}, skipped: true } } })
+  })
+
   it('returns a stable module object across calls', () => {
     const collection = buildCollection('User')
     const { engine } = createTestEngine([collection])
