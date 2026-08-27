@@ -1,21 +1,10 @@
+import type { MutableEngineChangeSet } from './change-set.js'
 import type { KeyId, ObserverRegistry } from './internal-types.js'
-import type { ObserverChanges } from './observer-changes.js'
 import type { ObserverCallback, Unsubscribe } from './types.js'
+import { getIndexDependencyId, touchItem, touchList } from './change-set.js'
 import { toKeyId } from './identity.js'
 
-/** Pending observer invalidations, deduplicated until the next queue flush. */
-interface PendingChange {
-  items: Map<string, Set<KeyId>>
-  lists: Set<string>
-  indexes: Map<string, Map<string, Set<string>>>
-}
-
-/** Create an empty pending-change accumulator. */
-function createPending(): PendingChange {
-  return { items: new Map(), lists: new Set(), indexes: new Map() }
-}
-
-/** Invoke callbacks independently so one failure cannot block other readers. */
+/** Invoke callbacks independently so one failure cannot starve other readers. */
 function runAll(callbacks: Set<ObserverCallback> | undefined): void {
   for (const callback of callbacks ? [...callbacks] : []) {
     try {
@@ -27,18 +16,18 @@ function runAll(callbacks: Set<ObserverCallback> | undefined): void {
   }
 }
 
-/** Create fine-grained item, list and index observer registries. */
-export function createObserverRegistry(onFlush?: (changes: ObserverChanges) => void): ObserverRegistry {
+/** Create subscription-owned item, list, and index observer registries. */
+export function createObserverRegistry(): ObserverRegistry {
   const itemObservers = new Map<string, Map<KeyId, Set<ObserverCallback>>>()
   const listObservers = new Map<string, Set<ObserverCallback>>()
-  const indexObservers = new Map<string, Map<string, Map<string, Set<ObserverCallback>>>>()
-  let pending = createPending()
+  const indexObservers = new Map<string, Set<ObserverCallback>>()
+  const indexDependenciesByCollection = new Map<string, Set<string>>()
   let disposed = false
 
+  /** Subscribe to one item identity. */
   function observeItem(collection: string, key: string | number, callback: ObserverCallback): Unsubscribe {
-    if (disposed) {
-      return () => {}
-    }
+    if (disposed)
+      return noop
     const id = toKeyId(key)
     const byKey = itemObservers.get(collection) ?? new Map<KeyId, Set<ObserverCallback>>()
     itemObservers.set(collection, byKey)
@@ -47,148 +36,81 @@ export function createObserverRegistry(onFlush?: (changes: ObserverChanges) => v
     callbacks.add(callback)
     return () => {
       callbacks.delete(callback)
-      if (callbacks.size === 0) {
+      if (!callbacks.size)
         byKey.delete(id)
-      }
-      if (byKey.size === 0) {
+      if (!byKey.size)
         itemObservers.delete(collection)
-      }
     }
   }
 
+  /** Subscribe to one visible collection membership. */
   function observeList(collection: string, callback: ObserverCallback): Unsubscribe {
-    if (disposed) {
-      return () => {}
-    }
+    if (disposed)
+      return noop
     const callbacks = listObservers.get(collection) ?? new Set<ObserverCallback>()
     listObservers.set(collection, callbacks)
     callbacks.add(callback)
     return () => {
       callbacks.delete(callback)
-      if (callbacks.size === 0) {
+      if (!callbacks.size)
         listObservers.delete(collection)
-      }
     }
   }
 
-  function observeIndex(collection: string, indexKey: string, indexValue: string, callback: ObserverCallback): Unsubscribe {
-    if (disposed) {
-      return () => {}
-    }
-    const byIndex = indexObservers.get(collection) ?? new Map<string, Map<string, Set<ObserverCallback>>>()
-    indexObservers.set(collection, byIndex)
-    const byValue = byIndex.get(indexKey) ?? new Map<string, Set<ObserverCallback>>()
-    byIndex.set(indexKey, byValue)
-    const callbacks = byValue.get(indexValue) ?? new Set<ObserverCallback>()
-    byValue.set(indexValue, callbacks)
+  /** Subscribe to one already-encoded index membership. */
+  function observeIndex(collection: string, indexKey: string, indexValueId: string, callback: ObserverCallback): Unsubscribe {
+    if (disposed)
+      return noop
+    const dependency = getIndexDependencyId(collection, indexKey, indexValueId)
+    const callbacks = indexObservers.get(dependency) ?? new Set<ObserverCallback>()
+    indexObservers.set(dependency, callbacks)
     callbacks.add(callback)
+    const dependencies = indexDependenciesByCollection.get(collection) ?? new Set<string>()
+    indexDependenciesByCollection.set(collection, dependencies)
+    dependencies.add(dependency)
     return () => {
       callbacks.delete(callback)
-      if (callbacks.size === 0) {
-        byValue.delete(indexValue)
-      }
-      if (byValue.size === 0) {
-        byIndex.delete(indexKey)
-      }
-      if (byIndex.size === 0) {
-        indexObservers.delete(collection)
-      }
+      if (callbacks.size)
+        return
+      indexObservers.delete(dependency)
+      dependencies.delete(dependency)
+      if (!dependencies.size)
+        indexDependenciesByCollection.delete(collection)
     }
   }
 
-  function touchItem(collection: string, key: string | number): void {
-    if (disposed) {
+  /** Add every directly observed scope when a collection is replaced. */
+  function collectCollection(changes: MutableEngineChangeSet, collection: string): void {
+    if (disposed)
       return
-    }
-    const keys = pending.items.get(collection) ?? new Set<KeyId>()
-    pending.items.set(collection, keys)
-    keys.add(toKeyId(key))
+    for (const id of itemObservers.get(collection)?.keys() ?? []) touchItem(changes, collection, id)
+    touchList(changes, collection)
+    for (const dependency of indexDependenciesByCollection.get(collection) ?? []) changes.indexes.add(dependency)
   }
 
-  function touchList(collection: string): void {
-    if (disposed) {
+  /** Dispatch one immutable completed journal to direct observers. */
+  function dispatch(changes: MutableEngineChangeSet): void {
+    if (disposed)
       return
-    }
-    pending.lists.add(collection)
-  }
-
-  function touchIndex(collection: string, indexKey: string, indexValue: string): void {
-    if (disposed) {
-      return
-    }
-    const byIndex = pending.indexes.get(collection) ?? new Map<string, Set<string>>()
-    pending.indexes.set(collection, byIndex)
-    const values = byIndex.get(indexKey) ?? new Set<string>()
-    byIndex.set(indexKey, values)
-    values.add(indexValue)
-  }
-
-  function invalidateCollection(collection: string): void {
-    if (disposed) {
-      return
-    }
-    for (const key of itemObservers.get(collection)?.keys() ?? []) {
-      touchItem(collection, key)
-    }
-    touchList(collection)
-    for (const [indexKey, byValue] of indexObservers.get(collection) ?? []) {
-      for (const indexValue of byValue.keys()) {
-        touchIndex(collection, indexKey, indexValue)
-      }
-    }
-  }
-
-  function flush(): void {
-    if (disposed) {
-      pending = createPending()
-      return
-    }
-    if (pending.items.size === 0 && pending.lists.size === 0 && pending.indexes.size === 0) {
-      return
-    }
-    const change = pending
-    pending = createPending()
-    let bridgeError: unknown
-    let bridgeFailed = false
-    try {
-      onFlush?.(change)
-    }
-    catch (error) {
-      // Framework bridge failures must not starve direct engine observers.
-      bridgeError = error
-      bridgeFailed = true
-    }
-    for (const [collection, keys] of change.items) {
+    for (const [collection, keys] of changes.items) {
       const byKey = itemObservers.get(collection)
-      for (const key of keys) {
-        runAll(byKey?.get(key))
-      }
+      for (const key of keys) runAll(byKey?.get(key))
     }
-    for (const collection of change.lists) {
-      runAll(listObservers.get(collection))
-    }
-    for (const [collection, byIndex] of change.indexes) {
-      const observedIndexes = indexObservers.get(collection)
-      for (const [indexKey, values] of byIndex) {
-        const observedValues = observedIndexes?.get(indexKey)
-        for (const value of values) {
-          runAll(observedValues?.get(value))
-        }
-      }
-    }
-    if (bridgeFailed) {
-      throw bridgeError
-    }
+    for (const collection of changes.lists) runAll(listObservers.get(collection))
+    for (const dependency of changes.indexes) runAll(indexObservers.get(dependency))
   }
 
-  /** Release every observer and pending change owned by this registry. */
+  /** Release every observer owned by this registry. */
   function dispose(): void {
     disposed = true
     itemObservers.clear()
     listObservers.clear()
     indexObservers.clear()
-    pending = createPending()
+    indexDependenciesByCollection.clear()
   }
 
-  return { observeItem, observeList, observeIndex, touchItem, touchList, touchIndex, invalidateCollection, flush, dispose }
+  return { observeItem, observeList, observeIndex, collectCollection, dispatch, dispose }
 }
+
+/** Reusable disposed subscription handle. */
+function noop(): void {}

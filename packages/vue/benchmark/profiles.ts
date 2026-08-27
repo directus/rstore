@@ -1,5 +1,6 @@
 import type { CacheImplementation } from './runtime'
 import type { Scenario, ScenarioOptions } from './scenario-harness'
+import { compositeWriteWithDirectWatcher, compositeWriteWithoutWatcher, scalarWriteWithDirectWatcher } from './decomposition-scenarios'
 import { compositeIndexMembershipWrite, compositeIndexRead } from './index-scenarios'
 import { filteredLimitedListRead, fullListRead, indexedListRead, itemRead } from './read-scenarios'
 import { fieldWriteUnderItems, fieldWriteUnderLists, fieldWriteWithListRead, listReadUnderLayer, relationRelatedFieldWrites, relationUnrelatedWrites, replaceUnderLists } from './scenarios'
@@ -23,7 +24,7 @@ export interface BenchmarkScenario {
 /** Benchmark duration and workload selection. */
 export interface BenchmarkProfile {
   /** Human-readable command profile. */
-  name: 'quick' | 'full'
+  name: 'quick' | 'full' | 'decomposition'
   /** Item counts to exercise. */
   itemCounts: readonly number[]
   /** Live watcher count for reactive workloads. */
@@ -36,7 +37,7 @@ export interface BenchmarkProfile {
   iterations: number
   /** Target elapsed duration for one calibrated batch. */
   batchTargetMs: number
-  /** RME threshold before one longer retry. */
+  /** RME threshold before longer bounded retries. */
   maxRme: number
   /** Workloads selected by this profile. */
   scenarios: readonly BenchmarkScenario[]
@@ -59,8 +60,12 @@ const REACTIVE_SCENARIOS: readonly BenchmarkScenario[] = [
   workload('relation-unrelated-write', 'relation read / unrelated writes', relationUnrelatedWrites, { observer: 'relation' }),
 ]
 
-const FULL_ONLY_SCENARIOS: readonly BenchmarkScenario[] = [
+const REGRESSION_SCENARIOS: readonly BenchmarkScenario[] = [
   workload('item-read', 'read item', itemRead),
+  workload('composite-index-membership-write', 'composite index membership write', compositeIndexMembershipWrite, { observer: 'relation', itemCounts: [1000] }),
+]
+
+const FULL_ONLY_SCENARIOS: readonly BenchmarkScenario[] = [
   workload('list-read', 'read full list', fullListRead),
   workload('filtered-list-read', 'read filtered limited list', filteredLimitedListRead),
   workload('indexed-list-read', 'read indexed list', indexedListRead),
@@ -69,13 +74,15 @@ const FULL_ONLY_SCENARIOS: readonly BenchmarkScenario[] = [
   workload('relation-membership-write', 'relation membership write', relationMembershipWrite, { observer: 'relation' }),
   workload('relation-related-field-write', 'relation read / related field writes', relationRelatedFieldWrites, { observer: 'relation', itemCounts: [1000] }),
   workload('composite-index-read', 'read composite index', compositeIndexRead),
-  workload('composite-index-membership-write', 'composite index membership write', compositeIndexMembershipWrite, { observer: 'relation', itemCounts: [1000] }),
   workload('crdt-fresh-write', 'accepted CRDT field write', crdtFreshWrite, { itemCounts: [1000] }),
   workload('crdt-stale-write', 'rejected stale CRDT field write', crdtStaleWrite, { itemCounts: [1000] }),
   workload('nested-relation-write', 'write parent + 10 nested children', nestedRelationWrite, { itemCounts: [1000] }),
   workload('layer-cycle', 'optimistic layer cycle', layerCycle),
   workload('serialize-state', 'serialize cache state', serializeState),
   workload('hydrate-state', 'hydrate cache state', hydrateState),
+  workload('composite-write-no-watcher', 'composite membership write / no watcher', compositeWriteWithoutWatcher, { itemCounts: [1000] }),
+  workload('composite-write-direct-watcher', 'composite membership write / direct watcher', compositeWriteWithDirectWatcher, { observer: 'relation', itemCounts: [1000] }),
+  workload('scalar-write-direct-watcher', 'scalar membership write / direct watcher', scalarWriteWithDirectWatcher, { observer: 'relation', itemCounts: [1000] }),
 ]
 
 /** Fast local comparison profile. */
@@ -88,7 +95,7 @@ export const QUICK_PROFILE: BenchmarkProfile = {
   iterations: 10,
   batchTargetMs: 2,
   maxRme: 5,
-  scenarios: REACTIVE_SCENARIOS,
+  scenarios: [...REACTIVE_SCENARIOS, ...REGRESSION_SCENARIOS],
 }
 
 /** Broad size matrix for deliberate performance investigation. */
@@ -101,7 +108,17 @@ export const FULL_PROFILE: BenchmarkProfile = {
   iterations: 20,
   batchTargetMs: 5,
   maxRme: 3,
-  scenarios: [...REACTIVE_SCENARIOS, ...FULL_ONLY_SCENARIOS],
+  scenarios: [...REACTIVE_SCENARIOS, ...REGRESSION_SCENARIOS, ...FULL_ONLY_SCENARIOS],
+}
+
+/** Focused index-writer decomposition for local profiling. */
+export const DECOMPOSITION_PROFILE: BenchmarkProfile = {
+  ...QUICK_PROFILE,
+  name: 'decomposition',
+  scenarios: [
+    REGRESSION_SCENARIOS[1]!,
+    ...FULL_ONLY_SCENARIOS.slice(-3),
+  ],
 }
 
 /** Attach a stable label to a scenario builder. */

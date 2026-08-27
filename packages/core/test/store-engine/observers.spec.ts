@@ -1,4 +1,6 @@
+import type { EngineChangeSet } from '../../src'
 import { describe, expect, it, vi } from 'vitest'
+import { createStoreEngine } from '../../src'
 import { buildCollection, createTestEngine } from './helpers'
 
 describe('store-engine: observers', () => {
@@ -11,6 +13,53 @@ describe('store-engine: observers', () => {
     engine.writeItem({ collection, key: 1, item: { id: 1, name: 'A' } })
 
     expect(cb).toHaveBeenCalledTimes(1)
+  })
+
+  it('publishes committed state before hooks and final observers', () => {
+    const collection = buildCollection('User')
+    const order: string[] = []
+    const engine = createStoreEngine({
+      isServer: true,
+      callbacks: {
+        getCollection: name => name === collection.name ? collection : undefined,
+        resolveChildCollection: () => null,
+        onStateChange(changes) {
+          expect(engine.readItemRaw({ collection, key: 1 })).toEqual({ id: 1, name: 'A' })
+          expect(changes.items.get('User')).toEqual(new Set(['1']))
+          order.push('state')
+        },
+        onAfterWrite: () => order.push('hook'),
+        onObserverFlush: () => order.push('flush'),
+      },
+    })
+    engine.observeItem('User', 1, () => order.push('observer'))
+
+    engine.writeItem({ collection, key: 1, item: { id: 1, name: 'A' } })
+
+    expect(order).toEqual(['state', 'hook', 'flush', 'observer'])
+  })
+
+  it('publishes stable operation-local change sets during one queue flush', () => {
+    const collection = buildCollection('User')
+    const operations: EngineChangeSet[] = []
+    const engine = createStoreEngine({
+      isServer: true,
+      callbacks: {
+        getCollection: name => name === collection.name ? collection : undefined,
+        resolveChildCollection: () => null,
+        onStateChange: changes => operations.push(changes),
+      },
+    })
+    engine.pause()
+    engine.writeItem({ collection, key: 1, item: { id: 1 } })
+    engine.writeItem({ collection, key: 2, item: { id: 2 } })
+
+    engine.resume()
+
+    expect(operations).toHaveLength(2)
+    expect(operations[0]).not.toBe(operations[1])
+    expect(operations[0]!.items.get('User')).toEqual(new Set(['1']))
+    expect(operations[1]!.items.get('User')).toEqual(new Set(['2']))
   })
 
   it('a field update does NOT re-run the list observer (perf win)', () => {

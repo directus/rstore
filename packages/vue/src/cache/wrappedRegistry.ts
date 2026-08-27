@@ -1,5 +1,6 @@
 import type { Collection, CollectionDefaults, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { WrappedItemMetadata } from '../item'
+import type { ItemCell } from './itemCells'
 
 /** Wrapped proxy and metadata with one shared lifecycle. */
 export interface WrappedItemEntry<
@@ -10,6 +11,8 @@ export interface WrappedItemEntry<
   item: WrappedItem<Collection, TCollectionDefaults, TSchema>
   /** Query ownership metadata attached to the proxy. */
   metadata: WrappedItemMetadata<Collection, TCollectionDefaults, TSchema>
+  /** Reactive source owned by this exact wrapper identity. */
+  cell: ItemCell
 }
 
 /** Collision-free collection/base-or-layer/key wrapper registry. */
@@ -75,18 +78,32 @@ export function createWrappedItemRegistry<
     },
     deleteBase(collection, key) {
       const state = collections.get(collection)
-      state?.base.delete(String(key))
+      const id = String(key)
+      state?.base.get(id)?.cell.detach()
+      state?.base.delete(id)
       pruneCollection(collection, state)
     },
     deleteLayer(collection, layerId) {
       const state = collections.get(collection)
+      for (const entry of state?.layers.get(layerId)?.values() ?? []) entry.cell.detach()
       state?.layers.delete(layerId)
       pruneCollection(collection, state)
     },
     deleteCollection(collection) {
+      const state = collections.get(collection)
+      for (const entry of state?.base.values() ?? []) entry.cell.detach()
+      for (const entries of state?.layers.values() ?? []) {
+        for (const entry of entries.values()) entry.cell.detach()
+      }
       collections.delete(collection)
     },
     clear() {
+      for (const state of collections.values()) {
+        for (const entry of state.base.values()) entry.cell.detach()
+        for (const entries of state.layers.values()) {
+          for (const entry of entries.values()) entry.cell.detach()
+        }
+      }
       collections.clear()
     },
   }
