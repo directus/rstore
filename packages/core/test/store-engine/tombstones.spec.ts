@@ -55,4 +55,39 @@ describe('store-engine: tombstones', () => {
 
     expect(engine.readItemRaw({ collection, key: 1 })).toEqual({ id: 1, name: 'Forced' })
   })
+
+  it('keeps collection and key tuples distinct when delimiters collide', () => {
+    const first = buildCollection('a:b')
+    const second = buildCollection('a')
+    const { engine } = createTestEngine([first, second])
+
+    engine.tombstones.set({ collection: 'a:b', key: 'c', deletedAt: 10 })
+    engine.tombstones.set({ collection: 'a', key: 'b:c', deletedAt: 20 })
+
+    expect(engine.tombstones.get('a:b', 'c')?.deletedAt).toBe(10)
+    expect(engine.tombstones.get('a', 'b:c')?.deletedAt).toBe(20)
+    expect(engine.tombstones.size()).toBe(2)
+  })
+
+  it('releases rejected write key identity after tombstone GC', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+    engine.tombstones.set({ collection: 'User', key: '1', deletedAt: 100 })
+    engine.writeItem({
+      collection,
+      key: '1',
+      item: { id: 1, name: 'stale' },
+      fieldTimestamps: { name: 50 },
+    })
+
+    engine.gcTombstones(200)
+    engine.addLayer({
+      id: 'layer-only',
+      collectionName: 'User',
+      state: { 1: { name: 'layer' } },
+      deletedItems: new Set(),
+    })
+
+    expect(engine.resolveKeys({ collection })).toEqual(['1'])
+  })
 })

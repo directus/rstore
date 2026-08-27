@@ -1,18 +1,13 @@
 import type { CacheLayer, ResolvedCollection } from '@rstore/shared'
-import type { EngineCollectionState, EngineContext, EngineLayer, KeyId } from './types.js'
-import { getPublicKey, registerKey, releaseUnusedKey, toKeyId } from './identity.js'
+import type { EngineCollectionState, EngineContext, EngineEffect, EngineLayer, KeyId } from './internal-types.js'
+import { isEntityKey, refreshPublicKey, releaseUnusedKey, toKeyId } from './identity.js'
 import { reconcileItemIndexes } from './indexes.js'
 import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
-
-/** Layer metadata plus public key forms changed during normalization. */
-interface NormalizedLayer extends EngineLayer {
-  keyFormsChanged: Set<KeyId>
-}
 
 /** Find a public layer by id. */
 export function getLayerNow(ctx: EngineContext, layerId: string): CacheLayer | undefined {
   const collectionName = ctx.layerIdToCollection.get(layerId)
-  return collectionName
+  return collectionName !== undefined
     ? ctx.collections.get(collectionName)?.layers.find(entry => entry.layer.id === layerId)?.layer
     : undefined
 }
@@ -22,38 +17,47 @@ function normalizeLayer(
   state: EngineCollectionState,
   collection: ResolvedCollection<any, any, any>,
   layer: CacheLayer,
-): NormalizedLayer {
+): EngineLayer {
   const patches = new Map<KeyId, any>()
   const deletedItems = new Set<KeyId>()
   const affectedKeys = new Set<KeyId>()
   const keyValues = new Map<KeyId, string | number>()
-  const keyFormsChanged = new Set<KeyId>()
+  const canonicalKeys = new Set<KeyId>()
 
   for (const key of Object.keys(layer.state)) {
-    const previousKey = state.keyValues.get(toKeyId(key))
-    const id = registerKey(state, collection, key, layer.state[key])
-    if (previousKey !== undefined && previousKey !== getPublicKey(state, id)) {
-      keyFormsChanged.add(id)
+    const item = layer.state[key]
+    const id = toKeyId(key)
+    const derived = collection.getKey(item)
+    let publicKey: string | number = state.keyValues.get(id) ?? key
+    if (isEntityKey(derived) && toKeyId(derived) === id) {
+      publicKey = derived
+      canonicalKeys.add(id)
     }
-    patches.set(id, layer.state[key])
+    patches.set(id, item)
     affectedKeys.add(id)
-    keyValues.set(id, getPublicKey(state, id))
+    keyValues.set(id, publicKey)
   }
   for (const key of layer.deletedItems) {
     const id = toKeyId(key)
-    const previousKey = state.keyValues.get(id)
-    if (!state.keyValues.has(id)) {
-      registerKey(state, collection, key)
-    }
-    if (previousKey !== undefined && previousKey !== getPublicKey(state, id)) {
-      keyFormsChanged.add(id)
-    }
     deletedItems.add(id)
     affectedKeys.add(id)
-    keyValues.set(id, getPublicKey(state, id))
+    keyValues.set(id, state.keyValues.get(id) ?? key)
   }
 
-  return { layer, state: patches, deletedItems, affectedKeys, keyValues, keyFormsChanged }
+  return { layer, state: patches, deletedItems, affectedKeys, keyValues, canonicalKeys }
+}
+
+/** Recompute affected public key forms and report exact changes. */
+function refreshLayerKeyValues(state: EngineCollectionState, keys: Set<KeyId>): Set<KeyId> {
+  const changed = new Set<KeyId>()
+  for (const id of keys) {
+    const previous = state.keyValues.get(id)
+    refreshPublicKey(state, id)
+    if (previous !== undefined && previous !== state.keyValues.get(id)) {
+      changed.add(id)
+    }
+  }
+  return changed
 }
 
 /** Capture resolved values before changing a set of layer inputs. */
@@ -75,9 +79,11 @@ function reconcileLayerChange(
     invalidateResolvedItem(state, id)
     const next = resolveItemById(state, id)
     const before = previous.get(id)
-    reconcileItemIndexes(ctx, collection, id, before, next)
-    ctx.observers.touchItem(collection.name, id)
-    visibilityChanged ||= Boolean(before) !== Boolean(next)
+    if (before !== next) {
+      reconcileItemIndexes(ctx, collection, id, before, next)
+      ctx.observers.touchItem(collection.name, id)
+    }
+    visibilityChanged ||= (before !== undefined) !== (next !== undefined)
       || (keyFormsChanged.has(id) && (before !== undefined || next !== undefined))
   }
   if (visibilityChanged) {
@@ -87,50 +93,54 @@ function reconcileLayerChange(
 }
 
 /** Add an optimistic layer and update only its effective records. */
-export function addLayerNow(ctx: EngineContext, layer: CacheLayer): void {
+export function addLayerNow(ctx: EngineContext, layer: CacheLayer): EngineEffect[] {
   const collection = ctx.callbacks.getCollection(layer.collectionName)
   if (!collection) {
     throw new Error(`Collection not found for layer: ${layer.collectionName}`)
   }
 
-  removeLayerNow(ctx, layer.id)
-
   const state = ctx.ensureCollection(collection.name)
+  // Normalize before replacing a same-id layer so malformed patches cannot
+  // remove an already-committed layer as a partial side effect.
   const entry = normalizeLayer(state, collection, layer)
+  const effects = removeLayerNow(ctx, layer.id)
   const previous = captureResolved(state, entry.affectedKeys)
   const hadNoLayers = state.layers.length === 0
   state.layers = [...state.layers, entry]
   ctx.layerIdToCollection.set(layer.id, collection.name)
+  const keyFormsChanged = refreshLayerKeyValues(state, entry.affectedKeys)
   if (hadNoLayers) {
     state.resolvedItems.clear()
   }
 
-  reconcileLayerChange(ctx, collection, state, entry.affectedKeys, previous, entry.keyFormsChanged)
-  ctx.callbacks.onLayerAdd?.(layer)
+  reconcileLayerChange(ctx, collection, state, entry.affectedKeys, previous, keyFormsChanged)
+  effects.push({ type: 'layerAdd', layer })
+  return effects
 }
 
 /** Remove an optimistic layer and restore its underlying effective records. */
-export function removeLayerNow(ctx: EngineContext, layerId: string): void {
+export function removeLayerNow(ctx: EngineContext, layerId: string): EngineEffect[] {
   const collectionName = ctx.layerIdToCollection.get(layerId)
-  const state = collectionName ? ctx.collections.get(collectionName) : undefined
+  const state = collectionName === undefined ? undefined : ctx.collections.get(collectionName)
   const entry = state?.layers.find(candidate => candidate.layer.id === layerId)
-  if (!collectionName || !state || !entry) {
-    return
+  if (collectionName === undefined || !state || !entry) {
+    return []
   }
 
   const collection = ctx.callbacks.getCollection(collectionName)
   const previous = captureResolved(state, entry.affectedKeys)
   state.layers = state.layers.filter(candidate => candidate !== entry)
   ctx.layerIdToCollection.delete(layerId)
+  const keyFormsChanged = refreshLayerKeyValues(state, entry.affectedKeys)
   if (state.layers.length === 0) {
     state.resolvedItems.clear()
   }
 
   if (collection) {
-    reconcileLayerChange(ctx, collection, state, entry.affectedKeys, previous)
+    reconcileLayerChange(ctx, collection, state, entry.affectedKeys, previous, keyFormsChanged)
   }
   for (const id of entry.affectedKeys) {
     releaseUnusedKey(state, id)
   }
-  ctx.callbacks.onLayerRemove?.(entry.layer)
+  return [{ type: 'layerRemove', layer: entry.layer }]
 }

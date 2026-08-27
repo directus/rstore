@@ -7,18 +7,23 @@ import { isKeyDefined } from '@rstore/core'
 import { cloneInfo } from '@rstore/shared'
 import { markRaw, toRaw } from 'vue'
 
+/** Dependencies used to create one read-only live item proxy. */
 export interface WrapItemOptions<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > {
+  /** Owning Vue store. */
   store: VueStore<TSchema, TCollectionDefaults>
+  /** Resolved item collection. */
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  /** Live raw item source. */
   item: Ref<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
+  /** Query ownership metadata shared with cache GC. */
   metadata: WrappedItemMetadata<TCollection, TCollectionDefaults, TSchema>
   /**
-   * Non-reactive snapshot used to seed the proxy target and the `isFrozen`
-   * check. When omitted, `item.value` is read once at construction.
+   * Non-reactive snapshot used to seed the proxy facade. When omitted,
+   * `item.value` is read once at construction.
    *
    * For engine-backed items, `item` is a tracking `computed` that registers a
    * fine-grained signal on read. Reading it during construction would leak that
@@ -29,6 +34,7 @@ export interface WrapItemOptions<
   seed?: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
 }
 
+/** Create a read-only proxy that resolves fields and relations from live state. */
 export function wrapItem<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -46,13 +52,14 @@ export function wrapItem<
 
   const cache = store.$cache as unknown as Cache & VueCachePrivate
 
-  // Construct from the non-reactive seed (falling back to a single `item.value`
-  // read) so a tracking `computed` source is not evaluated here — see `seed`.
-  const target = seed ?? item.value
-  const isFrozen = Object.isFrozen(target)
+  // Proxying a frozen item directly prevents `get` from returning later field
+  // values. Use an extensible facade with the same prototype so every wrapper
+  // can keep reading its live engine source without violating Proxy invariants.
+  const source = seed ?? item.value
+  const target = Object.create(Object.getPrototypeOf(source)) as typeof source
 
   const proxy = new Proxy(target, {
-    get: (proxyTarget, key) => {
+    get: (_target, key) => {
       switch (key) {
         case '$collection':
           return (collection.name) satisfies WrappedItemBase<TCollection, TCollectionDefaults, TSchema>['$collection']
@@ -120,7 +127,7 @@ export function wrapItem<
       }
 
       // Resolve related items in the cache
-      if (!isFrozen && key in collection.normalizedRelations) {
+      if (!Object.isFrozen(item.value) && key in collection.normalizedRelations) {
         if (Reflect.has(item.value, key)) {
           // @TODO resolve references
           return Reflect.get(item.value, key)
@@ -133,18 +140,15 @@ export function wrapItem<
             if (!targetCollection) {
               throw new Error(`Collection "${target.collection}" does not exist in the store`)
             }
-            const indexKeys = Object.keys(target.on).sort()
-            const indexKey = indexKeys.join(':')
-            const indexValues = indexKeys.map((k) => {
+            const indexValues = target.indexFields.map((k) => {
               const currentKey = target.on[k]!
               return Reflect.get(proxy, currentKey)
             })
             if (indexValues.every(v => v != null)) {
-              const indexValue = indexValues.join(':')
               const cacheResultForTarget = cache.readItems({
                 collection: targetCollection,
-                indexKey,
-                indexValue,
+                indexKey: target.indexKey,
+                indexValue: indexValues.length === 1 ? String(indexValues[0]) : indexValues,
                 limit: relation.many ? undefined : 1,
                 filter: target.filter
                   ? (item) => {
@@ -168,7 +172,7 @@ export function wrapItem<
         }
       }
 
-      return Reflect.get(isFrozen ? proxyTarget : item.value, key)
+      return Reflect.get(item.value, key)
     },
 
     set: () => {
@@ -197,7 +201,8 @@ export function wrapItem<
           configurable: true,
         }
       }
-      return Reflect.getOwnPropertyDescriptor(item.value, key)
+      const descriptor = Reflect.getOwnPropertyDescriptor(item.value, key)
+      return descriptor ? { ...descriptor, configurable: true } : undefined
     },
 
     defineProperty: (_target, property, attributes) => {
@@ -215,11 +220,14 @@ export function wrapItem<
   return proxy as WrappedItem<TCollection, TCollectionDefaults, TSchema>
 }
 
+/** Query references retaining one wrapped item in cache. */
 export interface WrappedItemMetadata<
   _TCollection extends Collection,
   _TCollectionDefaults extends CollectionDefaults,
   _TSchema extends StoreSchema,
 > {
+  /** Queries currently owning the item. */
   queries: Set<any>
+  /** Owning queries that need reconciliation. */
   dirtyQueries: Set<any>
 }

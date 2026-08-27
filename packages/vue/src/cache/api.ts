@@ -3,7 +3,6 @@ import type { CacheRuntime, VueCachePrivate } from './types'
 import { reactive } from 'vue'
 import { ensureLayersForCollection, readRawCacheItem } from './context'
 import { applyMutationToCache } from './mutations'
-import { clearAllQueryState, clearQueryStateForCollection } from './queryState'
 import { garbageCollectItem, getWrappedItem } from './wrapped'
 
 /** Create the public Cache implementation from a cache runtime. */
@@ -52,15 +51,12 @@ export function createCacheApi<
       return ctx.engine.getState()
     },
     setState(state) {
-      ctx.state.pageRefs.clear()
       ctx.engine.setState(state)
     },
     clear() {
-      clearAllQueryState(ctx)
       ctx.engine.clear()
     },
     clearCollection(params) {
-      clearQueryStateForCollection(ctx, params.collection.name)
       ctx.engine.clearCollection(params)
     },
     garbageCollectItem({ collection, item }) {
@@ -93,24 +89,37 @@ export function createCacheApi<
       ctx.engine.resume()
     },
     dispose() {
-      ctx.engine.dispose()
-      ctx.signals.dispose()
+      disposeCacheRuntime(ctx)
     },
     _private: {
       state: ctx.state,
-      wrappedItems: ctx.wrappedItems,
-      wrappedItemsMetadata: ctx.wrappedItemsMetadata,
       getWrappedItem: (collection, item, noCache) => getWrappedItem(ctx, collection, item, noCache),
       layers: ctx.layers,
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
-      signals: ctx.signals,
     },
   } satisfies Cache & VueCachePrivate as any
 }
 
+/** Release every bridge-owned registry without invoking reset hooks. */
+function disposeCacheRuntime(ctx: CacheRuntime): void {
+  ctx.engine.dispose()
+  ctx.signals.dispose()
+  ctx.versions.dispose()
+  ctx.visibleListCache.clear()
+  ctx.wrappedItems.clear()
+  ctx.state.pageRefs.clear()
+  for (const key of Object.keys(ctx.state.queryMeta)) {
+    delete ctx.state.queryMeta[key]
+  }
+  for (const collectionName of Object.keys(ctx.layers)) {
+    ctx.layers[collectionName]!.value = []
+    delete ctx.layers[collectionName]
+  }
+}
+
 function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit, indexKey, indexValue }: Parameters<Cache['readItems']>[0]) {
   if (keys == null && indexKey != null) {
-    if (!ctx.signals.trackIndex(collection.name, indexKey, String(indexValue))) {
+    if (!ctx.signals.trackIndex(collection.name, indexKey, indexValue)) {
       ctx.versions.trackIndex(collection.name)
     }
   }
@@ -120,7 +129,7 @@ function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit,
     }
   }
 
-  if (marker && !ctx.engine.hasMarker(marker)) {
+  if (marker !== undefined && !ctx.engine.hasMarker(marker)) {
     return []
   }
 

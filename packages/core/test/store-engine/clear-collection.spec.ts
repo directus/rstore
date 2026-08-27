@@ -44,4 +44,32 @@ describe('store-engine: clearCollection', () => {
     engine.resume()
     expect(engine.resolveKeys({ collection })).toEqual([])
   })
+
+  it('evaluates collection keys after earlier queued writes', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+
+    engine.pause()
+    engine.writeItem({ collection, key: 1, item: { id: 1 } })
+    engine.clearCollection({ collection })
+
+    engine.resume()
+
+    expect(engine.resolveKeys({ collection })).toEqual([])
+  })
+
+  it('supports nested pauses without draining early', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+
+    engine.pause()
+    engine.pause()
+    engine.writeItem({ collection, key: 1, item: { id: 1 } })
+
+    engine.resume()
+    expect(engine.resolveKeys({ collection })).toEqual([])
+
+    engine.resume()
+    expect(engine.resolveKeys({ collection })).toEqual([1])
+  })
 })

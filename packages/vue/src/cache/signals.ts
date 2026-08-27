@@ -1,6 +1,9 @@
-import type { StoreEngine, Unsubscribe } from '@rstore/core'
-import type { EffectScope, ShallowRef } from 'vue'
+import type { StoreEngine } from '@rstore/core'
+import type { CacheIndexValue } from '@rstore/shared'
+import type { EffectScope } from 'vue'
+import type { Signal, SignalOwner } from './signalInternals'
 import { getCurrentInstance, getCurrentScope, getCurrentWatcher, onScopeDispose, onWatcherCleanup, shallowRef } from 'vue'
+import { getIndexSignalId } from './signalInternals'
 
 /** Reactive bridge between engine observers and Vue effects. */
 export interface SignalRegistry {
@@ -9,31 +12,18 @@ export interface SignalRegistry {
   /** Track one collection's visible-key signal. */
   trackList: (collection: string) => boolean
   /** Track one collection index bucket signal. */
-  trackIndex: (collection: string, indexKey: string, indexValue: string) => boolean
+  trackIndex: (collection: string, indexKey: string, indexValue: CacheIndexValue) => boolean
   /** Unsubscribe every registered signal. */
   dispose: () => void
   /** Count active signal subscriptions for diagnostics and tests. */
   size: () => { items: number, lists: number, indexes: number }
 }
 
-/** A Vue version ref plus its engine observer and lifetime owners. */
-interface Signal {
-  ref: ShallowRef<number>
-  stop: Unsubscribe
-  stopped: boolean
-  owners: Set<object>
-  remove: () => void
-}
-
-/** Signal owner selected from an active Vue scope or watcher. */
-interface Owner {
-  value: object
-  scope?: EffectScope
-}
-
 /** Options for creating a Vue signal registry. */
 export interface CreateSignalRegistryOptions {
+  /** Framework-agnostic observer source. */
   engine: StoreEngine
+  /** Server caches avoid creating Vue watcher subscriptions. */
   isServer: boolean
 }
 
@@ -49,20 +39,21 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
   const indexSignals = new Map<string, Map<string, Map<string, Signal>>>()
   const ownerSignals = new WeakMap<object, Set<Signal>>()
   const cleanupRegistered = new WeakSet<object>()
-  const watcherScopes = new WeakMap<object, EffectScope>()
-
+  let disposed = false
   /** Find the scope/watcher that owns a reactive cache read. */
-  function getOwner(): Owner | undefined {
+  function getOwner(): SignalOwner | undefined {
     const watcher = getCurrentWatcher() as object | undefined
+    if (watcher) {
+      // Watcher cleanup runs on dependency churn and individual stop. A
+      // surrounding scope would retain every historical dependency instead.
+      return { value: watcher }
+    }
     const instance = getCurrentInstance() as { scope?: EffectScope } | null
-    const scope = getCurrentScope() ?? instance?.scope ?? (watcher ? watcherScopes.get(watcher) : undefined)
+    const scope = getCurrentScope() ?? instance?.scope
     if (scope?.active) {
-      if (watcher) {
-        watcherScopes.set(watcher, scope)
-      }
       return { value: scope, scope }
     }
-    return watcher ? { value: watcher } : undefined
+    return undefined
   }
 
   /** Read a signal version so Vue records the current reactive dependency. */
@@ -97,7 +88,7 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
   }
 
   /** Register the matching Vue cleanup hook once for an owner. */
-  function registerCleanup(owner: Owner): void {
+  function registerCleanup(owner: SignalOwner): void {
     if (cleanupRegistered.has(owner.value)) {
       return
     }
@@ -118,7 +109,7 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
   }
 
   /** Retain one signal for its current owner. */
-  function retain(signal: Signal, owner: Owner): void {
+  function retain(signal: Signal, owner: SignalOwner): void {
     const owned = ownerSignals.get(owner.value) ?? new Set<Signal>()
     ownerSignals.set(owner.value, owned)
     if (owned.has(signal)) {
@@ -130,12 +121,15 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
   }
 
   /** Create a signal only when a live Vue owner is reading it. */
-  function ensureSignal(create: (remove: () => void) => Signal): Signal | undefined {
+  function ensureSignal(create: () => Signal): Signal | undefined {
+    if (disposed) {
+      return undefined
+    }
     const owner = getOwner()
     if (!owner) {
       return undefined
     }
-    const signal = create(() => {})
+    const signal = create()
     retain(signal, owner)
     track(signal)
     return signal
@@ -146,7 +140,7 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
     const id = String(key)
     const signal = itemSignals.get(collection)?.get(id)
     if (!signal) {
-      return Boolean(ensureSignal((remove) => {
+      return Boolean(ensureSignal(() => {
         const ref = shallowRef(0)
         const stop = engine.observeItem(collection, id, () => ref.value++)
         const created: Signal = {
@@ -162,7 +156,6 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
                 itemSignals.delete(collection)
               }
             }
-            remove()
           },
         }
         itemSignals.set(collection, itemSignals.get(collection) ?? new Map())
@@ -183,7 +176,7 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
   function trackList(collection: string): boolean {
     const signal = listSignals.get(collection)
     if (!signal) {
-      return Boolean(ensureSignal((remove) => {
+      return Boolean(ensureSignal(() => {
         const ref = shallowRef(0)
         const stop = engine.observeList(collection, () => ref.value++)
         const created: Signal = {
@@ -195,7 +188,6 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
             if (listSignals.get(collection) === created) {
               listSignals.delete(collection)
             }
-            remove()
           },
         }
         listSignals.set(collection, created)
@@ -212,10 +204,11 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
   }
 
   /** Track a relation/index bucket. */
-  function trackIndex(collection: string, indexKey: string, indexValue: string): boolean {
-    const signal = indexSignals.get(collection)?.get(indexKey)?.get(indexValue)
+  function trackIndex(collection: string, indexKey: string, indexValue: CacheIndexValue): boolean {
+    const valueId = getIndexSignalId(indexValue)
+    const signal = indexSignals.get(collection)?.get(indexKey)?.get(valueId)
     if (!signal) {
-      return Boolean(ensureSignal((remove) => {
+      return Boolean(ensureSignal(() => {
         const ref = shallowRef(0)
         const stop = engine.observeIndex(collection, indexKey, indexValue, () => ref.value++)
         const created: Signal = {
@@ -225,8 +218,8 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
           owners: new Set(),
           remove: () => {
             const byValue = indexSignals.get(collection)?.get(indexKey)
-            if (byValue?.get(indexValue) === created) {
-              byValue.delete(indexValue)
+            if (byValue?.get(valueId) === created) {
+              byValue.delete(valueId)
               if (byValue.size === 0) {
                 indexSignals.get(collection)!.delete(indexKey)
               }
@@ -234,14 +227,13 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
                 indexSignals.delete(collection)
               }
             }
-            remove()
           },
         }
         const byIndex = indexSignals.get(collection) ?? new Map<string, Map<string, Signal>>()
         indexSignals.set(collection, byIndex)
         const byValue = byIndex.get(indexKey) ?? new Map<string, Signal>()
         byIndex.set(indexKey, byValue)
-        byValue.set(indexValue, created)
+        byValue.set(valueId, created)
         return created
       }))
     }
@@ -256,6 +248,10 @@ export function createSignalRegistry({ engine, isServer }: CreateSignalRegistryO
 
   /** Stop all engine observers when the whole cache is disposed. */
   function dispose(): void {
+    if (disposed) {
+      return
+    }
+    disposed = true
     const signals = [
       ...Array.from(itemSignals.values()).flatMap(byKey => Array.from(byKey.values())),
       ...listSignals.values(),

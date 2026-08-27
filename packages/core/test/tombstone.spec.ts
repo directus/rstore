@@ -14,8 +14,12 @@ function hlc(physical: number, logical = 0, nodeId = 'n') {
 
 describe('tombstoneKey', () => {
   it('should include collection and key', () => {
-    expect(tombstoneKey('users', 42)).toBe('users:42')
-    expect(tombstoneKey('posts', 'abc')).toBe('posts:abc')
+    expect(tombstoneKey('users', 42)).toBe('["users","42"]')
+    expect(tombstoneKey('posts', 'abc')).toBe('["posts","abc"]')
+  })
+
+  it('should keep delimiter-containing tuples distinct', () => {
+    expect(tombstoneKey('a:b', 'c')).not.toBe(tombstoneKey('a', 'b:c'))
   })
 })
 

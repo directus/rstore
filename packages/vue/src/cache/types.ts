@@ -1,10 +1,10 @@
 import type { StoreEngine, TombstoneGcOptions } from '@rstore/core'
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
-import type { WrappedItemMetadata } from '../item'
 import type { VueStore } from '../store'
 import type { SignalRegistry } from './signals'
 import type { CacheVersionRegistry } from './versions'
+import type { WrappedItemRegistry } from './wrappedRegistry'
 
 /** Bridge-owned state surfaced to Vue internals. */
 export interface VueCacheState {
@@ -46,14 +46,8 @@ export interface CacheRuntime<
   versions: CacheVersionRegistry
   /** Devtools layer mirror by collection name. */
   layers: Record<string, Ref<CacheLayer[]>>
-  /** Devtools layer id to collection lookup. */
-  layerIdToCollectionName: Record<string, string>
-  /** Wrapped item proxies by wrap key. */
-  wrappedItems: Map<string, WrappedItem<Collection, TCollectionDefaults, TSchema>>
-  /** Wrapped item metadata by wrap key. */
-  wrappedItemsMetadata: Map<string, WrappedItemMetadata<Collection, TCollectionDefaults, TSchema>>
-  /** Wrap keys created for each layer. */
-  wrappedItemKeysPerLayer: Map<string, Set<string>>
+  /** Structured wrapped-item identities and metadata. */
+  wrappedItems: WrappedItemRegistry<TCollectionDefaults, TSchema>
   /** Stable visible-list wrappers reused until cache membership can change. */
   visibleListCache: Map<string, Array<WrappedItem<Collection, TCollectionDefaults, TSchema>>>
 }
@@ -63,10 +57,6 @@ export interface VueCachePrivate {
   _private: {
     /** Bridge-owned cache state. */
     state: VueCacheState
-    /** Wrapped item proxies by wrap key. */
-    wrappedItems: Map<string, WrappedItem<Collection, CollectionDefaults, StoreSchema>>
-    /** Wrapped item metadata by wrap key. */
-    wrappedItemsMetadata: Map<string, WrappedItemMetadata<Collection, CollectionDefaults, StoreSchema>>
     /** Return an existing wrapped item or create one for the raw item. */
     getWrappedItem: <TCollection extends Collection>(
       collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
@@ -77,7 +67,5 @@ export interface VueCachePrivate {
     layers: Record<string, Ref<CacheLayer[]>>
     /** Ensure a devtools layer mirror exists for a collection. */
     ensureLayersForCollection: (collectionName: string) => Ref<CacheLayer[]>
-    /** Signal registry used by diagnostics and leak tests. */
-    signals: SignalRegistry
   }
 }

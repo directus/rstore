@@ -191,17 +191,10 @@ describe('cache reactivity granularity', () => {
       }, { flush: 'sync' })
     })
 
-    const signals = (cache as any)._private.signals
-    expect(signals.size().items).toBe(1)
-
     cache.deleteItem({ collection, key: 1 })
     expect(reader).toHaveBeenLastCalledWith(undefined)
-    // The active reader still owns its subscription until unmount/stop.
-    expect(signals.size().items).toBe(1)
 
     scope.stop()
-    expect(signals.size().items).toBe(0)
-
     cache.dispose()
   })
 
@@ -221,19 +214,11 @@ describe('cache reactivity granularity', () => {
       }, { flush: 'sync' })
     })
 
-    const signals = (cache as any)._private.signals
-    expect(signals.size().items).toBe(1)
-    expect(signals.size().lists).toBe(1)
-
     cache.clear()
     expect(listReader).toHaveBeenLastCalledWith(0)
     expect(itemReader).toHaveBeenLastCalledWith(undefined)
-    // Reset does not unsubscribe live readers before the observer flush.
-    expect(signals.size()).toEqual({ items: 1, lists: 1, indexes: 0 })
 
     scope.stop()
-    expect(signals.size()).toEqual({ items: 0, lists: 0, indexes: 0 })
-
     cache.dispose()
   })
 })

@@ -1,6 +1,7 @@
 import type {
+  CacheIndexValue,
   CacheLayer,
-  Collection,
+  CacheStateInput,
   CollectionDefaults,
   CollectionRelation,
   CustomCacheState,
@@ -15,281 +16,229 @@ import type {
 import type { TombstoneStore } from '../tombstone.js'
 import type { ObserverChanges } from './observer-changes.js'
 
-/** Unsubscribe handle returned by the engine's `observe*` methods. */
+/** Unsubscribe handle returned by engine observer methods. */
 export type Unsubscribe = () => void
 
-/** A plain callback fired when an observed scope changes. */
+/** Callback fired when an observed cache scope changes. */
 export type ObserverCallback = () => void
 
-/** Stable internal identity for a string or numeric entity key. */
-export type KeyId = string
-
-/** Fine-grained observer registry exposed by the engine. */
-export interface ObserverRegistry {
-  /** Observe changes to a single item by key. */
-  observeItem: (collection: string, key: string | number, cb: ObserverCallback) => Unsubscribe
-  /** Observe changes to the visible key set of a collection. */
-  observeList: (collection: string, cb: ObserverCallback) => Unsubscribe
-  /** Observe changes to a single index bucket. */
-  observeIndex: (collection: string, indexKey: string, indexValue: string, cb: ObserverCallback) => Unsubscribe
-  /** Record an item value change for the next flush. */
-  touchItem: (collection: string, key: string | number) => void
-  /** Record a visible-key-set (or marker) change for the next flush. */
-  touchList: (collection: string) => void
-  /** Record an index bucket change for the next flush. */
-  touchIndex: (collection: string, indexKey: string, indexValue: string) => void
-  /** Invalidate every subscribed item, list and index scope for a collection. */
-  invalidateCollection: (collection: string) => void
-  /** Notify all observers matching the accumulated change set, then reset. */
-  flush: () => void
+/** Visibility and public-key metadata for one committed write. */
+export interface EngineWriteChange {
+  /** Canonical public key after the operation. */
+  key: string | number
+  /** Public key form before the operation, when one existed. */
+  previousKey?: string | number
+  /** Whether the item entered or left the visible collection view. */
+  visibilityChanged: boolean
+  /** Whether canonical numeric/string key representation changed. */
+  keyFormChanged: boolean
 }
 
 /** Payload passed to {@link EngineCallbacks.onAfterWrite}. */
 export interface EngineAfterWritePayload {
+  /** Collection targeted by the public write. */
   collection: ResolvedCollection<any, any, any>
+  /** Single-write key retained for hook compatibility. */
   key?: string | number
+  /** Hook result retained for hook compatibility. */
   result?: any
+  /** Optional query marker set by the write. */
   marker?: string
+  /** Applied operation kind. */
   operation: 'write' | 'delete'
+  /** Every item change committed by this payload. */
+  changes: readonly EngineWriteChange[]
 }
 
 /** Payload passed to {@link EngineCallbacks.onConflict}. */
 export interface EngineConflictPayload {
+  /** Collection containing the conflicted item. */
   collection: ResolvedCollection<any, any, any>
+  /** Canonical public item key. */
   key: string | number
+  /** Rejected or resolved field conflicts. */
   conflicts: FieldConflict[]
 }
 
-/** Callbacks injected by the embedding framework. */
+/** Reset scope applied before {@link EngineCallbacks.onReset}. */
+export interface EngineResetPayload {
+  /** Reset source operation. */
+  source: 'clear' | 'setState' | 'clearCollection'
+  /** Collection reset by `clearCollection`; omitted for whole-cache resets. */
+  collection?: ResolvedCollection<any, any, any>
+}
+
+/** Callbacks injected by an embedding framework. */
 export interface EngineCallbacks {
   /** Resolve a collection by name. */
   getCollection: (name: string) => ResolvedCollection<any, any, any> | undefined
-  /** Resolve the collection of a related child item among candidate names. */
+  /** Resolve a related child item among candidate collection names. */
   resolveChildCollection: (item: any, possibleNames: string[]) => ResolvedCollection<any, any, any> | null
-  /** Fired after a write or delete is applied (drives `afterCacheWrite`). */
+  /** Fired after a write or delete commits. */
   onAfterWrite?: (payload: EngineAfterWritePayload) => void
-  /** Fired when a CRDT field merge yields conflicts. */
+  /** Fired when a CRDT merge reports field conflicts. */
   onConflict?: (payload: EngineConflictPayload) => void
-  /** Fired after a layer is added. */
+  /** Fired after an optimistic layer commits. */
   onLayerAdd?: (layer: CacheLayer) => void
-  /** Fired after a layer is removed. */
+  /** Fired after an optimistic layer removal commits. */
   onLayerRemove?: (layer: CacheLayer) => void
-  /** Fired after the cache is reset (clear / setState). */
-  onReset?: () => void
-  /** Wrap a newly-created module state value for the embedding framework. */
+  /** Fired after a cache or collection reset commits. */
+  onReset?: (payload: EngineResetPayload) => void
+  /** Wrap newly created module state for the embedding framework. */
   wrapModuleState?: (value: any) => any
-  /** Internal bridge hook fired with batched observer invalidations. */
+  /** Bridge hook for batched observer invalidations. */
   onObserverFlush?: (changes: ObserverChanges) => void
 }
 
-/** Tombstone auto-GC configuration. `false` disables the background sweep. */
+/** Tombstone auto-GC configuration. `false` disables background sweeps. */
 export type TombstoneGcOptions = false | {
-  /** Sweep interval in ms. Defaults to 60_000. */
+  /** Sweep interval in milliseconds. */
   intervalMs?: number
-  /** Drop tombstones older than this many ms. Defaults to 86_400_000 (24h). */
+  /** Drop tombstones older than this duration in milliseconds. */
   ttlMs?: number
 }
 
 /** Options for {@link createStoreEngine}. */
 export interface EngineOptions {
+  /** Framework callbacks and collection resolvers. */
   callbacks: EngineCallbacks
-  /**
-   * Maximum number of writes applied synchronously per 10ms window. `0`
-   * disables staggering (writes apply immediately).
-   */
+  /** Maximum writes per 10ms window; zero disables staggering. */
   cacheStaggering?: number
   /** Tombstone auto-GC settings. */
   tombstoneGc?: TombstoneGcOptions
-  /** Whether the engine belongs to a server-side store (disables auto-GC). */
+  /** Server engines skip background GC timers. */
   isServer?: boolean
 }
 
-/**
- * Per-collection plain-JS storage. No reactivity — the bridge maps the
- * engine's observers onto its own signals.
- */
-export interface EngineCollectionState {
-  /** Canonical raw items keyed by {@link KeyId}. */
-  base: Map<KeyId, any>
-  /** Public key representation retained for each internal identity. */
-  keyValues: Map<KeyId, string | number>
-  /** indexKey (`field1:field2`) -> joined value -> set of {@link KeyId}s. */
-  indexes: Map<string, Map<string, Set<KeyId>>>
-  /** Ordered optimistic layers affecting this collection. */
-  layers: EngineLayer[]
-  /** Resolved layered values; `undefined` is a cached hidden/missing value. */
-  resolvedItems: Map<KeyId, any>
-  /** Lazily materialized visible key identities. */
-  visibleKeys: KeyId[] | undefined
-  /** Public keys cached beside `visibleKeys`; callers receive a copy. */
-  visibleKeyValues: Array<string | number> | undefined
-}
-
-/** Pre-normalized layer metadata used by the hot read path. */
-export interface EngineLayer {
-  /** Original public layer object, retained for callbacks and `$layer`. */
-  layer: CacheLayer
-  /** Layer patches keyed by {@link KeyId}. */
-  state: Map<KeyId, any>
-  /** Layer deletions keyed by {@link KeyId}. */
-  deletedItems: Set<KeyId>
-  /** Union of state and deleted keys. */
-  affectedKeys: Set<KeyId>
-  /** Public key form selected while normalizing this layer. */
-  keyValues: Map<KeyId, string | number>
-}
-
-/**
- * A queued cache operation. Operations are applied in FIFO order when the
- * cache is resumed or when the staggering budget allows.
- */
-export type QueuedOperation
-  = | { type: 'writeItem', params: WriteItemParams }
-    | { type: 'writeItems', params: WriteItemsParams, index: number }
-    | { type: 'deleteItem', params: DeleteItemParams }
-    | { type: 'addLayer', layer: CacheLayer }
-    | { type: 'removeLayer', layerId: string }
-    | { type: 'setState', state: CustomCacheState }
-    | { type: 'clear' }
-
+/** Parameters for one item write. */
 export interface WriteItemParams {
+  /** Target collection. */
   collection: ResolvedCollection<any, any, any>
+  /** Public item key. */
   key: string | number
+  /** Full or partial item data. */
   item: ResolvedCollectionItemBase<any, any, any>
+  /** Optional query marker. */
   marker?: string
+  /** Internal batch flag retained for bridge compatibility. */
   fromWriteItems?: boolean
+  /** Hook metadata. */
   meta?: CustomHookMeta
+  /** Optional CRDT field timestamps. */
   fieldTimestamps?: FieldTimestamps
 }
 
+/** Parameters for a batch item write. */
 export interface WriteItemsParams {
+  /** Target collection. */
   collection: ResolvedCollection<any, any, any>
+  /** Keyed items in commit order. */
   items: Array<{ key: string | number, value: ResolvedCollectionItemBase<any, any, any> }>
+  /** Optional marker set after the final item. */
   marker?: string
+  /** Hook metadata shared by the batch. */
   meta?: CustomHookMeta
 }
 
+/** Parameters for one item deletion. */
 export interface DeleteItemParams {
+  /** Target collection. */
   collection: ResolvedCollection<any, any, any>
+  /** Public item key. */
   key: string | number
+  /** Optional causal tombstone timestamp. */
   deletedAt?: FieldTimestampValue
 }
 
+/** Parameters for writing a related child item. */
 export interface WriteItemForRelationParams {
+  /** Collection owning the relation. */
   parentCollection: ResolvedCollection<any, any, any>
+  /** Parent relation property. */
   relationKey: string | number | symbol
+  /** Relation definition. */
   relation: CollectionRelation
+  /** Related item to write. */
   childItem: any
+  /** Hook metadata. */
   meta?: CustomHookMeta
 }
 
-/** Parameters for reading a list of candidate keys from the engine. */
+/** Parameters for resolving list candidate keys. */
 export interface ResolveKeysParams {
+  /** Collection being read. */
   collection: ResolvedCollection<any, any, any>
+  /** Optional marker gate. */
   marker?: string
+  /** Explicit keys, bypassing list/index resolution. */
   keys?: Array<string | number>
+  /** Optional index name. */
   indexKey?: string
-  indexValue?: string
+  /** Scalar single-field value or composite tuple. */
+  indexValue?: CacheIndexValue
 }
 
-/** Internal mutable engine context shared across the engine's focused modules. */
-export interface EngineContext {
-  collections: Map<string, EngineCollectionState>
-  markers: Record<string, boolean>
-  modules: Map<string, { value: any }>
-  fieldTimestamps: Map<string, Map<KeyId, FieldTimestamps>>
-  tombstones: TombstoneStore
-  queryMeta: Record<string, CustomHookMeta>
-  layerIdToCollection: Map<string, string>
-  paused: boolean
-  queue: QueuedOperation[]
-  queueHead: number
-  isFlushingQueue: boolean
-  callbacks: EngineCallbacks
-  observers: ObserverRegistry
-  /** Staggering controller. */
-  staggering: Staggering
-  /** Lazily get or create a collection's storage. */
-  ensureCollection: (name: string) => EngineCollectionState
-}
-
-/** Staggering controller for throttling writes per 10ms window. */
-export interface Staggering {
-  canProcess: () => boolean
-  consume: () => void
-  /** Re-run the flush callback after the budget resets. */
-  setFlush: (flush: () => void) => void
-  /** Whether staggering is active (budget > 0 configured). */
-  enabled: boolean
-  /** Cancel any pending budget-reset timer (called on engine dispose). */
-  dispose: () => void
-}
-
-/**
- * Public, framework-agnostic storage engine. Reads return raw plain objects
- * (with `$layer` attached for layered items), never framework proxies.
- */
+/** Framework-agnostic plain-JS storage engine. */
 export interface StoreEngine<
-  // Phantom type params: kept so the Vue bridge can carry schema typing on the
-  // engine handle, even though the engine's runtime surface is schema-agnostic.
   _TSchema extends StoreSchema = StoreSchema,
   _TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > {
-  /** Read the resolved (layer-merged) raw item for a key, or undefined. */
+  /** Read one resolved raw item. */
   readItemRaw: (params: { collection: ResolvedCollection<any, any, any>, key: string | number }) => any | undefined
-  /** Resolve the candidate key list for a list read (honors layers/index). */
+  /** Resolve visible, explicit, or indexed candidate keys. */
   resolveKeys: (params: ResolveKeysParams) => Array<string | number>
-  /** Read an index bucket's key set (after layer reconciliation). */
-  getIndexBucket: (collection: string, indexKey: string, indexValue: string) => ReadonlySet<string | number> | undefined
-  /** Whether a marker has been set. */
+  /** Read one reconciled index bucket. */
+  getIndexBucket: (collection: string, indexKey: string, indexValue: CacheIndexValue) => ReadonlySet<string | number> | undefined
+  /** Check whether a query marker exists. */
   hasMarker: (marker: string) => boolean
+  /** Queue one item write. */
   writeItem: (params: WriteItemParams) => void
+  /** Queue a batch item write. */
   writeItems: (params: WriteItemsParams) => void
+  /** Queue one item deletion. */
   deleteItem: (params: DeleteItemParams) => void
+  /** Queue one related item write. */
   writeItemForRelation: (params: WriteItemForRelationParams) => void
+  /** Read CRDT field timestamps. */
   readFieldTimestamps: (params: { collectionName: string, key: string | number }) => FieldTimestamps | undefined
+  /** Write CRDT field timestamps. */
   writeFieldTimestamps: (params: { collectionName: string, key: string | number, timestamps: FieldTimestamps }) => void
+  /** Get or create stable module state. */
   getModuleState: (name: string, key: string, initState: any) => any
+  /** Serialize version-1 base state. */
   getState: () => CustomCacheState
-  setState: (state: CustomCacheState) => void
+  /** Queue validated versioned or legacy state hydration. */
+  setState: (state: CacheStateInput) => void
+  /** Queue a whole-cache clear. */
   clear: () => void
+  /** Queue one collection clear. */
   clearCollection: (params: { collection: ResolvedCollection<any, any, any> }) => void
-  /** Immediately delete a key without queuing (used by GC). Returns true if removed. */
+  /** Immediately evict one unused base item. */
   garbageCollectKey: (collection: ResolvedCollection<any, any, any>, key: string | number) => boolean
-  /** Iterate the base keys of a collection (used by GC). */
-  forEachKey: (collection: string, cb: (key: string | number) => void) => void
+  /** Iterate current base keys. */
+  forEachKey: (collection: string, callback: (key: string | number) => void) => void
+  /** Queue an optimistic layer. */
   addLayer: (layer: CacheLayer) => void
+  /** Read one optimistic layer. */
   getLayer: (layerId: string) => CacheLayer | undefined
+  /** Queue one layer removal. */
   removeLayer: (layerId: string) => void
+  /** Read-only tombstone registry. */
   tombstones: TombstoneStore
+  /** Remove tombstones older than a cutoff. */
   gcTombstones: (olderThan: FieldTimestampValue) => Array<{ collection: string, key: string | number }>
+  /** Increment queue pause depth. */
   pause: () => void
+  /** Decrement pause depth and drain at zero. */
   resume: () => void
+  /** Stop timers and discard pending work. */
   dispose: () => void
-  observeItem: ObserverRegistry['observeItem']
-  observeList: ObserverRegistry['observeList']
-  observeIndex: ObserverRegistry['observeIndex']
-  /**
-   * Direct access to the layer index for devtools/debug.
-   * @internal
-   */
-  _getLayers: () => Map<string, CacheLayer[]>
-  /**
-   * Live access to the query meta record (persisted via SSR).
-   * @internal
-   */
-  _getQueryMeta: () => Record<string, CustomHookMeta>
-  _ctx: EngineContext
-}
-
-// Re-export for convenience so consumers import engine types from one place.
-export type {
-  CacheLayer,
-  Collection,
-  CollectionDefaults,
-  FieldConflict,
-  FieldTimestamps,
-  FieldTimestampValue,
-  ResolvedCollection,
-  StoreSchema,
+  /** Observe one item identity. */
+  observeItem: (collection: string, key: string | number, callback: ObserverCallback) => Unsubscribe
+  /** Observe one collection visible-key set. */
+  observeList: (collection: string, callback: ObserverCallback) => Unsubscribe
+  /** Observe one index lookup. */
+  observeIndex: (collection: string, indexKey: string, indexValue: CacheIndexValue, callback: ObserverCallback) => Unsubscribe
+  /** Access live query metadata for SSR and bridge state. */
+  getQueryMeta: () => Record<string, CustomHookMeta>
 }

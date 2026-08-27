@@ -208,9 +208,12 @@ export function normalizeCollectionRelations(collections: ResolvedCollection[]):
             const currentKey = on[key]!.replace(`${collection.name}.`, '')
             newOn[oppositeKey] = currentKey
           }
+          const indexFields = Object.keys(newOn).sort()
           newNormalizedRelation.to.push({
             collection: toCollectionName,
             on: newOn,
+            indexKey: indexFields.join(':'),
+            indexFields,
             filter: config.filter,
           })
         }
@@ -235,12 +238,12 @@ export function resolveCollectionOppositeRelations(collections: ResolvedCollecti
         const relation = otherCollection.normalizedRelations[relationKey]!
         for (const target of relation.to) {
           if (target.collection === collection.name) {
-            const fields = Object.keys(target.on as Record<string, string>).sort()
+            const fields = [...target.indexFields]
             collection.oppositeRelations[otherCollection.name] = {
               relation,
               fields,
             }
-            const indexField = fields.join(':')
+            const indexField = target.indexKey
             if (!indexes.has(indexField)) {
               indexes.set(indexField, fields)
             }
