@@ -148,7 +148,6 @@ describe('store-engine: data-core regressions', () => {
 
     expect(engine.resolveKeys({ collection })).toHaveLength(2_000)
     expect(events.afterWrite.map(event => event.key).slice(0, 3)).toEqual([1, 2, 3])
-    expect(engine._ctx.queue).toEqual([])
-    expect(engine._ctx.queueHead).toBe(0)
+    expect('_ctx' in engine).toBe(false)
   })
 })

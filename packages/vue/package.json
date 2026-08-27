@@ -37,7 +37,8 @@
     "build": "unbuild",
     "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",
     "prepack": "node ../../scripts/sync-dep-skills.mjs .",
-    "benchmark": "vitest bench --run benchmark/cache.bench.ts",
+    "benchmark": "vite-node benchmark/cache.bench.ts",
+    "benchmark:full": "vite-node benchmark/full.ts",
     "test:types": "tsrs --noEmit && pnpm run build && tsrs --noEmit -p test/tsconfig.plugin-global-store.json"
   },
   "peerDependencies": {
@@ -51,6 +52,7 @@
     "klona": "^2.0.6"
   },
   "devDependencies": {
+    "tinybench": "^2.9.0",
     "typescript": "catalog:",
     "unbuild": "catalog:",
     "vite-node": "catalog:",

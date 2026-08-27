@@ -11,6 +11,7 @@ import { createRelationPayloadField, getInitialRelationData } from './utils/rela
 /**
  * Create the proxy that tracks field writes and resolves relation reads.
  */
+/** Create form proxy handling relation-aware field access. */
 export function createFormProxy<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(ctx: FormObjectRuntime<TData, TSchema, TResult>) {
   return new Proxy(ctx.form, {
     set(_target, key, value) {
@@ -65,6 +66,7 @@ export function createFormProxy<TData extends Record<string, any>, TSchema exten
 /**
  * Install relation methods on the form object.
  */
+/** Install relation mutation helpers on one form runtime. */
 export function installRelationMethods<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(ctx: FormObjectRuntime<TData, TSchema, TResult>) {
   if (!ctx.options.collection)
     return
@@ -204,13 +206,12 @@ function resolveRelationFromCache<TData extends Record<string, any>, TSchema ext
     const targetCollection = store.$collections.find((m: any) => m.name === target.collection)
     if (!targetCollection)
       continue
-    const indexKeys = Object.keys(target.on).sort()
-    const indexValue = indexKeys.map((k: string) => ctx.form[leafFieldName(target.on[k]! as string)])
+    const indexValue = target.indexFields.map((key: string) => ctx.form[leafFieldName(target.on[key]! as string)])
     if (indexValue.every((v: any) => v != null)) {
       result.push(...store.$cache.readItems({
         collection: targetCollection as any,
-        indexKey: indexKeys.join(':'),
-        indexValue: indexValue.join(':'),
+        indexKey: target.indexKey,
+        indexValue: indexValue.length === 1 ? String(indexValue[0]) : indexValue,
         limit: many ? undefined : 1,
         filter: target.filter ? (item: any) => target.filter!(ctx.proxy, item) : undefined,
       }))

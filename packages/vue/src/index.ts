@@ -106,6 +106,9 @@ export {
 
 export type {
   CacheLayer,
+  CacheIndexValue,
+  CacheModuleSnapshot,
+  CacheStateInput,
   Collection,
   CollectionByName,
   CollectionDefaults,

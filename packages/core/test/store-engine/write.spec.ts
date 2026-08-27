@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildCollection, createTestEngine } from './helpers'
 
 describe('store-engine: write & read', () => {
@@ -75,6 +75,16 @@ describe('store-engine: write & read', () => {
     engine.writeItem({ collection, key: 1, item: { id: 1 } })
 
     expect(engine.resolveKeys({ collection, marker: 'never' })).toEqual([])
+  })
+
+  it('treats an empty marker as a defined identity', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+    engine.writeItem({ collection, key: 1, item: { id: 1 } })
+    expect(engine.resolveKeys({ collection, marker: '' })).toEqual([])
+
+    engine.writeItem({ collection, key: 1, item: { id: 1 }, marker: '' })
+    expect(engine.resolveKeys({ collection, marker: '' })).toEqual([1])
   })
 
   it('fires afterWrite on single write and delete', () => {
@@ -174,5 +184,48 @@ describe('store-engine: indexes', () => {
 
     expect(engine.resolveKeys({ collection, indexKey: 'venue', indexValue: 'paris:A' })).toEqual([])
     expect(engine.resolveKeys({ collection, indexKey: 'venue', indexValue: 'paris:B' })).toEqual([1])
+  })
+
+  it('keeps colliding composite tuples in distinct buckets', () => {
+    const collection = buildCollection('Event', {
+      indexes: new Map([['venue', ['city', 'room']]]),
+    })
+    const { engine } = createTestEngine([collection])
+    engine.writeItem({ collection, key: 1, item: { id: 1, city: 'a:b', room: 'c' } })
+    engine.writeItem({ collection, key: 2, item: { id: 2, city: 'a', room: 'b:c' } })
+
+    expect(engine.resolveKeys({ collection, indexKey: 'venue', indexValue: ['a:b', 'c'] })).toEqual([1])
+    expect(engine.resolveKeys({ collection, indexKey: 'venue', indexValue: ['a', 'b:c'] })).toEqual([2])
+    expect(() => engine.resolveKeys({ collection, indexKey: 'venue', indexValue: 'a:b:c' }))
+      .toThrow(/Ambiguous legacy composite index value/)
+  })
+
+  it('accepts an unambiguous legacy composite index value', () => {
+    const collection = buildCollection('Event', {
+      indexes: new Map([['venue', ['city', 'room']]]),
+    })
+    const { engine } = createTestEngine([collection])
+    engine.writeItem({ collection, key: 1, item: { id: 1, city: 'paris', room: 'A' } })
+
+    expect(engine.resolveKeys({ collection, indexKey: 'venue', indexValue: 'paris:A' })).toEqual([1])
+  })
+
+  it('invalidates only the exact composite tuple observer', () => {
+    const collection = buildCollection('Event', {
+      indexes: new Map([['venue', ['city', 'room']]]),
+    })
+    const { engine } = createTestEngine([collection])
+    const firstTuple = vi.fn()
+    const secondTuple = vi.fn()
+    engine.observeIndex('Event', 'venue', ['a:b', 'c'], firstTuple)
+    engine.observeIndex('Event', 'venue', ['a', 'b:c'], secondTuple)
+
+    engine.writeItem({ collection, key: 1, item: { id: 1, city: 'a:b', room: 'c' } })
+    expect(firstTuple).toHaveBeenCalledTimes(1)
+    expect(secondTuple).not.toHaveBeenCalled()
+
+    engine.writeItem({ collection, key: 2, item: { id: 2, city: 'a', room: 'b:c' } })
+    expect(firstTuple).toHaveBeenCalledTimes(1)
+    expect(secondTuple).toHaveBeenCalledTimes(1)
   })
 })

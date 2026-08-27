@@ -1,4 +1,4 @@
-import type { KeyId } from './types.js'
+import type { KeyId } from './internal-types.js'
 
 /** Batched invalidations emitted after one engine observer flush. */
 export interface ObserverChanges {
