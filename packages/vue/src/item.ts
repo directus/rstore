@@ -6,6 +6,7 @@ import type { VueStore } from './store'
 import { isKeyDefined } from '@rstore/core'
 import { cloneInfo } from '@rstore/shared'
 import { markRaw, toRaw } from 'vue'
+import { createItemRelationReader } from './itemRelations'
 
 /** Dependencies used to create one read-only live item proxy. */
 export interface WrapItemOptions<
@@ -50,6 +51,21 @@ export function wrapItem<
     return store[collection.name as keyof typeof store] as any
   }
 
+  const relatedCollections = new Map<string, ResolvedCollection<any, any, any>>()
+  const relationReaders = new Map<PropertyKey, (current: any) => any>()
+
+  /** Resolve and cache one relation target collection for this wrapper. */
+  function getRelatedCollection(name: string): ResolvedCollection<any, any, any> {
+    let targetCollection = relatedCollections.get(name)
+    if (!targetCollection) {
+      targetCollection = store.$collections.find(candidate => candidate.name === name)
+      if (!targetCollection)
+        throw new Error(`Collection "${name}" does not exist in the store`)
+      relatedCollections.set(name, targetCollection)
+    }
+    return targetCollection
+  }
+
   const cache = store.$cache as unknown as Cache & VueCachePrivate
 
   // Proxying a frozen item directly prevents `get` from returning later field
@@ -60,6 +76,7 @@ export function wrapItem<
 
   const proxy = new Proxy(target, {
     get: (_target, key) => {
+      const current = item.value
       switch (key) {
         case '$collection':
           return (collection.name) satisfies WrappedItemBase<TCollection, TCollectionDefaults, TSchema>['$collection']
@@ -109,16 +126,16 @@ export function wrapItem<
           }) satisfies WrappedItemBase<TCollection, TCollectionDefaults, TSchema>['$delete']
 
         case '$isOptimistic':
-          return item.value.$layer?.optimistic ?? false
+          return current.$layer?.optimistic ?? false
 
         case '$meta':
           return metadata
 
         case '$raw':
-          return () => toRaw(item.value)
+          return () => toRaw(current)
 
         case 'toJSON':
-          return () => item.value
+          return () => current
       }
 
       // Resolve computed properties
@@ -127,52 +144,23 @@ export function wrapItem<
       }
 
       // Resolve related items in the cache
-      if (!Object.isFrozen(item.value) && key in collection.normalizedRelations) {
-        if (Reflect.has(item.value, key)) {
+      if (!Object.isFrozen(current) && key in collection.normalizedRelations) {
+        if (Reflect.has(current, key)) {
           // @TODO resolve references
-          return Reflect.get(item.value, key)
+          return Reflect.get(current, key)
         }
         else {
           const relation = collection.normalizedRelations[key as string]!
-          const result: Array<any> = []
-          for (const target of relation.to) {
-            const targetCollection = store.$collections.find(m => m.name === target.collection)
-            if (!targetCollection) {
-              throw new Error(`Collection "${target.collection}" does not exist in the store`)
-            }
-            const indexValues = target.indexFields.map((k) => {
-              const currentKey = target.on[k]!
-              return Reflect.get(proxy, currentKey)
-            })
-            if (indexValues.every(v => v != null)) {
-              const cacheResultForTarget = cache.readItems({
-                collection: targetCollection,
-                indexKey: target.indexKey,
-                indexValue: indexValues.length === 1 ? String(indexValues[0]) : indexValues,
-                limit: relation.many ? undefined : 1,
-                filter: target.filter
-                  ? (item) => {
-                      return target.filter!(proxy, item)
-                    }
-                  : undefined,
-              })
-              result.push(...cacheResultForTarget)
-            }
+          let reader = relationReaders.get(key)
+          if (!reader) {
+            reader = createItemRelationReader({ cache, collection, proxy, relation, getCollection: getRelatedCollection })
+            relationReaders.set(key, reader)
           }
-
-          let finalResult
-          if (relation.many) {
-            finalResult = result
-          }
-          else {
-            finalResult = result[0]
-          }
-
-          return finalResult
+          return reader(current)
         }
       }
 
-      return Reflect.get(item.value, key)
+      return Reflect.get(current, key)
     },
 
     set: () => {

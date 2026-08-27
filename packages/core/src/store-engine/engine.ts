@@ -2,10 +2,11 @@ import type { FieldTimestampValue } from '@rstore/shared'
 import type { EngineContext } from './internal-types.js'
 import type { EngineOptions, StoreEngine } from './types.js'
 import { createTombstoneStore, gcTombstones as gcTombstonesStore, scheduleTombstoneGc } from '../tombstone.js'
+import { createEngineChangeSet, getIndexDependencyId as encodeIndexDependencyId, isChangeSetEmpty } from './change-set.js'
 import { createEngineContext } from './context.js'
 import { dispatchEffects, throwCollectedErrors } from './effects.js'
 import { getPublicKey } from './identity.js'
-import { getIndexBucket, getIndexObserverId } from './indexes.js'
+import { getIndexBucket, getIndexBucketIds, getIndexObserverId } from './indexes.js'
 import { getLayerNow } from './layers.js'
 import { getModuleState } from './modules.js'
 import { createObserverRegistry } from './observers.js'
@@ -27,7 +28,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     tombstoneGc = {},
     isServer = false,
   } = options
-  const observers = createObserverRegistry(changes => callbacks.onObserverFlush?.(changes))
+  const observers = createObserverRegistry()
   const staggering = createStaggering(cacheStaggering)
   const tombstones = createTombstoneStore()
   const ctx = createEngineContext({ callbacks, observers, staggering, tombstones })
@@ -52,8 +53,11 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
         return []
       }
       if (keys == null && indexKey != null) {
-        const bucket = getIndexBucket(ctx.collections.get(collection.name), collection, indexKey, indexValue)
-        return bucket ? Array.from(bucket) : []
+        const state = ctx.collections.get(collection.name)
+        const bucket = getIndexBucketIds(state, collection, indexKey, indexValue)
+        if (!state || !bucket)
+          return []
+        return Array.from(bucket, id => getPublicKey(state, id))
       }
       return keys ?? getVisibleKeys(ctx, collection.name)
     },
@@ -65,6 +69,18 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
         indexKey,
         indexValue,
       )
+    },
+
+    getIndexDependencyId(collectionName, indexKey, indexValue) {
+      const state = ctx.collections.get(collectionName)
+      const valueId = getIndexObserverId(
+        state,
+        callbacks.getCollection(collectionName),
+        indexKey,
+        indexValue,
+      )
+      return state?.indexes.get(indexKey)?.dependencyIds.get(valueId)
+        ?? encodeIndexDependencyId(collectionName, indexKey, valueId)
     },
 
     hasMarker(marker) {
@@ -118,9 +134,10 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     garbageCollectKey(collection, key) {
       // Field timestamps intentionally outlive cache eviction: GC is not a
       // causal delete, so a later refill still merges against local history.
-      const result = deleteItemFromBase(ctx, { collection, key })
+      const changes = createEngineChangeSet()
+      const result = deleteItemFromBase(ctx, changes, { collection, key })
       if (result.removed) {
-        dispatchImmediate(ctx, result.effects)
+        dispatchImmediate(ctx, changes, result.effects)
       }
       return result.removed
     },
@@ -201,19 +218,34 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
 }
 
 /** Dispatch immediate GC effects and observers with queue-equivalent errors. */
-function dispatchImmediate(ctx: EngineContext, effects: Parameters<typeof dispatchEffects>[1]): void {
+function dispatchImmediate(
+  ctx: EngineContext,
+  changes: ReturnType<typeof createEngineChangeSet>,
+  effects: Parameters<typeof dispatchEffects>[1],
+): void {
   const errors: unknown[] = []
+  if (!isChangeSetEmpty(changes)) {
+    try {
+      ctx.callbacks.onStateChange?.(changes)
+    }
+    catch (error) {
+      errors.push(error)
+    }
+  }
   try {
     dispatchEffects(ctx, effects)
   }
   catch (error) {
     errors.push(error)
   }
-  try {
-    ctx.observers.flush()
-  }
-  catch (error) {
-    errors.push(error)
+  if (!isChangeSetEmpty(changes)) {
+    try {
+      ctx.callbacks.onObserverFlush?.(changes)
+    }
+    catch (error) {
+      errors.push(error)
+    }
+    ctx.observers.dispatch(changes)
   }
   throwCollectedErrors(errors, 'Store engine callbacks failed')
 }
