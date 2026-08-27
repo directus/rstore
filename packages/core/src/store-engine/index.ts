@@ -1,4 +1,5 @@
 export { createStoreEngine } from './engine.js'
+export type { ObserverChanges } from './observer-changes.js'
 export { createObserverRegistry } from './observers.js'
 export {
   getIndexBucket,
@@ -11,7 +12,9 @@ export type {
   EngineCollectionState,
   EngineConflictPayload,
   EngineContext,
+  EngineLayer,
   EngineOptions,
+  KeyId,
   ObserverCallback,
   ObserverRegistry,
   StoreEngine,

@@ -1,6 +1,7 @@
 import type { CacheLayer, FieldTimestampValue } from '@rstore/shared'
 import type { EngineContext, EngineOptions, StoreEngine } from './types.js'
 import { createTombstoneStore, gcTombstones as gcTombstonesStore, scheduleTombstoneGc } from '../tombstone.js'
+import { getPublicKey } from './identity.js'
 import { getLayerNow } from './layers.js'
 import { createObserverRegistry } from './observers.js'
 import { createStaggering, enqueueOperation, flushQueuedOperations } from './queue.js'
@@ -22,7 +23,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     isServer = false,
   } = options
 
-  const observers = createObserverRegistry()
+  const observers = createObserverRegistry(changes => callbacks.onObserverFlush?.(changes))
   const staggering = createStaggering(cacheStaggering)
   const tombstones = createTombstoneStore()
 
@@ -36,6 +37,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     layerIdToCollection: new Map(),
     paused: false,
     queue: [],
+    queueHead: 0,
     isFlushingQueue: false,
     callbacks,
     observers,
@@ -47,7 +49,15 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
   ctx.ensureCollection = (name) => {
     let collectionState = ctx.collections.get(name)
     if (!collectionState) {
-      collectionState = { base: new Map(), indexes: new Map(), layers: [] }
+      collectionState = {
+        base: new Map(),
+        keyValues: new Map(),
+        indexes: new Map(),
+        layers: [],
+        resolvedItems: new Map(),
+        visibleKeys: undefined,
+        visibleKeyValues: undefined,
+      }
       ctx.collections.set(name, collectionState)
     }
     return collectionState
@@ -79,7 +89,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       }
       // Index lookups resolve to the bucket's key set.
       if (keys == null && indexKey != null) {
-        const bucket = getIndexBucket(ctx, collection.name, indexKey, indexValue ?? '')
+        const bucket = getIndexBucket(ctx, collection.name, indexKey, String(indexValue ?? ''))
         return bucket ? Array.from(bucket) : []
       }
       if (keys != null) {
@@ -89,7 +99,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     },
 
     getIndexBucket(collection, indexKey, indexValue) {
-      return getIndexBucket(ctx, collection, indexKey, indexValue)
+      return getIndexBucket(ctx, collection, indexKey, String(indexValue))
     },
 
     hasMarker(marker) {
@@ -138,7 +148,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       const cacheKey = `${name}:${key}`
       let mod = ctx.modules.get(cacheKey)
       if (!mod) {
-        mod = { value: initState }
+        mod = { value: callbacks.wrapModuleState?.(initState) ?? initState }
         ctx.modules.set(cacheKey, mod)
       }
       return mod.value
@@ -173,8 +183,8 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
         ctx.paused = true
         try {
           // Snapshot keys: each delete mutates `base` as the queue drains.
-          for (const key of Array.from(collectionState.base.keys())) {
-            enqueueOperation(ctx, { type: 'deleteItem', params: { collection, key } })
+          for (const id of Array.from(collectionState.base.keys())) {
+            enqueueOperation(ctx, { type: 'deleteItem', params: { collection, key: getPublicKey(collectionState, id) } })
           }
         }
         finally {
@@ -199,8 +209,8 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       if (!collectionState) {
         return
       }
-      for (const key of Array.from(collectionState.base.keys())) {
-        cb(key)
+      for (const id of Array.from(collectionState.base.keys())) {
+        cb(getPublicKey(collectionState, id))
       }
     },
 
@@ -245,7 +255,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     _getLayers() {
       const result = new Map<string, CacheLayer[]>()
       for (const [name, collectionState] of ctx.collections) {
-        result.set(name, collectionState.layers)
+        result.set(name, collectionState.layers.map(entry => entry.layer))
       }
       return result
     },
