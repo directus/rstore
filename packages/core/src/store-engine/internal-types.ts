@@ -28,8 +28,20 @@ export interface ObserverRegistry {
   observeList: (collection: string, callback: ObserverCallback) => Unsubscribe
   /** Observe one encoded index lookup id. */
   observeIndex: (collection: string, indexKey: string, indexValueId: IndexValueId, callback: ObserverCallback) => Unsubscribe
-  /** Add every subscribed scope for one reset collection to a journal. */
-  collectCollection: (changes: MutableEngineChangeSet, collection: string) => void
+  /** Return whether any direct subscription is active. */
+  hasAny: () => boolean
+  /** Return whether one exact item subscription is active. */
+  hasItem: (collection: string, key: KeyId) => boolean
+  /** Return whether one list subscription is active. */
+  hasList: (collection: string) => boolean
+  /** Return whether one exact index dependency is active. */
+  hasIndex: (dependency: string) => boolean
+  /** Return whether a collection owns any index subscription. */
+  hasIndexCollection: (collection: string) => boolean
+  /** Return directly observed item identities for a collection reset. */
+  itemKeys: (collection: string) => Iterable<KeyId>
+  /** Return directly observed index dependencies for a collection reset. */
+  indexDependencies: (collection: string) => Iterable<string>
   /** Dispatch one completed flush journal. */
   dispatch: (changes: MutableEngineChangeSet) => void
   /** Release observer maps and ignore future invalidations. */
@@ -205,6 +217,8 @@ export interface EngineContext {
   observers: ObserverRegistry
   /** Write staggering controller. */
   staggering: Staggering
+  /** Indexes whose retained empty buckets may need a bounded sweep. */
+  indexSweepCandidates: Set<EngineIndexState>
   /** Get or create collection storage. */
   ensureCollection: (name: string) => EngineCollectionState
 }

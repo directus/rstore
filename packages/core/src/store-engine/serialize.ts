@@ -1,7 +1,7 @@
 import type { CustomCacheState, ResolvedCollection } from '@rstore/shared'
-import type { MutableEngineChangeSet } from './change-set.js'
+import type { ChangeRecorder } from './change-recorder.js'
 import type { EngineCollectionState, EngineContext, EngineEffect, NormalizedCacheSnapshot } from './internal-types.js'
-import { invalidateObservedCollection, touchItem } from './change-set.js'
+import { recordCollectionReset } from './change-recorder.js'
 import { createCollectionState } from './context.js'
 import { getPublicKey, isEntityKey, registerBaseKey, restoreLayerKeyValues } from './identity.js'
 import { rebuildIndexes } from './indexes.js'
@@ -32,7 +32,7 @@ export function getState(ctx: EngineContext): CustomCacheState {
 }
 
 /** Hydrate a staged snapshot while preserving active layers and identities. */
-export function setStateNow(ctx: EngineContext, changes: MutableEngineChangeSet, snapshot: NormalizedCacheSnapshot): EngineEffect[] {
+export function setStateNow(ctx: EngineContext, changes: ChangeRecorder | undefined, snapshot: NormalizedCacheSnapshot): EngineEffect[] {
   // Every throwable collection key derivation, index rebuild, module kind
   // check, and new module wrapper runs before the live state swap.
   const collections = stageCollections(ctx, snapshot.collections)
@@ -47,7 +47,7 @@ export function setStateNow(ctx: EngineContext, changes: MutableEngineChangeSet,
 }
 
 /** Clear base state while retaining installed optimistic layers. */
-export function clearNow(ctx: EngineContext, changes: MutableEngineChangeSet): EngineEffect[] {
+export function clearNow(ctx: EngineContext, changes: ChangeRecorder | undefined): EngineEffect[] {
   const collections = stageCollections(ctx, new Map())
   const modules = prepareModuleClear(ctx)
   ctx.markers = createNullRecord<boolean>()
@@ -62,7 +62,7 @@ export function clearNow(ctx: EngineContext, changes: MutableEngineChangeSet): E
 /** Clear one collection at queue head and retain active layer projections. */
 export function clearCollectionNow(
   ctx: EngineContext,
-  changes: MutableEngineChangeSet,
+  changes: ChangeRecorder | undefined,
   collection: ResolvedCollection<any, any, any>,
 ): EngineEffect[] {
   const effects: EngineEffect[] = [{ type: 'reset', payload: { source: 'clearCollection', collection } }]
@@ -77,7 +77,8 @@ export function clearCollectionNow(
   }
   ctx.fieldTimestamps.delete(collection.name)
   clearCollectionTombstones(ctx, collection.name)
-  invalidateObservedCollection(ctx.observers, changes, collection.name)
+  const current = ctx.collections.get(collection.name)
+  recordCollectionReset(changes, collection.name, current ? getVisibleKeyIds(current) : [], current ? getVisibleKeyIds(current) : [])
   return effects
 }
 
@@ -129,24 +130,21 @@ function restoreCollection(
 }
 
 /** Swap staged collections and invalidate every old/new observed scope. */
-function commitCollections(ctx: EngineContext, changes: MutableEngineChangeSet, staged: Map<string, EngineCollectionState>): void {
+function commitCollections(ctx: EngineContext, changes: ChangeRecorder | undefined, staged: Map<string, EngineCollectionState>): void {
   const names = new Set([...ctx.collections.keys(), ...staged.keys()])
   for (const name of names) {
     const previous = ctx.collections.get(name)
     const next = staged.get(name)
-    if (previous) {
-      for (const id of getVisibleKeyIds(previous)) touchItem(changes, name, id)
-    }
-    if (next) {
-      for (const id of getVisibleKeyIds(next)) touchItem(changes, name, id)
-    }
+    recordCollectionReset(
+      changes,
+      name,
+      previous ? getVisibleKeyIds(previous) : [],
+      next ? getVisibleKeyIds(next) : [],
+    )
   }
   ctx.collections.clear()
   for (const [name, state] of staged) {
     ctx.collections.set(name, state)
-  }
-  for (const name of names) {
-    invalidateObservedCollection(ctx.observers, changes, name)
   }
 }
 

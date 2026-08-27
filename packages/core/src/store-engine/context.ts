@@ -55,6 +55,7 @@ export function createEngineContext(options: {
     callbacks: options.callbacks,
     observers: options.observers,
     staggering: options.staggering,
+    indexSweepCandidates: new Set(),
     ensureCollection,
   }
 }
