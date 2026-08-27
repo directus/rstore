@@ -47,7 +47,7 @@ export function getWrappedItem<
       queries: new Set(),
       dirtyQueries: new Set(),
     }
-    const cell = ctx.itemCells.create(collection.name, key, current)
+    const cell = ctx.itemCells.create(collection.name, key, current, track)
     const wrappedItem = wrapItem({
       store: ctx.getStore(),
       collection,

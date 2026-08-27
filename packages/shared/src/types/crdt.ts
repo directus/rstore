@@ -35,6 +35,10 @@ export interface MergeResult<T extends Record<string, any> = Record<string, any>
   mergedTimestamps: FieldTimestamps
   /** Fields where both local and remote had concurrent modifications */
   conflicts: FieldConflict[]
+  /** Whether winning field values changed observable item data. */
+  valueChanged: boolean
+  /** Whether merged field timestamps differ from local timestamps. */
+  timestampsChanged: boolean
 }
 
 /**

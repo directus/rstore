@@ -1,4 +1,5 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
+import { createStoreEngine } from '../../src'
 import { buildCollection, createTestEngine } from './helpers'
 
 describe('store-engine: CRDT field merge', () => {
@@ -10,6 +11,31 @@ describe('store-engine: CRDT field merge', () => {
     engine.writeItem({ collection, key: 1, item: { id: 1, name: 'Remote' }, fieldTimestamps: { name: 50 } })
 
     expect(engine.readItemRaw({ collection, key: 1 }).name).toBe('Local')
+  })
+
+  it('keeps resolved identity and skips item invalidation for a stale write', () => {
+    const collection = buildCollection('User')
+    const stateChange = vi.fn()
+    const afterWrite = vi.fn()
+    const engine = createStoreEngine({
+      isServer: true,
+      callbacks: {
+        getCollection: name => name === collection.name ? collection : undefined,
+        resolveChildCollection: () => null,
+        onStateChange: stateChange,
+        onAfterWrite: afterWrite,
+      },
+    })
+    engine.writeItem({ collection, key: 1, item: { id: 1, name: 'Local' }, fieldTimestamps: { name: 100 } })
+    const before = engine.readItemRaw({ collection, key: 1 })
+    stateChange.mockClear()
+    afterWrite.mockClear()
+
+    engine.writeItem({ collection, key: 1, item: { id: 1, name: 'Remote' }, fieldTimestamps: { name: 50 } })
+
+    expect(engine.readItemRaw({ collection, key: 1 })).toBe(before)
+    expect(stateChange).not.toHaveBeenCalled()
+    expect(afterWrite).toHaveBeenCalledTimes(1)
   })
 
   it('takes the incoming field when its timestamp is newer', () => {

@@ -1,34 +1,38 @@
-# `writeItems` publication benchmark
+# Data Core benchmarks
 
-From the repository root, after installing dependencies and building packages, run:
+Run from repository root after building Core:
 
-```sh
-pnpm --filter @rstore/vue benchmark:write-items
+```bash
+pnpm --filter @rstore/core build
+pnpm --filter @rstore/vue benchmark
+pnpm --filter @rstore/vue benchmark:write-decomposition
+pnpm --filter @rstore/vue benchmark:read-regressions
+pnpm --filter @rstore/vue benchmark:full
 ```
 
-The command exercises the real Vue cache runtime, the public collection `peekMany` query API, a
-Vue computed, and a synchronous watcher. It measures 100 and 1,000 deterministic flat items. Every
-warmup and measured sample creates an isolated store and cache. The two modes alternate execution
-order to reduce order bias.
+Every profile validates state and reactive rerun counters outside timed regions. Console tables are followed by structured JSON containing environment, stable scenario IDs, dimensions, normalized means, throughput, RME, samples, calibrated batch size, retries, counters, confidence interval, and verdict.
 
-The optimized mode calls the public `cache.writeItems` API. The control reproduces the flat,
-non-staggered `processQueuedWriteItems` path at the parent of the optimization commit
-(`3db362ce95fe5aed6c1e461f6f455ccf50354ad1`): it calls the real `writeItemNow` once per item with
-`fromWriteItems: true`, then emits the one outer `afterCacheWrite` hook. The current no-batch
-`writeItemNow` path retains the legacy per-item reactive publication semantics. This is an exact
-control for the benchmarked flat, non-staggered case; it does not claim to reproduce legacy
-staggering, nested-relation settlement, or error handling.
+Optional CPU profiles:
 
-The JSON output contains Git revision and benchmark-source and helper-source provenance, environment metadata, every
-measured iteration, and median, p95, and MAD summaries. It also reports structural evidence. For
-1,000 items, the control must expose 1,000
-visible query transitions while the optimized path must expose one. The lower-level synchronous
-watcher/query counts are also asserted (the legacy write triggers three recomputations per item:
-pre-write invalidation, reactive assignment, and post-write invalidation). Both modes must produce
-the same final cache and query digest and exactly one outer hook.
+```bash
+node --cpu-prof --cpu-prof-name=rstore-write.cpuprofile node_modules/vite-node/vite-node.mjs packages/vue/benchmark/write-decomposition.ts
+node --cpu-prof --cpu-prof-name=rstore-full.cpuprofile node_modules/vite-node/vite-node.mjs packages/vue/benchmark/full.ts
+```
 
-Timing values are descriptive, not pass/fail thresholds. The command fails only when final
-semantics, hook counts, or publication/recomputation counts differ. When reporting results, run the
-command from a clean worktree and fresh process, report the source and environment blocks plus the
-1,000-item medians with p95 and MAD. Raw per-iteration values in the same output are the provenance
-for the quoted summary; generated output is intentionally not checked in.
+Keep semantic validation enabled while profiling. Inspect `.cpuprofile` files in Chrome DevTools Performance panel. Production code contains no benchmark counters.
+
+After three same-machine full runs:
+
+```bash
+pnpm --filter @rstore/vue benchmark:combine-reports /tmp/v3-1.log /tmp/v3-2.log /tmp/v3-3.log
+```
+
+Pass three additional clean-v2 logs when current verification shows environment drift despite matching static fingerprint:
+
+```bash
+pnpm --filter @rstore/vue benchmark:combine-reports /tmp/v3-{1,2,3}.log /tmp/v2-{1,2,3}.log
+```
+
+Set `RSTORE_CPU_PROFILE=/path/to/profile.cpuprofile` to embed focused CPU evidence in generated report.
+
+Combiner rejects wrong run counts, row-count drift, and Node-version mismatch before replacing four-version Markdown/JSON artifacts.

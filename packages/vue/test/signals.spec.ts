@@ -1,6 +1,7 @@
 import type { EngineChangeSet } from '@rstore/core'
 import { describe, expect, it, vi } from 'vitest'
 import { effectScope, ref, watchEffect } from 'vue'
+import { createCacheChangeInterestRegistry } from '../src/cache/changeInterest'
 import { createSignalRegistry } from '../src/cache/signals'
 
 /** Build one exact immutable change-set payload. */
@@ -13,9 +14,14 @@ function changes(options: Partial<EngineChangeSet> = {}): EngineChangeSet {
   }
 }
 
+/** Create one client signal registry with selective Core interests. */
+function createRegistry() {
+  return createSignalRegistry({ isServer: false, interest: createCacheChangeInterestRegistry() })
+}
+
 describe('signal registry', () => {
   it('does not retain an unowned non-reactive read', () => {
-    const registry = createSignalRegistry({ isServer: false })
+    const registry = createRegistry()
 
     registry.trackList('User')
 
@@ -23,7 +29,7 @@ describe('signal registry', () => {
   })
 
   it('retains one list signal until every owning scope stops', () => {
-    const registry = createSignalRegistry({ isServer: false })
+    const registry = createRegistry()
     const first = effectScope()
     const second = effectScope()
     first.run(() => watchEffect(() => registry.trackList('User'), { flush: 'sync' }))
@@ -37,8 +43,8 @@ describe('signal registry', () => {
   })
 
   it('uses watcher cleanup when no enclosing scope exists', () => {
-    const registry = createSignalRegistry({ isServer: false })
-    const stop = watchEffect(() => registry.trackIndex('dependency'), { flush: 'sync' })
+    const registry = createRegistry()
+    const stop = watchEffect(() => registry.trackIndex('User', 'dependency'), { flush: 'sync' })
 
     expect(registry.size().indexes).toBe(1)
     stop()
@@ -46,12 +52,12 @@ describe('signal registry', () => {
   })
 
   it('releases stale index dependencies while scope stays active', () => {
-    const registry = createSignalRegistry({ isServer: false })
+    const registry = createRegistry()
     const dependency = ref('first')
     const scope = effectScope()
     let stopWatcher!: () => void
     scope.run(() => {
-      stopWatcher = watchEffect(() => registry.trackIndex(dependency.value), { flush: 'sync' })
+      stopWatcher = watchEffect(() => registry.trackIndex('User', dependency.value), { flush: 'sync' })
     })
 
     expect(registry.size().indexes).toBe(1)
@@ -64,7 +70,7 @@ describe('signal registry', () => {
   })
 
   it('routes exact list and index changes without engine subscriptions', () => {
-    const registry = createSignalRegistry({ isServer: false })
+    const registry = createRegistry()
     const listReader = vi.fn()
     const indexReader = vi.fn()
     const scope = effectScope()
@@ -74,7 +80,7 @@ describe('signal registry', () => {
         listReader()
       }, { flush: 'sync' })
       watchEffect(() => {
-        registry.trackIndex('wanted')
+        registry.trackIndex('User', 'wanted')
         indexReader()
       }, { flush: 'sync' })
     })
@@ -90,7 +96,7 @@ describe('signal registry', () => {
   })
 
   it('resets sync watchers once even when they replace owned signals', () => {
-    const registry = createSignalRegistry({ isServer: false })
+    const registry = createRegistry()
     const reader = vi.fn()
     const scope = effectScope()
     scope.run(() => watchEffect(() => {
@@ -106,11 +112,11 @@ describe('signal registry', () => {
   })
 
   it('disposes every remaining signal', () => {
-    const registry = createSignalRegistry({ isServer: false })
+    const registry = createRegistry()
     const scope = effectScope()
     scope.run(() => {
       watchEffect(() => registry.trackList('User'), { flush: 'sync' })
-      watchEffect(() => registry.trackIndex('dependency'), { flush: 'sync' })
+      watchEffect(() => registry.trackIndex('User', 'dependency'), { flush: 'sync' })
     })
 
     registry.dispose()
@@ -124,7 +130,7 @@ describe('signal registry', () => {
   })
 
   it('does no work on server', () => {
-    const registry = createSignalRegistry({ isServer: true })
+    const registry = createSignalRegistry({ isServer: true, interest: createCacheChangeInterestRegistry() })
     const scope = effectScope()
     scope.run(() => watchEffect(() => registry.trackList('User'), { flush: 'sync' }))
 

@@ -14,6 +14,20 @@ export function compositeWriteWithoutWatcher(implementation: CacheImplementation
 
 /** Build composite writes with one direct exact-index reader. */
 export function compositeWriteWithDirectWatcher(implementation: CacheImplementation, options: ScenarioOptions): Scenario {
+  return compositeWriteWithIndexWatcher(implementation, options, [TARGET_CITY, TARGET_ROOM])
+}
+
+/** Build composite writes with one backward-compatible joined-string reader. */
+export function compositeWriteWithLegacyWatcher(implementation: CacheImplementation, options: ScenarioOptions): Scenario {
+  return compositeWriteWithIndexWatcher(implementation, options, `${TARGET_CITY}:${TARGET_ROOM}`)
+}
+
+/** Build composite writes with one selected exact or legacy index reader. */
+function compositeWriteWithIndexWatcher(
+  implementation: CacheImplementation,
+  options: ScenarioOptions,
+  indexValue: string | string[],
+): Scenario {
   const runtime = createCompositeRuntime(implementation, options)
   const event = runtime.collections.find(collection => collection.name === 'Event')!
   const scope = effectScope()
@@ -21,7 +35,7 @@ export function compositeWriteWithDirectWatcher(implementation: CacheImplementat
     void runtime.cache.readItems({
       collection: event,
       indexKey: 'city:room',
-      indexValue: [TARGET_CITY, TARGET_ROOM],
+      indexValue,
     }).length
     runtime.counts.relation++
   }, { flush: 'sync' }))

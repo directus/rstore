@@ -1,7 +1,7 @@
 import type { CacheLayer, ResolvedCollection } from '@rstore/shared'
-import type { MutableEngineChangeSet } from './change-set.js'
+import type { ChangeRecorder } from './change-recorder.js'
 import type { EngineCollectionState, EngineContext, EngineEffect, EngineLayer, KeyId } from './internal-types.js'
-import { touchItem, touchList } from './change-set.js'
+import { recordItem, recordList } from './change-recorder.js'
 import { isEntityKey, refreshPublicKey, releaseUnusedKey, toKeyId } from './identity.js'
 import { reconcileItemIndexes } from './indexes.js'
 import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
@@ -70,7 +70,7 @@ function captureResolved(state: EngineCollectionState, keys: Set<KeyId>): Map<Ke
 /** Reconcile indexes and reactive scopes after a layer transition. */
 function reconcileLayerChange(
   ctx: EngineContext,
-  changes: MutableEngineChangeSet,
+  changes: ChangeRecorder | undefined,
   collection: ResolvedCollection<any, any, any>,
   state: EngineCollectionState,
   keys: Set<KeyId>,
@@ -84,19 +84,19 @@ function reconcileLayerChange(
     const before = previous.get(id)
     if (before !== next) {
       reconcileItemIndexes(ctx, changes, collection, id, next)
-      touchItem(changes, collection.name, id)
+      recordItem(changes, collection.name, id)
     }
     visibilityChanged ||= (before !== undefined) !== (next !== undefined)
       || (keyFormsChanged.has(id) && (before !== undefined || next !== undefined))
   }
   if (visibilityChanged) {
     invalidateVisibleKeys(state)
-    touchList(changes, collection.name)
+    recordList(changes, collection.name)
   }
 }
 
 /** Add an optimistic layer and update only its effective records. */
-export function addLayerNow(ctx: EngineContext, changes: MutableEngineChangeSet, layer: CacheLayer): EngineEffect[] {
+export function addLayerNow(ctx: EngineContext, changes: ChangeRecorder | undefined, layer: CacheLayer): EngineEffect[] {
   const collection = ctx.callbacks.getCollection(layer.collectionName)
   if (!collection) {
     throw new Error(`Collection not found for layer: ${layer.collectionName}`)
@@ -122,7 +122,7 @@ export function addLayerNow(ctx: EngineContext, changes: MutableEngineChangeSet,
 }
 
 /** Remove an optimistic layer and restore its underlying effective records. */
-export function removeLayerNow(ctx: EngineContext, changes: MutableEngineChangeSet, layerId: string): EngineEffect[] {
+export function removeLayerNow(ctx: EngineContext, changes: ChangeRecorder | undefined, layerId: string): EngineEffect[] {
   const collectionName = ctx.layerIdToCollection.get(layerId)
   const state = collectionName === undefined ? undefined : ctx.collections.get(collectionName)
   const entry = state?.layers.find(candidate => candidate.layer.id === layerId)

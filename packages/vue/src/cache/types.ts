@@ -2,6 +2,7 @@ import type { StoreEngine, TombstoneGcOptions } from '@rstore/core'
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { VueStore } from '../store'
+import type { CacheChangeInterestRegistry } from './changeInterest'
 import type { ItemCellRegistry } from './itemCells'
 import type { SignalRegistry } from './signals'
 import type { CacheVersionRegistry } from './versions'
@@ -39,6 +40,8 @@ export interface CacheRuntime<
   getStore: () => VueStore<TSchema, TCollectionDefaults>
   /** Framework-agnostic engine that owns storage and write semantics. */
   engine: StoreEngine<TSchema, TCollectionDefaults>
+  /** Active dependencies exposed to Core's selective journal. */
+  changeInterest: CacheChangeInterestRegistry
   /** Bridge-owned state used by Vue query helpers. */
   state: VueCacheState
   /** Vue signal registry subscribed to engine observers. */

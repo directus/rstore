@@ -3,6 +3,7 @@ import type { CacheLayer, CollectionDefaults, ResolvedCollection, ResolvedCollec
 import type { CacheRuntime, CreateCacheOptions } from './types'
 import { createStoreEngine, isKeyDefined } from '@rstore/core'
 import { reactive, shallowRef } from 'vue'
+import { createCacheChangeInterestRegistry } from './changeInterest'
 import { createItemCellRegistry } from './itemCells'
 import { clearAllQueryState, clearQueryStateForCollection } from './queryState'
 import { createSignalRegistry } from './signals'
@@ -22,11 +23,13 @@ export function createCacheRuntime<
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): CacheRuntime<TSchema, TCollectionDefaults> {
   let runtime: CacheRuntime<TSchema, TCollectionDefaults>
   const pageRefs = new Map<string, any>()
+  const changeInterest = createCacheChangeInterestRegistry()
 
   const callbacks: EngineCallbacks = {
     getCollection: name => getStore().$collections.find(collection => collection.name === name),
     resolveChildCollection: (item, possibleNames) => getStore().$getCollection(item, possibleNames),
     wrapModuleState: value => value && typeof value === 'object' ? reactive(value) : value,
+    getStateChangeInterest: () => changeInterest.value,
     onStateChange: changes => synchronizeBridge(runtime, changes),
     onAfterWrite: payload => handleAfterWrite(runtime, payload),
     onConflict: payload => handleConflict(getStore, payload),
@@ -36,23 +39,29 @@ export function createCacheRuntime<
   }
 
   const engine = createStoreEngine({ callbacks, cacheStaggering, tombstoneGc, isServer })
-  const versions = createCacheVersionRegistry()
+  const versions = createCacheVersionRegistry(changeInterest)
+  const signals = createSignalRegistry({ isServer, interest: changeInterest })
   runtime = {
     getStore,
     engine,
+    changeInterest,
     state: {
       pageRefs,
       get queryMeta() {
         return engine.getQueryMeta()
       },
     },
-    signals: createSignalRegistry({ isServer }),
+    signals,
     itemCells: createItemCellRegistry({
       read: (collectionName, key) => {
         const collection = getStore().$collections.find(candidate => candidate.name === collectionName)
         return collection ? engine.readItemRaw({ collection, key }) : undefined
       },
-      trackFallback: collectionName => versions.trackItem(collectionName),
+      trackFallback: (collectionName, key) => {
+        if (!signals.trackItem(collectionName, key))
+          versions.trackItem(collectionName)
+      },
+      interest: changeInterest,
     }),
     versions,
     layers: Object.create(null) as CacheRuntime<TSchema, TCollectionDefaults>['layers'],
@@ -65,17 +74,28 @@ export function createCacheRuntime<
 /** Synchronize every bridge registry even when one reactive effect fails. */
 function synchronizeBridge(ctx: CacheRuntime, changes: Parameters<NonNullable<EngineCallbacks['onStateChange']>>[0]): void {
   let errors: unknown[] | undefined
-  // Existing cells do not track fallback versions. Flushing broad fallbacks
-  // first prevents a cell detached by this operation from rerunning twice.
-  for (const flush of [ctx.versions.flush, ctx.itemCells.flush, ctx.signals.flush]) {
-    try {
-      flush(changes)
-    }
-    catch (error) {
-      errors = appendSyncError(errors, error)
-    }
-  }
+  // Flush existing missing/list/index dependencies before item deletion can
+  // install a new missing-item dependency during its synchronous cell rerun.
+  errors = runBridgeSink(ctx.versions.flush, changes, errors)
+  errors = runBridgeSink(ctx.signals.flush, changes, errors)
+  if (changes.items.size)
+    errors = runBridgeSink(ctx.itemCells.flush, changes, errors)
   throwSyncErrors(errors, 'Vue cache synchronization failed')
+}
+
+/** Run one relevant bridge sink without starving later sinks after failure. */
+function runBridgeSink(
+  flush: CacheRuntime['signals']['flush'],
+  changes: Parameters<CacheRuntime['signals']['flush']>[0],
+  errors: unknown[] | undefined,
+): unknown[] | undefined {
+  try {
+    flush(changes)
+  }
+  catch (error) {
+    return appendSyncError(errors, error)
+  }
+  return errors
 }
 
 /** Apply bridge write invalidation before calling user hooks. */
