@@ -1,9 +1,10 @@
 import type { EngineAfterWritePayload, EngineCallbacks, EngineConflictPayload } from '@rstore/core'
 import type { CacheLayer, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
 import type { CacheRuntime, CreateCacheOptions } from './types'
-import { createStoreEngine, isKeyDefined } from '@rstore/core'
-import { shallowRef } from 'vue'
+import { createStoreEngine, isKeyDefined, resolveItem } from '@rstore/core'
+import { reactive, shallowRef } from 'vue'
 import { createSignalRegistry } from './signals'
+import { createCacheVersionRegistry } from './versions'
 
 /** Create the mutable runtime shared by all cache modules. */
 export function createCacheRuntime<
@@ -24,7 +25,12 @@ export function createCacheRuntime<
 
     resolveChildCollection: (item, possibleNames) => getStore().$getCollection(item, possibleNames),
 
+    wrapModuleState: value => value && typeof value === 'object' ? reactive(value) : value,
+
+    onObserverFlush: changes => runtime.versions.flush(changes),
+
     onAfterWrite: (payload: EngineAfterWritePayload) => {
+      runtime.visibleListCache.delete(payload.collection.name)
       if (payload.operation === 'delete' && payload.key != null) {
         evictBaseWrappedItem(runtime, payload.collection, payload.key)
       }
@@ -52,6 +58,7 @@ export function createCacheRuntime<
     },
 
     onLayerAdd: (layer) => {
+      runtime.visibleListCache.delete(layer.collectionName)
       const ref = ensureLayersForCollection(runtime, layer.collectionName)
       ref.value = [...ref.value.filter(l => l.id !== layer.id), layer]
       runtime.layerIdToCollectionName[layer.id] = layer.collectionName
@@ -60,6 +67,7 @@ export function createCacheRuntime<
     },
 
     onLayerRemove: (layer) => {
+      runtime.visibleListCache.delete(layer.collectionName)
       const ref = runtime.layers[layer.collectionName]
       if (ref) {
         ref.value = ref.value.filter(l => l.id !== layer.id)
@@ -71,10 +79,11 @@ export function createCacheRuntime<
     },
 
     onReset: () => {
+      runtime.visibleListCache.clear()
       runtime.wrappedItems.clear()
       runtime.wrappedItemsMetadata.clear()
       runtime.wrappedItemKeysPerLayer.clear()
-      runtime.signals.dispose()
+      runtime.versions.reset()
       const store = getStore()
       store.$hooks.callHookSync('afterCacheReset', { store, meta: {} })
     },
@@ -97,11 +106,13 @@ export function createCacheRuntime<
       },
     },
     signals: createSignalRegistry({ engine, isServer }),
+    versions: createCacheVersionRegistry(),
     layers: {},
     layerIdToCollectionName: {},
     wrappedItems: new Map(),
     wrappedItemsMetadata: new Map(),
     wrappedItemKeysPerLayer: new Map(),
+    visibleListCache: new Map(),
   }
 
   return runtime
@@ -109,7 +120,8 @@ export function createCacheRuntime<
 
 /** Build the cache key for a wrapped item proxy. */
 export function getItemWrapKey(collection: ResolvedCollection<any, any, any>, key: string | number, layer: { id: string } | undefined) {
-  return [layer?.id, collection.name, key].filter(Boolean).join(':')
+  const itemKey = String(key)
+  return layer ? `${layer.id}:${collection.name}:${itemKey}` : `${collection.name}:${itemKey}`
 }
 
 /** Resolve an item primary key or throw a cache-friendly error. */
@@ -119,6 +131,15 @@ export function getItemKey(collection: ResolvedCollection<any, any, any>, item: 
     throw new Error(`Item does not have a key for collection ${collection.name}: ${item}`)
   }
   return key
+}
+
+/** Read one resolved engine value without allocating a public API parameter. */
+export function readRawCacheItem(
+  ctx: CacheRuntime,
+  collection: ResolvedCollection<any, any, any>,
+  key: string | number,
+): any | undefined {
+  return resolveItem(ctx.engine._ctx, collection.name, key)
 }
 
 /** Track a wrapped item key so layer removal can evict its proxy. */
@@ -144,7 +165,6 @@ export function evictBaseWrappedItem(ctx: CacheRuntime, collection: ResolvedColl
   const wrapKey = getItemWrapKey(collection, key, undefined)
   ctx.wrappedItems.delete(wrapKey)
   ctx.wrappedItemsMetadata.delete(wrapKey)
-  ctx.signals.dropItem(collection.name, key)
 }
 
 function clearLayerWrappedItems(ctx: CacheRuntime, layerId: string) {

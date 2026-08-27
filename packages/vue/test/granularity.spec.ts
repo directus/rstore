@@ -177,44 +177,47 @@ describe('cache reactivity granularity', () => {
     cache.dispose()
   })
 
-  it('frees an item signal + its engine subscription when the item is deleted', async () => {
+  it('keeps an active item signal through deletion, then frees it with its scope', async () => {
     const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
     const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: { id: 1, label: 'a' } })
 
     const scope = effectScope()
+    const reader = vi.fn()
     scope.run(() => {
       watchEffect(() => {
-        void (cache.readItem({ collection, key: 1 }) as any)?.label
+        reader((cache.readItem({ collection, key: 1 }) as any)?.label)
       }, { flush: 'sync' })
     })
 
     const signals = (cache as any)._private.signals
     expect(signals.size().items).toBe(1)
 
-    // The signal outlives the effect: nothing reclaims it implicitly.
-    scope.stop()
+    cache.deleteItem({ collection, key: 1 })
+    expect(reader).toHaveBeenLastCalledWith(undefined)
+    // The active reader still owns its subscription until unmount/stop.
     expect(signals.size().items).toBe(1)
 
-    // Deleting the item drops its signal (and unsubscribes the engine observer).
-    cache.deleteItem({ collection, key: 1 })
+    scope.stop()
     expect(signals.size().items).toBe(0)
 
     cache.dispose()
   })
 
-  it('disposes every signal on cache reset (clear)', async () => {
+  it('keeps active reset signals and invalidates their readers', async () => {
     const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
     const cache = store.$cache
     const collection = store.$collections[0]!
     cache.writeItem({ collection, key: 1, item: { id: 1, label: 'a' }, marker: 'all' })
 
     const scope = effectScope()
+    const listReader = vi.fn()
+    const itemReader = vi.fn()
     scope.run(() => {
       watchEffect(() => {
-        void cache.readItems({ collection, marker: 'all' }).length
-        void (cache.readItem({ collection, key: 1 }) as any)?.label
+        listReader(cache.readItems({ collection, marker: 'all' }).length)
+        itemReader((cache.readItem({ collection, key: 1 }) as any)?.label)
       }, { flush: 'sync' })
     })
 
@@ -222,9 +225,13 @@ describe('cache reactivity granularity', () => {
     expect(signals.size().items).toBe(1)
     expect(signals.size().lists).toBe(1)
 
-    scope.stop()
     cache.clear()
-    // onReset disposed every signal + its engine subscription.
+    expect(listReader).toHaveBeenLastCalledWith(0)
+    expect(itemReader).toHaveBeenLastCalledWith(undefined)
+    // Reset does not unsubscribe live readers before the observer flush.
+    expect(signals.size()).toEqual({ items: 1, lists: 1, indexes: 0 })
+
+    scope.stop()
     expect(signals.size()).toEqual({ items: 0, lists: 0, indexes: 0 })
 
     cache.dispose()

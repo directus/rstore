@@ -13,12 +13,16 @@ import type {
   StoreSchema,
 } from '@rstore/shared'
 import type { TombstoneStore } from '../tombstone.js'
+import type { ObserverChanges } from './observer-changes.js'
 
 /** Unsubscribe handle returned by the engine's `observe*` methods. */
 export type Unsubscribe = () => void
 
 /** A plain callback fired when an observed scope changes. */
 export type ObserverCallback = () => void
+
+/** Stable internal identity for a string or numeric entity key. */
+export type KeyId = string
 
 /** Fine-grained observer registry exposed by the engine. */
 export interface ObserverRegistry {
@@ -34,6 +38,8 @@ export interface ObserverRegistry {
   touchList: (collection: string) => void
   /** Record an index bucket change for the next flush. */
   touchIndex: (collection: string, indexKey: string, indexValue: string) => void
+  /** Invalidate every subscribed item, list and index scope for a collection. */
+  invalidateCollection: (collection: string) => void
   /** Notify all observers matching the accumulated change set, then reset. */
   flush: () => void
 }
@@ -70,6 +76,10 @@ export interface EngineCallbacks {
   onLayerRemove?: (layer: CacheLayer) => void
   /** Fired after the cache is reset (clear / setState). */
   onReset?: () => void
+  /** Wrap a newly-created module state value for the embedding framework. */
+  wrapModuleState?: (value: any) => any
+  /** Internal bridge hook fired with batched observer invalidations. */
+  onObserverFlush?: (changes: ObserverChanges) => void
 }
 
 /** Tombstone auto-GC configuration. `false` disables the background sweep. */
@@ -99,12 +109,34 @@ export interface EngineOptions {
  * engine's observers onto its own signals.
  */
 export interface EngineCollectionState {
-  /** Canonical raw items keyed by primary key. */
-  base: Map<string | number, any>
-  /** indexKey (`field1:field2`) -> joined value -> set of item keys. */
-  indexes: Map<string, Map<string, Set<string | number>>>
+  /** Canonical raw items keyed by {@link KeyId}. */
+  base: Map<KeyId, any>
+  /** Public key representation retained for each internal identity. */
+  keyValues: Map<KeyId, string | number>
+  /** indexKey (`field1:field2`) -> joined value -> set of {@link KeyId}s. */
+  indexes: Map<string, Map<string, Set<KeyId>>>
   /** Ordered optimistic layers affecting this collection. */
-  layers: CacheLayer[]
+  layers: EngineLayer[]
+  /** Resolved layered values; `undefined` is a cached hidden/missing value. */
+  resolvedItems: Map<KeyId, any>
+  /** Lazily materialized visible key identities. */
+  visibleKeys: KeyId[] | undefined
+  /** Public keys cached beside `visibleKeys`; callers receive a copy. */
+  visibleKeyValues: Array<string | number> | undefined
+}
+
+/** Pre-normalized layer metadata used by the hot read path. */
+export interface EngineLayer {
+  /** Original public layer object, retained for callbacks and `$layer`. */
+  layer: CacheLayer
+  /** Layer patches keyed by {@link KeyId}. */
+  state: Map<KeyId, any>
+  /** Layer deletions keyed by {@link KeyId}. */
+  deletedItems: Set<KeyId>
+  /** Union of state and deleted keys. */
+  affectedKeys: Set<KeyId>
+  /** Public key form selected while normalizing this layer. */
+  keyValues: Map<KeyId, string | number>
 }
 
 /**
@@ -165,12 +197,13 @@ export interface EngineContext {
   collections: Map<string, EngineCollectionState>
   markers: Record<string, boolean>
   modules: Map<string, { value: any }>
-  fieldTimestamps: Map<string, Map<string | number, FieldTimestamps>>
+  fieldTimestamps: Map<string, Map<KeyId, FieldTimestamps>>
   tombstones: TombstoneStore
   queryMeta: Record<string, CustomHookMeta>
   layerIdToCollection: Map<string, string>
   paused: boolean
   queue: QueuedOperation[]
+  queueHead: number
   isFlushingQueue: boolean
   callbacks: EngineCallbacks
   observers: ObserverRegistry
