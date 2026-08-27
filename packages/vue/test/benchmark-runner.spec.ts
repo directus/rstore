@@ -1,7 +1,7 @@
 import type { TaskResult } from 'tinybench'
 import type { ScenarioCounts } from '../benchmark/scenario-harness'
 import { describe, expect, it } from 'vitest'
-import { QUICK_PROFILE } from '../benchmark/profiles'
+import { QUICK_PROFILE, WRITE_DECOMPOSITION_PROFILE } from '../benchmark/profiles'
 import { createBenchmarkReport, normalizeMeasurement, resolveScenarioItemCounts, shouldRetryMeasurements, speedupInterval } from '../benchmark/runner'
 
 const COUNTS: ScenarioCounts = { list: 0, item: 0, relation: 0 }
@@ -43,6 +43,25 @@ describe('benchmark runner metrics', () => {
       'item-read',
       'composite-index-membership-write',
     ]))
+  })
+
+  it('keeps stable demand-driven write decomposition IDs', () => {
+    expect(WRITE_DECOMPOSITION_PROFILE.scenarios.map(scenario => scenario.id)).toEqual([
+      'field-write-no-consumer',
+      'field-write-list-watchers',
+      'field-write-exact-item',
+      'batch-write',
+      'paused-write-batch',
+      'crdt-stale-write',
+      'crdt-stale-write-item-interest',
+      'hydrate-state',
+      'hydrate-retained-wrapper',
+      'composite-write-no-watcher',
+      'composite-write-direct-watcher',
+      'scalar-write-direct-watcher',
+      'composite-write-legacy-watcher',
+      'composite-index-membership-write',
+    ])
   })
 
   it('creates stable structured benchmark reports', () => {

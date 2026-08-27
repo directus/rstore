@@ -117,4 +117,34 @@ describe('cache item cells', () => {
     scope.stop()
     cache.dispose()
   })
+
+  it('does not wake a missing-item watcher for another key', async () => {
+    const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
+    const cache = store.$cache
+    const collection = store.$collections[0]!
+    const reader = vi.fn()
+    const scope = effectScope()
+    scope.run(() => watchEffect(() => reader(cache.readItem({ collection, key: 1 })), { flush: 'sync' }))
+
+    cache.writeItem({ collection, key: 2, item: { id: 2, label: 'other' } })
+    expect(reader).toHaveBeenCalledTimes(1)
+
+    cache.writeItem({ collection, key: 1, item: { id: 1, label: 'wanted' } })
+    expect(reader).toHaveBeenCalledTimes(2)
+    scope.stop()
+    cache.dispose()
+  })
+
+  it('keeps list-created wrappers lazy until a field is read', async () => {
+    const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
+    const cache = store.$cache
+    const collection = store.$collections[0]!
+    cache.writeItem({ collection, key: 1, item: { id: 1, label: 'before' } })
+    const retained = cache.readItems({ collection })[0] as any
+
+    cache.writeItem({ collection, key: 1, item: { id: 1, label: 'after' } })
+
+    expect(retained.label).toBe('after')
+    cache.dispose()
+  })
 })

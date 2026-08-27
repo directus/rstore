@@ -12,9 +12,15 @@ export function mergeItemFields<T extends Record<string, any>>(
   localTimestamps: FieldTimestamps,
   remoteTimestamps: FieldTimestamps,
 ): MergeResult<T> {
-  const allFields = new Set([...Object.keys(local), ...Object.keys(remote)])
-  const merged = {} as Record<string, any>
-  const mergedTimestamps: FieldTimestamps = {}
+  const allFields = Object.keys(local)
+  for (const field of Object.keys(remote)) {
+    if (!Object.hasOwn(local, field))
+      allFields.push(field)
+  }
+  let merged = local as Record<string, any>
+  let mergedTimestamps = localTimestamps
+  let valueChanged = false
+  let timestampsChanged = false
   const conflicts: FieldConflict[] = []
 
   for (const field of allFields) {
@@ -22,15 +28,25 @@ export function mergeItemFields<T extends Record<string, any>>(
     const remoteTs = remoteTimestamps[field] ?? 0
     const order = compareHLC(localTs, remoteTs)
 
-    if (order < 0) {
-      merged[field] = remote[field]
-      mergedTimestamps[field] = remoteTs
+    const remoteWins = order < 0
+    const winningValue = remoteWins ? remote[field] : local[field]
+    const winningTimestamp = remoteWins ? remoteTs : localTs
+    if (remoteWins && (
+      !fieldValuesEqual(local[field], winningValue)
+      || Object.hasOwn(local, field) !== Object.hasOwn(remote, field)
+    )) {
+      if (!valueChanged)
+        merged = { ...local }
+      merged[field] = winningValue
+      valueChanged = true
     }
-    else if (order > 0) {
-      merged[field] = local[field]
-      mergedTimestamps[field] = localTs
+    if (!Object.hasOwn(localTimestamps, field) || localTimestamps[field] !== winningTimestamp) {
+      if (!timestampsChanged)
+        mergedTimestamps = { ...localTimestamps }
+      mergedTimestamps[field] = winningTimestamp
+      timestampsChanged = true
     }
-    else {
+    if (order === 0) {
       if (!fieldValuesEqual(local[field], remote[field])) {
         conflicts.push({
           field,
@@ -40,12 +56,10 @@ export function mergeItemFields<T extends Record<string, any>>(
           remoteTimestamp: remoteTs,
         })
       }
-      merged[field] = local[field]
-      mergedTimestamps[field] = localTs
     }
   }
 
-  return { merged: merged as T, mergedTimestamps, conflicts }
+  return { merged: merged as T, mergedTimestamps, conflicts, valueChanged, timestampsChanged }
 }
 
 /**
