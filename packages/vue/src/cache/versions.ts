@@ -13,17 +13,23 @@ export interface CacheVersionRegistry {
   flush: (changes: ObserverChanges) => void
   /** Invalidate all fallback readers after a cache reset. */
   reset: () => void
+  /** Release all tracked versions and ignore future reads. */
+  dispose: () => void
 }
 
 /** Create tiny per-collection reactive versions without engine subscriptions. */
 export function createCacheVersionRegistry(): CacheVersionRegistry {
-  const itemVersions = shallowReactive<Record<string, number>>({})
-  const listVersions = shallowReactive<Record<string, number>>({})
-  const indexVersions = shallowReactive<Record<string, number>>({})
+  const itemVersions = shallowReactive<Record<string, number>>(Object.create(null))
+  const listVersions = shallowReactive<Record<string, number>>(Object.create(null))
+  const indexVersions = shallowReactive<Record<string, number>>(Object.create(null))
   const resetVersion = shallowRef(0)
+  let disposed = false
 
   /** Read a collection version, creating its small holder on first access. */
   function track(versions: Record<string, number>, collection: string): void {
+    if (disposed) {
+      return
+    }
     versions[collection] ??= 0
     // eslint-disable-next-line ts/no-unused-expressions
     resetVersion.value
@@ -33,8 +39,17 @@ export function createCacheVersionRegistry(): CacheVersionRegistry {
 
   /** Increment a tracked version without allocating data-key-specific state. */
   function touch(versions: Record<string, number>, collection: string): void {
-    if (collection in versions) {
+    if (!disposed && collection in versions) {
       versions[collection] = (versions[collection] ?? 0) + 1
+    }
+  }
+
+  /** Remove every tracked collection without replacing reactive records. */
+  function clearVersions(): void {
+    for (const versions of [itemVersions, listVersions, indexVersions]) {
+      for (const collection of Object.keys(versions)) {
+        delete versions[collection]
+      }
     }
   }
 
@@ -54,7 +69,16 @@ export function createCacheVersionRegistry(): CacheVersionRegistry {
       }
     },
     reset() {
-      resetVersion.value++
+      if (!disposed) {
+        resetVersion.value++
+      }
+    },
+    dispose() {
+      if (disposed) {
+        return
+      }
+      disposed = true
+      clearVersions()
     },
   }
 }

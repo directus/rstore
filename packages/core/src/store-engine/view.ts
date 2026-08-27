@@ -1,4 +1,4 @@
-import type { EngineCollectionState, EngineContext, EngineLayer, KeyId } from './types.js'
+import type { EngineCollectionState, EngineContext, EngineLayer, KeyId } from './internal-types.js'
 import { getPublicKey, toKeyId } from './identity.js'
 
 /** Distinguish cached missing values from an uncached `Map#get` result. */

@@ -65,7 +65,7 @@ describe('vue cache data-core regressions', () => {
     cache.writeItem({ collection, key: 1, item: { id: 1, label: 'after' } })
 
     expect((cache.readItem({ collection, key: 1 }) as any).label).toBe('after')
-    expect((cache as any)._private.signals.size().items).toBe(0)
+    expect((cache as any)._private.signals).toBeUndefined()
     cache.dispose()
   })
 
@@ -91,6 +91,167 @@ describe('vue cache data-core regressions', () => {
     cache.dispose()
   })
 
+  it('retains the visible-list cache for field-only writes', async () => {
+    const getKey = vi.fn((item: any) => item.id)
+    const store = await createStore({ schema: [{ name: 'Todo', getKey }], plugins: [] })
+    const cache = store.$cache
+    const collection = store.$collections[0]!
+    cache.writeItems({
+      collection,
+      items: [
+        { key: 1, value: { id: 1, label: 'before' } },
+        { key: 2, value: { id: 2, label: 'other' } },
+      ],
+    })
+    const first = cache.readItems({ collection }) as any[]
+
+    cache.writeItem({ collection, key: 1, item: { id: 1, label: 'after' } })
+    const callsBeforeRead = getKey.mock.calls.length
+    const second = cache.readItems({ collection }) as any[]
+
+    expect(getKey).toHaveBeenCalledTimes(callsBeforeRead)
+    expect(second[0]).toBe(first[0])
+    expect(second[0].label).toBe('after')
+    cache.dispose()
+  })
+
+  it('keeps cached wrappers fresh when frozen items are replaced', async () => {
+    const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
+    const cache = store.$cache
+    const collection = store.$collections[0]!
+    cache.writeItem({ collection, key: 1, item: Object.freeze({ id: 1, label: 'before' }) })
+    const first = cache.readItems({ collection })[0] as any
+
+    cache.writeItem({ collection, key: 1, item: Object.freeze({ id: 1, label: 'after' }) })
+    const second = cache.readItems({ collection })[0] as any
+
+    expect(second).toBe(first)
+    expect(second.label).toBe('after')
+    expect(() => {
+      second.label = 'mutated'
+    }).toThrow(/read-only/)
+    cache.dispose()
+  })
+
+  it('keeps structured base and layer wrapper identities distinct', async () => {
+    const store = await createStore({
+      schema: [{ name: 'L' }, { name: 'C' }],
+      plugins: [],
+    })
+    const cache = store.$cache
+    const baseCollection = store.$collections.find(collection => collection.name === 'L')!
+    const layeredCollection = store.$collections.find(collection => collection.name === 'C')!
+    cache.writeItem({ collection: baseCollection, key: 'C:K', item: { id: 'C:K', label: 'base' } })
+    cache.writeItem({ collection: layeredCollection, key: 'K', item: { id: 'K', label: 'under' } })
+    const base = cache.readItem({ collection: baseCollection, key: 'C:K' }) as any
+
+    cache.addLayer({
+      id: 'L',
+      collectionName: 'C',
+      state: { K: { id: 'K', label: 'layer' } },
+      deletedItems: new Set(),
+    })
+    const layered = cache.readItem({ collection: layeredCollection, key: 'K' }) as any
+
+    expect(layered).not.toBe(base)
+    expect(base.label).toBe('base')
+    expect(layered.label).toBe('layer')
+    cache.dispose()
+  })
+
+  it('resolves colliding composite relation values through tuples', async () => {
+    const store = await createStore({
+      schema: [
+        {
+          name: 'Venue',
+          relations: {
+            events: {
+              many: true,
+              to: { Event: { on: { city: 'city', room: 'room' } } },
+            },
+          },
+        },
+        { name: 'Event' },
+      ],
+      plugins: [],
+    })
+    const cache = store.$cache
+    const venue = store.$collections.find(collection => collection.name === 'Venue')!
+    const event = store.$collections.find(collection => collection.name === 'Event')!
+    cache.writeItem({ collection: venue, key: 1, item: { id: 1, city: 'a:b', room: 'c' } })
+    cache.writeItem({ collection: event, key: 1, item: { id: 1, city: 'a:b', room: 'c' } })
+    cache.writeItem({ collection: event, key: 2, item: { id: 2, city: 'a', room: 'b:c' } })
+
+    const related = (cache.readItem({ collection: venue, key: 1 }) as any).events
+
+    expect(related.map((item: any) => item.id)).toEqual([1])
+    cache.dispose()
+  })
+
+  it('applies query and page reset state only when paused operations commit', async () => {
+    const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
+    const cache = store.$cache
+    const collection = store.$collections[0]!
+    const state = (cache as any)._private.state
+    const oldQuery = '["Todo-many",{}]'
+    const newQuery = '["Todo-many",{"next":true}]'
+    state.queryMeta[oldQuery] = {}
+    state.pageRefs.set(`${oldQuery}#0`, { page: 0 })
+
+    cache.pause()
+    cache.setState({
+      $rstoreVersion: 1,
+      collections: { Todo: { 1: { id: 1 } } },
+      markers: {},
+      modules: [],
+      queryMeta: { [newQuery]: {} },
+    })
+    expect(state.queryMeta).toHaveProperty(oldQuery)
+    expect(state.pageRefs.size).toBe(1)
+
+    cache.resume()
+    expect(state.queryMeta).not.toHaveProperty(oldQuery)
+    expect(state.queryMeta).toHaveProperty(newQuery)
+    expect(state.pageRefs.size).toBe(0)
+
+    state.pageRefs.set(`${newQuery}#0`, { page: 0 })
+    cache.pause()
+    cache.clearCollection({ collection })
+    expect(state.queryMeta).toHaveProperty(newQuery)
+    expect(state.pageRefs.size).toBe(1)
+    cache.resume()
+    expect(state.queryMeta).not.toHaveProperty(newQuery)
+    expect(state.pageRefs.size).toBe(0)
+    cache.dispose()
+  })
+
+  it('releases bridge-owned registries when disposed', async () => {
+    const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
+    const cache = store.$cache
+    const collection = store.$collections[0]!
+    const privateCache = (cache as any)._private
+    cache.writeItem({ collection, key: 1, item: { id: 1, label: 'base' } })
+    cache.addLayer({
+      id: 'optimistic',
+      collectionName: collection.name,
+      state: { 1: { label: 'layer' } },
+      deletedItems: new Set(),
+    })
+    const wrappedBeforeDispose = cache.readItem({ collection, key: 1 })
+    privateCache.state.queryMeta.query = {}
+    privateCache.state.pageRefs.set('query#0', { page: 0 })
+
+    expect(Object.getPrototypeOf(privateCache.layers)).toBeNull()
+    expect(privateCache.layers.Todo.value).toHaveLength(1)
+
+    cache.dispose()
+
+    expect(privateCache.state.queryMeta).toEqual({})
+    expect(privateCache.state.pageRefs.size).toBe(0)
+    expect(Object.keys(privateCache.layers)).toEqual([])
+    expect(cache.readItem({ collection, key: 1 })).not.toBe(wrappedBeforeDispose)
+  })
+
   it('updates a computed list without allocating an engine subscription', async () => {
     const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
     const cache = store.$cache
@@ -111,7 +272,6 @@ describe('vue cache data-core regressions', () => {
     expect(labels.value).toEqual(['reset'])
     cache.clear()
     expect(labels.value).toEqual([])
-    expect((cache as any)._private.signals.size()).toEqual({ items: 0, lists: 0, indexes: 0 })
     cache.dispose()
   })
 
@@ -153,9 +313,7 @@ describe('vue cache data-core regressions', () => {
     cache.garbageCollectItem({ collection, item })
 
     expect(reader).toHaveBeenLastCalledWith(undefined)
-    expect((cache as any)._private.signals.size().items).toBe(1)
     scope.stop()
-    expect((cache as any)._private.signals.size().items).toBe(0)
     cache.dispose()
   })
 

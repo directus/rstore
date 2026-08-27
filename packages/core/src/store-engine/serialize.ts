@@ -1,147 +1,164 @@
 import type { CustomCacheState, ResolvedCollection } from '@rstore/shared'
-import type { EngineCollectionState, EngineContext } from './types.js'
-import { getPublicKey, isEntityKey, registerKey, restoreLayerKeyValues } from './identity.js'
+import type { EngineCollectionState, EngineContext, EngineEffect, NormalizedCacheSnapshot } from './internal-types.js'
+import { createCollectionState } from './context.js'
+import { getPublicKey, isEntityKey, registerBaseKey, restoreLayerKeyValues } from './identity.js'
 import { rebuildIndexes } from './indexes.js'
+import { applyModuleHydration, prepareModuleClear, prepareModuleHydration, serializeModules } from './modules.js'
+import { copyNullRecord, createNullRecord } from './records.js'
+import { deleteItemFromBase } from './write.js'
 
-/** Serialize base data only; optimistic layers never cross the SSR boundary. */
+/** Serialize base data only; optimistic layers stay process-local. */
 export function getState(ctx: EngineContext): CustomCacheState {
-  const result: CustomCacheState = {
-    collections: {},
-    markers: { ...ctx.markers },
-    modules: {},
-    queryMeta: ctx.queryMeta,
-  }
+  const collections = createNullRecord<Record<string | number, any>>()
   for (const [name, state] of ctx.collections) {
-    const target: Record<string | number, any> = result.collections[name] = {}
+    const target = createNullRecord<any>()
+    collections[name] = target
     for (const [id, item] of state.base) {
-      if (item) {
+      if (item !== undefined) {
         target[getPublicKey(state, id)] = item
       }
     }
   }
-  for (const [key, module] of ctx.modules) {
-    result.modules[key] = module.value
+  return {
+    $rstoreVersion: 1,
+    collections,
+    markers: copyNullRecord(ctx.markers),
+    modules: serializeModules(ctx),
+    queryMeta: copyNullRecord(ctx.queryMeta),
+  }
+}
+
+/** Hydrate a staged snapshot while preserving active layers and identities. */
+export function setStateNow(ctx: EngineContext, snapshot: NormalizedCacheSnapshot): EngineEffect[] {
+  // Every throwable collection key derivation, index rebuild, module kind
+  // check, and new module wrapper runs before the live state swap.
+  const collections = stageCollections(ctx, snapshot.collections)
+  const modules = prepareModuleHydration(ctx, snapshot)
+
+  ctx.markers = snapshot.markers
+  ctx.fieldTimestamps.clear()
+  commitCollections(ctx, collections)
+  applyModuleHydration(ctx, modules)
+  replaceQueryMeta(ctx, snapshot.queryMeta)
+  return [{ type: 'reset', payload: { source: 'setState' } }]
+}
+
+/** Clear base state while retaining installed optimistic layers. */
+export function clearNow(ctx: EngineContext): EngineEffect[] {
+  const collections = stageCollections(ctx, new Map())
+  const modules = prepareModuleClear(ctx)
+  ctx.markers = createNullRecord<boolean>()
+  ctx.fieldTimestamps.clear()
+  commitCollections(ctx, collections)
+  applyModuleHydration(ctx, modules)
+  clearTombstones(ctx)
+  replaceQueryMeta(ctx, createNullRecord())
+  return [{ type: 'reset', payload: { source: 'clear' } }]
+}
+
+/** Clear one collection at queue head and retain active layer projections. */
+export function clearCollectionNow(
+  ctx: EngineContext,
+  collection: ResolvedCollection<any, any, any>,
+): EngineEffect[] {
+  const effects: EngineEffect[] = [{ type: 'reset', payload: { source: 'clearCollection', collection } }]
+  const state = ctx.collections.get(collection.name)
+  if (state) {
+    // Snapshot only after this operation reaches FIFO head. Mutations finish
+    // before any delete/reset hook observes the committed collection state.
+    for (const id of Array.from(state.base.keys())) {
+      const result = deleteItemFromBase(ctx, { collection, key: getPublicKey(state, id) })
+      effects.push(...result.effects)
+    }
+  }
+  ctx.fieldTimestamps.delete(collection.name)
+  clearCollectionTombstones(ctx, collection.name)
+  ctx.observers.invalidateCollection(collection.name)
+  return effects
+}
+
+/** Stage known collection states without touching live maps. */
+function stageCollections(
+  ctx: EngineContext,
+  incoming: Map<string, Record<string, any>>,
+): Map<string, EngineCollectionState> {
+  const result = new Map<string, EngineCollectionState>()
+  const names = new Set([...ctx.collections.keys(), ...incoming.keys()])
+  for (const name of names) {
+    const collection = ctx.callbacks.getCollection(name)
+    const previous = ctx.collections.get(name)
+    if (!collection && !previous) {
+      // Unknown SSR collections stay tolerated and are intentionally ignored.
+      continue
+    }
+    const state = createCollectionState()
+    state.layers = previous?.layers ?? []
+    if (collection) {
+      restoreCollection(state, collection, incoming.get(name))
+      rebuildIndexes(collection, state)
+    }
+    else {
+      restoreLayerKeyValues(state)
+    }
+    result.set(name, state)
   }
   return result
 }
 
-/** Replace query metadata in place so bridge references stay live. */
-function replaceQueryMeta(ctx: EngineContext, source: Record<string, any> | undefined): void {
+/** Restore snapshot rows using collection-derived canonical key forms. */
+function restoreCollection(
+  state: EngineCollectionState,
+  collection: ResolvedCollection<any, any, any>,
+  incoming: Record<string, any> | undefined,
+): void {
+  for (const rawKey of Object.keys(incoming ?? {})) {
+    const item = incoming![rawKey]
+    if (item == null) {
+      continue
+    }
+    const derived = collection.getKey(item)
+    const key = isEntityKey(derived) ? derived : rawKey
+    const id = registerBaseKey(state, collection, key, item)
+    state.base.set(id, item)
+  }
+  restoreLayerKeyValues(state)
+}
+
+/** Swap staged collections and invalidate every old/new observed scope. */
+function commitCollections(ctx: EngineContext, staged: Map<string, EngineCollectionState>): void {
+  const names = new Set([...ctx.collections.keys(), ...staged.keys()])
+  ctx.collections.clear()
+  for (const [name, state] of staged) {
+    ctx.collections.set(name, state)
+  }
+  for (const name of names) {
+    ctx.observers.invalidateCollection(name)
+  }
+}
+
+/** Replace query metadata in place so Vue bridge references remain live. */
+function replaceQueryMeta(ctx: EngineContext, source: Record<string, any>): void {
   if (source === ctx.queryMeta) {
     return
   }
   for (const key of Object.keys(ctx.queryMeta)) {
     delete ctx.queryMeta[key]
   }
-  Object.assign(ctx.queryMeta, source ?? {})
+  Object.assign(ctx.queryMeta, source)
 }
 
-/** Replace a module object or array without changing its identity. */
-function replaceModuleContents(target: any, source: any): void {
-  if (target === source || !(target && typeof target === 'object' && source && typeof source === 'object')) {
-    return
-  }
-  if (Array.isArray(target)) {
-    target.length = 0
-    if (Array.isArray(source)) {
-      target.push(...source)
-    }
-    return
-  }
-  for (const key of Object.keys(target)) {
-    delete target[key]
-  }
-  Object.assign(target, source)
-}
-
-/** Clear base/view storage while retaining installed optimistic layers. */
-function resetCollectionState(state: EngineCollectionState): void {
-  state.base.clear()
-  state.keyValues.clear()
-  state.indexes.clear()
-  state.resolvedItems.clear()
-  state.visibleKeys = undefined
-  state.visibleKeyValues = undefined
-}
-
-/** Restore snapshot base items using collection-derived key representation. */
-function restoreCollection(
-  state: EngineCollectionState,
-  collection: ResolvedCollection<any, any, any>,
-  incoming: Record<string | number, any> | undefined,
-): void {
-  if (incoming) {
-    for (const rawKey of Object.keys(incoming)) {
-      const item = incoming[rawKey]
-      if (!item) {
-        continue
-      }
-      const derived = collection.getKey(item)
-      const key = isEntityKey(derived) ? derived : rawKey
-      const id = registerKey(state, collection, key, item)
-      state.base.set(id, item)
-    }
-  }
-  restoreLayerKeyValues(state)
-}
-
-/** Rebuild every named collection, then invalidate all of its subscribers. */
-function resetCollections(ctx: EngineContext, incoming: CustomCacheState['collections']): void {
-  const names = new Set([...ctx.collections.keys(), ...Object.keys(incoming ?? {})])
-  for (const name of names) {
-    const collection = ctx.callbacks.getCollection(name)
-    const state = ctx.collections.get(name) ?? (collection ? ctx.ensureCollection(name) : undefined)
-    if (!state) {
-      continue
-    }
-    resetCollectionState(state)
-    if (collection) {
-      restoreCollection(state, collection, incoming?.[name as keyof typeof incoming] as Record<string | number, any> | undefined)
-      rebuildIndexes(ctx, collection)
-    }
-    ctx.observers.invalidateCollection(name)
-  }
-}
-
-/** Hydrate a cache snapshot while preserving active layers and module identity. */
-export function setStateNow(ctx: EngineContext, value: CustomCacheState): void {
-  ctx.markers = value.markers || {}
-  ctx.fieldTimestamps.clear()
-  resetCollections(ctx, value.collections)
-
-  for (const [key, module] of ctx.modules) {
-    if (!(key in (value.modules ?? {}))) {
-      replaceModuleContents(module.value, {})
-    }
-  }
-  for (const key of Object.keys(value.modules)) {
-    const incoming = value.modules[key]
-    const existing = ctx.modules.get(key)
-    if (existing) {
-      replaceModuleContents(existing.value, incoming)
-    }
-    else {
-      ctx.modules.set(key, { value: ctx.callbacks.wrapModuleState?.(incoming) ?? incoming })
-    }
-  }
-
-  replaceQueryMeta(ctx, value.queryMeta)
-  ctx.callbacks.onReset?.()
-}
-
-/** Clear base state while leaving installed optimistic layers visible. */
-export function clearNow(ctx: EngineContext): void {
-  ctx.markers = {}
-  ctx.fieldTimestamps.clear()
-  resetCollections(ctx, {})
-
-  for (const [, module] of ctx.modules) {
-    replaceModuleContents(module.value, {})
-  }
+/** Clear every tombstone without depending on encoded entry identities. */
+function clearTombstones(ctx: EngineContext): void {
   for (const [, tombstone] of Array.from(ctx.tombstones.entries())) {
     ctx.tombstones.clear(tombstone.collection, tombstone.key)
   }
+}
 
-  replaceQueryMeta(ctx, {})
-  ctx.callbacks.onReset?.()
+/** Clear tombstones owned by one collection. */
+function clearCollectionTombstones(ctx: EngineContext, collectionName: string): void {
+  for (const [, tombstone] of Array.from(ctx.tombstones.entries())) {
+    if (tombstone.collection === collectionName) {
+      ctx.tombstones.clear(tombstone.collection, tombstone.key)
+    }
+  }
 }

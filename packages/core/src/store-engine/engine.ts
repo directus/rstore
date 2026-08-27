@@ -1,19 +1,24 @@
-import type { CacheLayer, FieldTimestampValue } from '@rstore/shared'
-import type { EngineContext, EngineOptions, StoreEngine } from './types.js'
+import type { FieldTimestampValue } from '@rstore/shared'
+import type { EngineContext } from './internal-types.js'
+import type { EngineOptions, StoreEngine } from './types.js'
 import { createTombstoneStore, gcTombstones as gcTombstonesStore, scheduleTombstoneGc } from '../tombstone.js'
+import { createEngineContext } from './context.js'
+import { dispatchEffects, throwCollectedErrors } from './effects.js'
 import { getPublicKey } from './identity.js'
+import { getIndexBucket, getIndexObserverId } from './indexes.js'
 import { getLayerNow } from './layers.js'
+import { getModuleState } from './modules.js'
 import { createObserverRegistry } from './observers.js'
 import { createStaggering, enqueueOperation, flushQueuedOperations } from './queue.js'
-import { getIndexBucket, getVisibleKeys, resolveItem } from './resolve.js'
+import { resolveRelationWriteParams } from './relations.js'
 import { getState as serializeState } from './serialize.js'
+import { normalizeSnapshotInput } from './snapshot-input.js'
+import { getVisibleKeys, resolveItem } from './view.js'
 import { deleteItemFromBase, getFieldTimestamps, setFieldTimestamps } from './write.js'
 
 /**
- * Create the framework-agnostic storage engine. All state lives in plain JS
- * structures; reactivity is delegated to subscribers via the observer
- * registry, so a host framework (e.g. `@rstore/vue`) can map observers onto
- * its own signals without the engine ever importing it.
+ * Create a framework-agnostic storage engine. Plain JS structures own state;
+ * callbacks and observers let framework adapters project reactivity.
  */
 export function createStoreEngine(options: EngineOptions): StoreEngine {
   const {
@@ -22,52 +27,12 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     tombstoneGc = {},
     isServer = false,
   } = options
-
   const observers = createObserverRegistry(changes => callbacks.onObserverFlush?.(changes))
   const staggering = createStaggering(cacheStaggering)
   const tombstones = createTombstoneStore()
-
-  const ctx: EngineContext = {
-    collections: new Map(),
-    markers: {},
-    modules: new Map(),
-    fieldTimestamps: new Map(),
-    tombstones,
-    queryMeta: {},
-    layerIdToCollection: new Map(),
-    paused: false,
-    queue: [],
-    queueHead: 0,
-    isFlushingQueue: false,
-    callbacks,
-    observers,
-    staggering,
-    ensureCollection: undefined as any,
-  }
-
-  // Lazily create a collection's plain-JS storage container.
-  ctx.ensureCollection = (name) => {
-    let collectionState = ctx.collections.get(name)
-    if (!collectionState) {
-      collectionState = {
-        base: new Map(),
-        keyValues: new Map(),
-        indexes: new Map(),
-        layers: [],
-        resolvedItems: new Map(),
-        visibleKeys: undefined,
-        visibleKeyValues: undefined,
-      }
-      ctx.collections.set(name, collectionState)
-    }
-    return collectionState
-  }
-
-  // The staggering budget-reset timer re-drives the queue.
+  const ctx = createEngineContext({ callbacks, observers, staggering, tombstones })
   staggering.setFlush(() => flushQueuedOperations(ctx))
 
-  // Auto-GC keeps the tombstone store bounded in long-lived clients. Skipped
-  // on the server (request-scoped cache) and where timers are unavailable.
   let stopTombstoneGc: (() => void) | undefined
   const canScheduleTombstoneGc = !isServer && typeof setInterval !== 'undefined'
   if (tombstoneGc !== false && canScheduleTombstoneGc) {
@@ -77,29 +42,29 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     })
   }
 
-  return {
+  const engine: StoreEngine = {
     readItemRaw({ collection, key }) {
       return resolveItem(ctx, collection.name, key)
     },
 
     resolveKeys({ collection, marker, keys, indexKey, indexValue }) {
-      // A list gated on an unset marker reads as empty (no fetch happened yet).
-      if (marker && !ctx.markers[marker]) {
+      if (marker !== undefined && !ctx.markers[marker]) {
         return []
       }
-      // Index lookups resolve to the bucket's key set.
       if (keys == null && indexKey != null) {
-        const bucket = getIndexBucket(ctx, collection.name, indexKey, String(indexValue ?? ''))
+        const bucket = getIndexBucket(ctx.collections.get(collection.name), collection, indexKey, indexValue)
         return bucket ? Array.from(bucket) : []
       }
-      if (keys != null) {
-        return keys
-      }
-      return getVisibleKeys(ctx, collection.name)
+      return keys ?? getVisibleKeys(ctx, collection.name)
     },
 
-    getIndexBucket(collection, indexKey, indexValue) {
-      return getIndexBucket(ctx, collection, indexKey, String(indexValue))
+    getIndexBucket(collectionName, indexKey, indexValue) {
+      return getIndexBucket(
+        ctx.collections.get(collectionName),
+        callbacks.getCollection(collectionName),
+        indexKey,
+        indexValue,
+      )
     },
 
     hasMarker(marker) {
@@ -111,29 +76,15 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     },
 
     writeItems(params) {
-      enqueueOperation(ctx, { type: 'writeItems', params, index: 0 })
+      enqueueOperation(ctx, { type: 'writeItems', params, index: 0, changes: [] })
     },
 
     deleteItem(params) {
       enqueueOperation(ctx, { type: 'deleteItem', params })
     },
 
-    writeItemForRelation({ parentCollection, relationKey, relation, childItem, meta }) {
-      const possibleCollections = Object.keys(relation.to)
-      const nestedItemCollection = ctx.callbacks.resolveChildCollection(childItem, possibleCollections)
-      if (!nestedItemCollection) {
-        throw new Error(`Could not determine type for relation ${parentCollection.name}.${String(relationKey)}`)
-      }
-      const nestedKey = nestedItemCollection.getKey(childItem)
-      if (nestedKey == null) {
-        throw new Error(`Could not determine key for relation ${parentCollection.name}.${String(relationKey)}`)
-      }
-      this.writeItem({
-        collection: nestedItemCollection,
-        key: nestedKey,
-        item: childItem,
-        meta,
-      })
+    writeItemForRelation(params) {
+      engine.writeItem(resolveRelationWriteParams(ctx, params))
     },
 
     readFieldTimestamps({ collectionName, key }) {
@@ -145,13 +96,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     },
 
     getModuleState(name, key, initState) {
-      const cacheKey = `${name}:${key}`
-      let mod = ctx.modules.get(cacheKey)
-      if (!mod) {
-        mod = { value: callbacks.wrapModuleState?.(initState) ?? initState }
-        ctx.modules.set(cacheKey, mod)
-      }
-      return mod.value
+      return getModuleState(ctx, name, key, initState)
     },
 
     getState() {
@@ -159,7 +104,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     },
 
     setState(state) {
-      enqueueOperation(ctx, { type: 'setState', state })
+      enqueueOperation(ctx, { type: 'setState', state: normalizeSnapshotInput(state) })
     },
 
     clear() {
@@ -167,50 +112,26 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     },
 
     clearCollection({ collection }) {
-      ctx.fieldTimestamps.delete(collection.name)
-      const tombs = Array.from(ctx.tombstones.entries(), ([, t]) => t)
-        .filter(t => t.collection === collection.name)
-      for (const t of tombs) {
-        ctx.tombstones.clear(t.collection, t.key)
-      }
-      const collectionState = ctx.collections.get(collection.name)
-      if (collectionState) {
-        // Batch all deletes behind a single flush: enqueuing per key while
-        // unpaused would drain + dispatch observers once per item (O(N) on
-        // large collections). Pause around the loop, then flush once. If the
-        // caller already paused, leave the deletes queued for their resume.
-        const wasPaused = ctx.paused
-        ctx.paused = true
-        try {
-          // Snapshot keys: each delete mutates `base` as the queue drains.
-          for (const id of Array.from(collectionState.base.keys())) {
-            enqueueOperation(ctx, { type: 'deleteItem', params: { collection, key: getPublicKey(collectionState, id) } })
-          }
-        }
-        finally {
-          ctx.paused = wasPaused
-          if (!wasPaused) {
-            flushQueuedOperations(ctx)
-          }
-        }
-      }
+      enqueueOperation(ctx, { type: 'clearCollection', collection })
     },
 
     garbageCollectKey(collection, key) {
-      const removed = deleteItemFromBase(ctx, { collection, key })
-      if (removed) {
-        ctx.observers.flush()
+      // Field timestamps intentionally outlive cache eviction: GC is not a
+      // causal delete, so a later refill still merges against local history.
+      const result = deleteItemFromBase(ctx, { collection, key })
+      if (result.removed) {
+        dispatchImmediate(ctx, result.effects)
       }
-      return removed
+      return result.removed
     },
 
-    forEachKey(collection, cb) {
-      const collectionState = ctx.collections.get(collection)
-      if (!collectionState) {
+    forEachKey(collectionName, callback) {
+      const state = ctx.collections.get(collectionName)
+      if (!state) {
         return
       }
-      for (const id of Array.from(collectionState.base.keys())) {
-        cb(getPublicKey(collectionState, id))
+      for (const id of Array.from(state.base.keys())) {
+        callback(getPublicKey(state, id))
       }
     },
 
@@ -233,37 +154,66 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     },
 
     pause() {
-      ctx.paused = true
+      ctx.pauseDepth++
     },
 
     resume() {
-      ctx.paused = false
-      flushQueuedOperations(ctx)
+      if (ctx.pauseDepth > 0) {
+        ctx.pauseDepth--
+      }
+      if (ctx.pauseDepth === 0) {
+        flushQueuedOperations(ctx)
+      }
     },
 
     dispose() {
+      if (ctx.disposed) {
+        return
+      }
+      ctx.disposed = true
       stopTombstoneGc?.()
       stopTombstoneGc = undefined
-      // Cancel any pending staggering budget-reset timer.
       staggering.dispose()
+      observers.dispose()
+      ctx.queue.length = 0
+      ctx.queueHead = 0
+      ctx.pauseDepth = 0
     },
 
     observeItem: observers.observeItem,
     observeList: observers.observeList,
-    observeIndex: observers.observeIndex,
-
-    _getLayers() {
-      const result = new Map<string, CacheLayer[]>()
-      for (const [name, collectionState] of ctx.collections) {
-        result.set(name, collectionState.layers.map(entry => entry.layer))
-      }
-      return result
+    observeIndex(collectionName, indexKey, indexValue, callback) {
+      const observerId = getIndexObserverId(
+        ctx.collections.get(collectionName),
+        callbacks.getCollection(collectionName),
+        indexKey,
+        indexValue,
+      )
+      return observers.observeIndex(collectionName, indexKey, observerId, callback)
     },
 
-    _getQueryMeta() {
+    getQueryMeta() {
       return ctx.queryMeta
     },
-
-    _ctx: ctx,
   }
+
+  return engine
+}
+
+/** Dispatch immediate GC effects and observers with queue-equivalent errors. */
+function dispatchImmediate(ctx: EngineContext, effects: Parameters<typeof dispatchEffects>[1]): void {
+  const errors: unknown[] = []
+  try {
+    dispatchEffects(ctx, effects)
+  }
+  catch (error) {
+    errors.push(error)
+  }
+  try {
+    ctx.observers.flush()
+  }
+  catch (error) {
+    errors.push(error)
+  }
+  throwCollectedErrors(errors, 'Store engine callbacks failed')
 }

@@ -6,9 +6,8 @@ export default antfu({
     '**/.nitro',
     'docs/guide/migration/**',
     '**/skills/**',
-    // Benchmark fixtures: contains a verbatim snapshot of the previous cache
-    // implementation (the baseline) plus intentional console reporting.
-    'packages/*/benchmark/**',
+    // Verbatim audited baseline; authored benchmark code stays linted.
+    'packages/vue/benchmark/legacy-cache.ts',
   ],
   rules: {
     'vue/object-property-newline': ['error', {
@@ -58,6 +57,13 @@ export default antfu({
         message: 'Assert the public Store behavior produced by this private member.',
       },
     ],
+  },
+}, {
+  files: [
+    'packages/*/benchmark/**/*.ts',
+  ],
+  rules: {
+    'no-console': 'off',
   },
 }, {
   files: [
