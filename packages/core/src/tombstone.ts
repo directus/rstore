@@ -15,7 +15,7 @@ export interface Tombstone {
 
 /** Compute the storage key used internally to index tombstones. */
 export function tombstoneKey(collection: string, key: string | number): string {
-  return `${collection}:${key}`
+  return JSON.stringify([collection, String(key)])
 }
 
 /** Narrowing guard for arbitrary values that look like a {@link Tombstone}. */
@@ -77,27 +77,47 @@ export interface TombstoneStore {
  * is the max of all observed delete timestamps.
  */
 export function createTombstoneStore(): TombstoneStore {
-  const map = new Map<string, Tombstone>()
+  const collections = new Map<string, Map<string, Tombstone>>()
+  let count = 0
   return {
     get(collection, key) {
-      return map.get(tombstoneKey(collection, key))
+      return collections.get(collection)?.get(String(key))
     },
     set(tombstone) {
-      const id = tombstoneKey(tombstone.collection, tombstone.key)
-      const existing = map.get(id)
+      const id = String(tombstone.key)
+      let entries = collections.get(tombstone.collection)
+      const existing = entries?.get(id)
       if (existing && compareHLC(existing.deletedAt, tombstone.deletedAt) >= 0) {
         return
       }
-      map.set(id, tombstone)
+      if (!entries) {
+        entries = new Map()
+        collections.set(tombstone.collection, entries)
+      }
+      if (!existing) {
+        count++
+      }
+      entries.set(id, tombstone)
     },
     clear(collection, key) {
-      map.delete(tombstoneKey(collection, key))
+      const entries = collections.get(collection)
+      if (!entries?.delete(String(key))) {
+        return
+      }
+      count--
+      if (entries.size === 0) {
+        collections.delete(collection)
+      }
     },
-    entries() {
-      return map.entries()
+    * entries() {
+      for (const [collection, entries] of collections) {
+        for (const tombstone of entries.values()) {
+          yield [tombstoneKey(collection, tombstone.key), tombstone]
+        }
+      }
     },
     size() {
-      return map.size
+      return count
     },
   }
 }

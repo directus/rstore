@@ -1,12 +1,14 @@
-import type { EngineAfterWritePayload, EngineCallbacks, EngineConflictPayload } from '@rstore/core'
+import type { EngineAfterWritePayload, EngineCallbacks, EngineConflictPayload, EngineResetPayload } from '@rstore/core'
 import type { CacheLayer, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
 import type { CacheRuntime, CreateCacheOptions } from './types'
-import { createStoreEngine, isKeyDefined, resolveItem } from '@rstore/core'
+import { createStoreEngine, isKeyDefined } from '@rstore/core'
 import { reactive, shallowRef } from 'vue'
+import { clearAllQueryState, clearQueryStateForCollection } from './queryState'
 import { createSignalRegistry } from './signals'
 import { createCacheVersionRegistry } from './versions'
+import { createWrappedItemRegistry } from './wrappedRegistry'
 
-/** Create the mutable runtime shared by all cache modules. */
+/** Create mutable runtime shared by all Vue cache modules. */
 export function createCacheRuntime<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
@@ -20,111 +22,131 @@ export function createCacheRuntime<
   const pageRefs = new Map<string, any>()
 
   const callbacks: EngineCallbacks = {
-    getCollection: name => getStore().$collections.find(c => c.name === name),
-
+    getCollection: name => getStore().$collections.find(collection => collection.name === name),
     resolveChildCollection: (item, possibleNames) => getStore().$getCollection(item, possibleNames),
-
     wrapModuleState: value => value && typeof value === 'object' ? reactive(value) : value,
-
     onObserverFlush: changes => runtime.versions.flush(changes),
-
-    onAfterWrite: (payload: EngineAfterWritePayload) => {
-      runtime.visibleListCache.delete(payload.collection.name)
-      if (payload.operation === 'delete' && payload.key != null) {
-        evictBaseWrappedItem(runtime, payload.collection, payload.key)
-      }
-      const store = getStore()
-      store.$hooks.callHookSync('afterCacheWrite', {
-        store,
-        meta: {},
-        collection: payload.collection,
-        key: payload.key,
-        result: payload.result,
-        marker: payload.marker,
-        operation: payload.operation,
-      })
-    },
-
-    onConflict: (payload: EngineConflictPayload) => {
-      const store = getStore()
-      store.$hooks.callHookSync('cacheConflict', {
-        store,
-        meta: {},
-        collection: payload.collection,
-        key: payload.key,
-        conflicts: payload.conflicts,
-      })
-    },
-
-    onLayerAdd: (layer) => {
-      runtime.visibleListCache.delete(layer.collectionName)
-      const ref = ensureLayersForCollection(runtime, layer.collectionName)
-      ref.value = [...ref.value.filter(l => l.id !== layer.id), layer]
-      runtime.layerIdToCollectionName[layer.id] = layer.collectionName
-      const store = getStore()
-      store.$hooks.callHookSync('cacheLayerAdd', { store, layer })
-    },
-
-    onLayerRemove: (layer) => {
-      runtime.visibleListCache.delete(layer.collectionName)
-      const ref = runtime.layers[layer.collectionName]
-      if (ref) {
-        ref.value = ref.value.filter(l => l.id !== layer.id)
-      }
-      delete runtime.layerIdToCollectionName[layer.id]
-      clearLayerWrappedItems(runtime, layer.id)
-      const store = getStore()
-      store.$hooks.callHookSync('cacheLayerRemove', { store, layer })
-    },
-
-    onReset: () => {
-      runtime.visibleListCache.clear()
-      runtime.wrappedItems.clear()
-      runtime.wrappedItemsMetadata.clear()
-      runtime.wrappedItemKeysPerLayer.clear()
-      runtime.versions.reset()
-      const store = getStore()
-      store.$hooks.callHookSync('afterCacheReset', { store, meta: {} })
-    },
+    onAfterWrite: payload => handleAfterWrite(runtime, payload),
+    onConflict: payload => handleConflict(getStore, payload),
+    onLayerAdd: layer => handleLayerAdd(runtime, layer),
+    onLayerRemove: layer => handleLayerRemove(runtime, layer),
+    onReset: payload => handleReset(runtime, payload),
   }
 
-  const engine = createStoreEngine({
-    callbacks,
-    cacheStaggering,
-    tombstoneGc,
-    isServer,
-  })
-
+  const engine = createStoreEngine({ callbacks, cacheStaggering, tombstoneGc, isServer })
   runtime = {
     getStore,
     engine,
     state: {
       pageRefs,
       get queryMeta() {
-        return engine._getQueryMeta()
+        return engine.getQueryMeta()
       },
     },
     signals: createSignalRegistry({ engine, isServer }),
     versions: createCacheVersionRegistry(),
-    layers: {},
-    layerIdToCollectionName: {},
-    wrappedItems: new Map(),
-    wrappedItemsMetadata: new Map(),
-    wrappedItemKeysPerLayer: new Map(),
+    layers: Object.create(null) as CacheRuntime<TSchema, TCollectionDefaults>['layers'],
+    wrappedItems: createWrappedItemRegistry(),
     visibleListCache: new Map(),
   }
-
   return runtime
 }
 
-/** Build the cache key for a wrapped item proxy. */
-export function getItemWrapKey(collection: ResolvedCollection<any, any, any>, key: string | number, layer: { id: string } | undefined) {
-  const itemKey = String(key)
-  return layer ? `${layer.id}:${collection.name}:${itemKey}` : `${collection.name}:${itemKey}`
+/** Apply bridge write invalidation before calling user hooks. */
+function handleAfterWrite(ctx: CacheRuntime, payload: EngineAfterWritePayload): void {
+  if (payload.changes.some(change => change.visibilityChanged || change.keyFormChanged)) {
+    ctx.visibleListCache.delete(payload.collection.name)
+  }
+  for (const change of payload.changes) {
+    if (payload.operation === 'delete' || change.keyFormChanged) {
+      ctx.wrappedItems.deleteBase(payload.collection.name, change.previousKey ?? change.key)
+    }
+  }
+  const store = ctx.getStore()
+  store.$hooks.callHookSync('afterCacheWrite', {
+    store,
+    meta: {},
+    collection: payload.collection,
+    key: payload.key,
+    result: payload.result,
+    marker: payload.marker,
+    operation: payload.operation,
+  })
+}
+
+/** Forward a CRDT conflict after engine state commits. */
+function handleConflict(
+  getStore: CacheRuntime['getStore'],
+  payload: EngineConflictPayload,
+): void {
+  const store = getStore()
+  store.$hooks.callHookSync('cacheConflict', {
+    store,
+    meta: {},
+    collection: payload.collection,
+    key: payload.key,
+    conflicts: payload.conflicts,
+  })
+}
+
+/** Update layer mirrors before calling layer-add hooks. */
+function handleLayerAdd(ctx: CacheRuntime, layer: CacheLayer): void {
+  ctx.visibleListCache.delete(layer.collectionName)
+  const layers = ensureLayersForCollection(ctx, layer.collectionName)
+  layers.value = [...layers.value.filter(candidate => candidate.id !== layer.id), layer]
+  const store = ctx.getStore()
+  store.$hooks.callHookSync('cacheLayerAdd', { store, layer })
+}
+
+/** Remove exact layer wrappers and mirror state before user hooks. */
+function handleLayerRemove(ctx: CacheRuntime, layer: CacheLayer): void {
+  ctx.visibleListCache.delete(layer.collectionName)
+  const layers = ctx.layers[layer.collectionName]
+  if (layers) {
+    layers.value = layers.value.filter(candidate => candidate.id !== layer.id)
+  }
+  ctx.wrappedItems.deleteLayer(layer.collectionName, layer.id)
+  const store = ctx.getStore()
+  store.$hooks.callHookSync('cacheLayerRemove', { store, layer })
+}
+
+/** Apply bridge-owned reset state before forwarding reset hooks. */
+function handleReset(ctx: CacheRuntime, payload: EngineResetPayload): void {
+  if (payload.collection) {
+    const collectionName = payload.collection.name
+    ctx.visibleListCache.delete(collectionName)
+    ctx.wrappedItems.deleteCollection(collectionName)
+    clearQueryStateForCollection(ctx, collectionName)
+  }
+  else {
+    ctx.visibleListCache.clear()
+    ctx.wrappedItems.clear()
+    clearAllQueryState(ctx)
+  }
+  refreshLayerMirrors(ctx)
+  ctx.versions.reset()
+  if (payload.source === 'clearCollection') {
+    return
+  }
+  const store = ctx.getStore()
+  store.$hooks.callHookSync('afterCacheReset', { store, meta: {} })
+}
+
+/** Remove stale devtools layer mirror entries without exposing engine maps. */
+function refreshLayerMirrors(ctx: CacheRuntime): void {
+  for (const [collectionName, layers] of Object.entries(ctx.layers)) {
+    layers.value = layers.value.filter((layer) => {
+      const active = ctx.engine.getLayer(layer.id)
+      return active?.collectionName === collectionName
+    })
+  }
 }
 
 /** Resolve an item primary key or throw a cache-friendly error. */
-export function getItemKey(collection: ResolvedCollection<any, any, any>, item: ResolvedCollectionItem<any, any, any>): string | number {
+export function getItemKey(
+  collection: ResolvedCollection<any, any, any>,
+  item: ResolvedCollectionItem<any, any, any>,
+): string | number {
   const key = collection.getKey(item)
   if (!isKeyDefined(key)) {
     throw new Error(`Item does not have a key for collection ${collection.name}: ${item}`)
@@ -132,48 +154,16 @@ export function getItemKey(collection: ResolvedCollection<any, any, any>, item: 
   return key
 }
 
-/** Read one resolved engine value without allocating a public API parameter. */
+/** Read one resolved raw engine value through public engine API. */
 export function readRawCacheItem(
   ctx: CacheRuntime,
   collection: ResolvedCollection<any, any, any>,
   key: string | number,
 ): any | undefined {
-  return resolveItem(ctx.engine._ctx, collection.name, key)
+  return ctx.engine.readItemRaw({ collection, key })
 }
 
-/** Track a wrapped item key so layer removal can evict its proxy. */
-export function addWrappedItemKeyToLayer(ctx: CacheRuntime, layer: { id: string } | undefined, wrapKey: string) {
-  if (!layer) {
-    return
-  }
-  let keys = ctx.wrappedItemKeysPerLayer.get(layer.id)
-  if (!keys) {
-    keys = new Set()
-    ctx.wrappedItemKeysPerLayer.set(layer.id, keys)
-  }
-  keys.add(wrapKey)
-}
-
-/** Ensure the devtools layer mirror for a collection exists. */
+/** Ensure devtools layer mirror for a collection exists. */
 export function ensureLayersForCollection(ctx: CacheRuntime, collectionName: string) {
   return ctx.layers[collectionName] ??= shallowRef<CacheLayer[]>([])
-}
-
-/** Drop a wrapped base item and its metadata from the identity maps. */
-export function evictBaseWrappedItem(ctx: CacheRuntime, collection: ResolvedCollection<any, any, any>, key: string | number) {
-  const wrapKey = getItemWrapKey(collection, key, undefined)
-  ctx.wrappedItems.delete(wrapKey)
-  ctx.wrappedItemsMetadata.delete(wrapKey)
-}
-
-function clearLayerWrappedItems(ctx: CacheRuntime, layerId: string) {
-  const keys = ctx.wrappedItemKeysPerLayer.get(layerId)
-  if (!keys) {
-    return
-  }
-  for (const wrapKey of keys) {
-    ctx.wrappedItems.delete(wrapKey)
-    ctx.wrappedItemsMetadata.delete(wrapKey)
-  }
-  ctx.wrappedItemKeysPerLayer.delete(layerId)
 }

@@ -3,7 +3,7 @@ import type { Ref } from 'vue'
 import type { CacheRuntime } from './types'
 import { shallowRef } from 'vue'
 import { wrapItem } from '../item'
-import { addWrappedItemKeyToLayer, getItemKey, getItemWrapKey, readRawCacheItem } from './context'
+import { getItemKey, readRawCacheItem } from './context'
 
 /**
  * Read engine data on every wrapped-field access. Vue effects receive the
@@ -54,18 +54,13 @@ export function getWrappedItem<
 
   const key = getItemKey(collection, item)
   const layer = item.$layer
-  const wrapKey = getItemWrapKey(collection, key, layer)
-  let wrappedItem = ctx.wrappedItems.get(wrapKey)
-  if (!wrappedItem) {
-    let metadata = ctx.wrappedItemsMetadata.get(wrapKey)
-    if (!metadata) {
-      metadata = {
-        queries: new Set(),
-        dirtyQueries: new Set(),
-      }
-      ctx.wrappedItemsMetadata.set(wrapKey, metadata)
+  let entry = ctx.wrappedItems.get(collection.name, key, layer?.id)
+  if (!entry) {
+    const metadata = {
+      queries: new Set(),
+      dirtyQueries: new Set(),
     }
-    wrappedItem = wrapItem({
+    const wrappedItem = wrapItem({
       store: ctx.getStore(),
       collection,
       // Layered values can still inherit fields from base state. This source
@@ -75,10 +70,15 @@ export function getWrappedItem<
       metadata,
       seed: item,
     })
-    ctx.wrappedItems.set(wrapKey, wrappedItem)
-    addWrappedItemKeyToLayer(ctx, item.$layer, wrapKey)
+    entry = { item: wrappedItem, metadata }
+    ctx.wrappedItems.set(
+      collection.name,
+      key,
+      layer?.id,
+      entry as unknown as Parameters<typeof ctx.wrappedItems.set>[3],
+    )
   }
-  return wrappedItem as WrappedItem<TCollection, TCollectionDefaults, TSchema>
+  return entry.item as WrappedItem<TCollection, TCollectionDefaults, TSchema>
 }
 
 /** Delete an unreferenced item from cache and emit garbage collection hooks. */

@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { buildCollection, buildLayer, createTestEngine } from './helpers'
 
 describe('store-engine: layers', () => {
@@ -82,5 +82,69 @@ describe('store-engine: layers', () => {
     engine.addLayer(layer)
 
     expect(engine.getLayer('l1')).toBe(layer)
+  })
+
+  it('supports empty collection and layer identities', () => {
+    const collection = buildCollection('')
+    const { engine } = createTestEngine([collection])
+    const layer = buildLayer('', '', { 1: { id: 1 } })
+
+    engine.addLayer(layer)
+    expect(engine.getLayer('')).toBe(layer)
+    engine.removeLayer('')
+    expect(engine.getLayer('')).toBeUndefined()
+  })
+
+  it('keeps an existing same-id layer when replacement normalization fails', () => {
+    const collection = buildCollection('User', {
+      getKey(item) {
+        if (item.invalid) {
+          throw new Error('invalid layer key')
+        }
+        return item.id
+      },
+    })
+    const { engine } = createTestEngine([collection])
+    const existing = buildLayer('same', 'User', { 1: { id: 1, name: 'existing' } })
+    engine.addLayer(existing)
+
+    expect(() => engine.addLayer(buildLayer('same', 'User', { 2: { invalid: true } })))
+      .toThrow('invalid layer key')
+
+    expect(engine.getLayer('same')).toBe(existing)
+    expect(engine.readItemRaw({ collection, key: 1 })?.name).toBe('existing')
+  })
+
+  it('keeps skipped layers out of key forms and observer invalidations', () => {
+    const collection = buildCollection('User', { getKey: item => item.id })
+    const { engine } = createTestEngine([collection])
+    engine.writeItem({ collection, key: 1, item: { id: 1, name: 'base' } })
+    const itemObserver = vi.fn()
+    const listObserver = vi.fn()
+    engine.observeItem('User', 1, itemObserver)
+    engine.observeList('User', listObserver)
+
+    engine.addLayer({
+      ...buildLayer('skipped', 'User', { 1: { id: '1', name: 'ignored' } }),
+      skip: true,
+    })
+
+    expect(engine.resolveKeys({ collection })).toEqual([1])
+    expect(engine.readItemRaw({ collection, key: 1 })?.name).toBe('base')
+    expect(itemObserver).not.toHaveBeenCalled()
+    expect(listObserver).not.toHaveBeenCalled()
+  })
+
+  it('restores the base key form after removing a canonical layer key', () => {
+    const collection = buildCollection('User', { getKey: item => item.id })
+    const { engine } = createTestEngine([collection])
+    engine.writeItem({ collection, key: '1', item: { name: 'base' } })
+
+    engine.addLayer(buildLayer('canonical', 'User', { 1: { id: 1, name: 'layer' } }))
+    expect(engine.resolveKeys({ collection })).toEqual([1])
+
+    engine.removeLayer('canonical')
+    expect(engine.resolveKeys({ collection })).toEqual(['1'])
+    expect(engine.readItemRaw({ collection, key: 1 })?.name).toBe('base')
   })
 })

@@ -57,6 +57,9 @@ export {
 } from '@rstore/core'
 
 export type {
+  CacheIndexValue,
+  CacheModuleSnapshot,
+  CacheStateInput,
   Collection,
   CollectionDefaults,
   CustomCacheState,

@@ -1,5 +1,6 @@
+import type { KeyId, ObserverRegistry } from './internal-types.js'
 import type { ObserverChanges } from './observer-changes.js'
-import type { KeyId, ObserverCallback, ObserverRegistry, Unsubscribe } from './types.js'
+import type { ObserverCallback, Unsubscribe } from './types.js'
 import { toKeyId } from './identity.js'
 
 /** Pending observer invalidations, deduplicated until the next queue flush. */
@@ -32,8 +33,12 @@ export function createObserverRegistry(onFlush?: (changes: ObserverChanges) => v
   const listObservers = new Map<string, Set<ObserverCallback>>()
   const indexObservers = new Map<string, Map<string, Map<string, Set<ObserverCallback>>>>()
   let pending = createPending()
+  let disposed = false
 
   function observeItem(collection: string, key: string | number, callback: ObserverCallback): Unsubscribe {
+    if (disposed) {
+      return () => {}
+    }
     const id = toKeyId(key)
     const byKey = itemObservers.get(collection) ?? new Map<KeyId, Set<ObserverCallback>>()
     itemObservers.set(collection, byKey)
@@ -52,6 +57,9 @@ export function createObserverRegistry(onFlush?: (changes: ObserverChanges) => v
   }
 
   function observeList(collection: string, callback: ObserverCallback): Unsubscribe {
+    if (disposed) {
+      return () => {}
+    }
     const callbacks = listObservers.get(collection) ?? new Set<ObserverCallback>()
     listObservers.set(collection, callbacks)
     callbacks.add(callback)
@@ -64,6 +72,9 @@ export function createObserverRegistry(onFlush?: (changes: ObserverChanges) => v
   }
 
   function observeIndex(collection: string, indexKey: string, indexValue: string, callback: ObserverCallback): Unsubscribe {
+    if (disposed) {
+      return () => {}
+    }
     const byIndex = indexObservers.get(collection) ?? new Map<string, Map<string, Set<ObserverCallback>>>()
     indexObservers.set(collection, byIndex)
     const byValue = byIndex.get(indexKey) ?? new Map<string, Set<ObserverCallback>>()
@@ -86,16 +97,25 @@ export function createObserverRegistry(onFlush?: (changes: ObserverChanges) => v
   }
 
   function touchItem(collection: string, key: string | number): void {
+    if (disposed) {
+      return
+    }
     const keys = pending.items.get(collection) ?? new Set<KeyId>()
     pending.items.set(collection, keys)
     keys.add(toKeyId(key))
   }
 
   function touchList(collection: string): void {
+    if (disposed) {
+      return
+    }
     pending.lists.add(collection)
   }
 
   function touchIndex(collection: string, indexKey: string, indexValue: string): void {
+    if (disposed) {
+      return
+    }
     const byIndex = pending.indexes.get(collection) ?? new Map<string, Set<string>>()
     pending.indexes.set(collection, byIndex)
     const values = byIndex.get(indexKey) ?? new Set<string>()
@@ -104,6 +124,9 @@ export function createObserverRegistry(onFlush?: (changes: ObserverChanges) => v
   }
 
   function invalidateCollection(collection: string): void {
+    if (disposed) {
+      return
+    }
     for (const key of itemObservers.get(collection)?.keys() ?? []) {
       touchItem(collection, key)
     }
@@ -116,12 +139,25 @@ export function createObserverRegistry(onFlush?: (changes: ObserverChanges) => v
   }
 
   function flush(): void {
+    if (disposed) {
+      pending = createPending()
+      return
+    }
     if (pending.items.size === 0 && pending.lists.size === 0 && pending.indexes.size === 0) {
       return
     }
     const change = pending
     pending = createPending()
-    onFlush?.(change)
+    let bridgeError: unknown
+    let bridgeFailed = false
+    try {
+      onFlush?.(change)
+    }
+    catch (error) {
+      // Framework bridge failures must not starve direct engine observers.
+      bridgeError = error
+      bridgeFailed = true
+    }
     for (const [collection, keys] of change.items) {
       const byKey = itemObservers.get(collection)
       for (const key of keys) {
@@ -140,7 +176,19 @@ export function createObserverRegistry(onFlush?: (changes: ObserverChanges) => v
         }
       }
     }
+    if (bridgeFailed) {
+      throw bridgeError
+    }
   }
 
-  return { observeItem, observeList, observeIndex, touchItem, touchList, touchIndex, invalidateCollection, flush }
+  /** Release every observer and pending change owned by this registry. */
+  function dispose(): void {
+    disposed = true
+    itemObservers.clear()
+    listObservers.clear()
+    indexObservers.clear()
+    pending = createPending()
+  }
+
+  return { observeItem, observeList, observeIndex, touchItem, touchList, touchIndex, invalidateCollection, flush, dispose }
 }

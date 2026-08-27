@@ -128,4 +128,19 @@ describe('store-engine: observers', () => {
     expect(good).toHaveBeenCalledTimes(1)
     spy.mockRestore()
   })
+
+  it('releases observers on dispose and rejects new subscriptions', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+    const beforeDispose = vi.fn()
+    const afterDispose = vi.fn()
+    engine.observeItem('User', 1, beforeDispose)
+
+    engine.dispose()
+    engine.observeItem('User', 1, afterDispose)
+    engine.writeItem({ collection, key: 1, item: { id: 1 } })
+
+    expect(beforeDispose).not.toHaveBeenCalled()
+    expect(afterDispose).not.toHaveBeenCalled()
+  })
 })
