@@ -37,6 +37,8 @@
     "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",
     "prepack": "node ../../scripts/sync-dep-skills.mjs .",
     "benchmark": "vite-node benchmark/cache.bench.ts",
+    "benchmark:decomposition": "vite-node benchmark/decomposition.ts",
+    "benchmark:read-decomposition": "vite-node benchmark/read-decomposition.ts",
     "benchmark:full": "vite-node benchmark/full.ts",
     "test:types": "tsc --noEmit"
   },

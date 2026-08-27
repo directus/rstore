@@ -3,8 +3,10 @@ import type { CacheLayer, CollectionDefaults, ResolvedCollection, ResolvedCollec
 import type { CacheRuntime, CreateCacheOptions } from './types'
 import { createStoreEngine, isKeyDefined } from '@rstore/core'
 import { reactive, shallowRef } from 'vue'
+import { createItemCellRegistry } from './itemCells'
 import { clearAllQueryState, clearQueryStateForCollection } from './queryState'
 import { createSignalRegistry } from './signals'
+import { appendSyncError, throwSyncErrors } from './syncErrors'
 import { createCacheVersionRegistry } from './versions'
 import { createWrappedItemRegistry } from './wrappedRegistry'
 
@@ -25,7 +27,7 @@ export function createCacheRuntime<
     getCollection: name => getStore().$collections.find(collection => collection.name === name),
     resolveChildCollection: (item, possibleNames) => getStore().$getCollection(item, possibleNames),
     wrapModuleState: value => value && typeof value === 'object' ? reactive(value) : value,
-    onObserverFlush: changes => runtime.versions.flush(changes),
+    onStateChange: changes => synchronizeBridge(runtime, changes),
     onAfterWrite: payload => handleAfterWrite(runtime, payload),
     onConflict: payload => handleConflict(getStore, payload),
     onLayerAdd: layer => handleLayerAdd(runtime, layer),
@@ -34,6 +36,7 @@ export function createCacheRuntime<
   }
 
   const engine = createStoreEngine({ callbacks, cacheStaggering, tombstoneGc, isServer })
+  const versions = createCacheVersionRegistry()
   runtime = {
     getStore,
     engine,
@@ -43,13 +46,36 @@ export function createCacheRuntime<
         return engine.getQueryMeta()
       },
     },
-    signals: createSignalRegistry({ engine, isServer }),
-    versions: createCacheVersionRegistry(),
+    signals: createSignalRegistry({ isServer }),
+    itemCells: createItemCellRegistry({
+      read: (collectionName, key) => {
+        const collection = getStore().$collections.find(candidate => candidate.name === collectionName)
+        return collection ? engine.readItemRaw({ collection, key }) : undefined
+      },
+      trackFallback: collectionName => versions.trackItem(collectionName),
+    }),
+    versions,
     layers: Object.create(null) as CacheRuntime<TSchema, TCollectionDefaults>['layers'],
     wrappedItems: createWrappedItemRegistry(),
     visibleListCache: new Map(),
   }
   return runtime
+}
+
+/** Synchronize every bridge registry even when one reactive effect fails. */
+function synchronizeBridge(ctx: CacheRuntime, changes: Parameters<NonNullable<EngineCallbacks['onStateChange']>>[0]): void {
+  let errors: unknown[] | undefined
+  // Existing cells do not track fallback versions. Flushing broad fallbacks
+  // first prevents a cell detached by this operation from rerunning twice.
+  for (const flush of [ctx.versions.flush, ctx.itemCells.flush, ctx.signals.flush]) {
+    try {
+      flush(changes)
+    }
+    catch (error) {
+      errors = appendSyncError(errors, error)
+    }
+  }
+  throwSyncErrors(errors, 'Vue cache synchronization failed')
 }
 
 /** Apply bridge write invalidation before calling user hooks. */
@@ -124,6 +150,7 @@ function handleReset(ctx: CacheRuntime, payload: EngineResetPayload): void {
     clearAllQueryState(ctx)
   }
   refreshLayerMirrors(ctx)
+  ctx.signals.reset()
   ctx.versions.reset()
   if (payload.source === 'clearCollection') {
     return

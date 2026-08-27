@@ -2,6 +2,7 @@ import type { StoreEngine, TombstoneGcOptions } from '@rstore/core'
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { VueStore } from '../store'
+import type { ItemCellRegistry } from './itemCells'
 import type { SignalRegistry } from './signals'
 import type { CacheVersionRegistry } from './versions'
 import type { WrappedItemRegistry } from './wrappedRegistry'
@@ -42,6 +43,8 @@ export interface CacheRuntime<
   state: VueCacheState
   /** Vue signal registry subscribed to engine observers. */
   signals: SignalRegistry
+  /** Wrapper-owned exact item cells synchronized after commits. */
+  itemCells: ItemCellRegistry
   /** Reactive fallback for Vue computed getters without a scope owner. */
   versions: CacheVersionRegistry
   /** Devtools layer mirror by collection name. */

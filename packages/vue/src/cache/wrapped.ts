@@ -1,29 +1,8 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
-import type { Ref } from 'vue'
 import type { CacheRuntime } from './types'
 import { shallowRef } from 'vue'
 import { wrapItem } from '../item'
 import { getItemKey, readRawCacheItem } from './context'
-
-/**
- * Read engine data on every wrapped-field access. Vue effects receive the
- * matching item signal, while plain reads stay fresh without subscriptions.
- */
-function createEngineItemSource(
-  ctx: CacheRuntime,
-  collection: ResolvedCollection<any, any, any>,
-  key: string | number,
-  fallback: any,
-): Ref<any> {
-  return {
-    get value() {
-      if (!ctx.signals.trackItem(collection.name, key)) {
-        ctx.versions.trackItem(collection.name)
-      }
-      return readRawCacheItem(ctx, collection, key) ?? fallback
-    },
-  } as Ref<any>
-}
 
 /** Return the cached wrapped proxy for an item, creating it when needed. */
 export function getWrappedItem<
@@ -35,6 +14,8 @@ export function getWrappedItem<
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>,
   item: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null | undefined,
   noCache = false,
+  knownKey?: string | number,
+  track = false,
 ): WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined {
   if (!item) {
     return undefined
@@ -52,25 +33,29 @@ export function getWrappedItem<
     })
   }
 
-  const key = getItemKey(collection, item)
-  const layer = item.$layer
+  const key = knownKey ?? getItemKey(collection, item)
+  // Public wrapItem calls can carry embedded relation payloads that engine
+  // normalized into child rows. Seed cached wrappers from canonical engine
+  // state so relation fields keep resolving through indexes.
+  const current = knownKey === undefined
+    ? readRawCacheItem(ctx, collection, key) ?? item
+    : item
+  const layer = current.$layer
   let entry = ctx.wrappedItems.get(collection.name, key, layer?.id)
   if (!entry) {
     const metadata = {
       queries: new Set(),
       dirtyQueries: new Set(),
     }
+    const cell = ctx.itemCells.create(collection.name, key, current)
     const wrappedItem = wrapItem({
       store: ctx.getStore(),
       collection,
-      // Layered values can still inherit fields from base state. This source
-      // re-reads on field access, so base writes refresh without recreating
-      // wrappers and plain non-reactive reads cannot cache stale values.
-      item: createEngineItemSource(ctx, collection, key, item),
+      item: cell.source,
       metadata,
-      seed: item,
+      seed: current,
     })
-    entry = { item: wrappedItem, metadata }
+    entry = { item: wrappedItem, metadata, cell }
     ctx.wrappedItems.set(
       collection.name,
       key,
@@ -78,6 +63,8 @@ export function getWrappedItem<
       entry as unknown as Parameters<typeof ctx.wrappedItems.set>[3],
     )
   }
+  if (track)
+    entry.cell.track()
   return entry.item as WrappedItem<TCollection, TCollectionDefaults, TSchema>
 }
 
@@ -86,11 +73,12 @@ export function garbageCollectItem<TCollection extends Collection>(
   ctx: CacheRuntime,
   collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
   item: WrappedItem<TCollection, CollectionDefaults, StoreSchema>,
+  knownKey?: string | number,
 ) {
   if (item.$meta.queries.size !== 0) {
     return
   }
-  const key = getItemKey(collection, item)
+  const key = knownKey ?? getItemKey(collection, item)
   ctx.engine.garbageCollectKey(collection, key)
   const store = ctx.getStore()
   store.$hooks.callHookSync('itemGarbageCollect', {

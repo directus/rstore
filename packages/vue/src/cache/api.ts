@@ -15,10 +15,12 @@ export function createCacheApi<
       return getWrappedItem(ctx, collection, item, noCache)!
     },
     readItem({ collection, key }) {
-      if (!ctx.signals.trackItem(collection.name, key)) {
+      const raw = readRawCacheItem(ctx, collection, key)
+      if (!raw) {
         ctx.versions.trackItem(collection.name)
+        return undefined
       }
-      return getWrappedItem(ctx, collection, readRawCacheItem(ctx, collection, key))
+      return getWrappedItem(ctx, collection, raw, false, key, true)
     },
     readItems(params) {
       return readItems(ctx, params)
@@ -106,6 +108,7 @@ function disposeCacheRuntime(ctx: CacheRuntime): void {
   ctx.signals.dispose()
   ctx.versions.dispose()
   ctx.visibleListCache.clear()
+  ctx.itemCells.dispose()
   ctx.wrappedItems.clear()
   ctx.state.pageRefs.clear()
   for (const key of Object.keys(ctx.state.queryMeta)) {
@@ -119,8 +122,9 @@ function disposeCacheRuntime(ctx: CacheRuntime): void {
 
 function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit, indexKey, indexValue }: Parameters<Cache['readItems']>[0]) {
   if (keys == null && indexKey != null) {
-    if (!ctx.signals.trackIndex(collection.name, indexKey, indexValue)) {
-      ctx.versions.trackIndex(collection.name)
+    const dependency = ctx.engine.getIndexDependencyId(collection.name, indexKey, indexValue)
+    if (!ctx.signals.trackIndex(dependency)) {
+      ctx.versions.trackIndex(dependency)
     }
   }
   else {
@@ -147,7 +151,7 @@ function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit,
   const result: Array<WrappedItem<any, any, any>> = []
   let count = 0
   for (const key of candidateKeys) {
-    const wrappedItem = getWrappedItem(ctx, collection, readRawCacheItem(ctx, collection, key))
+    const wrappedItem = getWrappedItem(ctx, collection, readRawCacheItem(ctx, collection, key), false, key)
     if (!wrappedItem || (filter && !filter(wrappedItem))) {
       continue
     }
@@ -168,9 +172,9 @@ function garbageCollect(ctx: CacheRuntime) {
   const store = ctx.getStore()
   for (const collection of store.$collections) {
     ctx.engine.forEachKey(collection.name, (key) => {
-      const wrappedItem = getWrappedItem(ctx, collection, readRawCacheItem(ctx, collection, key))
+      const wrappedItem = getWrappedItem(ctx, collection, readRawCacheItem(ctx, collection, key), false, key)
       if (wrappedItem) {
-        garbageCollectItem(ctx, collection, wrappedItem)
+        garbageCollectItem(ctx, collection, wrappedItem, key)
       }
     })
   }

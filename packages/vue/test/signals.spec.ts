@@ -1,125 +1,133 @@
-import type { StoreEngine } from '@rstore/core'
+import type { EngineChangeSet } from '@rstore/core'
 import { describe, expect, it, vi } from 'vitest'
 import { effectScope, ref, watchEffect } from 'vue'
 import { createSignalRegistry } from '../src/cache/signals'
 
-/** Build a minimal observer engine and capture each unsubscribe call. */
-function fakeEngine() {
-  const stops = { item: vi.fn(), list: vi.fn(), index: vi.fn() }
-  const engine = {
-    observeItem: vi.fn(() => stops.item),
-    observeList: vi.fn(() => stops.list),
-    observeIndex: vi.fn(() => stops.index),
-  } as unknown as StoreEngine
-  return { engine, stops }
+/** Build one exact immutable change-set payload. */
+function changes(options: Partial<EngineChangeSet> = {}): EngineChangeSet {
+  return {
+    items: new Map(),
+    lists: new Set(),
+    indexes: new Set(),
+    ...options,
+  }
 }
 
 describe('signal registry', () => {
-  it('does not subscribe for an unowned non-reactive read', () => {
-    const { engine } = fakeEngine()
-    const registry = createSignalRegistry({ engine, isServer: false })
+  it('does not retain an unowned non-reactive read', () => {
+    const registry = createSignalRegistry({ isServer: false })
 
-    registry.trackItem('User', 1)
+    registry.trackList('User')
 
-    expect(engine.observeItem).not.toHaveBeenCalled()
     expect(registry.size()).toEqual({ items: 0, lists: 0, indexes: 0 })
   })
 
-  it('reuses string and numeric key aliases within one scope', () => {
-    const { engine, stops } = fakeEngine()
-    const registry = createSignalRegistry({ engine, isServer: false })
-    const scope = effectScope()
-    scope.run(() => {
-      watchEffect(() => registry.trackItem('User', 1), { flush: 'sync' })
-      watchEffect(() => registry.trackItem('User', '1'), { flush: 'sync' })
-    })
-
-    expect(engine.observeItem).toHaveBeenCalledTimes(1)
-    expect(registry.size().items).toBe(1)
-    scope.stop()
-    expect(stops.item).toHaveBeenCalledTimes(1)
-    expect(registry.size().items).toBe(0)
-  })
-
-  it('retains a signal until every owning scope stops', () => {
-    const { engine, stops } = fakeEngine()
-    const registry = createSignalRegistry({ engine, isServer: false })
+  it('retains one list signal until every owning scope stops', () => {
+    const registry = createSignalRegistry({ isServer: false })
     const first = effectScope()
     const second = effectScope()
     first.run(() => watchEffect(() => registry.trackList('User'), { flush: 'sync' }))
     second.run(() => watchEffect(() => registry.trackList('User'), { flush: 'sync' }))
 
-    expect(engine.observeList).toHaveBeenCalledTimes(1)
+    expect(registry.size().lists).toBe(1)
     first.stop()
-    expect(stops.list).not.toHaveBeenCalled()
+    expect(registry.size().lists).toBe(1)
     second.stop()
-    expect(stops.list).toHaveBeenCalledTimes(1)
     expect(registry.size().lists).toBe(0)
   })
 
-  it('uses watcher cleanup when a watcher has no enclosing scope', () => {
-    const { engine, stops } = fakeEngine()
-    const registry = createSignalRegistry({ engine, isServer: false })
-    const stop = watchEffect(() => registry.trackIndex('Post', 'authorId', 'a'), { flush: 'sync' })
+  it('uses watcher cleanup when no enclosing scope exists', () => {
+    const registry = createSignalRegistry({ isServer: false })
+    const stop = watchEffect(() => registry.trackIndex('dependency'), { flush: 'sync' })
 
-    expect(engine.observeIndex).toHaveBeenCalledTimes(1)
+    expect(registry.size().indexes).toBe(1)
     stop()
-    expect(stops.index).toHaveBeenCalledTimes(1)
     expect(registry.size().indexes).toBe(0)
   })
 
-  it('releases stale dependencies while a watcher scope stays active', () => {
-    const { engine, stops } = fakeEngine()
-    const registry = createSignalRegistry({ engine, isServer: false })
-    const key = ref(1)
+  it('releases stale index dependencies while scope stays active', () => {
+    const registry = createSignalRegistry({ isServer: false })
+    const dependency = ref('first')
     const scope = effectScope()
     let stopWatcher!: () => void
     scope.run(() => {
-      stopWatcher = watchEffect(() => registry.trackItem('User', key.value), { flush: 'sync' })
+      stopWatcher = watchEffect(() => registry.trackIndex(dependency.value), { flush: 'sync' })
     })
 
-    expect(registry.size().items).toBe(1)
-    key.value = 2
-    expect(registry.size().items).toBe(1)
-    expect(stops.item).toHaveBeenCalledTimes(1)
-
+    expect(registry.size().indexes).toBe(1)
+    dependency.value = 'second'
+    expect(registry.size().indexes).toBe(1)
     stopWatcher()
-    expect(registry.size().items).toBe(0)
-    expect(stops.item).toHaveBeenCalledTimes(2)
+    expect(registry.size().indexes).toBe(0)
     expect(scope.active).toBe(true)
     scope.stop()
   })
 
-  it('disposes every remaining subscription on cache disposal', () => {
-    const { engine, stops } = fakeEngine()
-    const registry = createSignalRegistry({ engine, isServer: false })
+  it('routes exact list and index changes without engine subscriptions', () => {
+    const registry = createSignalRegistry({ isServer: false })
+    const listReader = vi.fn()
+    const indexReader = vi.fn()
     const scope = effectScope()
     scope.run(() => {
-      watchEffect(() => registry.trackItem('User', 1), { flush: 'sync' })
+      watchEffect(() => {
+        registry.trackList('User')
+        listReader()
+      }, { flush: 'sync' })
+      watchEffect(() => {
+        registry.trackIndex('wanted')
+        indexReader()
+      }, { flush: 'sync' })
+    })
+
+    registry.flush(changes({ lists: new Set(['Other']), indexes: new Set(['other']) }))
+    expect(listReader).toHaveBeenCalledTimes(1)
+    expect(indexReader).toHaveBeenCalledTimes(1)
+
+    registry.flush(changes({ lists: new Set(['User']), indexes: new Set(['wanted']) }))
+    expect(listReader).toHaveBeenCalledTimes(2)
+    expect(indexReader).toHaveBeenCalledTimes(2)
+    scope.stop()
+  })
+
+  it('resets sync watchers once even when they replace owned signals', () => {
+    const registry = createSignalRegistry({ isServer: false })
+    const reader = vi.fn()
+    const scope = effectScope()
+    scope.run(() => watchEffect(() => {
+      registry.trackList('User')
+      reader()
+    }, { flush: 'sync' }))
+
+    registry.reset()
+
+    expect(reader).toHaveBeenCalledTimes(2)
+    expect(registry.size().lists).toBe(1)
+    scope.stop()
+  })
+
+  it('disposes every remaining signal', () => {
+    const registry = createSignalRegistry({ isServer: false })
+    const scope = effectScope()
+    scope.run(() => {
       watchEffect(() => registry.trackList('User'), { flush: 'sync' })
-      watchEffect(() => registry.trackIndex('Post', 'authorId', 'a'), { flush: 'sync' })
+      watchEffect(() => registry.trackIndex('dependency'), { flush: 'sync' })
     })
 
     registry.dispose()
 
-    expect(stops.item).toHaveBeenCalledTimes(1)
-    expect(stops.list).toHaveBeenCalledTimes(1)
-    expect(stops.index).toHaveBeenCalledTimes(1)
     expect(registry.size()).toEqual({ items: 0, lists: 0, indexes: 0 })
     const laterScope = effectScope()
-    laterScope.run(() => watchEffect(() => registry.trackItem('User', 2), { flush: 'sync' }))
-    expect(engine.observeItem).toHaveBeenCalledTimes(1)
+    laterScope.run(() => watchEffect(() => registry.trackList('Other'), { flush: 'sync' }))
+    expect(registry.size().lists).toBe(0)
     laterScope.stop()
     scope.stop()
   })
 
-  it('does no work on the server', () => {
-    const { engine } = fakeEngine()
-    const registry = createSignalRegistry({ engine, isServer: true })
+  it('does no work on server', () => {
+    const registry = createSignalRegistry({ isServer: true })
     const scope = effectScope()
-    scope.run(() => watchEffect(() => registry.trackItem('User', 1), { flush: 'sync' }))
+    scope.run(() => watchEffect(() => registry.trackList('User'), { flush: 'sync' }))
 
-    expect(engine.observeItem).not.toHaveBeenCalled()
     expect(registry.size()).toEqual({ items: 0, lists: 0, indexes: 0 })
     scope.stop()
   })

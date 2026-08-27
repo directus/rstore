@@ -1,6 +1,6 @@
 import type { CacheLayer, CustomHookMeta, FieldTimestamps, ResolvedCollection } from '@rstore/shared'
 import type { TombstoneStore } from '../tombstone.js'
-import type { ObserverChanges } from './observer-changes.js'
+import type { MutableEngineChangeSet } from './change-set.js'
 import type {
   DeleteItemParams,
   EngineAfterWritePayload,
@@ -28,16 +28,10 @@ export interface ObserverRegistry {
   observeList: (collection: string, callback: ObserverCallback) => Unsubscribe
   /** Observe one encoded index lookup id. */
   observeIndex: (collection: string, indexKey: string, indexValueId: IndexValueId, callback: ObserverCallback) => Unsubscribe
-  /** Accumulate an item invalidation. */
-  touchItem: (collection: string, key: string | number) => void
-  /** Accumulate a list invalidation. */
-  touchList: (collection: string) => void
-  /** Accumulate an encoded index invalidation. */
-  touchIndex: (collection: string, indexKey: string, indexValueId: IndexValueId) => void
-  /** Invalidate every observed scope for a collection. */
-  invalidateCollection: (collection: string) => void
-  /** Dispatch pending invalidations. */
-  flush: () => void
+  /** Add every subscribed scope for one reset collection to a journal. */
+  collectCollection: (changes: MutableEngineChangeSet, collection: string) => void
+  /** Dispatch one completed flush journal. */
+  dispatch: (changes: MutableEngineChangeSet) => void
   /** Release observer maps and ignore future invalidations. */
   dispose: () => void
 }
@@ -46,8 +40,26 @@ export interface ObserverRegistry {
 export interface EngineIndexState {
   /** Canonical encoded tuple to item ids. */
   buckets: Map<IndexValueId, Set<KeyId>>
+  /** Retained buckets currently containing no live item ids. */
+  emptyBucketCount: number
   /** Legacy joined value to every canonical tuple producing it. */
   legacyAliases: Map<string, Set<IndexValueId>>
+  /** Cached opaque dependency ids for hot repeated memberships. */
+  dependencyIds: Map<IndexValueId, string>
+  /** Reusable scalar memberships by coerced field value. */
+  scalarValues: Map<string, IndexedValue>
+  /** Reusable two-field memberships without serialization on hot writes. */
+  tupleValues: Map<string, Map<string, IndexedValue>>
+}
+
+/** Cached current membership for one item and index. */
+export interface IndexedValue {
+  /** Exact collision-safe bucket identity. */
+  id: IndexValueId
+  /** Backward-compatible joined composite value. */
+  legacy: string
+  /** Encoded backward-compatible observer identity. */
+  legacyId: IndexValueId
 }
 
 /** Pre-normalized optimistic layer used by hot reads. */
@@ -76,6 +88,8 @@ export interface EngineCollectionState {
   keyValues: Map<KeyId, string | number>
   /** Materialized collection indexes. */
   indexes: Map<string, EngineIndexState>
+  /** Current resolved memberships by item and index. */
+  indexMemberships: Map<KeyId, Map<string, IndexedValue>>
   /** Ordered optimistic layers. */
   layers: EngineLayer[]
   /** Cached layer-resolved values. */
@@ -194,6 +208,3 @@ export interface EngineContext {
   /** Get or create collection storage. */
   ensureCollection: (name: string) => EngineCollectionState
 }
-
-/** Internal callback receives immutable observer changes. */
-export type ObserverFlushCallback = (changes: ObserverChanges) => void

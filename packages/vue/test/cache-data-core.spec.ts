@@ -317,6 +317,26 @@ describe('vue cache data-core regressions', () => {
     cache.dispose()
   })
 
+  it('keeps an evicted wrapper readable and reactive after reinsertion', async () => {
+    const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
+    const cache = store.$cache
+    const collection = store.$collections[0]!
+    cache.writeItem({ collection, key: 1, item: { id: 1, label: 'before' } })
+    const retained = cache.readItem({ collection, key: 1 }) as any
+    const reader = vi.fn()
+    const scope = effectScope()
+    scope.run(() => watchEffect(() => reader(retained.label), { flush: 'sync' }))
+
+    cache.deleteItem({ collection, key: 1 })
+    expect(retained.label).toBe('before')
+    cache.writeItem({ collection, key: 1, item: { id: 1, label: 'after' } })
+
+    expect(retained.label).toBe('after')
+    expect(reader).toHaveBeenLastCalledWith('after')
+    scope.stop()
+    cache.dispose()
+  })
+
   it('updates active indexed lists when an optimistic layer deletes a record', async () => {
     const store = await createStore({
       schema: [

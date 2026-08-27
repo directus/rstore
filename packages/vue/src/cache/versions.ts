@@ -1,84 +1,98 @@
-import type { ObserverChanges } from '@rstore/core'
-import { shallowReactive, shallowRef } from 'vue'
+import type { EngineChangeSet } from '@rstore/core'
+import type { ShallowRef } from 'vue'
+import { shallowRef } from 'vue'
+import { appendSyncError, throwSyncErrors } from './syncErrors'
 
-/** Reactive fallback versions for Vue computed getters without a watcher owner. */
+/** Reactive fallbacks for ownerless and detached cache reads. */
 export interface CacheVersionRegistry {
-  /** Track one item value through its collection version. */
+  /** Track broad collection changes for missing or detached items. */
   trackItem: (collection: string) => void
-  /** Track one visible-key collection version. */
+  /** Track one visible-key collection dependency. */
   trackList: (collection: string) => void
-  /** Track one index bucket through its collection index version. */
-  trackIndex: (collection: string) => void
-  /** Publish the exact invalidations from an engine observer flush. */
-  flush: (changes: ObserverChanges) => void
-  /** Invalidate all fallback readers after a cache reset. */
+  /** Track one opaque exact index dependency. */
+  trackIndex: (dependency: string) => void
+  /** Publish exact invalidations from one engine operation. */
+  flush: (changes: EngineChangeSet) => void
+  /** Invalidate all fallback readers after reset. */
   reset: () => void
-  /** Release all tracked versions and ignore future reads. */
+  /** Release tracked holders and ignore future reads. */
   dispose: () => void
 }
 
-/** Create tiny per-collection reactive versions without engine subscriptions. */
+/** Create direct shallow-ref maps without reactive object proxy reads. */
 export function createCacheVersionRegistry(): CacheVersionRegistry {
-  const itemVersions = shallowReactive<Record<string, number>>(Object.create(null))
-  const listVersions = shallowReactive<Record<string, number>>(Object.create(null))
-  const indexVersions = shallowReactive<Record<string, number>>(Object.create(null))
+  const itemVersions = new Map<string, ShallowRef<number>>()
+  const listVersions = new Map<string, ShallowRef<number>>()
+  const indexVersions = new Map<string, ShallowRef<number>>()
   const resetVersion = shallowRef(0)
   let disposed = false
 
-  /** Read a collection version, creating its small holder on first access. */
-  function track(versions: Record<string, number>, collection: string): void {
-    if (disposed) {
+  /** Read one dependency holder and shared reset holder. */
+  function track(versions: Map<string, ShallowRef<number>>, id: string): void {
+    if (disposed)
       return
-    }
-    versions[collection] ??= 0
+    const holder = versions.get(id) ?? shallowRef(0)
+    versions.set(id, holder)
     // eslint-disable-next-line ts/no-unused-expressions
     resetVersion.value
     // eslint-disable-next-line ts/no-unused-expressions
-    versions[collection]
+    holder.value
   }
 
-  /** Increment a tracked version without allocating data-key-specific state. */
-  function touch(versions: Record<string, number>, collection: string): void {
-    if (!disposed && collection in versions) {
-      versions[collection] = (versions[collection] ?? 0) + 1
-    }
-  }
-
-  /** Remove every tracked collection without replacing reactive records. */
-  function clearVersions(): void {
-    for (const versions of [itemVersions, listVersions, indexVersions]) {
-      for (const collection of Object.keys(versions)) {
-        delete versions[collection]
-      }
-    }
+  /** Increment a holder only when an ownerless reader created it. */
+  function touch(versions: Map<string, ShallowRef<number>>, id: string): void {
+    const holder = versions.get(id)
+    if (!disposed && holder)
+      holder.value++
   }
 
   return {
     trackItem: collection => track(itemVersions, collection),
     trackList: collection => track(listVersions, collection),
-    trackIndex: collection => track(indexVersions, collection),
+    trackIndex: dependency => track(indexVersions, dependency),
     flush(changes) {
-      for (const collection of changes.items.keys()) {
-        touch(itemVersions, collection)
+      let errors: unknown[] | undefined
+      if (itemVersions.size) {
+        for (const collection of changes.items.keys()) {
+          try {
+            touch(itemVersions, collection)
+          }
+          catch (error) {
+            errors = appendSyncError(errors, error)
+          }
+        }
       }
-      for (const collection of changes.lists) {
-        touch(listVersions, collection)
+      if (listVersions.size) {
+        for (const collection of changes.lists) {
+          try {
+            touch(listVersions, collection)
+          }
+          catch (error) {
+            errors = appendSyncError(errors, error)
+          }
+        }
       }
-      for (const collection of changes.indexes.keys()) {
-        touch(indexVersions, collection)
+      if (indexVersions.size) {
+        for (const dependency of changes.indexes) {
+          try {
+            touch(indexVersions, dependency)
+          }
+          catch (error) {
+            errors = appendSyncError(errors, error)
+          }
+        }
       }
+      throwSyncErrors(errors, 'Fallback version synchronization failed')
     },
     reset() {
-      if (!disposed) {
+      if (!disposed)
         resetVersion.value++
-      }
     },
     dispose() {
-      if (disposed) {
-        return
-      }
       disposed = true
-      clearVersions()
+      itemVersions.clear()
+      listVersions.clear()
+      indexVersions.clear()
     },
   }
 }
