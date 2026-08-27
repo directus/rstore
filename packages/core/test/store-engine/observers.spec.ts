@@ -1,4 +1,4 @@
-import type { EngineChangeSet } from '../../src'
+import type { EngineChangeInterest, EngineChangeSet } from '../../src'
 import { describe, expect, it, vi } from 'vitest'
 import { createStoreEngine } from '../../src'
 import { buildCollection, createTestEngine } from './helpers'
@@ -60,6 +60,64 @@ describe('store-engine: observers', () => {
     expect(operations[0]).not.toBe(operations[1])
     expect(operations[0]!.items.get('User')).toEqual(new Set(['1']))
     expect(operations[1]!.items.get('User')).toEqual(new Set(['2']))
+  })
+
+  it('filters immediate state changes without filtering direct observers', () => {
+    const collection = buildCollection('User')
+    const itemKeys = new Map<string, true | ReadonlySet<string>>([
+      ['User', new Set(['1'])],
+    ])
+    const interest: EngineChangeInterest = {
+      itemKeys,
+      lists: new Set(),
+      indexes: new Map(),
+    }
+    const operations: EngineChangeSet[] = []
+    const otherObserver = vi.fn()
+    const engine = createStoreEngine({
+      isServer: true,
+      callbacks: {
+        getCollection: name => name === collection.name ? collection : undefined,
+        resolveChildCollection: () => null,
+        getStateChangeInterest: () => interest,
+        onStateChange: changes => operations.push(changes),
+      },
+    })
+    engine.observeItem('User', 2, otherObserver)
+
+    engine.writeItem({ collection, key: 2, item: { id: 2 } })
+    expect(operations).toHaveLength(0)
+    expect(otherObserver).toHaveBeenCalledTimes(1)
+
+    engine.writeItem({ collection, key: 1, item: { id: 1 } })
+    expect(operations).toHaveLength(1)
+    expect(operations[0]!.items.get('User')).toEqual(new Set(['1']))
+  })
+
+  it('reads state-change interests for every queued operation', () => {
+    const collection = buildCollection('User')
+    const itemKeys = new Map<string, true | ReadonlySet<string>>([
+      ['User', new Set(['1'])],
+    ])
+    const operations: EngineChangeSet[] = []
+    const engine = createStoreEngine({
+      isServer: true,
+      callbacks: {
+        getCollection: name => name === collection.name ? collection : undefined,
+        resolveChildCollection: () => null,
+        getStateChangeInterest: () => ({ itemKeys, lists: new Set(), indexes: new Map() }),
+        onStateChange: changes => operations.push(changes),
+      },
+    })
+    engine.pause()
+    engine.writeItem({ collection, key: 1, item: { id: 1 } })
+    engine.writeItem({ collection, key: 2, item: { id: 2 } })
+    itemKeys.set('User', new Set(['2']))
+
+    engine.resume()
+
+    expect(operations).toHaveLength(1)
+    expect(operations[0]!.items.get('User')).toEqual(new Set(['2']))
   })
 
   it('a field update does NOT re-run the list observer (perf win)', () => {

@@ -1,6 +1,7 @@
 import type { CacheIndexValue, ResolvedCollection } from '@rstore/shared'
-import type { MutableEngineChangeSet } from './change-set.js'
+import type { ChangeRecorder } from './change-recorder.js'
 import type { EngineCollectionState, EngineContext, EngineIndexState, IndexedValue, IndexValueId, KeyId } from './internal-types.js'
+import { mayRecordIndex, mayRecordIndexDependency, recordIndex } from './change-recorder.js'
 import { getIndexDependencyId } from './change-set.js'
 import { getPublicKey } from './identity.js'
 import { encodeIndexLookup, encodeLegacyValue, getLiveAliasTargets, readIndexedValue } from './index-value.js'
@@ -44,24 +45,29 @@ function addIndexKey(index: EngineIndexState, value: IndexedValue, id: KeyId, co
 }
 
 /** Remove one membership while retaining its empty storage for hot reuse. */
-function removeIndexKey(index: EngineIndexState, value: IndexedValue, id: KeyId): boolean {
+function removeIndexKey(ctx: EngineContext, index: EngineIndexState, value: IndexedValue, id: KeyId): boolean {
   const keys = index.buckets.get(value.id)
   if (!keys?.delete(id))
     return false
-  if (!keys.size)
+  if (!keys.size) {
     index.emptyBucketCount++
+    if (index.emptyBucketCount > EMPTY_BUCKET_SWEEP_THRESHOLD)
+      ctx.indexSweepCandidates.add(index)
+  }
   return true
 }
 
 /** Record exact tuple and legacy joined-string dependency changes. */
 function touchIndexedValue(
-  changes: MutableEngineChangeSet,
+  changes: ChangeRecorder | undefined,
   collection: string,
   indexKey: string,
   index: EngineIndexState,
   value: IndexedValue,
   composite: boolean,
 ): void {
+  if (!mayRecordIndex(changes, collection))
+    return
   addDependency(changes, index, collection, indexKey, value.id)
   if (composite)
     addDependency(changes, index, collection, indexKey, value.legacyId)
@@ -69,24 +75,41 @@ function touchIndexedValue(
 
 /** Reuse one opaque dependency string across alternating writes. */
 function addDependency(
-  changes: MutableEngineChangeSet,
+  changes: ChangeRecorder | undefined,
   index: EngineIndexState,
   collection: string,
   indexKey: string,
   valueId: IndexValueId,
 ): void {
   let dependency = index.dependencyIds.get(valueId)
+  if (!mayRecordIndexDependency(changes, collection, dependency))
+    return
   if (!dependency) {
     dependency = getIndexDependencyId(collection, indexKey, valueId)
     index.dependencyIds.set(valueId, dependency)
   }
-  changes.indexes.add(dependency)
+  recordIndex(changes, collection, dependency)
+}
+
+/** Cache one public opaque dependency after a reader or observer requests it. */
+export function cacheIndexDependencyId(
+  index: EngineIndexState | undefined,
+  collection: string,
+  indexKey: string,
+  valueId: IndexValueId,
+): string {
+  const cached = index?.dependencyIds.get(valueId)
+  if (cached)
+    return cached
+  const dependency = getIndexDependencyId(collection, indexKey, valueId)
+  index?.dependencyIds.set(valueId, dependency)
+  return dependency
 }
 
 /** Reconcile one item's indexes from cached previous memberships. */
 export function reconcileItemIndexes(
   ctx: EngineContext,
-  changes: MutableEngineChangeSet,
+  changes: ChangeRecorder | undefined,
   collection: ResolvedCollection<any, any, any>,
   id: KeyId,
   next: any | undefined,
@@ -100,7 +123,7 @@ export function reconcileItemIndexes(
     if (previousValue?.id === nextValue?.id)
       continue
     const composite = fields.length > 1
-    if (previousValue && removeIndexKey(index, previousValue, id)) {
+    if (previousValue && removeIndexKey(ctx, index, previousValue, id)) {
       touchIndexedValue(changes, collection.name, indexKey, index, previousValue, composite)
     }
     if (nextValue) {
@@ -193,9 +216,8 @@ export function getIndexBucket(
 
 /** Sweep excessive retained empty buckets after a complete queue flush. */
 export function sweepEmptyIndexBuckets(ctx: EngineContext): void {
-  for (const state of ctx.collections.values()) {
-    for (const index of state.indexes.values()) sweepIndex(index)
-  }
+  for (const index of ctx.indexSweepCandidates) sweepIndex(index)
+  ctx.indexSweepCandidates.clear()
 }
 
 /** Apply bounded retention policy to one index. */

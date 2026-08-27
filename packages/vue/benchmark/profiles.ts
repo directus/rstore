@@ -1,10 +1,11 @@
 import type { CacheImplementation } from './runtime'
 import type { Scenario, ScenarioOptions } from './scenario-harness'
-import { compositeWriteWithDirectWatcher, compositeWriteWithoutWatcher, scalarWriteWithDirectWatcher } from './decomposition-scenarios'
+import { compositeWriteWithDirectWatcher, compositeWriteWithLegacyWatcher, compositeWriteWithoutWatcher, scalarWriteWithDirectWatcher } from './decomposition-scenarios'
 import { compositeIndexMembershipWrite, compositeIndexRead } from './index-scenarios'
 import { filteredLimitedListRead, fullListRead, indexedListRead, itemRead } from './read-scenarios'
 import { fieldWriteUnderItems, fieldWriteUnderLists, fieldWriteWithListRead, listReadUnderLayer, relationRelatedFieldWrites, relationUnrelatedWrites, replaceUnderLists } from './scenarios'
 import { batchWrite, hydrateState, layerCycle, pausedWriteBatch, relationMembershipWrite, serializeState } from './state-scenarios'
+import { crdtStaleWriteWithItemInterest, fieldWriteWithExactItemInterest, fieldWriteWithoutConsumer, hydrateWithRetainedWrapper } from './write-decomposition-scenarios'
 import { crdtFreshWrite, crdtStaleWrite, nestedRelationWrite } from './write-scenarios'
 
 /** A workload that both cache implementations support. */
@@ -24,7 +25,7 @@ export interface BenchmarkScenario {
 /** Benchmark duration and workload selection. */
 export interface BenchmarkProfile {
   /** Human-readable command profile. */
-  name: 'quick' | 'full' | 'decomposition'
+  name: 'quick' | 'full' | 'decomposition' | 'write-decomposition'
   /** Item counts to exercise. */
   itemCounts: readonly number[]
   /** Live watcher count for reactive workloads. */
@@ -118,6 +119,36 @@ export const DECOMPOSITION_PROFILE: BenchmarkProfile = {
   scenarios: [
     REGRESSION_SCENARIOS[1]!,
     ...FULL_ONLY_SCENARIOS.slice(-3),
+  ],
+}
+
+/** Focused demand-driven write-path decomposition for local profiling. */
+export const WRITE_DECOMPOSITION_PROFILE: BenchmarkProfile = {
+  ...QUICK_PROFILE,
+  name: 'write-decomposition',
+  scenarios: [
+    workload('field-write-no-consumer', 'field write / no consumer', fieldWriteWithoutConsumer, { itemCounts: [1000] }),
+    REACTIVE_SCENARIOS[0]!,
+    workload('field-write-exact-item', 'field write / exact item consumer', fieldWriteWithExactItemInterest, { observer: 'item', itemCounts: [1000] }),
+    FULL_ONLY_SCENARIOS[3]!,
+    FULL_ONLY_SCENARIOS[4]!,
+    FULL_ONLY_SCENARIOS[9]!,
+    workload('crdt-stale-write-item-interest', 'rejected stale CRDT write / item consumer', crdtStaleWriteWithItemInterest, { observer: 'item', itemCounts: [1000] }),
+    FULL_ONLY_SCENARIOS[13]!,
+    workload('hydrate-retained-wrapper', 'hydrate / retained wrapper', hydrateWithRetainedWrapper, { observer: 'item', itemCounts: [1000] }),
+    ...FULL_ONLY_SCENARIOS.slice(-3),
+    workload('composite-write-legacy-watcher', 'composite membership write / legacy watcher', compositeWriteWithLegacyWatcher, { observer: 'relation', itemCounts: [1000] }),
+    REGRESSION_SCENARIOS[1]!,
+  ],
+}
+
+/** Focused public list/index read matrix for regression investigation. */
+export const READ_REGRESSION_PROFILE: BenchmarkProfile = {
+  ...FULL_PROFILE,
+  name: 'decomposition',
+  scenarios: [
+    ...FULL_ONLY_SCENARIOS.slice(0, 3),
+    FULL_ONLY_SCENARIOS[7]!,
   ],
 }
 

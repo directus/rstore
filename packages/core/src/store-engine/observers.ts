@@ -1,7 +1,7 @@
 import type { MutableEngineChangeSet } from './change-set.js'
 import type { KeyId, ObserverRegistry } from './internal-types.js'
 import type { ObserverCallback, Unsubscribe } from './types.js'
-import { getIndexDependencyId, touchItem, touchList } from './change-set.js'
+import { getIndexDependencyId } from './change-set.js'
 import { toKeyId } from './identity.js'
 
 /** Invoke callbacks independently so one failure cannot starve other readers. */
@@ -79,15 +79,6 @@ export function createObserverRegistry(): ObserverRegistry {
     }
   }
 
-  /** Add every directly observed scope when a collection is replaced. */
-  function collectCollection(changes: MutableEngineChangeSet, collection: string): void {
-    if (disposed)
-      return
-    for (const id of itemObservers.get(collection)?.keys() ?? []) touchItem(changes, collection, id)
-    touchList(changes, collection)
-    for (const dependency of indexDependenciesByCollection.get(collection) ?? []) changes.indexes.add(dependency)
-  }
-
   /** Dispatch one immutable completed journal to direct observers. */
   function dispatch(changes: MutableEngineChangeSet): void {
     if (disposed)
@@ -109,7 +100,20 @@ export function createObserverRegistry(): ObserverRegistry {
     indexDependenciesByCollection.clear()
   }
 
-  return { observeItem, observeList, observeIndex, collectCollection, dispatch, dispose }
+  return {
+    observeItem,
+    observeList,
+    observeIndex,
+    hasAny: () => !disposed && (itemObservers.size > 0 || listObservers.size > 0 || indexObservers.size > 0),
+    hasItem: (collection, key) => !disposed && Boolean(itemObservers.get(collection)?.get(key)?.size),
+    hasList: collection => !disposed && Boolean(listObservers.get(collection)?.size),
+    hasIndex: dependency => !disposed && Boolean(indexObservers.get(dependency)?.size),
+    hasIndexCollection: collection => !disposed && Boolean(indexDependenciesByCollection.get(collection)?.size),
+    itemKeys: collection => itemObservers.get(collection)?.keys() ?? [],
+    indexDependencies: collection => indexDependenciesByCollection.get(collection) ?? [],
+    dispatch,
+    dispose,
+  }
 }
 
 /** Reusable disposed subscription handle. */

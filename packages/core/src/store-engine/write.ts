@@ -1,14 +1,15 @@
 import type { FieldTimestamps } from '@rstore/shared'
-import type { MutableEngineChangeSet } from './change-set.js'
+import type { ChangeRecorder } from './change-recorder.js'
 import type { EngineContext, EngineEffect, WriteCommitResult } from './internal-types.js'
 import type { PlannedWrite } from './relations.js'
 import type { DeleteItemParams, EngineWriteChange, WriteItemParams } from './types.js'
 import { mergeItemFields } from '../crdt/index.js'
 import { shouldResurrect } from '../tombstone.js'
-import { touchItem, touchList } from './change-set.js'
+import { recordItem, recordList } from './change-recorder.js'
+import { getCollectionMetadata } from './collection-metadata.js'
 import { getPublicKey, refreshPublicKey, registerBaseKey, releaseUnusedKey, toKeyId } from './identity.js'
 import { reconcileItemIndexes } from './indexes.js'
-import { planWriteTree } from './relations.js'
+import { planRelationFreeWrite, planWriteTree } from './relations.js'
 import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
 
 /** Result of deleting one base item. */
@@ -19,6 +20,14 @@ export interface DeleteCommitResult {
   effects: EngineEffect[]
   /** Visibility/key-form metadata when removed. */
   change?: EngineWriteChange
+}
+
+/** Mutable merge result with observable-value identity information. */
+interface BaseMergeResult {
+  /** Base value to store or retain. */
+  value: any
+  /** Whether resolved item data can have changed. */
+  valueChanged: boolean
 }
 
 /** Get or create field timestamps for one collection. */
@@ -47,8 +56,12 @@ export function setFieldTimestamps(ctx: EngineContext, collectionName: string, k
 }
 
 /** Commit a preflighted write tree and collect callbacks in legacy order. */
-export function writeItemNow(ctx: EngineContext, changes: MutableEngineChangeSet, params: WriteItemParams): WriteCommitResult {
+export function writeItemNow(ctx: EngineContext, changes: ChangeRecorder | undefined, params: WriteItemParams): WriteCommitResult {
   const effects: EngineEffect[] = []
+  if (!getCollectionMetadata(params.collection).hasRelations) {
+    const change = commitPlannedWrite(ctx, changes, planRelationFreeWrite(params), effects)
+    return { effects, change }
+  }
   let rootChange: EngineWriteChange | undefined
   for (const planned of planWriteTree(ctx, params)) {
     const change = commitPlannedWrite(ctx, changes, planned, effects)
@@ -62,7 +75,7 @@ export function writeItemNow(ctx: EngineContext, changes: MutableEngineChangeSet
 /** Commit one validated child or root write. */
 function commitPlannedWrite(
   ctx: EngineContext,
-  changes: MutableEngineChangeSet,
+  changes: ChangeRecorder | undefined,
   planned: PlannedWrite,
   effects: EngineEffect[],
 ): EngineWriteChange | undefined {
@@ -82,16 +95,17 @@ function commitPlannedWrite(
 
   const previous = resolveItemById(state, id)
   const existing = state.base.get(id)
-  const nextBase = planned.mutable
+  const mergedBase = planned.mutable
     ? mergeMutableItem(ctx, planned, existing, publicKey, effects)
-    : planned.data
-  state.base.set(id, nextBase)
+    : { value: planned.data, valueChanged: true }
+  if (mergedBase.valueChanged)
+    state.base.set(id, mergedBase.value)
 
-  invalidateResolvedItem(state, id)
-  const next = resolveItemById(state, id)
-  if (existing === undefined || !planned.mutable || touchesIndexedField(collection, planned.data))
+  if (mergedBase.valueChanged)
+    invalidateResolvedItem(state, id)
+  const next = mergedBase.valueChanged ? resolveItemById(state, id) : previous
+  if (mergedBase.valueChanged && (existing === undefined || !planned.mutable || touchesIndexedField(collection, planned.data)))
     reconcileItemIndexes(ctx, changes, collection, id, next)
-  touchItem(changes, collection.name, id)
   const change: EngineWriteChange = {
     key: publicKey,
     previousKey: previousPublicKey,
@@ -100,14 +114,16 @@ function commitPlannedWrite(
       && previousPublicKey !== publicKey
       && (previous !== undefined || next !== undefined),
   }
+  if (mergedBase.valueChanged || change.keyFormChanged)
+    recordItem(changes, collection.name, id)
   if (change.visibilityChanged || change.keyFormChanged) {
     invalidateVisibleKeys(state)
-    touchList(changes, collection.name)
+    recordList(changes, collection.name)
   }
 
   if (marker !== undefined) {
     ctx.markers[marker] = true
-    touchList(changes, collection.name)
+    recordList(changes, collection.name)
   }
   if (meta?.$queryTracking) {
     meta.$queryTracking.items[collection.name] ??= new Set()
@@ -124,11 +140,10 @@ function commitPlannedWrite(
 
 /** Check whether one mutable patch can change any materialized membership. */
 function touchesIndexedField(collection: PlannedWrite['params']['collection'], data: any): boolean {
-  for (const fields of collection.indexes.values()) {
-    for (const field of fields) {
-      if (Object.hasOwn(data, field))
-        return true
-    }
+  const indexedFields = getCollectionMetadata(collection).indexedFields
+  for (const field in data) {
+    if (Object.hasOwn(data, field) && indexedFields.has(field))
+      return true
   }
   return false
 }
@@ -140,34 +155,35 @@ function mergeMutableItem(
   existing: any,
   publicKey: string | number,
   effects: EngineEffect[],
-): any {
+): BaseMergeResult {
   const { collection, fieldTimestamps } = planned.params
   if (existing === undefined) {
     if (fieldTimestamps) {
       setFieldTimestamps(ctx, collection.name, publicKey, { ...fieldTimestamps })
     }
-    return planned.data
+    return { value: planned.data, valueChanged: true }
   }
   if (!fieldTimestamps) {
-    return { ...existing, ...planned.data }
+    return { value: { ...existing, ...planned.data }, valueChanged: true }
   }
 
   const localTimestamps = getFieldTimestamps(ctx, collection.name, publicKey) ?? {}
-  const { merged, mergedTimestamps, conflicts } = mergeItemFields(
+  const { merged, mergedTimestamps, conflicts, valueChanged, timestampsChanged } = mergeItemFields(
     existing,
     planned.data,
     localTimestamps,
     fieldTimestamps,
   )
-  setFieldTimestamps(ctx, collection.name, publicKey, mergedTimestamps)
+  if (timestampsChanged)
+    setFieldTimestamps(ctx, collection.name, publicKey, mergedTimestamps)
   if (conflicts.length > 0) {
     effects.push({ type: 'conflict', payload: { collection, key: publicKey, conflicts } })
   }
-  return merged
+  return { value: merged, valueChanged }
 }
 
 /** Delete one base item and collect its post-commit hook. */
-export function deleteItemFromBase(ctx: EngineContext, changes: MutableEngineChangeSet, params: DeleteItemParams): DeleteCommitResult {
+export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder | undefined, params: DeleteItemParams): DeleteCommitResult {
   const { collection, key } = params
   const state = ctx.collections.get(collection.name)
   if (!state) {
@@ -186,7 +202,7 @@ export function deleteItemFromBase(ctx: EngineContext, changes: MutableEngineCha
   invalidateResolvedItem(state, id)
   const next = resolveItemById(state, id)
   reconcileItemIndexes(ctx, changes, collection, id, next)
-  touchItem(changes, collection.name, id)
+  recordItem(changes, collection.name, id)
   const change: EngineWriteChange = {
     key: next === undefined ? publicKey : getPublicKey(state, id),
     previousKey: publicKey,
@@ -195,7 +211,7 @@ export function deleteItemFromBase(ctx: EngineContext, changes: MutableEngineCha
   }
   if (change.visibilityChanged || change.keyFormChanged) {
     invalidateVisibleKeys(state)
-    touchList(changes, collection.name)
+    recordList(changes, collection.name)
   }
   releaseUnusedKey(state, id)
   return {

@@ -2,12 +2,19 @@ import type { EngineContext, EngineEffect } from './internal-types.js'
 
 /** Dispatch every effect and preserve one error or aggregate many errors. */
 export function dispatchEffects(ctx: EngineContext, effects: readonly EngineEffect[]): void {
-  const errors: unknown[] = []
+  if (!effects.length)
+    return
+  if (effects.length === 1) {
+    dispatchEffect(ctx, effects[0]!)
+    return
+  }
+  let errors: unknown[] | undefined
   for (const effect of effects) {
     try {
       dispatchEffect(ctx, effect)
     }
     catch (error) {
+      errors ??= []
       errors.push(error)
     }
   }
@@ -36,7 +43,9 @@ function dispatchEffect(ctx: EngineContext, effect: EngineEffect): void {
 }
 
 /** Throw no error, one original error, or an aggregate for multiple errors. */
-export function throwCollectedErrors(errors: readonly unknown[], message: string): void {
+export function throwCollectedErrors(errors: readonly unknown[] | undefined, message: string): void {
+  if (!errors)
+    return
   if (errors.length === 1) {
     throw errors[0]
   }

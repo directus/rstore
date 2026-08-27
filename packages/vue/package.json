@@ -39,6 +39,9 @@
     "benchmark": "vite-node benchmark/cache.bench.ts",
     "benchmark:decomposition": "vite-node benchmark/decomposition.ts",
     "benchmark:read-decomposition": "vite-node benchmark/read-decomposition.ts",
+    "benchmark:read-regressions": "vite-node benchmark/read-regressions.ts",
+    "benchmark:write-decomposition": "vite-node benchmark/write-decomposition.ts",
+    "benchmark:combine-reports": "vite-node benchmark/combine-version-reports.ts",
     "benchmark:full": "vite-node benchmark/full.ts",
     "test:types": "tsc --noEmit"
   },

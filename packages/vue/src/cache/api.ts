@@ -15,9 +15,17 @@ export function createCacheApi<
       return getWrappedItem(ctx, collection, item, noCache)!
     },
     readItem({ collection, key }) {
+      const cached = ctx.layers[collection.name] === undefined
+        ? ctx.wrappedItems.get(collection.name, key)
+        : undefined
+      if (cached?.cell.isActive()) {
+        cached.cell.track()
+        return cached.item
+      }
       const raw = readRawCacheItem(ctx, collection, key)
       if (!raw) {
-        ctx.versions.trackItem(collection.name)
+        if (!ctx.signals.trackItem(collection.name, key))
+          ctx.versions.trackItem(collection.name)
         return undefined
       }
       return getWrappedItem(ctx, collection, raw, false, key, true)
@@ -109,6 +117,7 @@ function disposeCacheRuntime(ctx: CacheRuntime): void {
   ctx.versions.dispose()
   ctx.visibleListCache.clear()
   ctx.itemCells.dispose()
+  ctx.changeInterest.dispose()
   ctx.wrappedItems.clear()
   ctx.state.pageRefs.clear()
   for (const key of Object.keys(ctx.state.queryMeta)) {
@@ -123,8 +132,8 @@ function disposeCacheRuntime(ctx: CacheRuntime): void {
 function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit, indexKey, indexValue }: Parameters<Cache['readItems']>[0]) {
   if (keys == null && indexKey != null) {
     const dependency = ctx.engine.getIndexDependencyId(collection.name, indexKey, indexValue)
-    if (!ctx.signals.trackIndex(dependency)) {
-      ctx.versions.trackIndex(dependency)
+    if (!ctx.signals.trackIndex(collection.name, dependency)) {
+      ctx.versions.trackIndex(collection.name, dependency)
     }
   }
   else {
