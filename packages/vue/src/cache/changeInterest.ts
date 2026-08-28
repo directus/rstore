@@ -1,5 +1,7 @@
 import type { EngineChangeInterest } from '@rstore/core'
 
+const EMPTY_KEYS: ReadonlySet<string> = new Set()
+
 /** Ref-counted dependencies exposed to Core's selective change recorder. */
 export interface CacheChangeInterestRegistry {
   /** Live interest object read by StoreEngine before each operation. */
@@ -22,6 +24,16 @@ export interface CacheChangeInterestRegistry {
   releaseIndex: (collection: string, dependency: string) => void
   /** Release every interest. */
   dispose: () => void
+  /** Return whether any bridge or cache dependency is active. */
+  hasAny: () => boolean
+  /** Return whether an exact or broad item dependency is active. */
+  wantsItem: (collection: string, key: string) => boolean
+  /** Return whether one visible-list dependency is active. */
+  wantsList: (collection: string) => boolean
+  /** Return whether one opaque index dependency is active. */
+  wantsIndex: (dependency: string) => boolean
+  /** Return exact item keys retained independently from broad fallback. */
+  exactItemKeys: (collection: string) => ReadonlySet<string>
 }
 
 /** Create live ref-counted maps without reactive wrappers. */
@@ -35,6 +47,7 @@ export function createCacheChangeInterestRegistry(): CacheChangeInterestRegistry
   const listCounts = new Map<string, number>()
   const indexCounts = new Map<string, Map<string, number>>()
   const indexSets = new Map<string, Set<string>>()
+  const allIndexDependencies = new Set<string>()
   let disposed = false
 
   /** Refresh public exact-item view after one count changes. */
@@ -96,10 +109,12 @@ export function createCacheChangeInterestRegistry(): CacheChangeInterestRegistry
     if (next > 0) {
       counts.set(dependency, next)
       dependencies.add(dependency)
+      allIndexDependencies.add(dependency)
     }
     else {
       counts.delete(dependency)
       dependencies.delete(dependency)
+      allIndexDependencies.delete(dependency)
     }
     indexCounts.set(collection, counts)
     indexSets.set(collection, dependencies)
@@ -140,6 +155,15 @@ export function createCacheChangeInterestRegistry(): CacheChangeInterestRegistry
       listCounts.clear()
       indexCounts.clear()
       indexSets.clear()
+      allIndexDependencies.clear()
     },
+    hasAny: () => !disposed && Boolean(itemKeys.size || lists.size || indexes.size),
+    wantsItem(collection, key) {
+      const keys = itemKeys.get(collection)
+      return keys === true || Boolean(keys?.has(key))
+    },
+    wantsList: collection => lists.has(collection),
+    wantsIndex: dependency => allIndexDependencies.has(dependency),
+    exactItemKeys: collection => exactItemSets.get(collection) ?? EMPTY_KEYS,
   }
 }

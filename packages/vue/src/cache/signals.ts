@@ -1,29 +1,12 @@
-import type { EngineChangeSet } from '@rstore/core'
 import type { EffectScope } from 'vue'
 import type { CacheChangeInterestRegistry } from './changeInterest'
-import type { Signal, SignalOwner } from './signalInternals'
+import type { Signal } from './signalInternals'
+import type { SignalRegistry } from './signalTypes'
 import { getCurrentInstance, getCurrentScope, getCurrentWatcher, onScopeDispose, onWatcherCleanup, shallowRef } from 'vue'
 import { appendSyncError, throwSyncErrors } from './syncErrors'
 
 const MAX_ORPHAN_SIGNALS = 256
-
-/** Lifecycle-owned Vue dependency registry. */
-export interface SignalRegistry {
-  /** Track one missing item by canonical key. */
-  trackItem: (collection: string, key: string | number) => boolean
-  /** Track one collection visible-key signal. */
-  trackList: (collection: string) => boolean
-  /** Track one opaque exact index dependency. */
-  trackIndex: (collection: string, dependency: string) => boolean
-  /** Publish one engine operation's changes. */
-  flush: (changes: EngineChangeSet) => void
-  /** Invalidate every active signal after reset. */
-  reset: () => void
-  /** Release every retained signal. */
-  dispose: () => void
-  /** Count active dependencies for diagnostics. */
-  size: () => { items: number, lists: number, indexes: number }
-}
+export type { SignalRegistry } from './signalTypes'
 
 /** Signal with Core interest ownership metadata. */
 interface InternalSignal extends Signal {
@@ -33,6 +16,10 @@ interface InternalSignal extends Signal {
   collection: string
   /** Canonical key or opaque dependency id. */
   id: string
+  /** Whether Vue is synchronously rerunning owners from this signal. */
+  triggering: boolean
+  /** Whether final owner cleanup must release interest after current rerun. */
+  pendingRelease: boolean
 }
 
 /** Create lifecycle signals with bounded inactive-entry reuse. */
@@ -40,7 +27,7 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
   if (options.isServer) {
     const noopTrack = () => false
     const noop = () => {}
-    return { trackItem: noopTrack, trackList: noopTrack, trackIndex: noopTrack, flush: noop, reset: noop, dispose: noop, size: emptySize }
+    return { trackItem: noopTrack, trackList: noopTrack, trackIndex: noopTrack, flush: noop, flushItem: noop, flushIndex: noop, reset: noop, dispose: noop, size: () => ({ items: 0, lists: 0, indexes: 0 }) }
   }
 
   const itemSignals = new Map<string, Map<string, InternalSignal>>()
@@ -50,26 +37,30 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
   let ownerSignals = new WeakMap<object, Set<InternalSignal>>()
   let cleanupRegistered = new WeakSet<object>()
   let disposed = false
-
+  let selectedOwnerScope: EffectScope | undefined
   /** Find watcher or effect scope owning current reactive read. */
-  function getOwner(): SignalOwner | undefined {
+  function getOwner(): object | undefined {
+    selectedOwnerScope = undefined
     const watcher = getCurrentWatcher() as object | undefined
     if (watcher)
-      return { value: watcher }
+      return watcher
     const instance = getCurrentInstance() as { scope?: EffectScope } | null
     const scope = getCurrentScope() ?? instance?.scope
-    return scope?.active ? { value: scope, scope } : undefined
+    if (!scope?.active)
+      return undefined
+    selectedOwnerScope = scope
+    return scope
   }
 
   /** Register matching cleanup hook once for current owner run. */
-  function registerCleanup(owner: SignalOwner): void {
-    if (cleanupRegistered.has(owner.value))
+  function registerCleanup(owner: object, scope: EffectScope | undefined): void {
+    if (cleanupRegistered.has(owner))
       return
-    cleanupRegistered.add(owner.value)
-    const cleanup = () => releaseOwner(owner.value)
-    if (owner.scope) {
+    cleanupRegistered.add(owner)
+    const cleanup = () => releaseOwner(owner)
+    if (scope) {
       const register = () => onScopeDispose(cleanup)
-      getCurrentScope() === owner.scope ? register() : owner.scope.run(register)
+      getCurrentScope() === scope ? register() : scope.run(register)
     }
     else {
       onWatcherCleanup(cleanup)
@@ -81,29 +72,40 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
     const signals = ownerSignals.get(owner)
     if (!signals)
       return
-    ownerSignals.delete(owner)
     cleanupRegistered.delete(owner)
     for (const signal of signals) {
       signal.owners.delete(owner)
       if (!signal.owners.size) {
-        releaseInterest(signal)
-        retainOrphan(signal)
+        if (signal.triggering) {
+          signal.pendingRelease = true
+        }
+        else {
+          releaseInterest(signal)
+          retainOrphan(signal)
+        }
       }
     }
+    // Keep empty Set behind weak key for synchronous reruns; WeakMap still permits collection.
+    signals.clear()
   }
 
   /** Retain one signal for current owner and consume its version. */
-  function retain(signal: InternalSignal, owner: SignalOwner): boolean {
-    const owned = ownerSignals.get(owner.value) ?? new Set<InternalSignal>()
-    ownerSignals.set(owner.value, owned)
+  function retain(signal: InternalSignal, owner: object, scope: EffectScope | undefined): boolean {
+    const owned = ownerSignals.get(owner) ?? new Set<InternalSignal>()
+    ownerSignals.set(owner, owned)
     if (!owned.has(signal)) {
       if (!signal.owners.size) {
-        orphans.delete(signal)
-        retainInterest(signal)
+        if (signal.pendingRelease) {
+          signal.pendingRelease = false
+        }
+        else {
+          orphans.delete(signal)
+          retainInterest(signal)
+        }
       }
       owned.add(signal)
-      signal.owners.add(owner.value)
-      registerCleanup(owner)
+      signal.owners.add(owner)
+      registerCleanup(owner, scope)
     }
     // eslint-disable-next-line ts/no-unused-expressions
     signal.ref.value
@@ -122,7 +124,7 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
       signal = createSignal(kind, collection, id, () => registry.delete(id))
       registry.set(id, signal)
     }
-    return retain(signal, owner)
+    return retain(signal, owner, selectedOwnerScope)
   }
 
   /** Track or create one exact missing-item signal. */
@@ -144,12 +146,21 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
       })
       byKey.set(id, signal)
     }
-    return retain(signal, owner)
+    return retain(signal, owner, selectedOwnerScope)
   }
 
   /** Create one inactive reusable signal. */
   function createSignal(kind: InternalSignal['kind'], collection: string, id: string, remove: () => void): InternalSignal {
-    const signal: InternalSignal = { kind, collection, id, ref: shallowRef(0), owners: new Set(), remove }
+    const signal: InternalSignal = {
+      kind,
+      collection,
+      id,
+      ref: shallowRef(0),
+      owners: new Set(),
+      remove,
+      triggering: false,
+      pendingRelease: false,
+    }
     retainOrphan(signal)
     return signal
   }
@@ -190,11 +201,20 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
   function trigger(signal: InternalSignal | undefined, errors: unknown[] | undefined): unknown[] | undefined {
     if (!signal?.owners.size)
       return errors
+    signal.triggering = true
     try {
       signal.ref.value++
     }
     catch (error) {
       return appendSyncError(errors, error)
+    }
+    finally {
+      signal.triggering = false
+      if (signal.pendingRelease) {
+        signal.pendingRelease = false
+        releaseInterest(signal)
+        retainOrphan(signal)
+      }
     }
     return errors
   }
@@ -267,13 +287,14 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
       for (const dependency of changes.indexes) errors = trigger(indexSignals.get(dependency), errors)
       throwSyncErrors(errors, 'Signal synchronization failed')
     },
+    flushItem(collection, key) {
+      throwSyncErrors(trigger(itemSignals.get(collection)?.get(key), undefined), 'Signal synchronization failed')
+    },
+    flushIndex(dependency) {
+      throwSyncErrors(trigger(indexSignals.get(dependency), undefined), 'Signal synchronization failed')
+    },
     reset,
     dispose,
     size: activeSize,
   }
-}
-
-/** Empty diagnostics for server registries. */
-function emptySize(): { items: number, lists: number, indexes: number } {
-  return { items: 0, lists: 0, indexes: 0 }
 }

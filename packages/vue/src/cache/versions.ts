@@ -14,6 +14,10 @@ export interface CacheVersionRegistry {
   trackIndex: (collection: string, dependency: string) => void
   /** Publish exact invalidations from one engine operation. */
   flush: (changes: EngineChangeSet) => void
+  /** Publish one item invalidation without aggregate containers. */
+  flushItem: (collection: string) => void
+  /** Publish one index invalidation without aggregate containers. */
+  flushIndex: (dependency: string) => void
   /** Invalidate all fallback readers after reset. */
   reset: () => void
   /** Release tracked holders and ignore future reads. */
@@ -98,6 +102,12 @@ export function createCacheVersionRegistry(interest: CacheChangeInterestRegistry
         }
       }
       throwSyncErrors(errors, 'Fallback version synchronization failed')
+    },
+    flushItem(collection) {
+      touch(itemVersions, collection)
+    },
+    flushIndex(dependency) {
+      touch(indexVersions, dependency)
     },
     reset() {
       if (!disposed)

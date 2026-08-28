@@ -7,6 +7,8 @@ export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
 
 export const defaultIsInstanceOf: DefaultIsInstanceOf = collection => item => item.__typename === collection.name
 
+const defaultKeyCollections = new WeakSet<object>()
+
 /**
  * Allow typing the collection item type thanks to currying.
  */
@@ -26,6 +28,11 @@ export function withItemType<
   return {
     defineCollection: collection => collection as any,
   }
+}
+
+/** Return whether a resolved collection uses RStore's default item-key policy. */
+export function usesDefaultCollectionKey(collection: ResolvedCollection<any, any, any>): boolean {
+  return defaultKeyCollections.has(collection)
 }
 
 /**
@@ -104,7 +111,7 @@ export function resolveCollection<
     }
   }
 
-  return {
+  const resolved = {
     '~resolved': true,
     'name': collection.name,
     'getKey': item => item.$overrideKey ?? (collection.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
@@ -129,7 +136,10 @@ export function resolveCollection<
       ...defaults?.meta,
       ...collection.meta,
     },
-  }
+  } as ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  if (!collection.getKey && !defaults?.getKey)
+    defaultKeyCollections.add(resolved)
+  return resolved
 }
 
 /**

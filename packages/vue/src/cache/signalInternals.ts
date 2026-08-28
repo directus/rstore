@@ -1,4 +1,4 @@
-import type { EffectScope, ShallowRef } from 'vue'
+import type { ShallowRef } from 'vue'
 
 /** One shared Vue version signal and its exact lifetime owners. */
 export interface Signal {
@@ -8,12 +8,4 @@ export interface Signal {
   owners: Set<object>
   /** Exact registry removal callback. */
   remove: () => void
-}
-
-/** Watcher-first owner selected for one reactive cache read. */
-export interface SignalOwner {
-  /** Vue watcher or effect-scope identity. */
-  value: object
-  /** Enclosing scope, used only when no watcher exists. */
-  scope?: EffectScope
 }

@@ -4,10 +4,10 @@ import type { EngineCollectionState, EngineContext, EngineIndexState, IndexedVal
 import { mayRecordIndex, mayRecordIndexDependency, recordIndex } from './change-recorder.js'
 import { getIndexDependencyId } from './change-set.js'
 import { getPublicKey } from './identity.js'
-import { encodeIndexLookup, encodeLegacyValue, getLiveAliasTargets, readIndexedValue } from './index-value.js'
+import { cacheIndexDependencyId, takePendingIndexDependency } from './index-dependencies.js'
+import { EMPTY_BUCKET_SWEEP_THRESHOLD } from './index-sweep.js'
+import { encodeIndexLookup, getLiveAliasTargets, readIndexedValue } from './index-value.js'
 import { getVisibleKeyIds, resolveItemById } from './view.js'
-
-const EMPTY_BUCKET_SWEEP_THRESHOLD = 256
 
 /** Get or create one materialized index. */
 function ensureIndex(state: EngineCollectionState, indexKey: string): EngineIndexState {
@@ -81,7 +81,9 @@ function addDependency(
   indexKey: string,
   valueId: IndexValueId,
 ): void {
-  let dependency = index.dependencyIds.get(valueId)
+  let dependency = index.dependencyIds.get(valueId) ?? takePendingIndexDependency(changes?.ctx, collection, indexKey, valueId)
+  if (dependency && !index.dependencyIds.has(valueId))
+    index.dependencyIds.set(valueId, dependency)
   if (!mayRecordIndexDependency(changes, collection, dependency))
     return
   if (!dependency) {
@@ -89,21 +91,6 @@ function addDependency(
     index.dependencyIds.set(valueId, dependency)
   }
   recordIndex(changes, collection, dependency)
-}
-
-/** Cache one public opaque dependency after a reader or observer requests it. */
-export function cacheIndexDependencyId(
-  index: EngineIndexState | undefined,
-  collection: string,
-  indexKey: string,
-  valueId: IndexValueId,
-): string {
-  const cached = index?.dependencyIds.get(valueId)
-  if (cached)
-    return cached
-  const dependency = getIndexDependencyId(collection, indexKey, valueId)
-  index?.dependencyIds.set(valueId, dependency)
-  return dependency
 }
 
 /** Reconcile one item's indexes from cached previous memberships. */
@@ -169,15 +156,26 @@ export function getIndexObserverId(
   indexKey: string,
   indexValue: CacheIndexValue,
 ): IndexValueId {
+  return resolveIndexValueIds(state, collection, indexKey, indexValue).dependencyValueId
+}
+
+/** Resolve one lookup once for dependency tracking and bucket scanning. */
+function resolveIndexValueIds(
+  state: EngineCollectionState | undefined,
+  collection: ResolvedCollection<any, any, any> | undefined,
+  indexKey: string,
+  indexValue: CacheIndexValue,
+): { dependencyValueId: IndexValueId, bucketValueId: IndexValueId } {
   const fields = collection?.indexes.get(indexKey) ?? [indexKey]
   const index = state?.indexes.get(indexKey)
   if (Array.isArray(indexValue))
     validateTupleLength(collection?.name, indexKey, fields.length, indexValue.length)
   const id = encodeIndexLookup(indexKey, fields.length, indexValue, index)
   if (fields.length > 1 && !Array.isArray(indexValue)) {
-    assertLegacyAliasIsUnambiguous(index, collection?.name, indexKey, String(indexValue))
+    const bucketValueId = assertLegacyAliasIsUnambiguous(index, collection?.name, indexKey, String(indexValue))?.[0] ?? id
+    return { dependencyValueId: id, bucketValueId }
   }
-  return id
+  return { dependencyValueId: id, bucketValueId: id }
 }
 
 /** Return canonical key ids for one exact or unambiguous legacy bucket. */
@@ -187,16 +185,25 @@ export function getIndexBucketIds(
   indexKey: string,
   indexValue: CacheIndexValue,
 ): ReadonlySet<KeyId> | undefined {
-  const fields = collection?.indexes.get(indexKey) ?? [indexKey]
   const index = state?.indexes.get(indexKey)
-  if (Array.isArray(indexValue))
-    validateTupleLength(collection?.name, indexKey, fields.length, indexValue.length)
-  let valueId = encodeIndexLookup(indexKey, fields.length, indexValue, index)
-  if (fields.length > 1 && !Array.isArray(indexValue)) {
-    valueId = assertLegacyAliasIsUnambiguous(index, collection?.name, indexKey, String(indexValue))?.[0] ?? valueId
-  }
-  const ids = index?.buckets.get(valueId)
+  const { bucketValueId } = resolveIndexValueIds(state, collection, indexKey, indexValue)
+  const ids = index?.buckets.get(bucketValueId)
   return ids?.size ? ids : undefined
+}
+
+/** Resolve one index dependency and current canonical bucket in one encoding pass. */
+export function getIndexRead(
+  ctx: EngineContext,
+  state: EngineCollectionState | undefined,
+  collection: ResolvedCollection<any, any, any>,
+  indexKey: string,
+  indexValue: CacheIndexValue,
+): { dependency: string, ids: ReadonlySet<KeyId> | undefined } {
+  const index = state?.indexes.get(indexKey)
+  const { dependencyValueId, bucketValueId } = resolveIndexValueIds(state, collection, indexKey, indexValue)
+  const dependency = cacheIndexDependencyId(ctx, index, collection.name, indexKey, dependencyValueId)
+  const ids = index?.buckets.get(bucketValueId)
+  return { dependency, ids: ids?.size ? ids : undefined }
 }
 
 /** Return public keys for the public index-bucket API. */
@@ -212,47 +219,6 @@ export function getIndexBucket(
   const keys = new Set<string | number>()
   for (const id of ids) keys.add(getPublicKey(state, id))
   return keys
-}
-
-/** Sweep excessive retained empty buckets after a complete queue flush. */
-export function sweepEmptyIndexBuckets(ctx: EngineContext): void {
-  for (const index of ctx.indexSweepCandidates) sweepIndex(index)
-  ctx.indexSweepCandidates.clear()
-}
-
-/** Apply bounded retention policy to one index. */
-function sweepIndex(index: EngineIndexState): void {
-  const live = index.buckets.size - index.emptyBucketCount
-  if (index.emptyBucketCount <= EMPTY_BUCKET_SWEEP_THRESHOLD || index.emptyBucketCount <= live * 2)
-    return
-  const empty: IndexValueId[] = []
-  for (const [id, keys] of index.buckets) {
-    if (!keys.size)
-      empty.push(id)
-  }
-  const removed = new Set(empty)
-  for (const id of empty) index.buckets.delete(id)
-  index.emptyBucketCount = 0
-  for (const id of empty) index.dependencyIds.delete(id)
-  for (const [value, indexed] of index.scalarValues) {
-    if (removed.has(indexed.id))
-      index.scalarValues.delete(value)
-  }
-  for (const [first, bySecond] of index.tupleValues) {
-    for (const [second, indexed] of bySecond) {
-      if (removed.has(indexed.id))
-        bySecond.delete(second)
-    }
-    if (!bySecond.size)
-      index.tupleValues.delete(first)
-  }
-  for (const [legacy, aliases] of index.legacyAliases) {
-    for (const id of removed) aliases.delete(id)
-    if (!aliases.size) {
-      index.legacyAliases.delete(legacy)
-      index.dependencyIds.delete(encodeLegacyValue(legacy))
-    }
-  }
 }
 
 /** Reject a tuple with wrong index arity. */
