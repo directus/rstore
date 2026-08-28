@@ -266,12 +266,14 @@ export interface Cache<
   removeLayer: (layerId: string) => void
 
   /**
-   * Pause cache updates to prevent flickering. Queued updates will be applied when `resume()` is called.
+   * Increment cache pause depth. Every call must have a matching `resume()`.
+   * Queued updates remain pending until the depth returns to zero.
    */
   pause: () => void
 
   /**
-   * Resume cache updates and apply all queued updates.
+   * Decrement positive pause depth and apply queued updates only when it
+   * reaches zero.
    */
   resume: () => void
 
