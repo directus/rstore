@@ -3,6 +3,8 @@ import { applyBenchmarkReruns } from '../benchmark/report-reruns'
 import { combineVersionReports, parseBenchmarkOutput } from '../benchmark/version-report'
 import { combineV4VersionReports } from '../benchmark/version-report-v4'
 import { renderV4VersionReportMarkdown } from '../benchmark/version-report-v4-markdown'
+import { combineV5VersionReports } from '../benchmark/version-report-v5'
+import { renderV5VersionReportMarkdown } from '../benchmark/version-report-v5-markdown'
 
 describe('four-version benchmark report', () => {
   it('combines three candidate runs with stable labels and envelopes', () => {
@@ -78,6 +80,38 @@ describe('four-version benchmark report', () => {
     expect(report.runQuality.dataCoreV3Current).toHaveLength(3)
     expect(report.rows[0]!.medians.dataCoreV3Microseconds).toBe(4)
     expect(report.rows[0]!.speedups.dataCoreV4VsV3).toBe(2)
+  })
+
+  it('adds v5 runs and classifies same-machine v4 slowdown tolerance', () => {
+    const v3 = combineVersionReports(baseline() as any, [candidate(3), candidate(3), candidate(3)] as any, {
+      dataCoreV1: 'v1',
+      dataCoreV2: 'v2',
+      dataCoreV3: 'v3',
+      candidateDiffHash: 'v3-diff',
+    })
+    const v4 = combineV4VersionReports(v3, [candidate(2), candidate(2), candidate(2)] as any, {
+      dataCoreV1: 'v1',
+      dataCoreV2: 'v2',
+      dataCoreV3: 'v3',
+      dataCoreV4: 'v4',
+      candidateDiffHash: 'v4-diff',
+    })
+    const report = combineV5VersionReports(v4, [candidate(2.1), candidate(2.1), candidate(2.1)] as any, {
+      dataCoreV1: 'v1',
+      dataCoreV2: 'v2',
+      dataCoreV3: 'v3',
+      dataCoreV4: 'v4',
+      dataCoreV5: 'v5',
+      candidateDiffHash: 'v5-diff',
+    }, [candidate(2), candidate(2), candidate(2)] as any)
+
+    expect(report.rows[0]).toMatchObject({
+      medians: { dataCoreV4Microseconds: 2, dataCoreV5Microseconds: 2.1 },
+      performanceTarget: 'meets target',
+    })
+    expect(report.rows[0]!.speedups.dataCoreV5VsV4).toBeCloseTo(2 / 2.1)
+    expect(report.cacheBounds.orphanSignals).toBe(0)
+    expect(renderV5VersionReportMarkdown(report)).toContain('median <=10%')
   })
 
   it('renders version uncertainty in plain language', () => {

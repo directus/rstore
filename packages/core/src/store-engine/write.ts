@@ -51,8 +51,9 @@ export function getFieldTimestamps(ctx: EngineContext, collectionName: string, k
 export function setFieldTimestamps(ctx: EngineContext, collectionName: string, key: string | number, timestamps: FieldTimestamps): void {
   const id = toKeyId(key)
   const state = ctx.collections.get(collectionName)
-  if (state && !state.keyValues.has(id)) {
-    state.keyValues.set(id, key)
+  if (state && !state.base.has(id) && !state.fallbackKeyValues?.has(id)) {
+    state.fallbackKeyValues ??= new Map()
+    state.fallbackKeyValues.set(id, key)
   }
   ensureCollectionTimestamps(ctx, collectionName).set(id, timestamps)
 }
@@ -99,8 +100,10 @@ function commitWrite(
   const { collection, key, item, marker, fromWriteItems, meta } = params
   const state = ctx.ensureCollection(collection.name)
   const id = toKeyId(key)
-  const previousPublicKey = state.keyValues.get(id)
+  const layerless = state.layers.length === 0
+  const itemOwnsKey = metadata.usesDefaultKey && ownsKeyField(item)
   const existing = state.base.get(id)
+  const previousPublicKey = state.publicKeys.get(id)
   const tombstone = ctx.tombstones.get(collection.name, key)
   if (tombstone) {
     if (params.fieldTimestamps && !shouldResurrect(tombstone, params.fieldTimestamps)) {
@@ -108,27 +111,25 @@ function commitWrite(
     }
     ctx.tombstones.clear(collection.name, key)
   }
-  if (metadata.usesDefaultKey && existing !== undefined && !ownsKeyField(item))
-    registerBaseKeyValue(state, key)
+  if (metadata.usesDefaultKey)
+    registerBaseKeyValue(state, key, itemOwnsKey ? readDefaultKey(item) : undefined)
   else
     registerBaseKey(state, collection, key, item)
   const publicKey = getPublicKey(state, id)
 
-  const layerless = state.layers.length === 0
   const previous = layerless ? existing : resolveItemById(state, id)
   const mergedBase = mutable
     ? mergeMutableItem(ctx, params, data, existing, publicKey, effects)
     : { value: data, valueChanged: true }
   if (mergedBase.valueChanged)
     state.base.set(id, mergedBase.value)
-
   if (mergedBase.valueChanged && !layerless)
     invalidateResolvedItem(state, id)
   const next = mergedBase.valueChanged
     ? (layerless ? mergedBase.value : resolveItemById(state, id))
     : previous
   if (metadata.hasIndexes && mergedBase.valueChanged && (existing === undefined || !mutable || touchesIndexedField(metadata, data)))
-    reconcileItemIndexes(ctx, changes, collection, id, next)
+    reconcileItemIndexes(ctx, changes, collection, id, previous, next)
   const visibilityChanged = (previous !== undefined) !== (next !== undefined)
   const keyFormChanged = previousPublicKey !== undefined
     && previousPublicKey !== publicKey
@@ -200,6 +201,11 @@ function ownsKeyField(item: object): boolean {
   return Object.hasOwn(item, '$overrideKey') || Object.hasOwn(item, 'id') || Object.hasOwn(item, '__id')
 }
 
+/** Read default override/id/__id public-key policy. */
+function readDefaultKey(item: any): unknown {
+  return item?.$overrideKey ?? item?.id ?? item?.__id
+}
+
 /** Merge relation-free mutable data and defer any CRDT conflict hook. */
 function mergeMutableItem(
   ctx: EngineContext,
@@ -251,16 +257,14 @@ export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder |
   const previous = layerless ? state.base.get(id) : resolveItemById(state, id)
   const publicKey = getPublicKey(state, id)
   state.base.delete(id)
-  state.baseKeyValues.delete(id)
-  if (layerless)
-    state.keyValues.delete(id)
-  else
+  state.fallbackKeyValues?.delete(id)
+  if (state.layers.length)
     refreshPublicKey(state, id)
   if (!layerless)
     invalidateResolvedItem(state, id)
   const next = layerless ? undefined : resolveItemById(state, id)
   if (getCollectionMetadata(collection).hasIndexes)
-    reconcileItemIndexes(ctx, changes, collection, id, next)
+    reconcileItemIndexes(ctx, changes, collection, id, previous, next)
   const change: EngineWriteChange = {
     key: next === undefined ? publicKey : getPublicKey(state, id),
     previousKey: publicKey,

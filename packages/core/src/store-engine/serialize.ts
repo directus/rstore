@@ -4,8 +4,9 @@ import type { EngineCollectionState, EngineContext, EngineEffect, NormalizedCach
 import { needsCollectionResetKeys, recordCollectionReset } from './change-recorder.js'
 import { getCollectionMetadata } from './collection-metadata.js'
 import { createCollectionState } from './context.js'
-import { getPublicKey, isEntityKey, registerBaseKeyValue, restoreLayerKeyValues } from './identity.js'
+import { getPublicKey, isEntityKey, registerBaseKeyValue } from './identity.js'
 import { rebuildIndexes } from './indexes.js'
+import { restoreLayerOwnership } from './layers.js'
 import { applyModuleHydration, prepareModuleClear, prepareModuleHydration, serializeModules } from './modules.js'
 import { copyNullRecord, createNullRecord } from './records.js'
 import { getVisibleKeyIds } from './view.js'
@@ -19,7 +20,13 @@ export function getState(ctx: EngineContext): CustomCacheState {
     collections[name] = target
     for (const [id, item] of state.base) {
       if (item !== undefined) {
-        target[getPublicKey(state, id)] = item
+        if (state.layers.length === 0 && state.usesDefaultKey) {
+          const derived = item.$overrideKey ?? item.id ?? item.__id
+          target[isEntityKey(derived) && String(derived) === id ? derived : state.fallbackKeyValues?.get(id) ?? id] = item
+        }
+        else {
+          target[getPublicKey(state, id)] = item
+        }
       }
     }
   }
@@ -100,7 +107,7 @@ function stageCollections(
       // Unknown SSR collections stay tolerated and are intentionally ignored.
       continue
     }
-    const state = createCollectionState()
+    const state = createCollectionState(collection)
     state.layers = previous?.layers ?? []
     if (collection) {
       restoreCollection(state, collection, incoming.get(name))
@@ -108,7 +115,7 @@ function stageCollections(
         rebuildIndexes(collection, state)
     }
     else {
-      restoreLayerKeyValues(state)
+      restoreLayerOwnership(state)
     }
     result.set(name, state)
   }
@@ -132,7 +139,7 @@ function restoreCollection(
     const id = registerBaseKeyValue(state, key, derived)
     state.base.set(id, item)
   }
-  restoreLayerKeyValues(state)
+  restoreLayerOwnership(state)
 }
 
 /** Swap staged collections and invalidate every old/new observed scope. */

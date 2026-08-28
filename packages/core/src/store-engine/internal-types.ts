@@ -83,36 +83,34 @@ export interface EngineLayer {
   state: Map<KeyId, any>
   /** Deleted canonical ids. */
   deletedItems: Set<KeyId>
-  /** Union of patch and delete ids. */
-  affectedKeys: Set<KeyId>
-  /** Stable affected-key order used by transition kernels. */
-  affectedKeyList: KeyId[]
-  /** Public key forms introduced by this layer. */
-  keyValues: Map<KeyId, string | number>
-  /** Keys whose layer items provide a canonical collection key. */
-  canonicalKeys: Set<KeyId>
+  /** Deduplicated patch and delete ids in stable transition order. */
+  affectedKeys: KeyId[]
+  /** Fallback public forms for layer-only partial rows and deletes. */
+  fallbackKeyValues?: Map<KeyId, string | number>
 }
 
 /** Plain per-collection engine storage. */
 export interface EngineCollectionState {
+  /** Resolved schema used to recover public key forms from stored items. */
+  collection?: ResolvedCollection<any, any, any>
+  /** Whether public keys use direct override/id/__id extraction. */
+  usesDefaultKey: boolean
   /** Base items by canonical id. */
   base: Map<KeyId, any>
-  /** Public key forms owned by base rows. */
-  baseKeyValues: Map<KeyId, string | number>
-  /** Preferred public numeric/string key form. */
-  keyValues: Map<KeyId, string | number>
+  /** Current public key form by canonical id. */
+  publicKeys: Map<KeyId, string | number>
+  /** Sparse caller key forms only when base data cannot recover them. */
+  fallbackKeyValues?: Map<KeyId, string | number>
   /** Materialized collection indexes. */
   indexes: Map<string, EngineIndexState>
-  /** Current resolved memberships by item and index. */
-  indexMemberships: Map<KeyId, Map<string, IndexedValue>>
   /** Ordered optimistic layers. */
   layers: EngineLayer[]
+  /** Active layer ownership count by affected canonical id. */
+  layeredKeyCounts?: Map<KeyId, number>
   /** Cached layer-resolved values. */
   resolvedItems: Map<KeyId, any>
   /** Cached visible canonical ids. */
   visibleKeys: KeyId[] | undefined
-  /** Cached visible public keys. */
-  visibleKeyValues: Array<string | number> | undefined
 }
 
 /** Mutable holder preserving module state identity. */
