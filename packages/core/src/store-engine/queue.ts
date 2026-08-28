@@ -1,11 +1,13 @@
 import type { ChangeRecorder, FlushChangeRecorder } from './change-recorder.js'
 import type { EngineContext, EngineEffect, QueuedOperation } from './internal-types.js'
-import { createChangeRecorder, createFlushChangeRecorder, getFlushChanges, getOperationChanges, recordList } from './change-recorder.js'
-import { dispatchEffects, throwCollectedErrors } from './effects.js'
+import { createChangeRecorder, createFlushChangeRecorder, discardStateChangeSink, recordList } from './change-recorder.js'
+import { throwCollectedErrors } from './effects.js'
 import { getPublicKey, toKeyId } from './identity.js'
-import { sweepEmptyIndexBuckets } from './indexes.js'
+import { sweepEmptyIndexBuckets } from './index-sweep.js'
 import { addLayerNow, removeLayerNow } from './layers.js'
+import { appendError, dispatchCommitted, dispatchFinalObservers } from './queue-dispatch.js'
 import { clearCollectionNow, clearNow, setStateNow } from './serialize.js'
+import { createWriteEffects } from './write-effects.js'
 import { deleteItemFromBase, writeItemNow } from './write.js'
 
 /** Add an operation and drain immediately at pause depth zero. */
@@ -62,9 +64,12 @@ export function flushQueuedOperations(
   }
   finally {
     ctx.isFlushingQueue = false
-    compactQueue(ctx)
-    sweepEmptyIndexBuckets(ctx)
-    errors = dispatchFinalObservers(ctx, flushChanges, errors)
+    if (ctx.queueHead || ctx.queue.length)
+      compactQueue(ctx)
+    if (ctx.indexSweepCandidates.size)
+      sweepEmptyIndexBuckets(ctx)
+    if (flushChanges.changes)
+      errors = dispatchFinalObservers(ctx, flushChanges, errors)
   }
   throwCollectedErrors(errors, 'Store engine callbacks failed')
 }
@@ -88,8 +93,14 @@ function processDirectWrite(
   flushChanges: FlushChangeRecorder,
 ): void {
   const changes = createChangeRecorder(ctx, flushChanges)
-  const result = writeItemNow(ctx, changes, operation.params)
-  dispatchCommitted(ctx, changes, result.effects)
+  try {
+    const result = writeItemNow(ctx, changes, operation.params)
+    dispatchCommitted(ctx, changes, result.effects)
+  }
+  catch (error) {
+    discardStateChangeSink(changes)
+    throw error
+  }
 }
 
 /** Process one operation or one staggered batch item. */
@@ -98,20 +109,27 @@ function processOperation(
   operation: QueuedOperation,
   flushChanges: FlushChangeRecorder,
 ): boolean {
-  const changes = createChangeRecorder(ctx, flushChanges)
   switch (operation.type) {
     case 'writeItem': {
       if (!ctx.staggering.canProcess())
         return false
-      const result = writeItemNow(ctx, changes, operation.params)
-      ctx.staggering.consume()
-      advance(ctx)
-      dispatchCommitted(ctx, changes, result.effects)
-      return true
+      const changes = createChangeRecorder(ctx, flushChanges)
+      try {
+        const result = writeItemNow(ctx, changes, operation.params)
+        ctx.staggering.consume()
+        advance(ctx)
+        dispatchCommitted(ctx, changes, result.effects)
+        return true
+      }
+      catch (error) {
+        discardStateChangeSink(changes)
+        throw error
+      }
     }
     case 'writeItems':
       return processBatch(ctx, operation, flushChanges)
     case 'deleteItem': {
+      const changes = createChangeRecorder(ctx, flushChanges)
       const { collection, key, deletedAt } = operation.params
       const state = ctx.collections.get(collection.name)
       const id = toKeyId(key)
@@ -119,21 +137,43 @@ function processOperation(
       ctx.fieldTimestamps.get(collection.name)?.delete(id)
       if (deletedAt != null)
         ctx.tombstones.set({ collection: collection.name, key: publicKey, deletedAt })
-      const result = deleteItemFromBase(ctx, changes, operation.params)
-      advance(ctx)
-      dispatchCommitted(ctx, changes, result.effects)
-      return true
+      try {
+        const result = deleteItemFromBase(ctx, changes, operation.params)
+        advance(ctx)
+        dispatchCommitted(ctx, changes, result.effects)
+        return true
+      }
+      catch (error) {
+        discardStateChangeSink(changes)
+        throw error
+      }
     }
     case 'addLayer':
-      return commitSimple(ctx, changes, flushChanges, addLayerNow(ctx, changes, operation.layer))
+      return processSimple(ctx, flushChanges, changes => addLayerNow(ctx, changes, operation.layer))
     case 'removeLayer':
-      return commitSimple(ctx, changes, flushChanges, removeLayerNow(ctx, changes, operation.layerId))
+      return processSimple(ctx, flushChanges, changes => removeLayerNow(ctx, changes, operation.layerId))
     case 'setState':
-      return commitSimple(ctx, changes, flushChanges, setStateNow(ctx, changes, operation.state))
+      return processSimple(ctx, flushChanges, changes => setStateNow(ctx, changes, operation.state))
     case 'clearCollection':
-      return commitSimple(ctx, changes, flushChanges, clearCollectionNow(ctx, changes, operation.collection))
+      return processSimple(ctx, flushChanges, changes => clearCollectionNow(ctx, changes, operation.collection))
     case 'clear':
-      return commitSimple(ctx, changes, flushChanges, clearNow(ctx, changes))
+      return processSimple(ctx, flushChanges, changes => clearNow(ctx, changes))
+  }
+}
+
+/** Create, commit, and safely discard one simple operation recorder. */
+function processSimple(
+  ctx: EngineContext,
+  flushChanges: FlushChangeRecorder,
+  commit: (changes: ChangeRecorder | undefined) => EngineEffect[],
+): true {
+  const changes = createChangeRecorder(ctx, flushChanges)
+  try {
+    return commitSimple(ctx, changes, commit(changes))
+  }
+  catch (error) {
+    discardStateChangeSink(changes)
+    throw error
   }
 }
 
@@ -141,7 +181,6 @@ function processOperation(
 function commitSimple(
   ctx: EngineContext,
   changes: ChangeRecorder | undefined,
-  flushChanges: FlushChangeRecorder,
   effects: EngineEffect[],
 ): true {
   advance(ctx)
@@ -155,23 +194,34 @@ function processBatch(
   operation: Extract<QueuedOperation, { type: 'writeItems' }>,
   flushChanges: FlushChangeRecorder,
 ): boolean {
+  let skipItemRecorders = false
   while (operation.index < operation.params.items.length) {
     if (!ctx.staggering.canProcess())
       return false
-    const changes = createChangeRecorder(ctx, flushChanges)
+    const changes = skipItemRecorders ? undefined : createChangeRecorder(ctx, flushChanges)
+    // Batch items dispatch no hooks until aggregate completion, so consumer
+    // interest cannot change synchronously between unobserved item commits.
+    if (!changes)
+      skipItemRecorders = true
     const { key, value } = operation.params.items[operation.index]!
-    const result = writeItemNow(ctx, changes, {
-      collection: operation.params.collection,
-      key,
-      item: value,
-      meta: operation.params.meta,
-      fromWriteItems: true,
-    })
-    operation.index++
-    if (result.change)
-      operation.changes.push(result.change)
-    ctx.staggering.consume()
-    dispatchCommitted(ctx, changes, result.effects)
+    try {
+      const result = writeItemNow(ctx, changes, {
+        collection: operation.params.collection,
+        key,
+        item: value,
+        meta: operation.params.meta,
+        fromWriteItems: true,
+      })
+      operation.index++
+      if (result.change && operation.changes)
+        operation.changes.push(result.change)
+      ctx.staggering.consume()
+      dispatchCommitted(ctx, changes, result.effects)
+    }
+    catch (error) {
+      discardStateChangeSink(changes)
+      throw error
+    }
   }
 
   const changes = createChangeRecorder(ctx, flushChanges)
@@ -179,71 +229,21 @@ function processBatch(
     ctx.markers[operation.params.marker] = true
     recordList(changes, operation.params.collection.name)
   }
-  const effect: EngineEffect = {
-    type: 'afterWrite',
-    payload: {
-      collection: operation.params.collection,
-      result: operation.params.items,
-      marker: operation.params.marker,
-      operation: 'write',
-      changes: operation.changes,
-    },
-  }
+  const effects = createWriteEffects(ctx, {
+    collection: operation.params.collection,
+    result: operation.params.items,
+    marker: operation.params.marker,
+    operation: 'write',
+  }, operation.changes)
   advance(ctx)
-  dispatchCommitted(ctx, changes, [effect])
+  try {
+    dispatchCommitted(ctx, changes, effects)
+  }
+  catch (error) {
+    discardStateChangeSink(changes)
+    throw error
+  }
   return true
-}
-
-/** Publish framework state before hooks, collecting every callback failure. */
-function dispatchCommitted(
-  ctx: EngineContext,
-  changes: ChangeRecorder | undefined,
-  effects: readonly EngineEffect[],
-): void {
-  let errors: unknown[] | undefined
-  const operationChanges = getOperationChanges(changes)
-  if (operationChanges) {
-    try {
-      ctx.callbacks.onStateChange?.(operationChanges)
-    }
-    catch (error) {
-      errors = appendError(errors, error)
-    }
-  }
-  try {
-    dispatchEffects(ctx, effects)
-  }
-  catch (error) {
-    for (const nested of error instanceof AggregateError ? error.errors : [error])
-      errors = appendError(errors, nested)
-  }
-  throwCollectedErrors(errors, 'Store engine operation callbacks failed')
-}
-
-/** Run bridge flush then direct observers, even when bridge flush fails. */
-function dispatchFinalObservers(
-  ctx: EngineContext,
-  flush: FlushChangeRecorder,
-  errors: unknown[] | undefined,
-): unknown[] | undefined {
-  const changes = getFlushChanges(flush)
-  if (!changes)
-    return errors
-  try {
-    ctx.callbacks.onObserverFlush?.(changes)
-  }
-  catch (error) {
-    errors = appendError(errors, error)
-  }
-  ctx.observers.dispatch(changes)
-  return errors
-}
-
-/** Lazily allocate callback error storage. */
-function appendError(errors: unknown[] | undefined, error: unknown): unknown[] {
-  const result = errors ?? []
-  result.push(error)
-  return result
 }
 
 /** Advance past one fully processed top-level operation. */

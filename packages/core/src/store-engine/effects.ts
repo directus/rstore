@@ -24,6 +24,9 @@ export function dispatchEffects(ctx: EngineContext, effects: readonly EngineEffe
 /** Dispatch one post-commit callback. */
 function dispatchEffect(ctx: EngineContext, effect: EngineEffect): void {
   switch (effect.type) {
+    case 'writeCommitted':
+      ctx.callbacks.onWriteCommitted?.(effect.payload)
+      break
     case 'afterWrite':
       ctx.callbacks.onAfterWrite?.(effect.payload)
       break

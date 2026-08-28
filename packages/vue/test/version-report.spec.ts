@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest'
+import { applyBenchmarkReruns } from '../benchmark/report-reruns'
 import { combineVersionReports, parseBenchmarkOutput } from '../benchmark/version-report'
+import { combineV4VersionReports } from '../benchmark/version-report-v4'
+import { renderV4VersionReportMarkdown } from '../benchmark/version-report-v4-markdown'
 
 describe('four-version benchmark report', () => {
   it('combines three candidate runs with stable labels and envelopes', () => {
@@ -27,6 +30,89 @@ describe('four-version benchmark report', () => {
     const value = { environment: { node: 'v1' }, rows: [] }
     expect(parseBenchmarkOutput(JSON.stringify(value))).toEqual(value)
     expect(parseBenchmarkOutput(`console table\n${JSON.stringify(value, null, 2)}\n`)).toEqual(value)
+  })
+
+  it('adds three v4 runs without discarding prior run evidence', () => {
+    const previous = combineVersionReports(baseline() as any, [candidate(3), candidate(3), candidate(3)] as any, {
+      dataCoreV1: 'v1',
+      dataCoreV2: 'v2',
+      dataCoreV3: 'v3',
+      candidateDiffHash: 'v3-diff',
+    })
+    const report = combineV4VersionReports(previous, [candidate(1.5), candidate(2), candidate(2.5)] as any, {
+      dataCoreV1: 'v1',
+      dataCoreV2: 'v2',
+      dataCoreV3: 'v3',
+      dataCoreV4: 'v4',
+      candidateDiffHash: 'v4-diff',
+    })
+
+    expect(report.versions).toMatchObject({ dataCoreV1: 'v1', dataCoreV2: 'v2', dataCoreV3: 'v3', dataCoreV4: 'v4' })
+    expect(report.runQuality.dataCoreV4).toHaveLength(3)
+    expect(report.rows[0]).toMatchObject({
+      medians: { dataCoreV3Microseconds: 3, dataCoreV4Microseconds: 2 },
+      runs: { dataCoreV1: expect.any(Array), dataCoreV2: expect.any(Array), dataCoreV3: expect.any(Array), dataCoreV4: expect.any(Array) },
+    })
+    expect(report.rows[0]!.runs.dataCoreV4).toHaveLength(3)
+    expect(report.rows[0]!.speedups.dataCoreV4VsV3).toBeCloseTo(1.5)
+    expect(report.geometricMeans.dataCoreV4VsV3).toBeCloseTo(1.5)
+    expect(report.cacheBounds).toEqual({ indexResultEntries: 128, indexResultWrapperReferences: 20_000, orphanSignals: 256 })
+  })
+
+  it('uses fresh v3 runs for current-machine v4 envelopes', () => {
+    const previous = combineVersionReports(baseline() as any, [candidate(3), candidate(3), candidate(3)] as any, {
+      dataCoreV1: 'v1',
+      dataCoreV2: 'v2',
+      dataCoreV3: 'v3',
+      candidateDiffHash: 'v3-diff',
+    })
+    const freshV3 = [candidate(4), candidate(4), candidate(4)] as any
+    const report = combineV4VersionReports(previous, [candidate(2), candidate(2), candidate(2)] as any, {
+      dataCoreV1: 'v1',
+      dataCoreV2: 'v2',
+      dataCoreV3: 'v3',
+      dataCoreV4: 'v4',
+      candidateDiffHash: 'v4-diff',
+    }, freshV3)
+
+    expect(report.runQuality.dataCoreV3Current).toHaveLength(3)
+    expect(report.rows[0]!.medians.dataCoreV3Microseconds).toBe(4)
+    expect(report.rows[0]!.speedups.dataCoreV4VsV3).toBe(2)
+  })
+
+  it('renders version uncertainty in plain language', () => {
+    const previous = combineVersionReports(baseline() as any, [candidate(4), candidate(4), candidate(4)] as any, {
+      dataCoreV1: 'v1',
+      dataCoreV2: 'v2',
+      dataCoreV3: 'v3',
+      candidateDiffHash: 'v3-diff',
+    })
+    const report = combineV4VersionReports(previous, [candidate(2), candidate(2), candidate(2)] as any, {
+      dataCoreV1: 'v1',
+      dataCoreV2: 'v2',
+      dataCoreV3: 'v3',
+      dataCoreV4: 'v4',
+      candidateDiffHash: 'v4-diff',
+    })
+
+    const markdown = renderV4VersionReportMarkdown(report)
+    expect(markdown).toContain('Typical v4 throughput gain versus v3: 100% faster.')
+    expect(markdown).toContain('plausible 63.6–144.4% faster')
+    expect(markdown).toContain('Each Data Core version is first compared with legacy measured beside it')
+    expect(markdown).toContain('result says `unclear`')
+    expect(markdown).not.toContain('envelope')
+  })
+
+  it('replaces one noisy row with an explicit compatible retry', () => {
+    const original = candidate(3)
+    original.rows[0]!.reruns = 3
+    const report = applyBenchmarkReruns(original as any, [candidate(2)] as any)
+
+    expect(report.rows[0]).toMatchObject({
+      reruns: 4,
+      verdict: 'engine faster',
+      implementations: { engine: { meanMicroseconds: 2 } },
+    })
   })
 })
 

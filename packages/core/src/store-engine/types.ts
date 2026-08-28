@@ -15,40 +15,15 @@ import type {
 } from '@rstore/shared'
 import type { TombstoneStore } from '../tombstone.js'
 import type { EngineChangeInterest, EngineChangeSet, ObserverChanges } from './observer-changes.js'
+import type { EngineAfterWritePayload, EngineStateChangeSink, EngineWriteCommitPayload } from './write-callbacks.js'
+
+export type { EngineAfterWritePayload, EngineStateChangeSink, EngineWriteChange, EngineWriteCommitPayload } from './write-callbacks.js'
 
 /** Unsubscribe handle returned by engine observer methods. */
 export type Unsubscribe = () => void
 
 /** Callback fired when an observed cache scope changes. */
 export type ObserverCallback = () => void
-
-/** Visibility and public-key metadata for one committed write. */
-export interface EngineWriteChange {
-  /** Canonical public key after the operation. */
-  key: string | number
-  /** Public key form before the operation, when one existed. */
-  previousKey?: string | number
-  /** Whether the item entered or left the visible collection view. */
-  visibilityChanged: boolean
-  /** Whether canonical numeric/string key representation changed. */
-  keyFormChanged: boolean
-}
-
-/** Payload passed to {@link EngineCallbacks.onAfterWrite}. */
-export interface EngineAfterWritePayload {
-  /** Collection targeted by the public write. */
-  collection: ResolvedCollection<any, any, any>
-  /** Single-write key retained for hook compatibility. */
-  key?: string | number
-  /** Hook result retained for hook compatibility. */
-  result?: any
-  /** Optional query marker set by the write. */
-  marker?: string
-  /** Applied operation kind. */
-  operation: 'write' | 'delete'
-  /** Every item change committed by this payload. */
-  changes: readonly EngineWriteChange[]
-}
 
 /** Payload passed to {@link EngineCallbacks.onConflict}. */
 export interface EngineConflictPayload {
@@ -78,6 +53,10 @@ export interface EngineCallbacks {
   onStateChange?: (changes: EngineChangeSet) => void
   /** Return dependencies currently consumed by a selective state bridge. */
   getStateChangeInterest?: () => EngineChangeInterest | undefined
+  /** Allocation-light state bridge used by framework adapters. */
+  stateChangeSink?: EngineStateChangeSink
+  /** Allocation-light write callback not requiring `EngineWriteChange` objects. */
+  onWriteCommitted?: (payload: EngineWriteCommitPayload) => void
   /** Fired after a write or delete commits. */
   onAfterWrite?: (payload: EngineAfterWritePayload) => void
   /** Fired when a CRDT merge reports field conflicts. */
@@ -191,6 +170,15 @@ export interface StoreEngine<
   readItemRaw: (params: { collection: ResolvedCollection<any, any, any>, key: string | number }) => any | undefined
   /** Resolve visible, explicit, or indexed candidate keys. */
   resolveKeys: (params: ResolveKeysParams) => Array<string | number>
+  /**
+   * Visit current raw items without allocating a public key array.
+   * Returning `false` from dependency or item visitor stops the scan.
+   */
+  scanItemsRaw: (
+    params: ResolveKeysParams,
+    visit: (key: string | number, item: unknown) => boolean | void,
+    onIndexDependency?: (dependency: string) => boolean | void,
+  ) => void
   /** Read one reconciled index bucket. */
   getIndexBucket: (collection: string, indexKey: string, indexValue: CacheIndexValue) => ReadonlySet<string | number> | undefined
   /** Return stable opaque identity for one index dependency. */

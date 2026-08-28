@@ -8,6 +8,7 @@ import type {
   EngineConflictPayload,
   EngineResetPayload,
   EngineWriteChange,
+  EngineWriteCommitPayload,
   ObserverCallback,
   Unsubscribe,
   WriteItemParams,
@@ -84,6 +85,8 @@ export interface EngineLayer {
   deletedItems: Set<KeyId>
   /** Union of patch and delete ids. */
   affectedKeys: Set<KeyId>
+  /** Stable affected-key order used by transition kernels. */
+  affectedKeyList: KeyId[]
   /** Public key forms introduced by this layer. */
   keyValues: Map<KeyId, string | number>
   /** Keys whose layer items provide a canonical collection key. */
@@ -129,7 +132,7 @@ export interface ModuleIdentity {
 /** Structurally validated snapshot ready for queued staging. */
 export interface NormalizedCacheSnapshot {
   /** Known or unknown collection input records. */
-  collections: Map<string, Record<string, any>>
+  collections: Map<string, NormalizedCollectionRows>
   /** Validated marker record. */
   markers: Record<string, boolean>
   /** Exact version-1 module tuples. */
@@ -140,9 +143,18 @@ export interface NormalizedCacheSnapshot {
   queryMeta: Record<string, CustomHookMeta>
 }
 
+/** Detached collection container using aligned key and item arrays. */
+export interface NormalizedCollectionRows {
+  /** Own enumerable snapshot keys in insertion order. */
+  keys: string[]
+  /** Item references aligned with {@link keys}. */
+  values: any[]
+}
+
 /** Post-commit callback effect. */
 export type EngineEffect
-  = | { type: 'afterWrite', payload: EngineAfterWritePayload }
+  = | { type: 'writeCommitted', payload: EngineWriteCommitPayload }
+    | { type: 'afterWrite', payload: EngineAfterWritePayload }
     | { type: 'conflict', payload: EngineConflictPayload }
     | { type: 'layerAdd', layer: CacheLayer }
     | { type: 'layerRemove', layer: CacheLayer }
@@ -159,7 +171,7 @@ export interface WriteCommitResult {
 /** FIFO engine operation. */
 export type QueuedOperation
   = | { type: 'writeItem', params: WriteItemParams }
-    | { type: 'writeItems', params: WriteItemsParams, index: number, changes: EngineWriteChange[] }
+    | { type: 'writeItems', params: WriteItemsParams, index: number, changes?: EngineWriteChange[] }
     | { type: 'deleteItem', params: DeleteItemParams }
     | { type: 'addLayer', layer: CacheLayer }
     | { type: 'removeLayer', layerId: string }
@@ -219,6 +231,8 @@ export interface EngineContext {
   staggering: Staggering
   /** Indexes whose retained empty buckets may need a bounded sweep. */
   indexSweepCandidates: Set<EngineIndexState>
+  /** Dependencies requested before their collection index state exists. */
+  pendingIndexDependencies: Map<string, Map<string, Map<IndexValueId, string>>>
   /** Get or create collection storage. */
   ensureCollection: (name: string) => EngineCollectionState
 }

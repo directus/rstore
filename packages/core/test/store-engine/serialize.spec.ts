@@ -301,6 +301,21 @@ describe('store-engine: serialize', () => {
     expect(engine.getState().collections).not.toHaveProperty('RemovedCollection')
   })
 
+  it('detaches queued collection structure from later input mutation', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+    const rows: Record<string, any> = { 1: { id: 1 } }
+    const snapshot = { collections: { User: rows } }
+
+    engine.pause()
+    engine.setState(snapshot)
+    delete rows[1]
+    rows[2] = { id: 2 }
+    engine.resume()
+
+    expect(engine.resolveKeys({ collection })).toEqual([1])
+  })
+
   it('detaches serialized marker and query-meta records from live containers', () => {
     const collection = buildCollection('User')
     const { engine } = createTestEngine([collection])
