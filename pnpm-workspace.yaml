@@ -50,6 +50,7 @@ catalog:
   three: ^0.183.2
   typescript: ^5.9.2
   unbuild: ^3.2.0
+  vite-node: 6.0.0
   vitepress: ^2.0.0-alpha.16
   vitest: ^5.0.0
   vue: 3.5.42
