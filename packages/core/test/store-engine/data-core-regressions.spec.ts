@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import { createStoreEngine } from '../../src'
 import { buildCollection, buildLayer, createTestEngine } from './helpers'
 
 describe('store-engine: data-core regressions', () => {
@@ -23,6 +24,19 @@ describe('store-engine: data-core regressions', () => {
     engine.deleteItem({ collection, key: '1' })
     expect(engine.resolveKeys({ collection })).toEqual([])
     expect(engine.readItemRaw({ collection, key: 1 })).toBeUndefined()
+  })
+
+  it('retains sparse numeric key form when a patch writes an invalid key field', () => {
+    const collection = buildCollection('Post')
+    const { engine } = createTestEngine([collection])
+    engine.writeItem({ collection, key: 1, item: { id: 1, title: 'first' } })
+
+    engine.writeItem({ collection, key: '1', item: { id: null, title: 'patched' } })
+    expect(engine.resolveKeys({ collection })).toEqual([1])
+    expect(engine.readItemRaw({ collection, key: 1 })).toMatchObject({ id: null, title: 'patched' })
+
+    engine.writeItem({ collection, key: 1, item: { id: '1' } })
+    expect(engine.resolveKeys({ collection })).toEqual(['1'])
   })
 
   it('reconciles indexes and observers for layer deletes', () => {
@@ -149,5 +163,53 @@ describe('store-engine: data-core regressions', () => {
     expect(engine.resolveKeys({ collection })).toHaveLength(2_000)
     expect(events.afterWrite.map(event => event.key).slice(0, 3)).toEqual([1, 2, 3])
     expect('_ctx' in engine).toBe(false)
+  })
+
+  it('detaches wide batch payloads from nested caller mutation', () => {
+    const collection = buildCollection('Post')
+    const { engine } = createTestEngine([collection])
+    const items = Array.from({ length: 64 }, (_, index) => ({
+      key: index + 1,
+      value: {
+        id: index + 1,
+        fields: Array.from({ length: 16 }, (__, field) => ({ field, value: `value-${index}-${field}` })),
+      },
+    }))
+
+    engine.writeItems({ collection, items })
+    items[0]!.value.fields[0]!.value = 'mutated'
+    items.splice(1)
+
+    expect(engine.resolveKeys({ collection })).toHaveLength(64)
+    expect(engine.readItemRaw({ collection, key: 1 })?.fields[0].value).toBe('value-0-0')
+    expect(engine.readItemRaw({ collection, key: 64 })?.fields[15].value).toBe('value-63-15')
+  })
+
+  it('preserves direct unobserved batch ownership and aggregate publication', () => {
+    const collection = buildCollection('Post')
+    const committed = vi.fn()
+    const engine = createStoreEngine({
+      isServer: true,
+      callbacks: {
+        getCollection: name => name === collection.name ? collection : undefined,
+        resolveChildCollection: () => null,
+        onWriteCommitted: committed,
+      },
+    })
+    const nested = { title: 'first' }
+    const items = [
+      { key: '1', value: { id: 1, nested } },
+      { key: 2, value: { label: 'partial' } },
+    ]
+
+    engine.writeItems({ collection, items, marker: 'all' })
+    engine.writeItems({ collection, items: [{ key: 1, value: { id: 1, extra: true } }] })
+    nested.title = 'mutated'
+
+    expect(engine.resolveKeys({ collection, marker: 'all' })).toEqual([1, 2])
+    expect(engine.readItemRaw({ collection, key: '1' })).toEqual({ id: 1, nested: { title: 'first' }, extra: true })
+    expect(engine.readItemRaw({ collection, key: 2 })).toEqual({ label: 'partial' })
+    expect(committed).toHaveBeenCalledTimes(2)
+    expect(committed.mock.calls[0]![0]).toMatchObject({ operation: 'write', result: items, marker: 'all' })
   })
 })

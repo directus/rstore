@@ -147,4 +147,20 @@ describe('store-engine: layers', () => {
     expect(engine.resolveKeys({ collection })).toEqual(['1'])
     expect(engine.readItemRaw({ collection, key: 1 })?.name).toBe('base')
   })
+
+  it('detaches installed layer structure from later caller mutation', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+    const layer = buildLayer('detached', 'User', { 1: { id: 1, name: 'one' } }, [2])
+
+    engine.addLayer(layer)
+    delete layer.state[1]
+    layer.state[3] = { id: 3, name: 'late' }
+    layer.deletedItems.clear()
+
+    expect(engine.readItemRaw({ collection, key: 1 })?.name).toBe('one')
+    expect(engine.readItemRaw({ collection, key: 2 })).toBeUndefined()
+    expect(engine.readItemRaw({ collection, key: 3 })).toBeUndefined()
+    expect(engine.getLayer('detached')).toBe(layer)
+  })
 })

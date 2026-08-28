@@ -1,5 +1,5 @@
 import type { Collection, CollectionDefaults, StoreSchema, WrappedItem } from '@rstore/shared'
-import type { WrappedItemMetadata } from '../item'
+import type { WrappedItemMetadata } from '../itemMetadata'
 import type { ItemCell } from './itemCells'
 
 /** Wrapped proxy and metadata with one shared lifecycle. */

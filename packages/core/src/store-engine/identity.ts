@@ -1,4 +1,3 @@
-import type { ResolvedCollection } from '@rstore/shared'
 import type { EngineCollectionState, KeyId } from './internal-types.js'
 
 /** Convert every public key form into one stable internal identity. */
@@ -11,15 +10,9 @@ export function isEntityKey(value: unknown): value is string | number {
   return typeof value === 'string' || typeof value === 'number'
 }
 
-/** Register a base-owned key and recompute its active public representation. */
-export function registerBaseKey(
-  state: EngineCollectionState,
-  collection: ResolvedCollection<any, any, any>,
-  key: string | number,
-  item?: any,
-): KeyId {
-  const derived = item == null ? undefined : collection.getKey(item)
-  return registerBaseKeyValue(state, key, derived)
+/** Check one public key against canonical internal identity. */
+export function matchesKeyId(value: unknown, id: KeyId): value is string | number {
+  return isEntityKey(value) && toKeyId(value) === id
 }
 
 /** Register a base-owned key when caller already derived its public form. */
@@ -27,65 +20,56 @@ export function registerBaseKeyValue(
   state: EngineCollectionState,
   key: string | number,
   derived?: unknown,
+  keyFieldWritten = false,
 ): KeyId {
   const id = toKeyId(key)
-  if (isEntityKey(derived) && toKeyId(derived) === id) {
-    state.fallbackKeyValues?.delete(id)
-    state.publicKeys.set(id, derived)
+  if (matchesKeyId(derived, id)) {
+    clearKeyOverride(state, id)
   }
   else {
-    const previous = deriveBaseKey(state, id) ?? state.fallbackKeyValues?.get(id)
-    if (previous !== undefined) {
-      state.publicKeys.set(id, previous)
-    }
-    else {
-      const values = state.fallbackKeyValues ?? new Map<KeyId, string | number>()
-      state.fallbackKeyValues = values
-      values.set(id, key)
-      state.publicKeys.set(id, key)
+    const previous = deriveBaseKey(state, id) ?? state.keyOverrides?.get(id)
+    if (previous === undefined || keyFieldWritten) {
+      const values = state.keyOverrides ?? new Map<KeyId, string | number>()
+      state.keyOverrides = values
+      values.set(id, previous ?? key)
     }
   }
-  if (state.layers.length)
-    refreshPublicKey(state, id)
   return id
+}
+
+/** Remove one sparse key form and eagerly release its empty map. */
+export function clearKeyOverride(state: EngineCollectionState, id: KeyId): void {
+  state.keyOverrides?.delete(id)
+  if (state.keyOverrides?.size === 0)
+    state.keyOverrides = undefined
 }
 
 /** Return the preserved public key form for an internal identity. */
 export function getPublicKey(state: EngineCollectionState, id: KeyId, baseCandidate?: any): string | number {
-  if (baseCandidate !== undefined && !state.layeredKeyCounts?.has(id))
-    return deriveItemKey(state, id, baseCandidate) ?? state.publicKeys.get(id) ?? state.fallbackKeyValues?.get(id) ?? id
-  const retained = state.publicKeys.get(id)
-  if (retained !== undefined)
-    return retained
-  if (state.layeredKeyCounts?.has(id)) {
-    const layerKey = getLayerPublicKey(state, id, baseCandidate)
-    if (layerKey !== undefined)
-      return layerKey
+  if (!state.layeredKeyCounts?.has(id)) {
+    const override = state.keyOverrides?.get(id)
+    if (override !== undefined)
+      return override
+    const item = baseCandidate === undefined ? state.base.get(id) : baseCandidate
+    return readItemKey(state, item) ?? id
   }
-  return deriveItemKey(state, id, baseCandidate) ?? deriveBaseKey(state, id) ?? state.fallbackKeyValues?.get(id) ?? id
-}
-
-/** Refresh one canonical public key after base or layer ownership changes. */
-export function refreshPublicKey(state: EngineCollectionState, id: KeyId): void {
-  const next = state.layeredKeyCounts?.has(id)
-    ? getLayerPublicKey(state, id)
-    : deriveBaseKey(state, id) ?? state.fallbackKeyValues?.get(id)
-  if (next === undefined)
-    state.publicKeys.delete(id)
-  else state.publicKeys.set(id, next)
+  const layerKey = getLayerPublicKey(state, id, baseCandidate)
+  if (layerKey !== undefined)
+    return layerKey
+  return state.keyOverrides?.get(id) ?? id
 }
 
 /** Resolve active canonical layers, base data, then layer fallbacks. */
 function getLayerPublicKey(state: EngineCollectionState, id: KeyId, baseCandidate?: any): string | number | undefined {
   for (let index = state.layers.length - 1; index >= 0; index--) {
     const layer = state.layers[index]!
-    if (!layer.layer.skip && layer.state.has(id)) {
-      const derived = deriveItemKey(state, id, layer.state.get(id))
+    if (!layer.layer.skip && Object.hasOwn(layer.state, id)) {
+      const derived = deriveItemKey(state, id, layer.state[id])
       if (derived !== undefined)
         return derived
     }
   }
-  const base = deriveItemKey(state, id, baseCandidate) ?? deriveBaseKey(state, id) ?? state.fallbackKeyValues?.get(id)
+  const base = deriveItemKey(state, id, baseCandidate) ?? deriveBaseKey(state, id) ?? state.keyOverrides?.get(id)
   if (base !== undefined)
     return base
   for (const layer of state.layers) {
@@ -100,13 +84,10 @@ function getLayerPublicKey(state: EngineCollectionState, id: KeyId, baseCandidat
 
 /** Drop a representative once no base item or installed layer can expose it. */
 export function releaseUnusedKey(state: EngineCollectionState, id: KeyId): void {
-  if (state.base.has(id) || state.layers.some(layer => layer.state.has(id) || layer.deletedItems.has(id))) {
+  if (state.base.has(id) || state.layers.some(layer => Object.hasOwn(layer.state, id) || layer.deletedItems.has(id))) {
     return
   }
-  state.fallbackKeyValues?.delete(id)
-  state.publicKeys.delete(id)
-  if (state.fallbackKeyValues?.size === 0)
-    state.fallbackKeyValues = undefined
+  clearKeyOverride(state, id)
 }
 
 /** Recover one canonical public form from current base data. */
@@ -116,10 +97,16 @@ function deriveBaseKey(state: EngineCollectionState, id: KeyId): string | number
 
 /** Recover a valid public key whose canonical identity matches the map id. */
 function deriveItemKey(state: EngineCollectionState, id: KeyId, item: any): string | number | undefined {
-  if (item == null || !state.collection)
+  const derived = readItemKey(state, item)
+  if (typeof derived === 'string')
+    return derived === id ? derived : undefined
+  return typeof derived === 'number' && String(derived) === id ? derived : undefined
+}
+
+/** Read one entity key from current item data without canonical coercion. */
+function readItemKey(state: EngineCollectionState, item: any): string | number | undefined {
+  if (item == null)
     return undefined
-  const derived = state.usesDefaultKey
-    ? item.$overrideKey ?? item.id ?? item.__id
-    : state.collection.getKey(item)
-  return isEntityKey(derived) && toKeyId(derived) === id ? derived : undefined
+  const derived = state.usesDefaultKey ? item.$overrideKey ?? item.id ?? item.__id : state.collection?.getKey(item)
+  return isEntityKey(derived) ? derived : undefined
 }
