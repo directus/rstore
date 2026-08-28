@@ -41,12 +41,12 @@ export function createCacheChangeInterestRegistry(): CacheChangeInterestRegistry
   const itemKeys = new Map<string, true | ReadonlySet<string>>()
   const lists = new Set<string>()
   const indexes = new Map<string, ReadonlySet<string>>()
-  const exactItems = new Map<string, Map<string, number>>()
   const exactItemSets = new Map<string, Set<string>>()
+  const duplicateItems = new Map<string, Map<string, number>>()
   const broadItems = new Set<string>()
   const listCounts = new Map<string, number>()
-  const indexCounts = new Map<string, Map<string, number>>()
   const indexSets = new Map<string, Set<string>>()
+  const duplicateIndexes = new Map<string, Map<string, number>>()
   const allIndexDependencies = new Set<string>()
   let disposed = false
 
@@ -67,20 +67,30 @@ export function createCacheChangeInterestRegistry(): CacheChangeInterestRegistry
     if (disposed)
       return
     const id = String(key)
-    const counts = exactItems.get(collection) ?? new Map<string, number>()
-    const keys = exactItemSets.get(collection) ?? new Set<string>()
-    const next = (counts.get(id) ?? 0) + delta
-    if (next > 0) {
-      counts.set(id, next)
+    let keys = exactItemSets.get(collection)
+    let duplicates = duplicateItems.get(collection)
+    if (delta === 1) {
+      keys ??= new Set<string>()
+      exactItemSets.set(collection, keys)
+      if (keys.has(id)) {
+        duplicates ??= new Map<string, number>()
+        duplicateItems.set(collection, duplicates)
+        duplicates.set(id, (duplicates.get(id) ?? 1) + 1)
+      }
       keys.add(id)
     }
-    else {
-      counts.delete(id)
-      keys.delete(id)
+    else if (keys?.has(id)) {
+      const count = duplicates?.get(id)
+      if (count && count > 2)
+        duplicates!.set(id, count - 1)
+      else if (count === 2)
+        duplicates!.delete(id)
+      else keys.delete(id)
     }
-    // Keep empty containers for hot synchronous watcher cleanup/rerun reuse.
-    exactItems.set(collection, counts)
-    exactItemSets.set(collection, keys)
+    if (duplicates && !duplicates.size)
+      duplicateItems.delete(collection)
+    if (keys && !keys.size)
+      exactItemSets.delete(collection)
     refreshItems(collection)
   }
 
@@ -103,25 +113,39 @@ export function createCacheChangeInterestRegistry(): CacheChangeInterestRegistry
   function changeIndex(collection: string, dependency: string, delta: 1 | -1): void {
     if (disposed)
       return
-    const counts = indexCounts.get(collection) ?? new Map<string, number>()
-    const dependencies = indexSets.get(collection) ?? new Set<string>()
-    const next = (counts.get(dependency) ?? 0) + delta
-    if (next > 0) {
-      counts.set(dependency, next)
+    let dependencies = indexSets.get(collection)
+    let duplicates = duplicateIndexes.get(collection)
+    if (delta === 1) {
+      dependencies ??= new Set<string>()
+      indexSets.set(collection, dependencies)
+      if (dependencies.has(dependency)) {
+        duplicates ??= new Map<string, number>()
+        duplicateIndexes.set(collection, duplicates)
+        duplicates.set(dependency, (duplicates.get(dependency) ?? 1) + 1)
+      }
       dependencies.add(dependency)
       allIndexDependencies.add(dependency)
     }
-    else {
-      counts.delete(dependency)
-      dependencies.delete(dependency)
-      allIndexDependencies.delete(dependency)
+    else if (dependencies?.has(dependency)) {
+      const count = duplicates?.get(dependency)
+      if (count && count > 2) {
+        duplicates!.set(dependency, count - 1)
+      }
+      else if (count === 2) {
+        duplicates!.delete(dependency)
+      }
+      else {
+        dependencies.delete(dependency)
+        allIndexDependencies.delete(dependency)
+      }
     }
-    indexCounts.set(collection, counts)
-    indexSets.set(collection, dependencies)
-    if (counts.size) {
+    if (duplicates && !duplicates.size)
+      duplicateIndexes.delete(collection)
+    if (dependencies?.size) {
       indexes.set(collection, dependencies)
     }
     else {
+      indexSets.delete(collection)
       indexes.delete(collection)
     }
   }
@@ -149,12 +173,12 @@ export function createCacheChangeInterestRegistry(): CacheChangeInterestRegistry
       itemKeys.clear()
       lists.clear()
       indexes.clear()
-      exactItems.clear()
       exactItemSets.clear()
+      duplicateItems.clear()
       broadItems.clear()
       listCounts.clear()
-      indexCounts.clear()
       indexSets.clear()
+      duplicateIndexes.clear()
       allIndexDependencies.clear()
     },
     hasAny: () => !disposed && Boolean(itemKeys.size || lists.size || indexes.size),

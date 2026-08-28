@@ -16,6 +16,20 @@ export interface V4VersionLabels {
   candidateDiffHash: string
 }
 
+/** Configuration for adding one candidate to an existing version artifact. */
+export interface NextVersionConfig {
+  /** Candidate report property. */
+  candidateKey: string
+  /** Human-readable candidate label. */
+  candidateLabel: string
+  /** Existing Data Core report properties in version order. */
+  baselineKeys: string[]
+  /** Existing version optionally refreshed beside candidate. */
+  currentBaselineKey: string
+  /** Cache ownership bounds recorded in report. */
+  cacheBounds: Record<string, number>
+}
+
 /** Add three paired v4 runs to existing legacy/v1/v2/v3 history. */
 export function combineV4VersionReports(
   baseline: any,
@@ -23,79 +37,98 @@ export function combineV4VersionReports(
   versions: V4VersionLabels,
   currentV3: readonly BenchmarkReport[] = [],
 ): any {
-  validateRuns(baseline, candidates, 'Data Core v4')
-  if (currentV3.length)
-    validateRuns(baseline, currentV3, 'Data Core v3')
+  return combineNextVersionReports(baseline, candidates, versions, currentV3, {
+    candidateKey: 'dataCoreV4',
+    candidateLabel: 'Data Core v4',
+    baselineKeys: ['dataCoreV1', 'dataCoreV2', 'dataCoreV3'],
+    currentBaselineKey: 'dataCoreV3',
+    cacheBounds: { indexResultEntries: 128, indexResultWrapperReferences: 20_000, orphanSignals: 256 },
+  })
+}
+
+/** Add three paired candidate runs to an existing version artifact. */
+export function combineNextVersionReports(
+  baseline: any,
+  candidates: readonly BenchmarkReport[],
+  versions: object & { legacy?: string },
+  currentBaseline: readonly BenchmarkReport[],
+  config: NextVersionConfig,
+): any {
+  validateRuns(baseline, candidates, config.candidateLabel)
+  if (currentBaseline.length)
+    validateRuns(baseline, currentBaseline, displayVersion(config.currentBaselineKey))
   const candidateRows = mapRuns(candidates)
-  const v3Rows = mapRuns(currentV3)
-  const rows = baseline.rows.map((row: any) => combineRow(row, candidateRows, v3Rows))
+  const baselineRows = mapRuns(currentBaseline)
+  const rows = baseline.rows.map((row: any) => combineRow(row, candidateRows, baselineRows, config))
+  const comparisonKeys = config.baselineKeys.map(key => `${config.candidateKey}Vs${versionSuffix(key)}`)
   return {
     generatedAt: new Date().toISOString(),
     environment: { ...baseline.environment, candidate: candidates[0]!.environment },
     versions: { ...versions, legacy: versions.legacy ?? baseline.versions?.legacy },
-    cacheBounds: { indexResultEntries: 128, indexResultWrapperReferences: 20_000, orphanSignals: 256 },
+    cacheBounds: config.cacheBounds,
     runQuality: {
       ...baseline.runQuality,
-      ...(currentV3.length ? { dataCoreV3Current: currentV3.map(summarizeRun) } : {}),
-      dataCoreV4: candidates.map(summarizeRun),
+      ...(currentBaseline.length ? { [`${config.currentBaselineKey}Current`]: currentBaseline.map(summarizeRun) } : {}),
+      [config.candidateKey]: candidates.map(summarizeRun),
     },
-    geometricMeans: {
-      dataCoreV4VsV3: geometricMean(rows.map((row: any) => row.speedups.dataCoreV4VsV3)),
-      dataCoreV4VsV2: geometricMean(rows.map((row: any) => row.speedups.dataCoreV4VsV2)),
-      dataCoreV4VsV1: geometricMean(rows.map((row: any) => row.speedups.dataCoreV4VsV1)),
-    },
+    geometricMeans: Object.fromEntries(comparisonKeys.map(key => [key, geometricMean(rows.map((row: any) => row.speedups[key]))])),
     residualRegressions: {
-      versusLegacy: rows.filter((row: any) => row.speedups.dataCoreV4VsLegacyVerdicts.some((value: string) => value !== 'engine faster')).map(identity),
-      versusV3: rows.filter((row: any) => row.speedups.dataCoreV4VsV3ConfidenceEnvelope[1] < 1).map(identity),
-      versusV2: rows.filter((row: any) => row.speedups.dataCoreV4VsV2ConfidenceEnvelope[1] < 1).map(identity),
-      versusV1: rows.filter((row: any) => row.speedups.dataCoreV4VsV1ConfidenceEnvelope[1] < 1).map(identity),
+      versusLegacy: rows.filter((row: any) => row.speedups[`${config.candidateKey}VsLegacyVerdicts`].some((value: string) => value !== 'engine faster')).map(identity),
+      ...Object.fromEntries(config.baselineKeys.map(key => [
+        `versus${versionSuffix(key)}`,
+        rows.filter((row: any) => row.speedups[`${config.candidateKey}Vs${versionSuffix(key)}ConfidenceEnvelope`][1] < 1).map(identity),
+      ])),
     },
     rows,
   }
 }
 
-/** Combine one stable scenario/dimension row across five implementations. */
-function combineRow(row: any, candidates: RunMaps, currentV3: RunMaps): any {
+/** Combine one stable row across candidate and historical versions. */
+function combineRow(row: any, candidates: RunMaps, refreshed: RunMaps, config: NextVersionConfig): any {
   const key = rowKey(row)
-  const v4Runs = readMappedRuns(candidates, key, 'Data Core v4')
-  const v3Runs = currentV3.length ? readMappedRuns(currentV3, key, 'Data Core v3') : row.runs.dataCoreV3
-  const v1Speedups = row.runs.dataCoreV1.map(readSpeedup)
-  const v2Speedups = row.runs.dataCoreV2.map(readSpeedup)
-  const v3Speedups = v3Runs.map(readSpeedup)
-  const v4Speedups = v4Runs.map((run: any) => run.speedup)
-  const v1Intervals = row.runs.dataCoreV1.map(readInterval)
-  const v2Intervals = row.runs.dataCoreV2.map(readInterval)
-  const v3Intervals = v3Runs.map(readInterval)
-  const v4Intervals = v4Runs.map((run: any) => run.speedupInterval)
+  const candidateRuns = readMappedRuns(candidates, key, config.candidateLabel)
+  const versionRuns = Object.fromEntries(config.baselineKeys.map(version => [
+    version,
+    version === config.currentBaselineKey && refreshed.length
+      ? readMappedRuns(refreshed, key, displayVersion(version))
+      : row.runs[version],
+  ])) as Record<string, any[]>
+  const candidateSpeedups = candidateRuns.map((run: any) => run.speedup)
+  const candidateIntervals = candidateRuns.map((run: any) => run.speedupInterval)
+  const baselineSpeedups = Object.fromEntries(config.baselineKeys.map(version => [version, versionRuns[version]!.map(readSpeedup)]))
+  const baselineIntervals = Object.fromEntries(config.baselineKeys.map(version => [version, versionRuns[version]!.map(readInterval)]))
+  const comparisons = Object.fromEntries(config.baselineKeys.flatMap((version) => {
+    const name = `${config.candidateKey}Vs${versionSuffix(version)}`
+    return Object.entries(versionRatio(name, candidateSpeedups, baselineSpeedups[version]!, candidateIntervals, baselineIntervals[version]!))
+  }))
   return {
     ...row,
     medians: {
       ...row.medians,
-      legacyMicroseconds: median(v4Runs.map((run: any) => run.implementations.legacy.meanMicroseconds)),
-      dataCoreV3Microseconds: median(v3Runs.map(readMean)),
-      dataCoreV4Microseconds: median(v4Runs.map((run: any) => run.implementations.engine.meanMicroseconds)),
+      legacyMicroseconds: median(candidateRuns.map((run: any) => run.implementations.legacy.meanMicroseconds)),
+      [`${config.currentBaselineKey}Microseconds`]: median(versionRuns[config.currentBaselineKey]!.map(readMean)),
+      [`${config.candidateKey}Microseconds`]: median(candidateRuns.map((run: any) => run.implementations.engine.meanMicroseconds)),
     },
     speedups: {
       ...row.speedups,
-      dataCoreV4VsLegacy: median(v4Speedups),
-      dataCoreV4VsLegacyRange: range(v4Speedups),
-      dataCoreV4VsLegacyIntervals: v4Intervals,
-      dataCoreV4VsLegacyVerdicts: v4Runs.map((run: any) => run.verdict),
-      normalizedLegacyRatios: { dataCoreV1: v1Speedups, dataCoreV2: v2Speedups, dataCoreV3: v3Speedups, dataCoreV4: v4Speedups },
-      ...versionRatio('dataCoreV4VsV3', v4Speedups, v3Speedups, v4Intervals, v3Intervals),
-      ...versionRatio('dataCoreV4VsV2', v4Speedups, v2Speedups, v4Intervals, v2Intervals),
-      ...versionRatio('dataCoreV4VsV1', v4Speedups, v1Speedups, v4Intervals, v1Intervals),
+      [`${config.candidateKey}VsLegacy`]: median(candidateSpeedups),
+      [`${config.candidateKey}VsLegacyRange`]: range(candidateSpeedups),
+      [`${config.candidateKey}VsLegacyIntervals`]: candidateIntervals,
+      [`${config.candidateKey}VsLegacyVerdicts`]: candidateRuns.map((run: any) => run.verdict),
+      normalizedLegacyRatios: { ...baselineSpeedups, [config.candidateKey]: candidateSpeedups },
+      ...comparisons,
     },
     uncertainty: {
       ...row.uncertainty,
-      dataCoreV3MaxRme: Math.max(...v3Runs.flatMap(readRmes)),
-      dataCoreV4MaxRme: Math.max(...v4Runs.flatMap(readRmes)),
+      [`${config.currentBaselineKey}MaxRme`]: Math.max(...versionRuns[config.currentBaselineKey]!.flatMap(readRmes)),
+      [`${config.candidateKey}MaxRme`]: Math.max(...candidateRuns.flatMap(readRmes)),
     },
-    runs: { ...row.runs, dataCoreV3: v3Runs, dataCoreV4: v4Runs },
+    runs: { ...row.runs, ...versionRuns, [config.candidateKey]: candidateRuns },
   }
 }
 
 type RunMaps = ReadonlyArray<ReadonlyMap<string, BenchmarkReport['rows'][number]>>
+type Interval = readonly [number, number]
 
 /** Map each report by stable scenario and item dimensions. */
 function mapRuns(reports: readonly BenchmarkReport[]): RunMaps {
@@ -134,8 +167,6 @@ function versionRatio(name: string, candidate: number[], baseline: number[], can
   }
 }
 
-type Interval = readonly [number, number]
-
 /** Read engine mean from old combined or paired benchmark shape. */
 function readMean(run: any): number {
   return run.dataCoreV1?.meanMicroseconds ?? run.dataCoreV2?.meanMicroseconds ?? run.implementations.engine.meanMicroseconds
@@ -164,6 +195,16 @@ function readRmes(run: any): number[] {
   return [run.legacy?.rme, run.dataCoreV2?.rme].filter((value): value is number => typeof value === 'number')
 }
 
+/** Summarize classifications, uncertainty, and retries for one run. */
+function summarizeRun(report: BenchmarkReport): any {
+  const classification = { faster: 0, slower: 0, noClearDifference: 0, noisy: 0 }
+  for (const row of report.rows) {
+    const key = row.verdict === 'engine faster' ? 'faster' : row.verdict === 'legacy faster' ? 'slower' : row.verdict === 'no clear difference' ? 'noClearDifference' : 'noisy'
+    classification[key]++
+  }
+  return { classification, maxRme: Math.max(...report.rows.flatMap(row => Object.values(row.implementations).map(value => value.rme))), reruns: report.rows.reduce((total, row) => total + row.reruns, 0) }
+}
+
 /** Compute conservative candidate/baseline point envelope. */
 function ratioEnvelope(candidate: number[], baseline: number[]): [number, number] {
   return range(candidate.flatMap(value => baseline.map(base => value / base)))
@@ -176,41 +217,31 @@ function intervalRatioEnvelope(candidate: Interval[], baseline: Interval[]): [nu
   return [Math.min(...lower), Math.max(...upper)]
 }
 
-/** Summarize classifications, uncertainty, and retries for one run. */
-function summarizeRun(report: BenchmarkReport): any {
-  const classification = { faster: 0, slower: 0, noClearDifference: 0, noisy: 0 }
-  for (const row of report.rows) {
-    const key = row.verdict === 'engine faster' ? 'faster' : row.verdict === 'legacy faster' ? 'slower' : row.verdict === 'no clear difference' ? 'noClearDifference' : 'noisy'
-    classification[key]++
-  }
-  return {
-    classification,
-    maxRme: Math.max(...report.rows.flatMap(row => Object.values(row.implementations).map(value => value.rme))),
-    reruns: report.rows.reduce((total, row) => total + row.reruns, 0),
-  }
-}
-
-/** Return stable scenario key. */
+/** Return stable row identity. */
 function rowKey(row: { scenarioId: string, dimensions: { items: number } }): string {
   return `${row.scenarioId}|${row.dimensions.items}`
 }
-
 /** Return compact residual identity. */
 function identity(row: any): any {
   return { scenarioId: row.scenarioId, dimensions: row.dimensions }
 }
-
 /** Return inclusive bounds. */
 function range(values: number[]): [number, number] {
   return [Math.min(...values), Math.max(...values)]
 }
-
 /** Return median. */
 function median(values: number[]): number {
   return [...values].sort((a, b) => a - b)[Math.floor(values.length / 2)]!
 }
-
-/** Return geometric mean for positive version ratios. */
+/** Return geometric mean for positive ratios. */
 function geometricMean(values: number[]): number {
   return Math.exp(values.reduce((sum, value) => sum + Math.log(value), 0) / values.length)
+}
+/** Return short version suffix. */
+function versionSuffix(key: string): string {
+  return key.replace('dataCore', '')
+}
+/** Return display version label. */
+function displayVersion(key: string): string {
+  return `Data Core ${versionSuffix(key).toLowerCase()}`
 }

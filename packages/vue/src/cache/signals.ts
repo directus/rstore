@@ -5,7 +5,6 @@ import type { SignalRegistry } from './signalTypes'
 import { getCurrentInstance, getCurrentScope, getCurrentWatcher, onScopeDispose, onWatcherCleanup, shallowRef } from 'vue'
 import { appendSyncError, throwSyncErrors } from './syncErrors'
 
-const MAX_ORPHAN_SIGNALS = 256
 export type { SignalRegistry } from './signalTypes'
 
 /** Signal with Core interest ownership metadata. */
@@ -22,7 +21,7 @@ interface InternalSignal extends Signal {
   pendingRelease: boolean
 }
 
-/** Create lifecycle signals with bounded inactive-entry reuse. */
+/** Create lifecycle signals retained only while reactive owners exist. */
 export function createSignalRegistry(options: { isServer: boolean, interest: CacheChangeInterestRegistry }): SignalRegistry {
   if (options.isServer) {
     const noopTrack = () => false
@@ -33,7 +32,6 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
   const itemSignals = new Map<string, Map<string, InternalSignal>>()
   const listSignals = new Map<string, InternalSignal>()
   const indexSignals = new Map<string, InternalSignal>()
-  const orphans = new Map<InternalSignal, true>()
   let ownerSignals = new WeakMap<object, Set<InternalSignal>>()
   let cleanupRegistered = new WeakSet<object>()
   let disposed = false
@@ -81,7 +79,7 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
         }
         else {
           releaseInterest(signal)
-          retainOrphan(signal)
+          signal.remove()
         }
       }
     }
@@ -99,7 +97,6 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
           signal.pendingRelease = false
         }
         else {
-          orphans.delete(signal)
           retainInterest(signal)
         }
       }
@@ -149,7 +146,7 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
     return retain(signal, owner, selectedOwnerScope)
   }
 
-  /** Create one inactive reusable signal. */
+  /** Create one signal that becomes retained with its first owner. */
   function createSignal(kind: InternalSignal['kind'], collection: string, id: string, remove: () => void): InternalSignal {
     const signal: InternalSignal = {
       kind,
@@ -161,22 +158,7 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
       triggering: false,
       pendingRelease: false,
     }
-    retainOrphan(signal)
     return signal
-  }
-
-  /** Retain one inactive signal and prune oldest excess entries. */
-  function retainOrphan(signal: InternalSignal): void {
-    orphans.delete(signal)
-    orphans.set(signal, true)
-    const limit = Math.max(MAX_ORPHAN_SIGNALS, activeCount() * 2)
-    while (orphans.size > limit) {
-      const oldest = orphans.keys().next().value as InternalSignal | undefined
-      if (!oldest)
-        break
-      orphans.delete(oldest)
-      oldest.remove()
-    }
   }
 
   /** Register one active dependency with Core. */
@@ -213,16 +195,10 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
       if (signal.pendingRelease) {
         signal.pendingRelease = false
         releaseInterest(signal)
-        retainOrphan(signal)
+        signal.remove()
       }
     }
     return errors
-  }
-
-  /** Count active signals across all registries. */
-  function activeCount(): number {
-    const size = activeSize()
-    return size.items + size.lists + size.indexes
   }
 
   /** Return active registry counts. */
@@ -250,7 +226,7 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
     throwSyncErrors(errors, 'Signal reset failed')
   }
 
-  /** Release all active and reusable signals. */
+  /** Release all active signals. */
   function dispose(): void {
     if (disposed)
       return
@@ -268,7 +244,6 @@ export function createSignalRegistry(options: { isServer: boolean, interest: Cac
     itemSignals.clear()
     listSignals.clear()
     indexSignals.clear()
-    orphans.clear()
     ownerSignals = new WeakMap()
     cleanupRegistered = new WeakSet()
   }

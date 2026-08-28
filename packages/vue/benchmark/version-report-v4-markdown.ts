@@ -69,20 +69,20 @@ export function renderV4VersionReportMarkdown(report: any): string {
 }
 
 /** Render one v4 paired measurement. */
-function formatRun(run: any): string {
+export function formatRun(run: any): string {
   const value = run.implementations.engine
   return `${format(value.meanMicroseconds)} µs; ${Math.round(value.operationsPerSecond)} ops/s; RME ${format(value.rme)}%; n=${value.samples}; retry=${run.reruns}`
 }
 
 /** Render compact residual identities. */
-function renderResidual(label: string, rows: any[]): string {
+export function renderResidual(label: string, rows: any[]): string {
   return rows.length
     ? `- ${label}: ${rows.map(row => `${row.scenarioId} (${row.dimensions.items})`).join(', ')}.`
     : `- ${label}: none.`
 }
 
 /** Render typical throughput change with conservative uncertainty in plain language. */
-function formatComparison(ratio: number, plausible: readonly [number, number]): string {
+export function formatComparison(ratio: number, plausible: readonly [number, number]): string {
   const [lower, upper] = plausible
   if (lower > 1)
     return `${formatChange(ratio)}; plausible ${formatPercent((lower - 1) * 100)}–${formatPercent((upper - 1) * 100)}% faster`
@@ -92,7 +92,7 @@ function formatComparison(ratio: number, plausible: readonly [number, number]): 
 }
 
 /** Render ratio as throughput change relative to baseline. */
-function formatChange(ratio: number): string {
+export function formatChange(ratio: number): string {
   if (ratio === 1)
     return 'same speed'
   const percent = Math.abs(ratio - 1) * 100
@@ -105,11 +105,11 @@ function formatPercent(value: number): string {
 }
 
 /** Render numeric interval. */
-function formatRange(values: readonly [number, number]): string {
+export function formatRange(values: readonly [number, number]): string {
   return `${format(values[0])}–${format(values[1])}`
 }
 
 /** Render values without meaningless trailing precision. */
-function format(value: number): string {
+export function format(value: number): string {
   return Number(value).toFixed(value >= 100 ? 1 : value >= 10 ? 2 : 3)
 }
