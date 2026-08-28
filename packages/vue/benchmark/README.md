@@ -88,3 +88,57 @@ envelope. Other growth stays `inconclusive`; negative values remain visible as
 GC/runtime noise. Quick profile usually completes in about 20 seconds; full
 profile in about 90 seconds per trial on current development machine. Historical
 version run includes locked installs/builds and can take tens of minutes.
+
+## Big-payload benchmarks
+
+Payload profiles isolate every implementation and row in its own Node 23+
+process with `--expose-gc`. Deterministic input is constructed before timed
+work. Worker records input-retained heap, operation duration, maximum-RSS
+delta, retained cache heap after caller source release, and post-disposal
+residual. Heap checkpoints keep lowest reading across five forced collections.
+
+Run quick smoke profile or exact full large-payload matrix:
+
+```bash
+pnpm --filter @rstore/shared build
+pnpm --filter @rstore/core build
+pnpm --filter @rstore/vue benchmark:payload
+pnpm --filter @rstore/vue benchmark:payload:full
+```
+
+Quick profile usually takes under 15 seconds. One full trial usually takes
+under one minute on current development machine. Strict diagnostic filters:
+
+```bash
+RSTORE_PAYLOAD_SCENARIO=write-wide RSTORE_PAYLOAD_ITEMS=10000 \
+  RSTORE_PAYLOAD_FIELDS=64 RSTORE_PAYLOAD_TRIALS=3 \
+  pnpm --filter @rstore/vue benchmark:payload:full
+```
+
+`RSTORE_PAYLOAD_ITEMS` and `RSTORE_PAYLOAD_FIELDS` require
+`RSTORE_PAYLOAD_SCENARIO`. `RSTORE_PAYLOAD_TRIALS` accepts integer from 1
+through 20. Unset all filters for comparable evidence.
+
+Full historical controller creates one detached temporary worktree at exact v5
+commit, installs locked dependencies, builds Shared and Core serially, then runs
+three CPU trials, three retained-memory trials, and five alternating payload
+trials for v5 and current v6:
+
+```bash
+pnpm --filter @rstore/vue benchmark:payload:versions
+```
+
+Failure preserves logs under printed `/tmp/rstore-payload-*` path. Successful
+run writes these evidence snapshots only after environment, dimensions, run
+counts, candidate identity, and frozen legacy hash match:
+
+- `reports/data-core-big-payload-v5-v6.{json,md}`
+- `reports/data-core-memory-v5-v6.{json,md}`
+- `reports/data-core-v5-v6.{json,md}`
+
+Duration, peak RSS, and retained heap are lower-is-better. Zero-crossing RSS or
+heap values use signed absolute deltas instead of ratios. Expected retained
+cache state before teardown is distinct from residual state after disposal.
+JSON rows also retain signed metrics after matching input-only or empty-lifecycle
+control subtraction. Noisy control-overlapping readings remain `inconclusive`. Reports are
+informational evidence snapshots, not baselines, budgets, or CI gates.

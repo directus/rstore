@@ -3,8 +3,9 @@ import type { ChangeRecorder } from './change-recorder.js'
 import type { EngineCollectionState, EngineContext, EngineEffect, EngineLayer, KeyId } from './internal-types.js'
 import { recordItem, recordList } from './change-recorder.js'
 import { getCollectionMetadata } from './collection-metadata.js'
-import { getPublicKey, isEntityKey, refreshPublicKey, releaseUnusedKey, toKeyId } from './identity.js'
+import { getPublicKey, isEntityKey, releaseUnusedKey, toKeyId } from './identity.js'
 import { reconcileItemIndexes } from './indexes.js'
+import { createNullRecord } from './records.js'
 import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
 
 /** Find a public layer by id. */
@@ -21,7 +22,7 @@ function normalizeLayer(
   collection: ResolvedCollection<any, any, any>,
   layer: CacheLayer,
 ): EngineLayer {
-  const patches = new Map<KeyId, any>()
+  const patches = createNullRecord<any>()
   const deletedItems = new Set<KeyId>()
   const affectedKeys: KeyId[] = []
   let fallbackKeyValues: Map<KeyId, string | number> | undefined
@@ -30,7 +31,7 @@ function normalizeLayer(
     const item = layer.state[key]
     const id = toKeyId(key)
     const derived = collection.getKey(item)
-    patches.set(id, item)
+    patches[id] = item
     affectedKeys.push(id)
     if (!isEntityKey(derived) || toKeyId(derived) !== id) {
       fallbackKeyValues ??= new Map()
@@ -40,7 +41,7 @@ function normalizeLayer(
   for (const key of layer.deletedItems) {
     const id = toKeyId(key)
     deletedItems.add(id)
-    if (!patches.has(id))
+    if (!Object.hasOwn(patches, id))
       affectedKeys.push(id)
     fallbackKeyValues ??= new Map()
     fallbackKeyValues.set(id, getPublicKey(state, id) ?? key)
@@ -87,7 +88,6 @@ function reconcileLayerChange(
     invalidateResolvedItem(state, id)
     const next = resolveItemById(state, id)
     const before = previous[index]
-    refreshPublicKey(state, id)
     const keyFormChanged = previousKeys[index] !== getPublicKey(state, id)
     if (before !== next) {
       if (hasIndexes)
@@ -163,11 +163,4 @@ export function restoreLayerOwnership(state: EngineCollectionState): void {
   state.layeredKeyCounts = undefined
   for (const layer of state.layers)
     changeLayeredKeyCounts(state, layer, 1)
-  const ids = new Set(state.base.keys())
-  for (const layer of state.layers) {
-    for (const id of layer.affectedKeys)
-      ids.add(id)
-  }
-  for (const id of ids)
-    refreshPublicKey(state, id)
 }

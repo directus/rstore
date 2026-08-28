@@ -18,11 +18,12 @@ export function getState(ctx: EngineContext): CustomCacheState {
   for (const [name, state] of ctx.collections) {
     const target = createNullRecord<any>()
     collections[name] = target
+    const directDefaultKeys = state.layers.length === 0 && state.usesDefaultKey && !state.keyOverrides
     for (const [id, item] of state.base) {
       if (item !== undefined) {
-        if (state.layers.length === 0 && state.usesDefaultKey) {
+        if (directDefaultKeys) {
           const derived = item.$overrideKey ?? item.id ?? item.__id
-          target[isEntityKey(derived) && String(derived) === id ? derived : state.fallbackKeyValues?.get(id) ?? id] = item
+          target[isEntityKey(derived) && String(derived) === id ? derived : id] = item
         }
         else {
           target[getPublicKey(state, id)] = item

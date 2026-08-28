@@ -2,6 +2,7 @@ import type { MemoryBenchmarkReport, MemoryMeasurement } from '../benchmark/memo
 import { describe, expect, it } from 'vitest'
 import { combineMemoryVersionReports } from '../benchmark/memory/version-report'
 import { renderMemoryVersionReportMarkdown } from '../benchmark/memory/version-report-markdown'
+import { combineMemoryV6Reports } from '../benchmark/memory/version-report-v6'
 
 const VERSIONS = {
   legacyHash: 'legacy-hash',
@@ -97,6 +98,20 @@ describe('memory version report', () => {
     expect(markdown).toContain('Retained-growth signals')
     expect(markdown).toContain('Post-disposal residuals')
     expect(markdown).toContain('retained-memory evidence snapshot')
+  })
+
+  it('compares v6 setup and steady ownership with v5 guards', () => {
+    const report = combineMemoryV6Reports(runs(500), runs(490), {
+      legacyHash: 'legacy-hash',
+      dataCoreV5: 'v5',
+      dataCoreV6: 'v6',
+      candidateDiffHash: 'diff',
+    })
+
+    expect(report.rows[0]).toMatchObject({
+      comparisons: { setup: { medianRatio: 0.98 }, steady: { medianRatio: 0.98 } },
+      guards: { setup: true, steady: true },
+    })
   })
 })
 
