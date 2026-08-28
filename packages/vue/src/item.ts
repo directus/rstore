@@ -53,6 +53,19 @@ export function wrapItem<
     return store[collection.name as keyof typeof store] as any
   }
 
+  // Proxying a frozen item directly prevents `get` from returning later field
+  // values. Use an extensible facade with the same prototype so every wrapper
+  // can keep reading its live engine source without violating Proxy invariants.
+  const source = seed ?? item.value
+  const target = Object.create(Object.getPrototypeOf(source)) as typeof source
+  const plain = Object.keys(collection.computed).length === 0
+    && Object.keys(collection.normalizedRelations).length === 0
+    && Object.keys(collection.relations).length === 0
+
+  if (plain) {
+    return new Proxy(target, createPlainItemHandler({ collection, item, metadata, getApi })) as WrappedItem<TCollection, TCollectionDefaults, TSchema>
+  }
+
   const relatedCollections = new Map<string, ResolvedCollection<any, any, any>>()
   const relationReaders = new Map<PropertyKey, (current: any) => any>()
 
@@ -69,19 +82,6 @@ export function wrapItem<
   }
 
   const cache = store.$cache as unknown as Cache & VueCachePrivate
-
-  // Proxying a frozen item directly prevents `get` from returning later field
-  // values. Use an extensible facade with the same prototype so every wrapper
-  // can keep reading its live engine source without violating Proxy invariants.
-  const source = seed ?? item.value
-  const target = Object.create(Object.getPrototypeOf(source)) as typeof source
-  const plain = Object.keys(collection.computed).length === 0
-    && Object.keys(collection.normalizedRelations).length === 0
-    && Object.keys(collection.relations).length === 0
-
-  if (plain) {
-    return new Proxy(target, createPlainItemHandler({ collection, item, metadata, getApi })) as WrappedItem<TCollection, TCollectionDefaults, TSchema>
-  }
 
   const proxy = new Proxy(target, {
     get: (_target, key) => {

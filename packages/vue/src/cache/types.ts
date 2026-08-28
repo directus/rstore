@@ -57,7 +57,7 @@ export interface CacheRuntime<
   wrappedItems: WrappedItemRegistry<TCollectionDefaults, TSchema>
   /** Stable visible-list wrappers reused until cache membership can change. */
   visibleListCache: Map<string, Array<WrappedItem<Collection, TCollectionDefaults, TSchema>>>
-  /** Bounded exact-index wrapper results retained until membership changes. */
+  /** Bounded weak exact-index wrapper results retained until membership changes. */
   indexResultCache: IndexResultCache
 }
 
