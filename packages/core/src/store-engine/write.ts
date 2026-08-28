@@ -1,14 +1,14 @@
-import type { FieldTimestamps } from '@rstore/shared'
 import type { ChangeRecorder } from './change-recorder.js'
 import type { CollectionMetadata } from './collection-metadata.js'
-import type { EngineContext, EngineEffect, WriteCommitResult } from './internal-types.js'
+import type { EngineCollectionState, EngineContext, EngineEffect, WriteCommitResult } from './internal-types.js'
 import type { DeleteItemParams, EngineWriteChange, WriteItemParams } from './types.js'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { mergeItemFields } from '../crdt/index.js'
 import { shouldResurrect } from '../tombstone.js'
 import { recordItem, recordList } from './change-recorder.js'
 import { getCollectionMetadata } from './collection-metadata.js'
-import { getPublicKey, refreshPublicKey, registerBaseKey, registerBaseKeyValue, releaseUnusedKey, toKeyId } from './identity.js'
+import { getFieldTimestamps, setFieldTimestamps } from './crdt-state.js'
+import { clearKeyOverride, getPublicKey, isEntityKey, matchesKeyId, registerBaseKeyValue, releaseUnusedKey, toKeyId } from './identity.js'
 import { reconcileItemIndexes } from './indexes.js'
 import { planWriteTree, validateWriteInput } from './relations.js'
 import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
@@ -30,32 +30,6 @@ interface BaseMergeResult {
   value: any
   /** Whether resolved item data can have changed. */
   valueChanged: boolean
-}
-
-/** Get or create field timestamps for one collection. */
-function ensureCollectionTimestamps(ctx: EngineContext, collectionName: string): Map<string, FieldTimestamps> {
-  let timestamps = ctx.fieldTimestamps.get(collectionName)
-  if (!timestamps) {
-    timestamps = new Map()
-    ctx.fieldTimestamps.set(collectionName, timestamps)
-  }
-  return timestamps
-}
-
-/** Read field timestamps through canonical numeric/string identity. */
-export function getFieldTimestamps(ctx: EngineContext, collectionName: string, key: string | number): FieldTimestamps | undefined {
-  return ctx.fieldTimestamps.get(collectionName)?.get(toKeyId(key))
-}
-
-/** Store field timestamps through canonical numeric/string identity. */
-export function setFieldTimestamps(ctx: EngineContext, collectionName: string, key: string | number, timestamps: FieldTimestamps): void {
-  const id = toKeyId(key)
-  const state = ctx.collections.get(collectionName)
-  if (state && !state.base.has(id) && !state.fallbackKeyValues?.has(id)) {
-    state.fallbackKeyValues ??= new Map()
-    state.fallbackKeyValues.set(id, key)
-  }
-  ensureCollectionTimestamps(ctx, collectionName).set(id, timestamps)
 }
 
 /** Commit a preflighted write tree and collect callbacks in legacy order. */
@@ -86,24 +60,32 @@ export function writeItemNow(ctx: EngineContext, changes: ChangeRecorder | undef
   }
   return { effects, change: rootChange }
 }
-
 /** Commit one validated child or root write. */
-function commitWrite(
+export function commitWrite(
   ctx: EngineContext,
   changes: ChangeRecorder | undefined,
   params: WriteItemParams,
   data: any,
   mutable: boolean,
-  effects: EngineEffect[],
+  effects: EngineEffect[] | undefined,
   metadata: CollectionMetadata,
+  preparedState?: EngineCollectionState,
 ): EngineWriteChange | undefined {
   const { collection, key, item, marker, fromWriteItems, meta } = params
-  const state = ctx.ensureCollection(collection.name)
+  const state = preparedState ?? ctx.ensureCollection(collection.name)
   const id = toKeyId(key)
   const layerless = state.layers.length === 0
-  const itemOwnsKey = metadata.usesDefaultKey && ownsKeyField(item)
+  const derivedKey = metadata.usesDefaultKey
+    ? readDefaultKey(item)
+    : collection.getKey(item)
+  const itemOwnsKey = metadata.usesDefaultKey && (derivedKey !== undefined || ownsKeyField(item))
+  const derivedKeyIsCanonical = matchesKeyId(derivedKey, id)
   const existing = state.base.get(id)
-  const previousPublicKey = state.publicKeys.get(id)
+  const previousPublicKey = existing === undefined && !state.layeredKeyCounts?.has(id)
+    ? undefined
+    : layerless && metadata.usesDefaultKey && !state.keyOverrides
+      ? readDefaultKey(existing) ?? id
+      : getPublicKey(state, id, existing)
   const tombstone = ctx.tombstones.get(collection.name, key)
   if (tombstone) {
     if (params.fieldTimestamps && !shouldResurrect(tombstone, params.fieldTimestamps)) {
@@ -111,11 +93,12 @@ function commitWrite(
     }
     ctx.tombstones.clear(collection.name, key)
   }
-  if (metadata.usesDefaultKey)
-    registerBaseKeyValue(state, key, itemOwnsKey ? readDefaultKey(item) : undefined)
-  else
-    registerBaseKey(state, collection, key, item)
-  const publicKey = getPublicKey(state, id)
+  if (derivedKeyIsCanonical)
+    clearKeyOverride(state, id)
+  else registerBaseKeyValue(state, key, derivedKey, itemOwnsKey || (!metadata.usesDefaultKey && derivedKey !== undefined))
+  const publicKey = derivedKeyIsCanonical
+    ? derivedKey
+    : getPublicKey(state, id, existing)
 
   const previous = layerless ? existing : resolveItemById(state, id)
   const mergedBase = mutable
@@ -169,7 +152,7 @@ function commitWrite(
   if (!fromWriteItems) {
     appendWriteEffects(
       ctx,
-      effects,
+      effects!,
       {
         collection,
         key: publicKey,
@@ -185,7 +168,6 @@ function commitWrite(
   }
   return change
 }
-
 /** Check whether one mutable patch can change any materialized membership. */
 function touchesIndexedField(metadata: CollectionMetadata, data: any): boolean {
   const indexedFields = metadata.indexedFields
@@ -195,15 +177,15 @@ function touchesIndexedField(metadata: CollectionMetadata, data: any): boolean {
   }
   return false
 }
-
 /** Check whether default key derivation can change public key representation. */
 function ownsKeyField(item: object): boolean {
   return Object.hasOwn(item, '$overrideKey') || Object.hasOwn(item, 'id') || Object.hasOwn(item, '__id')
 }
 
 /** Read default override/id/__id public-key policy. */
-function readDefaultKey(item: any): unknown {
-  return item?.$overrideKey ?? item?.id ?? item?.__id
+function readDefaultKey(item: any): string | number | undefined {
+  const key = item?.$overrideKey ?? item?.id ?? item?.__id
+  return isEntityKey(key) ? key : undefined
 }
 
 /** Merge relation-free mutable data and defer any CRDT conflict hook. */
@@ -213,7 +195,7 @@ function mergeMutableItem(
   data: any,
   existing: any,
   publicKey: string | number,
-  effects: EngineEffect[],
+  effects: EngineEffect[] | undefined,
 ): BaseMergeResult {
   const { collection, fieldTimestamps } = params
   if (existing === undefined) {
@@ -236,7 +218,7 @@ function mergeMutableItem(
   if (timestampsChanged)
     setFieldTimestamps(ctx, collection.name, publicKey, mergedTimestamps)
   if (conflicts.length > 0) {
-    effects.push({ type: 'conflict', payload: { collection, key: publicKey, conflicts } })
+    effects?.push({ type: 'conflict', payload: { collection, key: publicKey, conflicts } })
   }
   return { value: merged, valueChanged }
 }
@@ -257,9 +239,7 @@ export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder |
   const previous = layerless ? state.base.get(id) : resolveItemById(state, id)
   const publicKey = getPublicKey(state, id)
   state.base.delete(id)
-  state.fallbackKeyValues?.delete(id)
-  if (state.layers.length)
-    refreshPublicKey(state, id)
+  clearKeyOverride(state, id)
   if (!layerless)
     invalidateResolvedItem(state, id)
   const next = layerless ? undefined : resolveItemById(state, id)

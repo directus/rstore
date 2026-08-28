@@ -31,10 +31,10 @@ export function resolveItemById(state: EngineCollectionState, id: KeyId): any | 
 
   let result = state.base.get(id)
   for (const layer of state.layers) {
-    if (isLayerActive(layer) && layer.state.has(id)) {
+    if (isLayerActive(layer) && Object.hasOwn(layer.state, id)) {
       result = {
         ...result,
-        ...layer.state.get(id),
+        ...layer.state[id],
         $layer: layer.layer,
       }
     }
@@ -65,7 +65,7 @@ export function getVisibleKeyIds(state: EngineCollectionState): KeyId[] {
   const keys = new Set<KeyId>(state.base.keys())
   for (const layer of state.layers) {
     if (isLayerActive(layer)) {
-      for (const id of layer.state.keys()) {
+      for (const id of Object.keys(layer.state)) {
         keys.add(id)
       }
     }

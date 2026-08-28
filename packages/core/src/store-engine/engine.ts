@@ -3,6 +3,7 @@ import type { EngineOptions, StoreEngine } from './types.js'
 import { createTombstoneStore, gcTombstones as gcTombstonesStore, scheduleTombstoneGc } from '../tombstone.js'
 import { createChangeRecorder, createFlushChangeRecorder, discardStateChangeSink } from './change-recorder.js'
 import { createEngineContext } from './context.js'
+import { getFieldTimestamps, setFieldTimestamps } from './crdt-state.js'
 import { getPublicKey } from './identity.js'
 import { cacheIndexDependencyId } from './index-dependencies.js'
 import { getIndexBucket, getIndexBucketIds, getIndexObserverId, getIndexRead } from './indexes.js'
@@ -16,7 +17,7 @@ import { getState as serializeState } from './serialize.js'
 import { normalizeSnapshotInput } from './snapshot-input.js'
 import { createStaggering } from './staggering.js'
 import { getVisibleKeyIds, getVisibleKeys, resolveItem, resolveItemById } from './view.js'
-import { deleteItemFromBase, getFieldTimestamps, setFieldTimestamps } from './write.js'
+import { deleteItemFromBase } from './write.js'
 
 /**
  * Create a framework-agnostic storage engine. Plain JS structures own state;
@@ -87,10 +88,18 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       }
 
       const ids = indexKey != null ? indexIds : getVisibleKeyIds(state)
+      const directDefaultKeys = state.layers.length === 0 && state.usesDefaultKey && !state.keyOverrides
       for (const id of ids ?? []) {
         const item = resolveItemById(state, id)
-        if (item !== undefined && visit(getPublicKey(state, id), item) === false)
-          break
+        if (item !== undefined) {
+          // Ordinary default-key rows need no sparse-map or layer resolution:
+          // write/hydration registration guarantees current item key identity.
+          const publicKey = directDefaultKeys
+            ? item.$overrideKey ?? item.id ?? item.__id ?? id
+            : getPublicKey(state, id, item)
+          if (visit(publicKey, item) === false)
+            break
+        }
       }
     },
 

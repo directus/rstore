@@ -5,6 +5,7 @@ import { combineV4VersionReports } from '../benchmark/version-report-v4'
 import { renderV4VersionReportMarkdown } from '../benchmark/version-report-v4-markdown'
 import { combineV5VersionReports } from '../benchmark/version-report-v5'
 import { renderV5VersionReportMarkdown } from '../benchmark/version-report-v5-markdown'
+import { combineV6VersionReports } from '../benchmark/version-report-v6'
 
 describe('four-version benchmark report', () => {
   it('combines three candidate runs with stable labels and envelopes', () => {
@@ -112,6 +113,17 @@ describe('four-version benchmark report', () => {
     expect(report.rows[0]!.speedups.dataCoreV5VsV4).toBeCloseTo(2 / 2.1)
     expect(report.cacheBounds.orphanSignals).toBe(0)
     expect(renderV5VersionReportMarkdown(report)).toContain('median <=10%')
+  })
+
+  it('compares three same-machine v5/v6 CPU runs with tighter guards', () => {
+    const report = combineV6VersionReports(
+      [candidate(2), candidate(2), candidate(2)] as any,
+      [candidate(2.1), candidate(2.1), candidate(2.1)] as any,
+      { dataCoreV5: 'v5', dataCoreV6: 'v6', candidateDiffHash: 'diff', legacyHash: 'legacy' },
+    )
+
+    expect(report.rows[0]).toMatchObject({ performanceRatio: 1.05, acceptance: 'meets target' })
+    expect(report.acceptance).toMatchObject({ rowsMeetingTarget: 1, allRowsMeetTarget: true })
   })
 
   it('renders version uncertainty in plain language', () => {
