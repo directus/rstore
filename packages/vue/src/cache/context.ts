@@ -1,12 +1,16 @@
-import type { EngineAfterWritePayload, EngineCallbacks, EngineConflictPayload, EngineResetPayload } from '@rstore/core'
+import type { EngineCallbacks, EngineConflictPayload, EngineResetPayload, EngineStateChangeSink, EngineWriteCommitPayload } from '@rstore/core'
 import type { CacheLayer, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
 import type { CacheRuntime, CreateCacheOptions } from './types'
 import { createStoreEngine, isKeyDefined } from '@rstore/core'
 import { reactive, shallowRef } from 'vue'
 import { createCacheChangeInterestRegistry } from './changeInterest'
+import { createIndexResultCache } from './indexResultCache'
 import { createItemCellRegistry } from './itemCells'
 import { clearAllQueryState, clearQueryStateForCollection } from './queryState'
 import { createSignalRegistry } from './signals'
+import { createCacheStateSink } from './stateSink'
+import { synchronizeBridgeIndex } from './stateSinkIndex'
+import { synchronizeBridgeItem } from './stateSinkItem'
 import { appendSyncError, throwSyncErrors } from './syncErrors'
 import { createCacheVersionRegistry } from './versions'
 import { createWrappedItemRegistry } from './wrappedRegistry'
@@ -22,16 +26,29 @@ export function createCacheRuntime<
   isServer = (import.meta as unknown as { server?: boolean }).server === true,
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): CacheRuntime<TSchema, TCollectionDefaults> {
   let runtime: CacheRuntime<TSchema, TCollectionDefaults>
+  let sinkImplementation: EngineStateChangeSink
   const pageRefs = new Map<string, any>()
   const changeInterest = createCacheChangeInterestRegistry()
+  const stateChangeSink: EngineStateChangeSink = {
+    getInterest: () => changeInterest.value,
+    begin: () => sinkImplementation.begin(),
+    wantsItem: (collection, key) => sinkImplementation.wantsItem(collection, key),
+    wantsList: collection => sinkImplementation.wantsList(collection),
+    wantsIndex: dependency => sinkImplementation.wantsIndex(dependency),
+    recordItem: (collection, key, value, keyForm) => sinkImplementation.recordItem(collection, key, value, keyForm),
+    recordList: collection => sinkImplementation.recordList(collection),
+    recordIndex: dependency => sinkImplementation.recordIndex(dependency),
+    recordCollectionReset: collection => sinkImplementation.recordCollectionReset(collection),
+    commit: () => sinkImplementation.commit(),
+    discard: () => sinkImplementation.discard(),
+  }
 
   const callbacks: EngineCallbacks = {
     getCollection: name => getStore().$collections.find(collection => collection.name === name),
     resolveChildCollection: (item, possibleNames) => getStore().$getCollection(item, possibleNames),
     wrapModuleState: value => value && typeof value === 'object' ? reactive(value) : value,
-    getStateChangeInterest: () => changeInterest.value,
-    onStateChange: changes => synchronizeBridge(runtime, changes),
-    onAfterWrite: payload => handleAfterWrite(runtime, payload),
+    stateChangeSink,
+    onWriteCommitted: payload => handleAfterWrite(runtime, payload),
     onConflict: payload => handleConflict(getStore, payload),
     onLayerAdd: layer => handleLayerAdd(runtime, layer),
     onLayerRemove: layer => handleLayerRemove(runtime, layer),
@@ -67,19 +84,39 @@ export function createCacheRuntime<
     layers: Object.create(null) as CacheRuntime<TSchema, TCollectionDefaults>['layers'],
     wrappedItems: createWrappedItemRegistry(),
     visibleListCache: new Map(),
+    indexResultCache: createIndexResultCache(changeInterest),
   }
+  sinkImplementation = createCacheStateSink({
+    interest: changeInterest,
+    flush: (changes, values, keyForms, resets, deletions) => synchronizeBridge(runtime, changes, values, keyForms, resets, deletions),
+    flushItem: (collection, key, value, keyForm) => synchronizeBridgeItem(runtime, collection, key, value, keyForm),
+    flushIndex: dependency => synchronizeBridgeIndex(runtime, dependency),
+  })
   return runtime
 }
 
 /** Synchronize every bridge registry even when one reactive effect fails. */
-function synchronizeBridge(ctx: CacheRuntime, changes: Parameters<NonNullable<EngineCallbacks['onStateChange']>>[0]): void {
+function synchronizeBridge(
+  ctx: CacheRuntime,
+  changes: Parameters<CacheRuntime['signals']['flush']>[0],
+  values: Parameters<CacheRuntime['itemCells']['flush']>[1],
+  keyForms: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[2],
+  resets: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[3],
+  deletions: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[4],
+): void {
   let errors: unknown[] | undefined
+  for (const collection of changes.lists) ctx.visibleListCache.delete(collection)
+  for (const collection of resets) ctx.visibleListCache.delete(collection)
+  for (const dependency of changes.indexes) ctx.indexResultCache.invalidate(dependency)
+  for (const collection of resets) ctx.indexResultCache.reset(collection)
   // Flush existing missing/list/index dependencies before item deletion can
   // install a new missing-item dependency during its synchronous cell rerun.
   errors = runBridgeSink(ctx.versions.flush, changes, errors)
   errors = runBridgeSink(ctx.signals.flush, changes, errors)
   if (changes.items.size)
-    errors = runBridgeSink(ctx.itemCells.flush, changes, errors)
+    errors = runBridgeSinkWithValues(ctx.itemCells.flush, changes, values, errors)
+  if (deletions.length || keyForms.length)
+    errors = cleanupChangedWrappers(ctx, deletions, keyForms, errors)
   throwSyncErrors(errors, 'Vue cache synchronization failed')
 }
 
@@ -98,16 +135,47 @@ function runBridgeSink(
   return errors
 }
 
+/** Run item-cell synchronization with Core-provided final values. */
+function runBridgeSinkWithValues(
+  flush: CacheRuntime['itemCells']['flush'],
+  changes: Parameters<CacheRuntime['itemCells']['flush']>[0],
+  values: Parameters<CacheRuntime['itemCells']['flush']>[1],
+  errors: unknown[] | undefined,
+): unknown[] | undefined {
+  try {
+    flush(changes, values)
+  }
+  catch (error) {
+    return appendSyncError(errors, error)
+  }
+  return errors
+}
+
+/** Evict deleted or public-key-changed identities after active cells update. */
+function cleanupChangedWrappers(
+  ctx: CacheRuntime,
+  deletions: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[4],
+  keyForms: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[2],
+  errors: unknown[] | undefined,
+): unknown[] | undefined {
+  try {
+    for (const deletion of deletions)
+      ctx.wrappedItems.deleteBase(deletion.collection, deletion.key)
+    for (const change of keyForms)
+      ctx.wrappedItems.deleteBase(change.collection, change.previousKey)
+  }
+  catch (error) {
+    return appendSyncError(errors, error)
+  }
+  return errors
+}
+
 /** Apply bridge write invalidation before calling user hooks. */
-function handleAfterWrite(ctx: CacheRuntime, payload: EngineAfterWritePayload): void {
-  if (payload.changes.some(change => change.visibilityChanged || change.keyFormChanged)) {
-    ctx.visibleListCache.delete(payload.collection.name)
-  }
-  for (const change of payload.changes) {
-    if (payload.operation === 'delete' || change.keyFormChanged) {
-      ctx.wrappedItems.deleteBase(payload.collection.name, change.previousKey ?? change.key)
-    }
-  }
+function handleAfterWrite(ctx: CacheRuntime, payload: EngineWriteCommitPayload): void {
+  if (payload.operation === 'delete')
+    ctx.wrappedItems.deleteBase(payload.collection.name, payload.key!)
+  else if (payload.keyFormChanged && payload.previousKey !== undefined)
+    ctx.wrappedItems.deleteBase(payload.collection.name, payload.previousKey)
   const store = ctx.getStore()
   store.$hooks.callHookSync('afterCacheWrite', {
     store,
@@ -161,11 +229,13 @@ function handleReset(ctx: CacheRuntime, payload: EngineResetPayload): void {
   if (payload.collection) {
     const collectionName = payload.collection.name
     ctx.visibleListCache.delete(collectionName)
+    ctx.indexResultCache.reset(collectionName)
     ctx.wrappedItems.deleteCollection(collectionName)
     clearQueryStateForCollection(ctx, collectionName)
   }
   else {
     ctx.visibleListCache.clear()
+    ctx.indexResultCache.reset()
     ctx.wrappedItems.clear()
     clearAllQueryState(ctx)
   }

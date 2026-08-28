@@ -5,8 +5,10 @@ import type { Scenario, ScenarioCounts, ScenarioOptions } from './scenario-harne
 import process from 'node:process'
 import { Bench } from 'tinybench'
 import { classifyComparison, createBenchmarkReport, speedupInterval } from './report'
+import { selectBenchmarkRows } from './selection'
 
 export { createBenchmarkReport, speedupInterval } from './report'
+export { resolveScenarioItemCounts } from './selection'
 
 const operationIndexes = new WeakMap<Scenario, number>()
 const RETRY_DURATION_MULTIPLIERS = [4, 16, 32] as const
@@ -77,25 +79,18 @@ export async function runBenchmarks(
   printEnvironment(profile)
   const rows: BenchmarkMeasurement[] = []
   const results: BenchmarkScenarioResult[] = []
-  for (let scenarioIndex = 0; scenarioIndex < profile.scenarios.length; scenarioIndex++) {
-    const scenario = profile.scenarios[scenarioIndex]!
-    for (const items of resolveScenarioItemCounts(profile, scenario)) {
-      const options = { items, watchers: profile.watchers }
-      const result = await measureScenario(profile, scenario, options, implementations, scenarioIndex)
-      rows.push(...result.measurements)
-      results.push(result)
-      printScenario(profile, scenario, options, result.measurements)
-    }
+  let scenarioIndex = 0
+  for (const [scenario, items] of selectBenchmarkRows(profile)) {
+    const options = { items, watchers: profile.watchers }
+    const result = await measureScenario(profile, scenario, options, implementations, scenarioIndex++)
+    rows.push(...result.measurements)
+    results.push(result)
+    printScenario(profile, scenario, options, result.measurements)
   }
   console.log(`\nMeasured ${rows.length} implementation rows.`)
   const report = createBenchmarkReport(profile, results)
   console.log(JSON.stringify(report, null, 2))
   return report
-}
-
-/** Resolve one workload's focused size matrix or inherit its profile default. */
-export function resolveScenarioItemCounts(profile: BenchmarkProfile, scenario: BenchmarkScenario): readonly number[] {
-  return scenario.itemCounts ?? profile.itemCounts
 }
 
 /** Measure one equivalent scenario pair with escalating bounded retries. */

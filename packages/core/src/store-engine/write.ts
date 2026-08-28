@@ -1,16 +1,18 @@
 import type { FieldTimestamps } from '@rstore/shared'
 import type { ChangeRecorder } from './change-recorder.js'
+import type { CollectionMetadata } from './collection-metadata.js'
 import type { EngineContext, EngineEffect, WriteCommitResult } from './internal-types.js'
-import type { PlannedWrite } from './relations.js'
 import type { DeleteItemParams, EngineWriteChange, WriteItemParams } from './types.js'
+import { pickNonSpecialProps } from '@rstore/shared'
 import { mergeItemFields } from '../crdt/index.js'
 import { shouldResurrect } from '../tombstone.js'
 import { recordItem, recordList } from './change-recorder.js'
 import { getCollectionMetadata } from './collection-metadata.js'
-import { getPublicKey, refreshPublicKey, registerBaseKey, releaseUnusedKey, toKeyId } from './identity.js'
+import { getPublicKey, refreshPublicKey, registerBaseKey, registerBaseKeyValue, releaseUnusedKey, toKeyId } from './identity.js'
 import { reconcileItemIndexes } from './indexes.js'
-import { planRelationFreeWrite, planWriteTree } from './relations.js'
+import { planWriteTree, validateWriteInput } from './relations.js'
 import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
+import { appendWriteEffects, createWriteEffects } from './write-effects.js'
 
 /** Result of deleting one base item. */
 export interface DeleteCommitResult {
@@ -58,13 +60,25 @@ export function setFieldTimestamps(ctx: EngineContext, collectionName: string, k
 /** Commit a preflighted write tree and collect callbacks in legacy order. */
 export function writeItemNow(ctx: EngineContext, changes: ChangeRecorder | undefined, params: WriteItemParams): WriteCommitResult {
   const effects: EngineEffect[] = []
-  if (!getCollectionMetadata(params.collection).hasRelations) {
-    const change = commitPlannedWrite(ctx, changes, planRelationFreeWrite(params), effects)
+  const metadata = getCollectionMetadata(params.collection)
+  if (!metadata.hasRelations) {
+    validateWriteInput(params)
+    const mutable = !Object.isFrozen(params.item)
+    const data = mutable ? pickNonSpecialProps(params.item, true) : params.item
+    const change = commitWrite(ctx, changes, params, data, mutable, effects, metadata)
     return { effects, change }
   }
   let rootChange: EngineWriteChange | undefined
   for (const planned of planWriteTree(ctx, params)) {
-    const change = commitPlannedWrite(ctx, changes, planned, effects)
+    const change = commitWrite(
+      ctx,
+      changes,
+      planned.params,
+      planned.data,
+      planned.mutable,
+      effects,
+      getCollectionMetadata(planned.params.collection),
+    )
     if (planned.root) {
       rootChange = change
     }
@@ -73,50 +87,64 @@ export function writeItemNow(ctx: EngineContext, changes: ChangeRecorder | undef
 }
 
 /** Commit one validated child or root write. */
-function commitPlannedWrite(
+function commitWrite(
   ctx: EngineContext,
   changes: ChangeRecorder | undefined,
-  planned: PlannedWrite,
+  params: WriteItemParams,
+  data: any,
+  mutable: boolean,
   effects: EngineEffect[],
+  metadata: CollectionMetadata,
 ): EngineWriteChange | undefined {
-  const { collection, key, item, marker, fromWriteItems, meta } = planned.params
+  const { collection, key, item, marker, fromWriteItems, meta } = params
   const state = ctx.ensureCollection(collection.name)
   const id = toKeyId(key)
   const previousPublicKey = state.keyValues.get(id)
+  const existing = state.base.get(id)
   const tombstone = ctx.tombstones.get(collection.name, key)
   if (tombstone) {
-    if (planned.params.fieldTimestamps && !shouldResurrect(tombstone, planned.params.fieldTimestamps)) {
+    if (params.fieldTimestamps && !shouldResurrect(tombstone, params.fieldTimestamps)) {
       return undefined
     }
     ctx.tombstones.clear(collection.name, key)
   }
-  registerBaseKey(state, collection, key, item)
+  if (metadata.usesDefaultKey && existing !== undefined && !ownsKeyField(item))
+    registerBaseKeyValue(state, key)
+  else
+    registerBaseKey(state, collection, key, item)
   const publicKey = getPublicKey(state, id)
 
-  const previous = resolveItemById(state, id)
-  const existing = state.base.get(id)
-  const mergedBase = planned.mutable
-    ? mergeMutableItem(ctx, planned, existing, publicKey, effects)
-    : { value: planned.data, valueChanged: true }
+  const layerless = state.layers.length === 0
+  const previous = layerless ? existing : resolveItemById(state, id)
+  const mergedBase = mutable
+    ? mergeMutableItem(ctx, params, data, existing, publicKey, effects)
+    : { value: data, valueChanged: true }
   if (mergedBase.valueChanged)
     state.base.set(id, mergedBase.value)
 
-  if (mergedBase.valueChanged)
+  if (mergedBase.valueChanged && !layerless)
     invalidateResolvedItem(state, id)
-  const next = mergedBase.valueChanged ? resolveItemById(state, id) : previous
-  if (mergedBase.valueChanged && (existing === undefined || !planned.mutable || touchesIndexedField(collection, planned.data)))
+  const next = mergedBase.valueChanged
+    ? (layerless ? mergedBase.value : resolveItemById(state, id))
+    : previous
+  if (metadata.hasIndexes && mergedBase.valueChanged && (existing === undefined || !mutable || touchesIndexedField(metadata, data)))
     reconcileItemIndexes(ctx, changes, collection, id, next)
-  const change: EngineWriteChange = {
-    key: publicKey,
-    previousKey: previousPublicKey,
-    visibilityChanged: (previous !== undefined) !== (next !== undefined),
-    keyFormChanged: previousPublicKey !== undefined
-      && previousPublicKey !== publicKey
-      && (previous !== undefined || next !== undefined),
+  const visibilityChanged = (previous !== undefined) !== (next !== undefined)
+  const keyFormChanged = previousPublicKey !== undefined
+    && previousPublicKey !== publicKey
+    && (previous !== undefined || next !== undefined)
+  if (mergedBase.valueChanged || keyFormChanged) {
+    recordItem(
+      changes,
+      collection.name,
+      id,
+      next,
+      keyFormChanged && previousPublicKey !== undefined
+        ? { previousKey: previousPublicKey, key: publicKey }
+        : undefined,
+    )
   }
-  if (mergedBase.valueChanged || change.keyFormChanged)
-    recordItem(changes, collection.name, id)
-  if (change.visibilityChanged || change.keyFormChanged) {
+  if (visibilityChanged || keyFormChanged) {
     invalidateVisibleKeys(state)
     recordList(changes, collection.name)
   }
@@ -129,18 +157,37 @@ function commitPlannedWrite(
     meta.$queryTracking.items[collection.name] ??= new Set()
     meta.$queryTracking.items[collection.name]!.add(publicKey)
   }
+  const change = !fromWriteItems || ctx.callbacks.onAfterWrite
+    ? {
+        key: publicKey,
+        previousKey: previousPublicKey,
+        visibilityChanged,
+        keyFormChanged,
+      }
+    : undefined
   if (!fromWriteItems) {
-    effects.push({
-      type: 'afterWrite',
-      payload: { collection, key: publicKey, result: [item], marker, operation: 'write', changes: [change] },
-    })
+    appendWriteEffects(
+      ctx,
+      effects,
+      {
+        collection,
+        key: publicKey,
+        previousKey: previousPublicKey,
+        keyFormChanged,
+        visibilityChanged,
+        result: [item],
+        marker,
+        operation: 'write',
+      },
+      [change!],
+    )
   }
   return change
 }
 
 /** Check whether one mutable patch can change any materialized membership. */
-function touchesIndexedField(collection: PlannedWrite['params']['collection'], data: any): boolean {
-  const indexedFields = getCollectionMetadata(collection).indexedFields
+function touchesIndexedField(metadata: CollectionMetadata, data: any): boolean {
+  const indexedFields = metadata.indexedFields
   for (const field in data) {
     if (Object.hasOwn(data, field) && indexedFields.has(field))
       return true
@@ -148,29 +195,35 @@ function touchesIndexedField(collection: PlannedWrite['params']['collection'], d
   return false
 }
 
+/** Check whether default key derivation can change public key representation. */
+function ownsKeyField(item: object): boolean {
+  return Object.hasOwn(item, '$overrideKey') || Object.hasOwn(item, 'id') || Object.hasOwn(item, '__id')
+}
+
 /** Merge relation-free mutable data and defer any CRDT conflict hook. */
 function mergeMutableItem(
   ctx: EngineContext,
-  planned: PlannedWrite,
+  params: WriteItemParams,
+  data: any,
   existing: any,
   publicKey: string | number,
   effects: EngineEffect[],
 ): BaseMergeResult {
-  const { collection, fieldTimestamps } = planned.params
+  const { collection, fieldTimestamps } = params
   if (existing === undefined) {
     if (fieldTimestamps) {
       setFieldTimestamps(ctx, collection.name, publicKey, { ...fieldTimestamps })
     }
-    return { value: planned.data, valueChanged: true }
+    return { value: data, valueChanged: true }
   }
   if (!fieldTimestamps) {
-    return { value: { ...existing, ...planned.data }, valueChanged: true }
+    return { value: { ...existing, ...data }, valueChanged: true }
   }
 
   const localTimestamps = getFieldTimestamps(ctx, collection.name, publicKey) ?? {}
   const { merged, mergedTimestamps, conflicts, valueChanged, timestampsChanged } = mergeItemFields(
     existing,
-    planned.data,
+    data,
     localTimestamps,
     fieldTimestamps,
   )
@@ -194,21 +247,33 @@ export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder |
     return { removed: false, effects: [] }
   }
 
-  const previous = resolveItemById(state, id)
+  const layerless = state.layers.length === 0
+  const previous = layerless ? state.base.get(id) : resolveItemById(state, id)
   const publicKey = getPublicKey(state, id)
   state.base.delete(id)
   state.baseKeyValues.delete(id)
-  refreshPublicKey(state, id)
-  invalidateResolvedItem(state, id)
-  const next = resolveItemById(state, id)
-  reconcileItemIndexes(ctx, changes, collection, id, next)
-  recordItem(changes, collection.name, id)
+  if (layerless)
+    state.keyValues.delete(id)
+  else
+    refreshPublicKey(state, id)
+  if (!layerless)
+    invalidateResolvedItem(state, id)
+  const next = layerless ? undefined : resolveItemById(state, id)
+  if (getCollectionMetadata(collection).hasIndexes)
+    reconcileItemIndexes(ctx, changes, collection, id, next)
   const change: EngineWriteChange = {
     key: next === undefined ? publicKey : getPublicKey(state, id),
     previousKey: publicKey,
     visibilityChanged: (previous !== undefined) !== (next !== undefined),
     keyFormChanged: next !== undefined && publicKey !== getPublicKey(state, id),
   }
+  recordItem(
+    changes,
+    collection.name,
+    id,
+    next,
+    change.keyFormChanged ? { previousKey: publicKey, key: change.key } : undefined,
+  )
   if (change.visibilityChanged || change.keyFormChanged) {
     invalidateVisibleKeys(state)
     recordList(changes, collection.name)
@@ -217,9 +282,13 @@ export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder |
   return {
     removed: true,
     change,
-    effects: [{
-      type: 'afterWrite',
-      payload: { collection, key: publicKey, operation: 'delete', changes: [change] },
-    }],
+    effects: createWriteEffects(ctx, {
+      collection,
+      key: publicKey,
+      previousKey: change.previousKey,
+      keyFormChanged: change.keyFormChanged,
+      visibilityChanged: change.visibilityChanged,
+      operation: 'delete',
+    }, [change]),
   }
 }

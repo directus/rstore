@@ -7,6 +7,7 @@ import { isKeyDefined } from '@rstore/core'
 import { cloneInfo } from '@rstore/shared'
 import { markRaw, toRaw } from 'vue'
 import { createItemRelationReader } from './itemRelations'
+import { createPlainItemHandler } from './plainItemHandler'
 
 /** Dependencies used to create one read-only live item proxy. */
 export interface WrapItemOptions<
@@ -47,6 +48,7 @@ export function wrapItem<
   metadata,
   seed,
 }: WrapItemOptions<TCollection, TCollectionDefaults, TSchema>): WrappedItem<TCollection, TCollectionDefaults, TSchema> {
+  /** Resolve public collection mutations only when a wrapper method runs. */
   function getApi(): VueCollectionApi<TCollection, TCollectionDefaults, TSchema, WrappedItem<TCollection, TCollectionDefaults, TSchema>> {
     return store[collection.name as keyof typeof store] as any
   }
@@ -73,6 +75,13 @@ export function wrapItem<
   // can keep reading its live engine source without violating Proxy invariants.
   const source = seed ?? item.value
   const target = Object.create(Object.getPrototypeOf(source)) as typeof source
+  const plain = Object.keys(collection.computed).length === 0
+    && Object.keys(collection.normalizedRelations).length === 0
+    && Object.keys(collection.relations).length === 0
+
+  if (plain) {
+    return new Proxy(target, createPlainItemHandler({ collection, item, metadata, getApi })) as WrappedItem<TCollection, TCollectionDefaults, TSchema>
+  }
 
   const proxy = new Proxy(target, {
     get: (_target, key) => {

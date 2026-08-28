@@ -3,6 +3,7 @@ import type { ScenarioCounts } from '../benchmark/scenario-harness'
 import { describe, expect, it } from 'vitest'
 import { QUICK_PROFILE, WRITE_DECOMPOSITION_PROFILE } from '../benchmark/profiles'
 import { createBenchmarkReport, normalizeMeasurement, resolveScenarioItemCounts, shouldRetryMeasurements, speedupInterval } from '../benchmark/runner'
+import { selectBenchmarkRows } from '../benchmark/selection'
 
 const COUNTS: ScenarioCounts = { list: 0, item: 0, relation: 0 }
 
@@ -37,6 +38,26 @@ describe('benchmark runner metrics', () => {
     expect(resolveScenarioItemCounts(QUICK_PROFILE, focused)).toBe(focused.itemCounts)
   })
 
+  it('filters diagnostic benchmark rows without changing profile definitions', () => {
+    const previousScenario = process.env.RSTORE_BENCH_SCENARIO
+    const previousItems = process.env.RSTORE_BENCH_ITEMS
+    try {
+      process.env.RSTORE_BENCH_SCENARIO = 'item-read'
+      process.env.RSTORE_BENCH_ITEMS = '100'
+      expect([...selectBenchmarkRows(QUICK_PROFILE)].map(([scenario, items]) => [scenario.id, items])).toEqual([
+        ['item-read', 100],
+      ])
+    }
+    finally {
+      if (previousScenario === undefined)
+        delete process.env.RSTORE_BENCH_SCENARIO
+      else process.env.RSTORE_BENCH_SCENARIO = previousScenario
+      if (previousItems === undefined)
+        delete process.env.RSTORE_BENCH_ITEMS
+      else process.env.RSTORE_BENCH_ITEMS = previousItems
+    }
+  })
+
   it('keeps every known regression workload in the quick profile', () => {
     expect(QUICK_PROFILE.scenarios.map(scenario => scenario.id)).toEqual(expect.arrayContaining([
       'layer-field-read',
@@ -52,8 +73,11 @@ describe('benchmark runner metrics', () => {
       'field-write-exact-item',
       'batch-write',
       'paused-write-batch',
+      'crdt-fresh-write',
       'crdt-stale-write',
       'crdt-stale-write-item-interest',
+      'layer-cycle',
+      'serialize-state',
       'hydrate-state',
       'hydrate-retained-wrapper',
       'composite-write-no-watcher',

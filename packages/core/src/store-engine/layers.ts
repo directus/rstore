@@ -2,6 +2,7 @@ import type { CacheLayer, ResolvedCollection } from '@rstore/shared'
 import type { ChangeRecorder } from './change-recorder.js'
 import type { EngineCollectionState, EngineContext, EngineEffect, EngineLayer, KeyId } from './internal-types.js'
 import { recordItem, recordList } from './change-recorder.js'
+import { getCollectionMetadata } from './collection-metadata.js'
 import { isEntityKey, refreshPublicKey, releaseUnusedKey, toKeyId } from './identity.js'
 import { reconcileItemIndexes } from './indexes.js'
 import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
@@ -46,25 +47,25 @@ function normalizeLayer(
     keyValues.set(id, state.keyValues.get(id) ?? key)
   }
 
-  return { layer, state: patches, deletedItems, affectedKeys, keyValues, canonicalKeys }
+  return { layer, state: patches, deletedItems, affectedKeys, affectedKeyList: [...affectedKeys], keyValues, canonicalKeys }
 }
 
 /** Recompute affected public key forms and report exact changes. */
-function refreshLayerKeyValues(state: EngineCollectionState, keys: Set<KeyId>): Set<KeyId> {
-  const changed = new Set<KeyId>()
+function refreshLayerKeyValues(state: EngineCollectionState, keys: readonly KeyId[]): Set<KeyId> | undefined {
+  let changed: Set<KeyId> | undefined
   for (const id of keys) {
     const previous = state.keyValues.get(id)
     refreshPublicKey(state, id)
     if (previous !== undefined && previous !== state.keyValues.get(id)) {
-      changed.add(id)
+      (changed ??= new Set()).add(id)
     }
   }
   return changed
 }
 
 /** Capture resolved values before changing a set of layer inputs. */
-function captureResolved(state: EngineCollectionState, keys: Set<KeyId>): Map<KeyId, any | undefined> {
-  return new Map(Array.from(keys, id => [id, resolveItemById(state, id)]))
+function captureResolved(state: EngineCollectionState, keys: readonly KeyId[]): any[] {
+  return keys.map(id => resolveItemById(state, id))
 }
 
 /** Reconcile indexes and reactive scopes after a layer transition. */
@@ -73,21 +74,24 @@ function reconcileLayerChange(
   changes: ChangeRecorder | undefined,
   collection: ResolvedCollection<any, any, any>,
   state: EngineCollectionState,
-  keys: Set<KeyId>,
-  previous: Map<KeyId, any | undefined>,
-  keyFormsChanged: Set<KeyId> = new Set(),
+  keys: readonly KeyId[],
+  previous: readonly any[],
+  keyFormsChanged?: ReadonlySet<KeyId>,
 ): void {
   let visibilityChanged = false
-  for (const id of keys) {
+  const hasIndexes = getCollectionMetadata(collection).hasIndexes
+  for (let index = 0; index < keys.length; index++) {
+    const id = keys[index]!
     invalidateResolvedItem(state, id)
     const next = resolveItemById(state, id)
-    const before = previous.get(id)
+    const before = previous[index]
     if (before !== next) {
-      reconcileItemIndexes(ctx, changes, collection, id, next)
-      recordItem(changes, collection.name, id)
+      if (hasIndexes)
+        reconcileItemIndexes(ctx, changes, collection, id, next)
+      recordItem(changes, collection.name, id, next)
     }
     visibilityChanged ||= (before !== undefined) !== (next !== undefined)
-      || (keyFormsChanged.has(id) && (before !== undefined || next !== undefined))
+      || (Boolean(keyFormsChanged?.has(id)) && (before !== undefined || next !== undefined))
   }
   if (visibilityChanged) {
     invalidateVisibleKeys(state)
@@ -107,16 +111,16 @@ export function addLayerNow(ctx: EngineContext, changes: ChangeRecorder | undefi
   // remove an already-committed layer as a partial side effect.
   const entry = normalizeLayer(state, collection, layer)
   const effects = removeLayerNow(ctx, changes, layer.id)
-  const previous = captureResolved(state, entry.affectedKeys)
+  const previous = captureResolved(state, entry.affectedKeyList)
   const hadNoLayers = state.layers.length === 0
-  state.layers = [...state.layers, entry]
+  state.layers.push(entry)
   ctx.layerIdToCollection.set(layer.id, collection.name)
-  const keyFormsChanged = refreshLayerKeyValues(state, entry.affectedKeys)
+  const keyFormsChanged = refreshLayerKeyValues(state, entry.affectedKeyList)
   if (hadNoLayers) {
     state.resolvedItems.clear()
   }
 
-  reconcileLayerChange(ctx, changes, collection, state, entry.affectedKeys, previous, keyFormsChanged)
+  reconcileLayerChange(ctx, changes, collection, state, entry.affectedKeyList, previous, keyFormsChanged)
   effects.push({ type: 'layerAdd', layer })
   return effects
 }
@@ -131,16 +135,16 @@ export function removeLayerNow(ctx: EngineContext, changes: ChangeRecorder | und
   }
 
   const collection = ctx.callbacks.getCollection(collectionName)
-  const previous = captureResolved(state, entry.affectedKeys)
-  state.layers = state.layers.filter(candidate => candidate !== entry)
+  const previous = captureResolved(state, entry.affectedKeyList)
+  state.layers.splice(state.layers.indexOf(entry), 1)
   ctx.layerIdToCollection.delete(layerId)
-  const keyFormsChanged = refreshLayerKeyValues(state, entry.affectedKeys)
+  const keyFormsChanged = refreshLayerKeyValues(state, entry.affectedKeyList)
   if (state.layers.length === 0) {
     state.resolvedItems.clear()
   }
 
   if (collection) {
-    reconcileLayerChange(ctx, changes, collection, state, entry.affectedKeys, previous, keyFormsChanged)
+    reconcileLayerChange(ctx, changes, collection, state, entry.affectedKeyList, previous, keyFormsChanged)
   }
   for (const id of entry.affectedKeys) {
     releaseUnusedKey(state, id)

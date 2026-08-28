@@ -1,7 +1,9 @@
 import type { MutableEngineChangeSet } from './change-set.js'
+import type { OperationChangeSink } from './change-sink.js'
 import type { EngineContext, KeyId } from './internal-types.js'
 import type { EngineChangeInterest } from './observer-changes.js'
 import { createEngineChangeSet, isChangeSetEmpty } from './change-set.js'
+import { commitOperationChangeSink, createOperationChangeSink, discardOperationChangeSink, maySinkIndex, maySinkIndexDependency, recordSinkIndex, recordSinkItem, recordSinkList, recordSinkReset } from './change-sink.js'
 
 /** Flush-local aggregate allocated only after one observed change. */
 export interface FlushChangeRecorder {
@@ -19,6 +21,8 @@ export interface ChangeRecorder {
   flush: FlushChangeRecorder
   /** Immediate callback payload, lazily allocated. */
   operation?: MutableEngineChangeSet
+  /** Active allocation-light framework sink for this operation. */
+  sink?: OperationChangeSink
 }
 
 const NO_CHANGE_RECORDER = undefined
@@ -30,25 +34,35 @@ export function createFlushChangeRecorder(): FlushChangeRecorder {
 
 /** Capture active state and observer interests for one operation. */
 export function createChangeRecorder(ctx: EngineContext, flush: FlushChangeRecorder): ChangeRecorder | undefined {
+  const selector = ctx.callbacks.getStateChangeInterest
+  const selectedInterest = selector?.()
   let interest: true | EngineChangeInterest | undefined
   if (ctx.callbacks.onStateChange) {
-    interest = ctx.callbacks.getStateChangeInterest
-      ? ctx.callbacks.getStateChangeInterest()
-      : true
+    interest = selector ? selectedInterest : true
   }
   const hasImmediateInterest = interest === true || Boolean(
     interest && (interest.itemKeys.size || interest.lists.size || interest.indexes.size),
   )
-  if (!hasImmediateInterest && !ctx.callbacks.onObserverFlush && !ctx.observers.hasAny())
+  const stateSink = ctx.callbacks.stateChangeSink
+  const sinkSelector = stateSink?.getInterest
+  const sink = createOperationChangeSink(stateSink, sinkSelector?.(), Boolean(sinkSelector))
+  if (!hasImmediateInterest && !sink && !ctx.callbacks.onObserverFlush && !ctx.observers.hasAny())
     return NO_CHANGE_RECORDER
-  return { ctx, interest: hasImmediateInterest ? interest : undefined, flush }
+  return { ctx, interest: hasImmediateInterest ? interest : undefined, flush, sink }
 }
 
 /** Record one canonical item only for interested immediate/final consumers. */
-export function recordItem(recorder: ChangeRecorder | undefined, collection: string, key: string | number): void {
+export function recordItem(
+  recorder: ChangeRecorder | undefined,
+  collection: string,
+  key: string | number,
+  value?: unknown,
+  keyFormChange?: { previousKey: string | number, key: string | number },
+): void {
   if (!recorder)
     return
   const id = String(key)
+  recordSinkItem(recorder.sink, collection, id, value, keyFormChange)
   if (wantsImmediateItem(recorder.interest, collection, id))
     addItem(ensureOperation(recorder), collection, id)
   if (recorder.ctx.callbacks.onObserverFlush || recorder.ctx.observers.hasItem(collection, id))
@@ -59,6 +73,7 @@ export function recordItem(recorder: ChangeRecorder | undefined, collection: str
 export function recordList(recorder: ChangeRecorder | undefined, collection: string): void {
   if (!recorder)
     return
+  recordSinkList(recorder.sink, collection)
   if (recorder.interest === true || recorder.interest?.lists.has(collection))
     ensureOperation(recorder).lists.add(collection)
   if (recorder.ctx.callbacks.onObserverFlush || recorder.ctx.observers.hasList(collection))
@@ -69,7 +84,8 @@ export function recordList(recorder: ChangeRecorder | undefined, collection: str
 export function mayRecordIndex(recorder: ChangeRecorder | undefined, collection: string): boolean {
   if (!recorder)
     return false
-  return recorder.interest === true
+  return maySinkIndex(recorder.sink, collection)
+    || recorder.interest === true
     || Boolean(recorder.interest?.indexes.get(collection)?.size)
     || Boolean(recorder.ctx.callbacks.onObserverFlush)
     || recorder.ctx.observers.hasIndexCollection(collection)
@@ -83,11 +99,15 @@ export function mayRecordIndexDependency(
 ): boolean {
   if (!recorder)
     return false
+  if (maySinkIndexDependency(recorder.sink, collection, dependency))
+    return true
   if (recorder.interest === true || recorder.ctx.callbacks.onObserverFlush)
     return true
   if (!dependency) {
-    return Boolean(recorder.interest?.indexes.get(collection)?.size)
-      || recorder.ctx.observers.hasIndexCollection(collection)
+    // Selective readers and direct observers cache every dependency when they
+    // subscribe. An unseen membership therefore cannot match active exact
+    // interest and needs no dependency string construction.
+    return false
   }
   return Boolean(recorder.interest?.indexes.get(collection)?.has(dependency))
     || recorder.ctx.observers.hasIndex(dependency)
@@ -97,6 +117,7 @@ export function mayRecordIndexDependency(
 export function recordIndex(recorder: ChangeRecorder | undefined, collection: string, dependency: string): void {
   if (!recorder)
     return
+  recordSinkIndex(recorder.sink, collection, dependency)
   if (recorder.interest === true || recorder.interest?.indexes.get(collection)?.has(dependency))
     ensureOperation(recorder).indexes.add(dependency)
   if (recorder.ctx.callbacks.onObserverFlush || recorder.ctx.observers.hasIndex(dependency))
@@ -112,6 +133,7 @@ export function recordCollectionReset(
 ): void {
   if (!recorder)
     return
+  recordSinkReset(recorder.sink, collection)
   if (recorder.interest === true) {
     const changes = ensureOperation(recorder)
     addItems(changes, collection, previousIds)
@@ -150,6 +172,15 @@ export function recordCollectionReset(
     ensureFlush(recorder).indexes.add(dependency)
 }
 
+/** Return whether reset payload needs complete old/new visible identities. */
+export function needsCollectionResetKeys(recorder: ChangeRecorder | undefined, collection: string): boolean {
+  if (!recorder)
+    return false
+  return recorder.interest === true
+    || recorder.interest?.itemKeys.get(collection) === true
+    || Boolean(recorder.ctx.callbacks.onObserverFlush)
+}
+
 /** Return non-empty operation payload for immediate framework synchronization. */
 export function getOperationChanges(recorder: ChangeRecorder | undefined): MutableEngineChangeSet | undefined {
   return recorder?.operation && !isChangeSetEmpty(recorder.operation) ? recorder.operation : undefined
@@ -158,6 +189,16 @@ export function getOperationChanges(recorder: ChangeRecorder | undefined): Mutab
 /** Return non-empty aggregate payload for final framework/direct observers. */
 export function getFlushChanges(flush: FlushChangeRecorder): MutableEngineChangeSet | undefined {
   return flush.changes && !isChangeSetEmpty(flush.changes) ? flush.changes : undefined
+}
+
+/** Publish or discard one operation-local fast sink buffer. */
+export function commitStateChangeSink(recorder: ChangeRecorder | undefined): void {
+  commitOperationChangeSink(recorder?.sink)
+}
+
+/** Discard one sink buffer after failure before state publication. */
+export function discardStateChangeSink(recorder: ChangeRecorder | undefined): void {
+  discardOperationChangeSink(recorder?.sink)
 }
 
 /** Lazily allocate one immediate callback payload. */

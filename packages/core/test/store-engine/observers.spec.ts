@@ -1,9 +1,193 @@
-import type { EngineChangeInterest, EngineChangeSet } from '../../src'
+import type { EngineChangeInterest, EngineChangeSet, EngineStateChangeSink } from '../../src'
 import { describe, expect, it, vi } from 'vitest'
 import { createStoreEngine } from '../../src'
 import { buildCollection, createTestEngine } from './helpers'
 
 describe('store-engine: observers', () => {
+  it('commits compact sink state before generic callbacks and write hooks', () => {
+    const collection = buildCollection('User')
+    const order: string[] = []
+    let buffered: unknown
+    const sink: EngineStateChangeSink = {
+      begin: () => true,
+      wantsItem: (name, key) => name === 'User' && key === '1',
+      wantsList: () => false,
+      wantsIndex: () => false,
+      recordItem: (_name, _key, value) => {
+        buffered = value
+        order.push('record')
+      },
+      recordList: vi.fn(),
+      recordIndex: vi.fn(),
+      recordCollectionReset: vi.fn(),
+      commit: () => {
+        expect(buffered).toEqual({ id: 1, name: 'A' })
+        order.push('sink')
+      },
+      discard: vi.fn(),
+    }
+    const engine = createStoreEngine({
+      isServer: true,
+      callbacks: {
+        getCollection: name => name === collection.name ? collection : undefined,
+        resolveChildCollection: () => null,
+        stateChangeSink: sink,
+        onStateChange: () => order.push('state'),
+        onWriteCommitted: () => order.push('compact'),
+        onAfterWrite: () => order.push('full'),
+      },
+    })
+
+    engine.writeItem({ collection, key: 1, item: { id: 1, name: 'A' } })
+
+    expect(order).toEqual(['record', 'sink', 'state', 'compact', 'full'])
+  })
+
+  it('discards a compact sink buffer after failed validation', () => {
+    const collection = buildCollection('User')
+    const sink: EngineStateChangeSink = {
+      begin: () => true,
+      wantsItem: () => true,
+      wantsList: () => true,
+      wantsIndex: () => true,
+      recordItem: vi.fn(),
+      recordList: vi.fn(),
+      recordIndex: vi.fn(),
+      recordCollectionReset: vi.fn(),
+      commit: vi.fn(),
+      discard: vi.fn(),
+    }
+    const engine = createStoreEngine({
+      isServer: true,
+      callbacks: {
+        getCollection: name => name === collection.name ? collection : undefined,
+        resolveChildCollection: () => null,
+        stateChangeSink: sink,
+      },
+    })
+
+    expect(() => engine.writeItem({ collection, key: 1, item: null as any })).toThrow(TypeError)
+    expect(sink.commit).not.toHaveBeenCalled()
+    expect(sink.discard).toHaveBeenCalledOnce()
+  })
+
+  it('starts a selective compact sink only for matching dependencies', () => {
+    const collection = buildCollection('User')
+    const interest: EngineChangeInterest = {
+      itemKeys: new Map([['User', new Set(['1'])]]),
+      lists: new Set(),
+      indexes: new Map(),
+    }
+    const begin = vi.fn(() => true)
+    const recordItem = vi.fn()
+    const sink: EngineStateChangeSink = {
+      getInterest: () => interest,
+      begin,
+      wantsItem: vi.fn(() => true),
+      wantsList: vi.fn(() => true),
+      wantsIndex: vi.fn(() => true),
+      recordItem,
+      recordList: vi.fn(),
+      recordIndex: vi.fn(),
+      recordCollectionReset: vi.fn(),
+      commit: vi.fn(),
+      discard: vi.fn(),
+    }
+    const engine = createStoreEngine({
+      isServer: true,
+      callbacks: {
+        getCollection: name => name === collection.name ? collection : undefined,
+        resolveChildCollection: () => null,
+        stateChangeSink: sink,
+      },
+    })
+
+    engine.writeItem({ collection, key: 2, item: { id: 2 } })
+    expect(begin).not.toHaveBeenCalled()
+
+    engine.writeItem({ collection, key: 1, item: { id: 1 } })
+    expect(begin).toHaveBeenCalledOnce()
+    expect(recordItem).toHaveBeenCalledOnce()
+    expect(sink.commit).toHaveBeenCalledOnce()
+  })
+
+  it('does not apply generic state selector to an independent compact sink', () => {
+    const collection = buildCollection('User')
+    const recordItem = vi.fn()
+    const onStateChange = vi.fn()
+    const sink: EngineStateChangeSink = {
+      begin: () => true,
+      wantsItem: () => true,
+      wantsList: () => false,
+      wantsIndex: () => false,
+      recordItem,
+      recordList: vi.fn(),
+      recordIndex: vi.fn(),
+      recordCollectionReset: vi.fn(),
+      commit: vi.fn(),
+      discard: vi.fn(),
+    }
+    const engine = createStoreEngine({
+      isServer: true,
+      callbacks: {
+        getCollection: name => name === collection.name ? collection : undefined,
+        resolveChildCollection: () => null,
+        getStateChangeInterest: () => ({ itemKeys: new Map(), lists: new Set(), indexes: new Map() }),
+        onStateChange,
+        stateChangeSink: sink,
+      },
+    })
+
+    engine.writeItem({ collection, key: 1, item: { id: 1 } })
+    expect(recordItem).toHaveBeenCalledOnce()
+    expect(sink.commit).toHaveBeenCalledOnce()
+    expect(onStateChange).not.toHaveBeenCalled()
+  })
+
+  it('scans raw index items with dependency tracking before visitation', () => {
+    const post = buildCollection('Post')
+    const comment = buildCollection('Comment', {
+      indexes: new Map([['postId', ['postId']]]),
+    } as any)
+    const { engine } = createTestEngine([post, comment])
+    engine.writeItems({
+      collection: comment,
+      items: [
+        { key: 1, value: { id: 1, postId: 1 } },
+        { key: 2, value: { id: 2, postId: 1 } },
+        { key: 3, value: { id: 3, postId: 2 } },
+      ],
+    })
+    const order: string[] = []
+
+    engine.scanItemsRaw(
+      { collection: comment, indexKey: 'postId', indexValue: 1 },
+      (key, item: any) => {
+        order.push(`item:${key}:${item.postId}`)
+        return false
+      },
+      (dependency) => {
+        order.push(`dependency:${dependency}`)
+      },
+    )
+
+    expect(order[0]).toMatch(/^dependency:/)
+    expect(order.slice(1)).toEqual(['item:1:1'])
+
+    order.length = 0
+    engine.scanItemsRaw(
+      { collection: comment, indexKey: 'postId', indexValue: 1 },
+      () => {
+        order.push('item')
+      },
+      () => {
+        order.push('dependency')
+        return false
+      },
+    )
+    expect(order).toEqual(['dependency'])
+  })
+
   it('notifies an item observer on write', () => {
     const collection = buildCollection('User')
     const { engine } = createTestEngine([collection])

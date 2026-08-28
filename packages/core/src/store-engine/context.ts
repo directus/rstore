@@ -56,6 +56,7 @@ export function createEngineContext(options: {
     observers: options.observers,
     staggering: options.staggering,
     indexSweepCandidates: new Set(),
+    pendingIndexDependencies: new Map(),
     ensureCollection,
   }
 }

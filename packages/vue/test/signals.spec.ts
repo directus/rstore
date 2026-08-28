@@ -95,6 +95,21 @@ describe('signal registry', () => {
     scope.stop()
   })
 
+  it('keeps same synchronous dependency registered across its rerun', () => {
+    const interest = createCacheChangeInterestRegistry()
+    const retain = vi.spyOn(interest, 'retainIndex')
+    const release = vi.spyOn(interest, 'releaseIndex')
+    const registry = createSignalRegistry({ isServer: false, interest })
+    const stop = watchEffect(() => registry.trackIndex('User', 'wanted'), { flush: 'sync' })
+
+    registry.flush(changes({ indexes: new Set(['wanted']) }))
+
+    expect(retain).toHaveBeenCalledTimes(1)
+    expect(release).not.toHaveBeenCalled()
+    stop()
+    expect(release).toHaveBeenCalledTimes(1)
+  })
+
   it('resets sync watchers once even when they replace owned signals', () => {
     const registry = createRegistry()
     const reader = vi.fn()

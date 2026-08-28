@@ -18,15 +18,27 @@ export function registerBaseKey(
   key: string | number,
   item?: any,
 ): KeyId {
-  const id = toKeyId(key)
   const derived = item == null ? undefined : collection.getKey(item)
+  return registerBaseKeyValue(state, key, derived)
+}
+
+/** Register a base-owned key when caller already derived its public form. */
+export function registerBaseKeyValue(
+  state: EngineCollectionState,
+  key: string | number,
+  derived?: unknown,
+): KeyId {
+  const id = toKeyId(key)
   if (isEntityKey(derived) && toKeyId(derived) === id) {
     state.baseKeyValues.set(id, derived)
   }
   else if (!state.baseKeyValues.has(id)) {
     state.baseKeyValues.set(id, key)
   }
-  refreshPublicKey(state, id)
+  if (state.layers.length === 0)
+    state.keyValues.set(id, state.baseKeyValues.get(id)!)
+  else
+    refreshPublicKey(state, id)
   return id
 }
 

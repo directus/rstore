@@ -3,6 +3,7 @@ import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, Resolv
 import type { Ref } from 'vue'
 import type { VueStore } from '../store'
 import type { CacheChangeInterestRegistry } from './changeInterest'
+import type { IndexResultCache } from './indexResultCache'
 import type { ItemCellRegistry } from './itemCells'
 import type { SignalRegistry } from './signals'
 import type { CacheVersionRegistry } from './versions'
@@ -56,6 +57,8 @@ export interface CacheRuntime<
   wrappedItems: WrappedItemRegistry<TCollectionDefaults, TSchema>
   /** Stable visible-list wrappers reused until cache membership can change. */
   visibleListCache: Map<string, Array<WrappedItem<Collection, TCollectionDefaults, TSchema>>>
+  /** Bounded exact-index wrapper results retained until membership changes. */
+  indexResultCache: IndexResultCache
 }
 
 /** Private Vue cache surface consumed by existing Vue internals and devtools. */
