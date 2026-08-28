@@ -1,20 +1,21 @@
+import type { ResolvedCollection } from '@rstore/shared'
 import type { TombstoneStore } from '../tombstone.js'
 import type { EngineCollectionState, EngineContext, ObserverRegistry, Staggering } from './internal-types.js'
 import type { EngineCallbacks } from './types.js'
+import { getCollectionMetadata } from './collection-metadata.js'
 import { createNullRecord } from './records.js'
 
 /** Create empty storage for one collection. */
-export function createCollectionState(): EngineCollectionState {
+export function createCollectionState(collection?: ResolvedCollection<any, any, any>): EngineCollectionState {
   return {
+    collection,
+    usesDefaultKey: collection ? getCollectionMetadata(collection).usesDefaultKey : false,
     base: new Map(),
-    baseKeyValues: new Map(),
-    keyValues: new Map(),
+    publicKeys: new Map(),
     indexes: new Map(),
-    indexMemberships: new Map(),
     layers: [],
     resolvedItems: new Map(),
     visibleKeys: undefined,
-    visibleKeyValues: undefined,
   }
 }
 
@@ -31,7 +32,7 @@ export function createEngineContext(options: {
   const ensureCollection = (name: string): EngineCollectionState => {
     let state = collections.get(name)
     if (!state) {
-      state = createCollectionState()
+      state = createCollectionState(options.callbacks.getCollection(name))
       collections.set(name, state)
     }
     return state

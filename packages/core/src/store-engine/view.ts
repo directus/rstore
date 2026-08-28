@@ -17,12 +17,11 @@ export function invalidateResolvedItem(state: EngineCollectionState, id: KeyId):
 /** Clear the lazily materialized visible key order. */
 export function invalidateVisibleKeys(state: EngineCollectionState): void {
   state.visibleKeys = undefined
-  state.visibleKeyValues = undefined
 }
 
 /** Resolve one item from base data plus all active layers. */
 export function resolveItemById(state: EngineCollectionState, id: KeyId): any | undefined {
-  if (state.layers.length === 0) {
+  if (state.layers.length === 0 || !state.layeredKeyCounts?.has(id)) {
     return state.base.get(id)
   }
   const cached = state.resolvedItems.get(id)
@@ -89,8 +88,5 @@ export function getVisibleKeys(ctx: EngineContext, collectionName: string): Arra
   if (!state) {
     return []
   }
-  state.visibleKeyValues ??= getVisibleKeyIds(state).map(id => getPublicKey(state, id))
-  // Public callers have always received a new array, so keep cache ownership
-  // internal while avoiding repeated `Map#get` conversions on hot list reads.
-  return state.visibleKeyValues.slice()
+  return getVisibleKeyIds(state).map(id => getPublicKey(state, id))
 }

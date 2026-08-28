@@ -9,7 +9,7 @@ import { appendSyncError, throwSyncErrors } from './syncErrors'
 export interface ItemCell {
   /** Ref-shaped source consumed by wrapped-item proxy. */
   source: Ref<any>
-  /** Track exact active cell without reading engine state. */
+  /** Track exact active cell without reading engine state twice. */
   track: () => void
   /** Return whether committed engine changes synchronize this cell. */
   isActive: () => boolean
@@ -41,71 +41,57 @@ export interface CreateItemCellRegistryOptions {
 
 /** Create wrapper-owned cells indexed by canonical collection and item id. */
 export function createItemCellRegistry(options: CreateItemCellRegistryOptions): ItemCellRegistry {
-  const collections = new Map<string, Map<string, Set<InternalItemCell>>>()
-  let disposed = false
+  const registry = new CacheItemCellRegistry(options)
+  return {
+    create: registry.create.bind(registry),
+    flush: registry.flush.bind(registry),
+    flushItem: registry.flushItem.bind(registry),
+    dispose: registry.dispose.bind(registry),
+  }
+}
 
-  /** Create one cell and register its exact wrapper identity. */
-  function create(collection: string, key: string | number, initial: any, active = false): ItemCell {
-    const id = String(key)
-    const value = shallowRef(initial)
-    const cell: InternalItemCell = {
-      value,
-      fallback: initial,
-      state: disposed ? 'detached' : 'dormant',
-      source: undefined as unknown as Ref<any>,
-      read: () => initial,
-      track() {
-        // eslint-disable-next-line ts/no-unused-expressions
-        cell.source.value
-      },
-      isActive: () => cell.state === 'active',
-      detach() {
-        detachCell(collection, id, cell)
-      },
-    }
-    cell.source = {
-      get value() {
-        return cell.read()
-      },
-    } as Ref<any>
-    installDormantReader(collection, id, cell)
-    if (active && !disposed)
-      registerCell(collection, id, cell)
+/** Compact registry shared by every item cell. */
+class CacheItemCellRegistry implements ItemCellRegistry {
+  /** Active cells grouped by collection and canonical key. */
+  private readonly collections = new Map<string, Map<string, Set<CacheItemCell>>>()
+  /** Whether cache disposal severed runtime ownership. */
+  private disposed = false
+
+  /** Create registry with engine-read and interest callbacks. */
+  constructor(private readonly options: CreateItemCellRegistryOptions) {}
+
+  /** Create one dormant or immediately active wrapper source. */
+  create(collection: string, key: string | number, initial: any, active = false): ItemCell {
+    const cell = new CacheItemCell(this, collection, String(key), initial, this.disposed ? 'detached' : 'dormant')
+    if (active && !this.disposed)
+      this.register(cell)
     return cell
   }
 
-  /** Activate one lazy wrapper from current engine state. */
-  function activateCell(collection: string, id: string, cell: InternalItemCell): boolean {
-    if (disposed || cell.state !== 'dormant')
+  /** Activate one lazy cell from current engine state. */
+  activate(cell: CacheItemCell): boolean {
+    if (this.disposed || cell.state !== 'dormant')
       return false
-    const current = options.read(collection, id)
-    if (current !== undefined) {
-      cell.fallback = current
-      cell.value.value = current
-    }
-    registerCell(collection, id, cell)
+    const current = this.options.read(cell.collection, cell.id)
+    if (current !== undefined)
+      cell.update(current)
+    this.register(cell)
     return true
   }
 
-  /** Register one current cell and its exact Core interest. */
-  function registerCell(collection: string, id: string, cell: InternalItemCell): void {
-    cell.state = 'active'
-    setCellReader(cell, () => cell.value.value)
-    const byKey = collections.get(collection) ?? new Map<string, Set<InternalItemCell>>()
-    collections.set(collection, byKey)
-    const cells = byKey.get(id) ?? new Set<InternalItemCell>()
-    byKey.set(id, cells)
-    cells.add(cell)
-    options.interest.retainItem(collection, id)
+  /** Resolve one detached value while registering broad fallback tracking. */
+  readFallback(cell: CacheItemCell): any {
+    this.options.trackFallback(cell.collection, cell.id)
+    return this.options.read(cell.collection, cell.id) ?? cell.fallback
   }
 
-  /** Synchronize each changed key with one engine read. */
-  function flush(changes: EngineChangeSet, values?: ResolvedItemChanges): void {
-    if (disposed || !collections.size)
+  /** Synchronize every active changed cell with at most one engine read. */
+  flush(changes: EngineChangeSet, values?: ResolvedItemChanges): void {
+    if (this.disposed || !this.collections.size)
       return
     let errors: unknown[] | undefined
     for (const [collection, keys] of changes.items) {
-      const byKey = collections.get(collection)
+      const byKey = this.collections.get(collection)
       if (!byKey)
         continue
       for (const key of keys) {
@@ -114,8 +100,8 @@ export function createItemCellRegistry(options: CreateItemCellRegistryOptions): 
           continue
         try {
           const resolved = values?.get(collection)
-          const next = resolved?.has(key) ? resolved.get(key) : options.read(collection, key)
-          updateCells(collection, key, cells, next)
+          const next = resolved?.has(key) ? resolved.get(key) : this.options.read(collection, key)
+          this.updateCells(collection, key, cells, next)
         }
         catch (error) {
           errors = appendSyncError(errors, error)
@@ -126,25 +112,67 @@ export function createItemCellRegistry(options: CreateItemCellRegistryOptions): 
   }
 
   /** Synchronize one exact key through scalar state-sink dispatch. */
-  function flushItem(collection: string, key: string, value: unknown): void {
-    const cells = collections.get(collection)?.get(key)
+  flushItem(collection: string, key: string, value: unknown): void {
+    const cells = this.collections.get(collection)?.get(key)
     if (cells?.size)
-      updateCells(collection, key, cells, value)
+      this.updateCells(collection, key, cells, value)
+  }
+
+  /** Remove one cell while preserving detached wrapper reads. */
+  detach(cell: CacheItemCell): void {
+    if (cell.state === 'detached')
+      return
+    const wasActive = cell.state === 'active'
+    cell.state = 'detached'
+    const byKey = this.collections.get(cell.collection)
+    const cells = byKey?.get(cell.id)
+    cells?.delete(cell)
+    if (cells && !cells.size)
+      byKey?.delete(cell.id)
+    if (byKey && !byKey.size)
+      this.collections.delete(cell.collection)
+    if (wasActive)
+      this.options.interest.releaseItem(cell.collection, cell.id)
+    if (wasActive)
+      triggerRef(cell.ref)
+  }
+
+  /** Release active cells and sever retained wrappers from cache runtime. */
+  dispose(): void {
+    if (this.disposed)
+      return
+    this.disposed = true
+    for (const [collection, byKey] of this.collections) {
+      for (const [id, cells] of byKey) {
+        for (const cell of cells) {
+          cell.state = 'detached'
+          cell.registry = undefined
+          this.options.interest.releaseItem(collection, id)
+        }
+      }
+    }
+    this.collections.clear()
+  }
+
+  /** Register one current cell and its exact Core interest. */
+  private register(cell: CacheItemCell): void {
+    cell.state = 'active'
+    const byKey = this.collections.get(cell.collection) ?? new Map<string, Set<CacheItemCell>>()
+    this.collections.set(cell.collection, byKey)
+    const cells = byKey.get(cell.id) ?? new Set<CacheItemCell>()
+    byKey.set(cell.id, cells)
+    cells.add(cell)
+    this.options.interest.retainItem(cell.collection, cell.id)
   }
 
   /** Apply one resolved value to all active wrappers for a canonical key. */
-  function updateCells(collection: string, key: string, cells: Set<InternalItemCell>, next: unknown): void {
+  private updateCells(collection: string, key: string, cells: Set<CacheItemCell>, next: unknown): void {
     let errors: unknown[] | undefined
     for (const cell of cells) {
       try {
-        if (next === undefined) {
-          // Switch ownership before notifying so reruns track reinsertion.
-          cell.detach()
-        }
-        else {
-          cell.fallback = next
-          cell.value.value = next
-        }
+        if (next === undefined)
+          this.detach(cell)
+        else cell.update(next)
       }
       catch (error) {
         errors = appendSyncError(errors, error)
@@ -152,80 +180,104 @@ export function createItemCellRegistry(options: CreateItemCellRegistryOptions): 
     }
     throwSyncErrors(errors, `Item cell synchronization failed for ${collection}:${key}`)
   }
-
-  /** Remove one cell without invalidating external wrapper references. */
-  function detachCell(collection: string, id: string, cell: InternalItemCell): void {
-    if (cell.state === 'detached')
-      return
-    const wasActive = cell.state === 'active'
-    cell.state = 'detached'
-    installDetachedReader(collection, id, cell)
-    const byKey = collections.get(collection)
-    const cells = byKey?.get(id)
-    cells?.delete(cell)
-    if (cells && !cells.size)
-      byKey?.delete(id)
-    if (byKey && !byKey.size)
-      collections.delete(collection)
-    if (wasActive)
-      options.interest.releaseItem(collection, id)
-    // Existing external wrapper readers must rerun once in detached mode so
-    // they acquire collection fallback tracking for later reinsertion/reset.
-    if (wasActive)
-      triggerRef(cell.value)
-  }
-
-  /** Detach all cells and release registry ownership. */
-  function dispose(): void {
-    if (disposed)
-      return
-    disposed = true
-    for (const [collection, byKey] of collections) {
-      for (const [id, cells] of byKey) {
-        for (const cell of cells) {
-          cell.state = 'detached'
-          installDetachedReader(collection, id, cell)
-          options.interest.releaseItem(collection, id)
-        }
-      }
-    }
-    collections.clear()
-  }
-
-  return { create, flush, flushItem, dispose }
-
-  /** Install one-shot activation logic on a dormant wrapper source. */
-  function installDormantReader(collection: string, id: string, cell: InternalItemCell): void {
-    setCellReader(cell, () => {
-      if (cell.state === 'dormant' && activateCell(collection, id, cell))
-        return cell.value.value
-      options.trackFallback(collection, id)
-      return options.read(collection, id) ?? cell.fallback
-    })
-  }
-
-  /** Install lazy engine/fallback resolution after registry detachment. */
-  function installDetachedReader(collection: string, id: string, cell: InternalItemCell): void {
-    setCellReader(cell, () => {
-      options.trackFallback(collection, id)
-      return options.read(collection, id) ?? cell.fallback
-    })
-  }
 }
 
-/** Replace one source getter so active field reads contain no state branch. */
-function setCellReader(cell: InternalItemCell, read: () => any): void {
-  cell.read = read
-}
-
-/** Mutable cell state hidden from cache consumers. */
-interface InternalItemCell extends ItemCell {
-  /** Vue cell updated after engine commits. */
-  value: ShallowRef<any>
+/** Prototype-backed item source avoiding wrapper-specific reader closures. */
+class CacheItemCell implements ItemCell {
+  /** Vue dependency updated after engine commits. */
+  readonly ref: ShallowRef<any>
   /** Last readable value retained after detachment or deletion. */
   fallback: any
-  /** Lazy, actively synchronized, or externally retained detached state. */
-  state: 'dormant' | 'active' | 'detached'
-  /** Current dormant, active, or detached read implementation. */
-  read: () => any
+  /** Shared state-specific reader selected outside hot field reads. */
+  private reader: ItemCellReader
+  /** Lazy, synchronized, or detached state. */
+  private currentState: ItemCellState
+
+  /** Create one compact source. */
+  constructor(
+    /** Owning registry, removed on complete disposal. */
+    public registry: CacheItemCellRegistry | undefined,
+    /** Owning collection. */
+    public readonly collection: string,
+    /** Canonical item key. */
+    public readonly id: string,
+    initial: any,
+    state: ItemCellState,
+  ) {
+    this.ref = shallowRef(initial)
+    this.fallback = initial
+    this.currentState = state
+    this.reader = state === 'active' ? () => this.ref.value : readerForInactiveState(state)
+  }
+
+  /** Return lazy, synchronized, or detached state. */
+  get state(): ItemCellState {
+    return this.currentState
+  }
+
+  /** Select shared reader during lifecycle transitions. */
+  set state(value: ItemCellState) {
+    this.currentState = value
+    this.reader = value === 'active' ? () => this.ref.value : readerForInactiveState(value)
+  }
+
+  /** Expose this prototype-backed source through Ref API. */
+  get source(): Ref<any> {
+    return this as unknown as Ref<any>
+  }
+
+  /** Read active value or lazily enter fallback/active ownership. */
+  get value(): any {
+    return this.reader(this)
+  }
+
+  /** Support Ref-shaped writes inside Vue utilities. */
+  set value(next: any) {
+    this.update(next)
+  }
+
+  /** Consume reactive dependency for an already requested wrapper. */
+  track(): void {
+    // eslint-disable-next-line ts/no-unused-expressions
+    this.value
+  }
+
+  /** Return whether committed engine changes synchronize this cell. */
+  isActive(): boolean {
+    return this.state === 'active'
+  }
+
+  /** Stop registry ownership while preserving lazy reads. */
+  detach(): void {
+    this.registry?.detach(this)
+  }
+
+  /** Store one current value and notify reactive consumers. */
+  update(next: any): void {
+    this.fallback = next
+    this.ref.value = next
+  }
+}
+
+/** Item-cell lifecycle state. */
+type ItemCellState = 'dormant' | 'active' | 'detached'
+
+/** Shared source reader signature. */
+type ItemCellReader = (cell: CacheItemCell) => any
+
+/** Activate a lazy wrapper or fall back to detached lookup. */
+function readDormant(cell: CacheItemCell): any {
+  if (cell.registry?.activate(cell))
+    return cell.ref.value
+  return cell.registry?.readFallback(cell) ?? cell.fallback
+}
+
+/** Read current engine value for an evicted wrapper when runtime remains live. */
+function readDetached(cell: CacheItemCell): any {
+  return cell.registry?.readFallback(cell) ?? cell.fallback
+}
+
+/** Return shared reader for one inactive lifecycle state. */
+function readerForInactiveState(state: Exclude<ItemCellState, 'active'>): ItemCellReader {
+  return state === 'dormant' ? readDormant : readDetached
 }

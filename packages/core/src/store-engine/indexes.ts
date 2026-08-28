@@ -93,19 +93,19 @@ function addDependency(
   recordIndex(changes, collection, dependency)
 }
 
-/** Reconcile one item's indexes from cached previous memberships. */
+/** Reconcile one item's indexes directly from previous and next resolved values. */
 export function reconcileItemIndexes(
   ctx: EngineContext,
   changes: ChangeRecorder | undefined,
   collection: ResolvedCollection<any, any, any>,
   id: KeyId,
+  previous: any | undefined,
   next: any | undefined,
 ): void {
   const state = ctx.ensureCollection(collection.name)
-  const memberships = state.indexMemberships.get(id) ?? new Map<string, IndexedValue>()
   for (const [indexKey, fields] of collection.indexes) {
     const index = ensureIndex(state, indexKey)
-    const previousValue = memberships.get(indexKey)
+    const previousValue = readIndexedValue(previous, fields, index)
     const nextValue = readIndexedValue(next, fields, index)
     if (previousValue?.id === nextValue?.id)
       continue
@@ -115,37 +115,25 @@ export function reconcileItemIndexes(
     }
     if (nextValue) {
       addIndexKey(index, nextValue, id, composite)
-      memberships.set(indexKey, nextValue)
       touchIndexedValue(changes, collection.name, indexKey, index, nextValue, composite)
     }
-    else {
-      memberships.delete(indexKey)
-    }
   }
-  if (memberships.size)
-    state.indexMemberships.set(id, memberships)
-  else state.indexMemberships.delete(id)
 }
 
-/** Rebuild buckets and membership caches from one resolved collection view. */
+/** Rebuild buckets from one resolved collection view. */
 export function rebuildIndexes(collection: ResolvedCollection<any, any, any>, state: EngineCollectionState): void {
   state.indexes.clear()
-  state.indexMemberships.clear()
   for (const id of getVisibleKeyIds(state)) {
     const item = resolveItemById(state, id)
     if (!item)
       continue
-    const memberships = new Map<string, IndexedValue>()
     for (const [indexKey, fields] of collection.indexes) {
       const index = ensureIndex(state, indexKey)
       const value = readIndexedValue(item, fields, index)
       if (!value)
         continue
-      memberships.set(indexKey, value)
       addIndexKey(index, value, id, fields.length > 1)
     }
-    if (memberships.size)
-      state.indexMemberships.set(id, memberships)
   }
 }
 
