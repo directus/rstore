@@ -2,11 +2,13 @@ import type { CacheLayer } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { CacheRuntime } from './types'
 import { shallowRef } from 'vue'
-import { ensureCollectionStateCacheReactivityMarker, invalidateCollectionStateCache } from './context'
+import { ensureCollectionRef, ensureCollectionStateCacheReactivityMarker, invalidateCollectionStateCache } from './context'
 import { updateItemIndexes } from './indexes'
 
 /** Read a collection state with active non-skipped layers applied. */
 export function getStateForCollection(ctx: CacheRuntime, collectionName: string) {
+  const collectionState = ensureCollectionRef(ctx, collectionName).value
+
   // eslint-disable-next-line ts/no-unused-expressions
   ensureCollectionStateCacheReactivityMarker(ctx, collectionName).value
 
@@ -16,7 +18,7 @@ export function getStateForCollection(ctx: CacheRuntime, collectionName: string)
   }
 
   let copied = false
-  let result = ctx.state.collections[collectionName]?.value ?? {}
+  let result = collectionState
   const collectionLayersRef = ctx.layers[collectionName]
   if (collectionLayersRef) {
     const collectionLayers = collectionLayersRef.value

@@ -1,6 +1,6 @@
 import type { Cache, Collection, CollectionDefaults, CustomCacheState, ResolvedCollection, StoreSchema } from '@rstore/shared'
 import type { Ref } from 'vue'
-import type { CacheRuntime } from './types'
+import type { CacheRuntime, CacheWriteBatch } from './types'
 import { mergeItemFields, shouldResurrect } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { markRaw, ref, shallowRef } from 'vue'
@@ -9,6 +9,7 @@ import { restoreCausality } from './hydration'
 import { removeItemIndexes, updateItemIndexes } from './indexes'
 import { clearAllQueryState } from './queryState'
 import { resolveRelationWriteParams } from './relationWrite'
+import { invalidateCollectionWrite, setCollectionItem } from './writePublication'
 
 /** Delete an item immediately without going through the pause queue. */
 export function deleteItemNow<TCollection extends Collection>(
@@ -51,12 +52,16 @@ export function writeItemForRelationNow({
   relation,
   childItem,
   meta,
-}: Parameters<Cache['writeItemForRelation']>[0] & { ctx: CacheRuntime }) {
-  writeItemNow(ctx, resolveRelationWriteParams(ctx, { parentCollection, relationKey, relation, childItem, meta }))
+  batch,
+}: Parameters<Cache['writeItemForRelation']>[0] & { ctx: CacheRuntime, batch?: CacheWriteBatch }) {
+  writeItemNow(ctx, {
+    ...resolveRelationWriteParams(ctx, { parentCollection, relationKey, relation, childItem, meta }),
+    batch,
+  })
 }
 
 /** Write an item immediately without going through the pause queue. */
-export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeItem']>[0]) {
+export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeItem']>[0] & { batch?: CacheWriteBatch }) {
   const { collection, key, item, marker, fromWriteItems, meta } = params
   const tomb = ctx.state.tombstones.get(collection.name, key)
   if (tomb) {
@@ -66,16 +71,16 @@ export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeI
     ctx.state.tombstones.clear(collection.name, key)
   }
 
-  invalidateCollectionStateCache(ctx, collection.name)
+  invalidateCollectionWrite(ctx, collection.name, params.batch)
 
   const collectionState = ensureCollectionRef(ctx, collection.name).value
   if (Object.isFrozen(item)) {
-    collectionState[key] = item
+    setCollectionItem(collectionState, key, item, params.batch)
   }
   else {
     writeMutableItem(ctx, params, collectionState)
   }
-  invalidateCollectionStateCache(ctx, collection.name)
+  invalidateCollectionWrite(ctx, collection.name, params.batch)
 
   if (marker) {
     mark(ctx, marker)
@@ -88,7 +93,7 @@ export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeI
 
   if (!fromWriteItems) {
     const store = ctx.getStore()
-    store.$hooks.callHookSync('afterCacheWrite', {
+    const payload: CacheWriteBatch['deferredAfterCacheWrites'][number] = {
       store,
       meta: {},
       collection,
@@ -96,7 +101,13 @@ export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeI
       result: [item],
       marker,
       operation: 'write',
-    })
+    }
+    if (params.batch) {
+      params.batch.deferredAfterCacheWrites.push(payload)
+    }
+    else {
+      store.$hooks.callHookSync('afterCacheWrite', payload)
+    }
   }
 }
 
@@ -176,7 +187,7 @@ export function clearNow(ctx: CacheRuntime) {
   })
 }
 
-function writeMutableItem(ctx: CacheRuntime, params: Parameters<Cache['writeItem']>[0], collectionState: Record<string | number, any>) {
+function writeMutableItem(ctx: CacheRuntime, params: Parameters<Cache['writeItem']>[0] & { batch?: CacheWriteBatch }, collectionState: Record<string | number, any>) {
   const { collection, key, item } = params
   const rawData = pickNonSpecialProps(item, true)
   const data: Record<string, any> = {}
@@ -192,8 +203,8 @@ function writeMutableItem(ctx: CacheRuntime, params: Parameters<Cache['writeItem
 
   const existing = collectionState[key]
   if (!existing) {
-    updateItemIndexes(ctx, collection, key, undefined, data)
-    collectionState[key] = shallowRef(markRaw(data))
+    updateItemIndexes(ctx, collection, key, undefined, data, params.batch)
+    setCollectionItem(collectionState, key, shallowRef(markRaw(data)), params.batch)
     if (params.fieldTimestamps) {
       ensureCollectionTimestamps(ctx, collection.name).set(key, { ...params.fieldTimestamps })
     }
@@ -202,15 +213,15 @@ function writeMutableItem(ctx: CacheRuntime, params: Parameters<Cache['writeItem
     mergeTimestampedItem(ctx, params, collectionState, existing, data)
   }
   else {
-    updateItemIndexes(ctx, collection, key, existing, data)
-    collectionState[key] = markRaw({
+    updateItemIndexes(ctx, collection, key, existing, data, params.batch)
+    setCollectionItem(collectionState, key, markRaw({
       ...existing,
       ...data,
-    })
+    }), params.batch)
   }
 }
 
-function writeRelationField(ctx: CacheRuntime, params: Parameters<Cache['writeItem']>[0], field: string, rawItem: any) {
+function writeRelationField(ctx: CacheRuntime, params: Parameters<Cache['writeItem']>[0] & { batch?: CacheWriteBatch }, field: string, rawItem: any) {
   const relation = params.collection.relations[field]
   if (!rawItem || !relation) {
     return
@@ -231,11 +242,12 @@ function writeRelationField(ctx: CacheRuntime, params: Parameters<Cache['writeIt
       relation,
       childItem: nestedItem,
       meta: params.meta,
+      batch: params.batch,
     })
   }
 }
 
-function mergeTimestampedItem(ctx: CacheRuntime, params: Parameters<Cache['writeItem']>[0], collectionState: Record<string | number, any>, existing: any, data: any) {
+function mergeTimestampedItem(ctx: CacheRuntime, params: Parameters<Cache['writeItem']>[0] & { batch?: CacheWriteBatch }, collectionState: Record<string | number, any>, existing: any, data: any) {
   const collectionTs = ensureCollectionTimestamps(ctx, params.collection.name)
   const localTimestamps = collectionTs.get(params.key) ?? {}
   const { merged, mergedTimestamps, conflicts } = mergeItemFields(
@@ -245,9 +257,9 @@ function mergeTimestampedItem(ctx: CacheRuntime, params: Parameters<Cache['write
     params.fieldTimestamps!,
   )
   // Rejected remote fields must not change relation membership.
-  updateItemIndexes(ctx, params.collection, params.key, existing, merged)
+  updateItemIndexes(ctx, params.collection, params.key, existing, merged, params.batch)
   collectionTs.set(params.key, mergedTimestamps)
-  collectionState[params.key] = markRaw(merged)
+  setCollectionItem(collectionState, params.key, markRaw(merged), params.batch)
 
   if (conflicts.length > 0) {
     const store = ctx.getStore()

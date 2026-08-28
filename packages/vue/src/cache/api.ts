@@ -7,7 +7,7 @@ import { rebuildIndexes } from './indexes'
 import { ensureLayersForCollection, getStateForCollection } from './layers'
 import { applyMutationToCache } from './mutations'
 import { clearQueryStateForCollection } from './queryState'
-import { enqueueOperation, flushQueuedOperations } from './queue'
+import { enqueueOperation, enqueueWriteItems, flushQueuedOperations } from './queue'
 import { resolveRelationWriteParams } from './relationWrite'
 import { garbageCollectItem, getWrappedItem } from './wrapped'
 
@@ -30,7 +30,7 @@ export function createCacheApi<
       enqueueOperation(ctx, { type: 'writeItem', params })
     },
     writeItems(params) {
-      enqueueOperation(ctx, { type: 'writeItems', params, index: 0 })
+      enqueueWriteItems(ctx, params)
     },
     writeItemForRelation(params) {
       enqueueOperation(ctx, { type: 'writeItem', params: resolveRelationWriteParams(ctx, params) })
