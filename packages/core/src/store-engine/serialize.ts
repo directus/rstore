@@ -1,9 +1,10 @@
 import type { CustomCacheState, ResolvedCollection } from '@rstore/shared'
 import type { ChangeRecorder } from './change-recorder.js'
-import type { EngineCollectionState, EngineContext, EngineEffect, NormalizedCacheSnapshot } from './internal-types.js'
-import { recordCollectionReset } from './change-recorder.js'
+import type { EngineCollectionState, EngineContext, EngineEffect, NormalizedCacheSnapshot, NormalizedCollectionRows } from './internal-types.js'
+import { needsCollectionResetKeys, recordCollectionReset } from './change-recorder.js'
+import { getCollectionMetadata } from './collection-metadata.js'
 import { createCollectionState } from './context.js'
-import { getPublicKey, isEntityKey, registerBaseKey, restoreLayerKeyValues } from './identity.js'
+import { getPublicKey, isEntityKey, registerBaseKeyValue, restoreLayerKeyValues } from './identity.js'
 import { rebuildIndexes } from './indexes.js'
 import { applyModuleHydration, prepareModuleClear, prepareModuleHydration, serializeModules } from './modules.js'
 import { copyNullRecord, createNullRecord } from './records.js'
@@ -78,14 +79,17 @@ export function clearCollectionNow(
   ctx.fieldTimestamps.delete(collection.name)
   clearCollectionTombstones(ctx, collection.name)
   const current = ctx.collections.get(collection.name)
-  recordCollectionReset(changes, collection.name, current ? getVisibleKeyIds(current) : [], current ? getVisibleKeyIds(current) : [])
+  if (changes) {
+    const ids = current && needsCollectionResetKeys(changes, collection.name) ? getVisibleKeyIds(current) : []
+    recordCollectionReset(changes, collection.name, ids, ids)
+  }
   return effects
 }
 
 /** Stage known collection states without touching live maps. */
 function stageCollections(
   ctx: EngineContext,
-  incoming: Map<string, Record<string, any>>,
+  incoming: Map<string, NormalizedCollectionRows>,
 ): Map<string, EngineCollectionState> {
   const result = new Map<string, EngineCollectionState>()
   const names = new Set([...ctx.collections.keys(), ...incoming.keys()])
@@ -100,7 +104,8 @@ function stageCollections(
     state.layers = previous?.layers ?? []
     if (collection) {
       restoreCollection(state, collection, incoming.get(name))
-      rebuildIndexes(collection, state)
+      if (getCollectionMetadata(collection).hasIndexes)
+        rebuildIndexes(collection, state)
     }
     else {
       restoreLayerKeyValues(state)
@@ -114,16 +119,17 @@ function stageCollections(
 function restoreCollection(
   state: EngineCollectionState,
   collection: ResolvedCollection<any, any, any>,
-  incoming: Record<string, any> | undefined,
+  incoming: NormalizedCollectionRows | undefined,
 ): void {
-  for (const rawKey of Object.keys(incoming ?? {})) {
-    const item = incoming![rawKey]
+  for (let index = 0; index < (incoming?.keys.length ?? 0); index++) {
+    const rawKey = incoming!.keys[index]!
+    const item = incoming!.values[index]
     if (item == null) {
       continue
     }
     const derived = collection.getKey(item)
     const key = isEntityKey(derived) ? derived : rawKey
-    const id = registerBaseKey(state, collection, key, item)
+    const id = registerBaseKeyValue(state, key, derived)
     state.base.set(id, item)
   }
   restoreLayerKeyValues(state)
@@ -135,12 +141,15 @@ function commitCollections(ctx: EngineContext, changes: ChangeRecorder | undefin
   for (const name of names) {
     const previous = ctx.collections.get(name)
     const next = staged.get(name)
-    recordCollectionReset(
-      changes,
-      name,
-      previous ? getVisibleKeyIds(previous) : [],
-      next ? getVisibleKeyIds(next) : [],
-    )
+    if (changes) {
+      const needsKeys = needsCollectionResetKeys(changes, name)
+      recordCollectionReset(
+        changes,
+        name,
+        previous && needsKeys ? getVisibleKeyIds(previous) : [],
+        next && needsKeys ? getVisibleKeyIds(next) : [],
+      )
+    }
   }
   ctx.collections.clear()
   for (const [name, state] of staged) {

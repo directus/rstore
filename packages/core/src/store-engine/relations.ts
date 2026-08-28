@@ -42,18 +42,6 @@ export function planWriteTree(ctx: EngineContext, params: WriteItemParams): Plan
   return result
 }
 
-/** Validate and prepare one write for a relation-free collection. */
-export function planRelationFreeWrite(params: WriteItemParams): PlannedWrite {
-  validateWriteInput(params)
-  const frozen = Object.isFrozen(params.item)
-  return {
-    params,
-    data: frozen ? params.item : pickNonSpecialProps(params.item, true),
-    mutable: !frozen,
-    root: true,
-  }
-}
-
 /** Recursively validate one write without mutating engine state. */
 function planWrite(
   ctx: EngineContext,
@@ -107,7 +95,7 @@ function planWrite(
 }
 
 /** Validate key and item shape before relation planning or mutation. */
-function validateWriteInput(params: WriteItemParams): void {
+export function validateWriteInput(params: WriteItemParams): void {
   if (!isKeyDefined(params.key)) {
     throw new TypeError(`Item key is required for collection ${params.collection.name}`)
   }

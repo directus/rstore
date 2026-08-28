@@ -1,6 +1,6 @@
 import type { CacheStateInput, CustomHookMeta } from '@rstore/shared'
-import type { NormalizedCacheSnapshot } from './internal-types.js'
-import { copyNullRecord, createNullRecord, isObjectRecord } from './records.js'
+import type { NormalizedCacheSnapshot, NormalizedCollectionRows } from './internal-types.js'
+import { createNullRecord, isObjectRecord } from './records.js'
 
 /** Validate and detach snapshot containers before queueing hydration. */
 export function normalizeSnapshotInput(value: CacheStateInput): NormalizedCacheSnapshot {
@@ -33,17 +33,18 @@ export function normalizeSnapshotInput(value: CacheStateInput): NormalizedCacheS
 }
 
 /** Validate collection container shapes while retaining item values. */
-function normalizeCollections(value: unknown): Map<string, Record<string, any>> {
+function normalizeCollections(value: unknown): Map<string, NormalizedCollectionRows> {
   if (!isObjectRecord(value)) {
     throw new TypeError('Cache snapshot collections must be an object record')
   }
-  const result = new Map<string, Record<string, any>>()
+  const result = new Map<string, NormalizedCollectionRows>()
   for (const name of Object.keys(value)) {
     const collection = value[name]
     if (!isObjectRecord(collection)) {
       throw new TypeError(`Cache snapshot collection "${name}" must be an object record`)
     }
-    result.set(name, copyNullRecord(collection))
+    const keys = Object.keys(collection)
+    result.set(name, { keys, values: keys.map(key => collection[key]) })
   }
   return result
 }

@@ -12,6 +12,10 @@ interface TemporalComparable {
  * Compare two field values for structural equality.
  */
 export function fieldValuesEqual(a: any, b: any): boolean {
+  if (Object.is(a, b) || (a == null && b == null))
+    return true
+  if (a == null || b == null || typeof a !== 'object' || typeof b !== 'object')
+    return false
   return deepEqual(a, b, new WeakMap(), 0)
 }
 

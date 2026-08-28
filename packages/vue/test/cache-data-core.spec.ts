@@ -115,6 +115,21 @@ describe('vue cache data-core regressions', () => {
     cache.dispose()
   })
 
+  it('refreshes cached marker validity when an existing write activates it', async () => {
+    const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
+    const cache = store.$cache
+    const collection = store.$collections[0]!
+    cache.writeItem({ collection, key: 1, item: { id: 1, label: 'before' } })
+    expect(cache.readItems({ collection })).toHaveLength(1)
+    expect(cache.readItems({ collection, marker: 'loaded' })).toHaveLength(0)
+
+    cache.writeItem({ collection, key: 1, item: { id: 1, label: 'after' }, marker: 'loaded' })
+
+    expect(cache.readItems({ collection, marker: 'loaded' })).toHaveLength(1)
+    expect(cache.readItems({ collection, marker: 'loaded' })).toHaveLength(1)
+    cache.dispose()
+  })
+
   it('keeps cached wrappers fresh when frozen items are replaced', async () => {
     const store = await createStore({ schema: [{ name: 'Todo' }], plugins: [] })
     const cache = store.$cache
@@ -185,6 +200,46 @@ describe('vue cache data-core regressions', () => {
     const related = (cache.readItem({ collection: venue, key: 1 }) as any).events
 
     expect(related.map((item: any) => item.id)).toEqual([1])
+    cache.dispose()
+  })
+
+  it('keeps exact-index result ownership private and invalidates membership only', async () => {
+    const store = await createStore({
+      schema: [
+        {
+          name: 'Venue',
+          relations: {
+            events: {
+              many: true,
+              to: { Event: { on: { city: 'city', room: 'room' } } },
+            },
+          },
+        },
+        { name: 'Event' },
+      ],
+      plugins: [],
+    })
+    const cache = store.$cache
+    const event = store.$collections.find(collection => collection.name === 'Event')!
+    cache.writeItems({
+      collection: event,
+      items: Array.from({ length: 8 }, (_, index) => ({
+        key: index + 1,
+        value: { id: index + 1, city: 'Paris', room: 'A', label: index === 0 ? 'before' : 'other' },
+      })),
+    })
+
+    const first = cache.readItems({ collection: event, indexKey: 'city:room', indexValue: ['Paris', 'A'] }) as any[]
+    first.pop()
+    cache.writeItem({ collection: event, key: 1, item: { label: 'after' } })
+    const fieldOnly = cache.readItems({ collection: event, indexKey: 'city:room', indexValue: ['Paris', 'A'] }) as any[]
+
+    expect(fieldOnly).toHaveLength(8)
+    expect(fieldOnly[0]).toBe(first[0])
+    expect(fieldOnly[0].label).toBe('after')
+
+    cache.writeItem({ collection: event, key: 1, item: { room: 'B' } })
+    expect(cache.readItems({ collection: event, indexKey: 'city:room', indexValue: ['Paris', 'A'] })).toHaveLength(7)
     cache.dispose()
   })
 

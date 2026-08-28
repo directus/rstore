@@ -1,21 +1,21 @@
 import type { FieldTimestampValue } from '@rstore/shared'
-import type { EngineContext } from './internal-types.js'
 import type { EngineOptions, StoreEngine } from './types.js'
 import { createTombstoneStore, gcTombstones as gcTombstonesStore, scheduleTombstoneGc } from '../tombstone.js'
-import { createChangeRecorder, createFlushChangeRecorder, getFlushChanges, getOperationChanges } from './change-recorder.js'
+import { createChangeRecorder, createFlushChangeRecorder, discardStateChangeSink } from './change-recorder.js'
 import { createEngineContext } from './context.js'
-import { dispatchEffects, throwCollectedErrors } from './effects.js'
 import { getPublicKey } from './identity.js'
-import { cacheIndexDependencyId, getIndexBucket, getIndexBucketIds, getIndexObserverId } from './indexes.js'
+import { cacheIndexDependencyId } from './index-dependencies.js'
+import { getIndexBucket, getIndexBucketIds, getIndexObserverId, getIndexRead } from './indexes.js'
 import { getLayerNow } from './layers.js'
 import { getModuleState } from './modules.js'
 import { createObserverRegistry } from './observers.js'
+import { dispatchImmediate } from './queue-dispatch.js'
 import { enqueueOperation, flushQueuedOperations } from './queue.js'
 import { resolveRelationWriteParams } from './relations.js'
 import { getState as serializeState } from './serialize.js'
 import { normalizeSnapshotInput } from './snapshot-input.js'
 import { createStaggering } from './staggering.js'
-import { getVisibleKeys, resolveItem } from './view.js'
+import { getVisibleKeyIds, getVisibleKeys, resolveItem, resolveItemById } from './view.js'
 import { deleteItemFromBase, getFieldTimestamps, setFieldTimestamps } from './write.js'
 
 /**
@@ -63,6 +63,37 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       return keys ?? getVisibleKeys(ctx, collection.name)
     },
 
+    scanItemsRaw({ collection, marker, keys, indexKey, indexValue }, visit, onIndexDependency) {
+      const state = ctx.collections.get(collection.name)
+      let indexIds: ReadonlySet<string> | undefined
+      if (keys == null && indexKey != null) {
+        const read = getIndexRead(ctx, state, collection, indexKey, indexValue)
+        if (onIndexDependency?.(read.dependency) === false)
+          return
+        indexIds = read.ids
+      }
+      if (marker !== undefined && !ctx.markers[marker])
+        return
+      if (!state)
+        return
+
+      if (keys != null) {
+        for (const key of keys) {
+          const item = resolveItem(ctx, collection.name, key)
+          if (item !== undefined && visit(key, item) === false)
+            break
+        }
+        return
+      }
+
+      const ids = indexKey != null ? indexIds : getVisibleKeyIds(state)
+      for (const id of ids ?? []) {
+        const item = resolveItemById(state, id)
+        if (item !== undefined && visit(getPublicKey(state, id), item) === false)
+          break
+      }
+    },
+
     getIndexBucket(collectionName, indexKey, indexValue) {
       return getIndexBucket(
         ctx.collections.get(collectionName),
@@ -80,7 +111,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
         indexKey,
         indexValue,
       )
-      return cacheIndexDependencyId(state?.indexes.get(indexKey), collectionName, indexKey, valueId)
+      return cacheIndexDependencyId(ctx, state?.indexes.get(indexKey), collectionName, indexKey, valueId)
     },
 
     hasMarker(marker) {
@@ -92,7 +123,12 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     },
 
     writeItems(params) {
-      enqueueOperation(ctx, { type: 'writeItems', params, index: 0, changes: [] })
+      enqueueOperation(ctx, {
+        type: 'writeItems',
+        params,
+        index: 0,
+        changes: callbacks.onAfterWrite ? [] : undefined,
+      })
     },
 
     deleteItem(params) {
@@ -136,11 +172,17 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       // causal delete, so a later refill still merges against local history.
       const flush = createFlushChangeRecorder()
       const changes = createChangeRecorder(ctx, flush)
-      const result = deleteItemFromBase(ctx, changes, { collection, key })
-      if (result.removed) {
-        dispatchImmediate(ctx, changes, flush, result.effects)
+      try {
+        const result = deleteItemFromBase(ctx, changes, { collection, key })
+        if (result.removed)
+          dispatchImmediate(ctx, changes, flush, result.effects)
+        else discardStateChangeSink(changes)
+        return result.removed
       }
-      return result.removed
+      catch (error) {
+        discardStateChangeSink(changes)
+        throw error
+      }
     },
 
     forEachKey(collectionName, callback) {
@@ -196,6 +238,8 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       ctx.queue.length = 0
       ctx.queueHead = 0
       ctx.pauseDepth = 0
+      ctx.pendingIndexDependencies.clear()
+      callbacks.stateChangeSink?.discard()
     },
 
     observeItem: observers.observeItem,
@@ -208,7 +252,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
         indexKey,
         indexValue,
       )
-      cacheIndexDependencyId(state?.indexes.get(indexKey), collectionName, indexKey, observerId)
+      cacheIndexDependencyId(ctx, state?.indexes.get(indexKey), collectionName, indexKey, observerId)
       return observers.observeIndex(collectionName, indexKey, observerId, callback)
     },
 
@@ -216,42 +260,5 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       return ctx.queryMeta
     },
   }
-
   return engine
-}
-
-/** Dispatch immediate GC effects and observers with queue-equivalent errors. */
-function dispatchImmediate(
-  ctx: EngineContext,
-  recorder: ReturnType<typeof createChangeRecorder>,
-  flush: ReturnType<typeof createFlushChangeRecorder>,
-  effects: Parameters<typeof dispatchEffects>[1],
-): void {
-  const errors: unknown[] = []
-  const operationChanges = getOperationChanges(recorder)
-  if (operationChanges) {
-    try {
-      ctx.callbacks.onStateChange?.(operationChanges)
-    }
-    catch (error) {
-      errors.push(error)
-    }
-  }
-  try {
-    dispatchEffects(ctx, effects)
-  }
-  catch (error) {
-    errors.push(error)
-  }
-  const flushChanges = getFlushChanges(flush)
-  if (flushChanges) {
-    try {
-      ctx.callbacks.onObserverFlush?.(flushChanges)
-    }
-    catch (error) {
-      errors.push(error)
-    }
-    ctx.observers.dispatch(flushChanges)
-  }
-  throwCollectedErrors(errors, 'Store engine callbacks failed')
 }
