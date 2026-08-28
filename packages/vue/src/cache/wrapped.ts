@@ -2,6 +2,7 @@ import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollec
 import type { CacheRuntime } from './types'
 import { shallowRef } from 'vue'
 import { wrapItem } from '../item'
+import { createWrappedItemMetadata } from '../itemMetadata'
 import { getItemKey, readRawCacheItem } from './context'
 
 /** Return the cached wrapped proxy for an item, creating it when needed. */
@@ -26,10 +27,7 @@ export function getWrappedItem<
       store: ctx.getStore(),
       collection,
       item: shallowRef(item),
-      metadata: {
-        queries: new Set(),
-        dirtyQueries: new Set(),
-      },
+      metadata: createWrappedItemMetadata(),
     })
   }
 
@@ -43,10 +41,7 @@ export function getWrappedItem<
   const layer = current.$layer
   let entry = ctx.wrappedItems.get(collection.name, key, layer?.id)
   if (!entry) {
-    const metadata = {
-      queries: new Set(),
-      dirtyQueries: new Set(),
-    }
+    const metadata = createWrappedItemMetadata()
     const cell = ctx.itemCells.create(collection.name, key, current, track)
     const wrappedItem = wrapItem({
       store: ctx.getStore(),

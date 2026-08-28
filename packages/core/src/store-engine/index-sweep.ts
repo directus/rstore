@@ -1,4 +1,5 @@
-import type { EngineContext, EngineIndexState, IndexValueId } from './internal-types.js'
+import type { EngineContext, EngineIndexState } from './internal-types.js'
+import { countIndexBuckets, removeEmptyIndexBuckets } from './index-buckets.js'
 import { encodeLegacyValue } from './index-value.js'
 
 export const EMPTY_BUCKET_SWEEP_THRESHOLD = 256
@@ -11,41 +12,18 @@ export function sweepEmptyIndexBuckets(ctx: EngineContext): void {
 
 /** Apply bounded retention policy to one index. */
 function sweepIndex(ctx: EngineContext, index: EngineIndexState): void {
-  const live = index.buckets.size - index.emptyBucketCount
+  const live = countIndexBuckets(index) - index.emptyBucketCount
   if (index.emptyBucketCount <= EMPTY_BUCKET_SWEEP_THRESHOLD || index.emptyBucketCount <= live * 2)
     return
-  const empty: IndexValueId[] = []
-  for (const [id, keys] of index.buckets) {
-    if (!keys.size)
-      empty.push(id)
-  }
-  const removed = new Set(empty)
-  for (const id of empty) index.buckets.delete(id)
-  index.emptyBucketCount = 0
-  for (const id of empty) {
-    const dependency = index.dependencyIds.get(id)
+  const removed = removeEmptyIndexBuckets(index)
+  for (const bucket of removed) {
+    const dependency = index.dependencyIds.get(bucket.valueId)
     if (!dependency || !hasIndexConsumer(ctx, dependency))
-      index.dependencyIds.delete(id)
-  }
-  for (const [value, indexed] of index.scalarValues) {
-    if (removed.has(indexed.id))
-      index.scalarValues.delete(value)
-  }
-  for (const [first, bySecond] of index.tupleValues) {
-    for (const [second, indexed] of bySecond) {
-      if (removed.has(indexed.id))
-        bySecond.delete(second)
-    }
-    if (!bySecond.size)
-      index.tupleValues.delete(first)
-  }
-  for (const [legacy, aliases] of index.legacyAliases) {
-    for (const id of removed) aliases.delete(id)
-    if (!aliases.size) {
-      index.legacyAliases.delete(legacy)
-      const legacyId = encodeLegacyValue(legacy)
-      const dependency = index.dependencyIds.get(legacyId)
-      if (!dependency || !hasIndexConsumer(ctx, dependency))
+      index.dependencyIds.delete(bucket.valueId)
+    if (bucket.legacy !== undefined) {
+      const legacyId = bucket.legacyId ?? encodeLegacyValue(bucket.legacy)
+      const legacyDependency = index.dependencyIds.get(legacyId)
+      if (!index.legacyAliases.has(bucket.legacy) && (!legacyDependency || !hasIndexConsumer(ctx, legacyDependency)))
         index.dependencyIds.delete(legacyId)
     }
   }

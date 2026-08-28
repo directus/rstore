@@ -1,5 +1,6 @@
 import type { ChangeRecorder, FlushChangeRecorder } from './change-recorder.js'
 import type { EngineContext, EngineEffect, QueuedOperation } from './internal-types.js'
+import { prepareBatchWrite, writePreparedBatchItem } from './batch-write.js'
 import { createChangeRecorder, createFlushChangeRecorder, discardStateChangeSink, recordList } from './change-recorder.js'
 import { throwCollectedErrors } from './effects.js'
 import { getPublicKey, toKeyId } from './identity.js'
@@ -194,6 +195,18 @@ function processBatch(
   operation: Extract<QueuedOperation, { type: 'writeItems' }>,
   flushChanges: FlushChangeRecorder,
 ): boolean {
+  const prepared = operation.index === 0 ? prepareBatchWrite(ctx, operation.params) : undefined
+  if (prepared) {
+    while (operation.index < operation.params.items.length) {
+      const { key, value } = operation.params.items[operation.index]!
+      const change = writePreparedBatchItem(ctx, prepared, key, value)
+      operation.index++
+      if (change && operation.changes)
+        operation.changes.push(change)
+    }
+    return finishBatch(ctx, operation, flushChanges)
+  }
+
   let skipItemRecorders = false
   while (operation.index < operation.params.items.length) {
     if (!ctx.staggering.canProcess())
@@ -224,6 +237,15 @@ function processBatch(
     }
   }
 
+  return finishBatch(ctx, operation, flushChanges)
+}
+
+/** Publish marker and aggregate hooks after every batch item committed. */
+function finishBatch(
+  ctx: EngineContext,
+  operation: Extract<QueuedOperation, { type: 'writeItems' }>,
+  flushChanges: FlushChangeRecorder,
+): true {
   const changes = createChangeRecorder(ctx, flushChanges)
   if (operation.params.marker !== undefined) {
     ctx.markers[operation.params.marker] = true

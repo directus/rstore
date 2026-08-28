@@ -51,36 +51,42 @@ export interface ObserverRegistry {
 
 /** Composite index buckets plus backward-compatible joined aliases. */
 export interface EngineIndexState {
-  /** Canonical encoded tuple to item ids. */
-  buckets: Map<IndexValueId, Set<KeyId>>
+  /** Index field count selecting direct bucket layout. */
+  arity: number
+  /** Direct single-field value buckets. */
+  scalarBuckets: Map<string, EngineIndexBucket>
+  /** Direct two-field value buckets. */
+  tupleBuckets: Map<string, Map<string, EngineIndexBucket>>
+  /** Encoded buckets for indexes containing more than two fields. */
+  encodedBuckets: Map<IndexValueId, EngineIndexBucket>
   /** Retained buckets currently containing no live item ids. */
   emptyBucketCount: number
   /** Legacy joined value to every canonical tuple producing it. */
-  legacyAliases: Map<string, Set<IndexValueId>>
+  legacyAliases: Map<string, Set<EngineIndexBucket>>
   /** Cached opaque dependency ids for hot repeated memberships. */
   dependencyIds: Map<IndexValueId, string>
-  /** Reusable scalar memberships by coerced field value. */
-  scalarValues: Map<string, IndexedValue>
-  /** Reusable two-field memberships without serialization on hot writes. */
-  tupleValues: Map<string, Map<string, IndexedValue>>
 }
 
-/** Cached current membership for one item and index. */
-export interface IndexedValue {
-  /** Exact collision-safe bucket identity. */
-  id: IndexValueId
+/** Uniform materialized index bucket. */
+export interface EngineIndexBucket {
+  /** Live canonical item ids. */
+  keys: Set<KeyId>
+  /** Exact collision-safe dependency value identity. */
+  valueId: IndexValueId
   /** Backward-compatible joined composite value. */
-  legacy: string
+  legacy?: string
   /** Encoded backward-compatible observer identity. */
-  legacyId: IndexValueId
+  legacyId?: IndexValueId
+  /** Whether empty-bucket retention currently counts this bucket. */
+  retainedEmpty?: boolean
 }
 
 /** Pre-normalized optimistic layer used by hot reads. */
 export interface EngineLayer {
   /** Original public layer. */
   layer: CacheLayer
-  /** Patches by canonical item id. */
-  state: Map<KeyId, any>
+  /** Detached patches by canonical item id. */
+  state: Record<KeyId, any>
   /** Deleted canonical ids. */
   deletedItems: Set<KeyId>
   /** Deduplicated patch and delete ids in stable transition order. */
@@ -97,10 +103,8 @@ export interface EngineCollectionState {
   usesDefaultKey: boolean
   /** Base items by canonical id. */
   base: Map<KeyId, any>
-  /** Current public key form by canonical id. */
-  publicKeys: Map<KeyId, string | number>
-  /** Sparse caller key forms only when base data cannot recover them. */
-  fallbackKeyValues?: Map<KeyId, string | number>
+  /** Sparse caller key forms only when current data cannot recover them. */
+  keyOverrides?: Map<KeyId, string | number>
   /** Materialized collection indexes. */
   indexes: Map<string, EngineIndexState>
   /** Ordered optimistic layers. */
