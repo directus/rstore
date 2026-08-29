@@ -57,6 +57,11 @@ export async function drizzleFindMany({ event, collection, params, query, search
   const dbQuery = rstoreUseDrizzle().query as unknown as Record<string, RelationalQueryBuilder<any, any>>
   const q = {} as NonNullable<Parameters<typeof dbQuery[string]['findMany']>[0]>
   const whereConditions: any[] = []
+  const extras: Record<string, any> = {}
+
+  // Hooks define the trusted extras that list filters may reference. Resolve
+  // them before the client condition so only server-authored expressions pass.
+  applyTransforms(transforms, whereConditions, extras)
 
   if (searchQuery.keys) {
     if (limits.maxKeys !== false && searchQuery.keys.length > limits.maxKeys) {
@@ -68,16 +73,13 @@ export async function drizzleFindMany({ event, collection, params, query, search
 
   if (searchQuery.where) {
     try {
-      whereConditions.push(getDrizzleCondition(table, searchQuery.where))
+      whereConditions.push(getDrizzleCondition(table, searchQuery.where, extras))
     }
     catch (e) {
       console.error(e)
       throw createError({ statusCode: 400, statusMessage: 'Invalid filter' })
     }
   }
-
-  const extras: Record<string, any> = {}
-  applyTransforms(transforms, whereConditions, extras)
 
   q.where = whereConditions.length ? and(...whereConditions) : undefined
   const limit = resolveLimit(searchQuery.limit, limits.maxLimit)

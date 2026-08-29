@@ -1,8 +1,9 @@
 import type { AddressInfo } from 'node:net'
 import { createServer } from 'node:http'
+import { sql } from 'drizzle-orm'
 import { createApp, toNodeListener } from 'h3'
 import SuperJSON from 'superjson'
-import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterAll, afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // Client-supplied queries used to be unbounded: no default/max `limit`
 // (full-table dump), uncapped `keys`, unlimited `include` recursion,
@@ -12,6 +13,7 @@ import { afterAll, beforeEach, describe, expect, it, vi } from 'vitest'
 const state = vi.hoisted(() => ({
   findMany: [] as any[],
   findFirst: [] as any[],
+  todos: undefined as any,
 }))
 
 vi.mock('$rstore-drizzle-server-utils.js', async () => {
@@ -20,6 +22,7 @@ vi.mock('$rstore-drizzle-server-utils.js', async () => {
     id: integer('id').primaryKey(),
     title: text('title'),
   })
+  state.todos = todos
   const secrets = sqliteTable('secrets', {
     id: integer('id').primaryKey(),
     token: text('token'),
@@ -62,6 +65,7 @@ vi.mock('$rstore-drizzle-server-utils.js', async () => {
 })
 
 const { drizzleFindMany, drizzleFindOne } = await import('../src/runtime/server/utils/operations')
+const { rstoreDrizzleHooks } = await import('../src/runtime/server/utils/hooks')
 
 const event = {} as any
 
@@ -74,6 +78,10 @@ async function runFindMany(searchQuery: any) {
 beforeEach(() => {
   state.findMany.length = 0
   state.findFirst.length = 0
+})
+
+afterEach(() => {
+  ;(rstoreDrizzleHooks as any)._hooks = {}
 })
 
 describe('findMany — limit bounds', () => {
@@ -106,6 +114,23 @@ describe('findMany — keys bound', () => {
 
   it('rejects more than maxKeys keys with 400', async () => {
     await expect(runFindMany({ keys: [1, 2, 3, 4] })).rejects.toMatchObject({ statusCode: 400 })
+  })
+})
+
+describe('findMany — server extras', () => {
+  it('registers hook extras before converting the client where condition', async () => {
+    rstoreDrizzleHooks.hook('index.get.before', ({ transformQuery }) => {
+      transformQuery(q => q.extras({
+        score: sql<number>`(select count(*) from comments where comments.todo_id = ${state.todos.id})`.as('score'),
+      }))
+    })
+
+    const q = await runFindMany({
+      where: { operator: 'gte', field: 'score', value: 2 },
+    })
+
+    expect(q.extras).toHaveProperty('score')
+    expect(q.where).toBeTruthy()
   })
 })
 

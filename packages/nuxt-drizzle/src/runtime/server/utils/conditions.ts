@@ -104,14 +104,19 @@ export function getDrizzleOrderBy(table: Table, orderByData: string | string[], 
 /**
  * Converts a wire condition tree into a drizzle condition.
  *
- * Every field is resolved against the table's real columns and every
- * operator is validated against the documented grammar; anything else is
- * rejected with a `400`.
+ * Every field is resolved against a table column or a server-authored extra,
+ * and every operator is validated against the documented grammar; anything
+ * else is rejected with a `400`.
  *
  * @param table The drizzle table the condition targets.
  * @param condition The client-supplied condition tree.
+ * @param extras Server-authored expressions eligible for this list filter.
  */
-export function getDrizzleCondition(table: Table, condition: RstoreDrizzleCondition): any {
+export function getDrizzleCondition(
+  table: Table,
+  condition: RstoreDrizzleCondition,
+  extras?: RstoreDrizzleExtras,
+): any {
   if (condition == null) {
     return undefined
   }
@@ -120,7 +125,7 @@ export function getDrizzleCondition(table: Table, condition: RstoreDrizzleCondit
       throw invalidOperator(condition.operator)
     }
     const operator = drizzle[condition.operator] as (...args: any[]) => any
-    const column = resolveTableColumn(table, condition.field)
+    const column = resolveConditionField(table, condition.field, extras)
     if ('value' in condition) {
       return operator(column, condition.value)
     }
@@ -136,15 +141,33 @@ export function getDrizzleCondition(table: Table, condition: RstoreDrizzleCondit
       // `as any`: the wire type says 'not' but a hostile client can send anything.
       throw invalidOperator((condition as any).operator)
     }
-    return drizzle.not(getDrizzleCondition(table, condition.condition))
+    return drizzle.not(getDrizzleCondition(table, condition.condition, extras))
   }
   else if ('conditions' in condition) {
     if (condition.operator !== 'and' && condition.operator !== 'or') {
       // `as any`: the wire type says 'and' | 'or' but a hostile client can send anything.
       throw invalidOperator((condition as any).operator)
     }
-    return drizzle[condition.operator](...condition.conditions.map(c => getDrizzleCondition(table, c)))
+    return drizzle[condition.operator](...condition.conditions.map(c => getDrizzleCondition(table, c, extras)))
   }
+}
+
+/**
+ * Resolves a filter field to a physical column or a server-authored extra.
+ *
+ * Real columns intentionally win when an extra shares their name: existing
+ * client filters must retain their table-column meaning. Extras are unwrapped
+ * to their SQL expression because a SELECT alias cannot be used in WHERE.
+ */
+function resolveConditionField(table: Table, field: unknown, extras?: RstoreDrizzleExtras): Column | SQL {
+  const columns = drizzle.getTableColumns(table)
+  if (typeof field === 'string' && Object.prototype.hasOwnProperty.call(columns, field)) {
+    return columns[field] as Column
+  }
+  if (typeof field === 'string' && extras && Object.prototype.hasOwnProperty.call(extras, field)) {
+    return extras[field]!.sql
+  }
+  return resolveTableColumn(table, field)
 }
 
 /** Builds the `400` thrown for operators outside the condition grammar. */

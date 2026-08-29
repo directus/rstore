@@ -83,6 +83,52 @@ describe('getDrizzleCondition — field validation', () => {
   })
 })
 
+describe('getDrizzleCondition — server-authored extras', () => {
+  const extras = {
+    score: sql<number>`(select count(*) from comments where comments.todo_id = ${todos.id})`.as('score'),
+    // Deliberately shadows a real column to pin down filter precedence.
+    title: sql<string>`lower(${todos.title})`.as('title'),
+  }
+
+  it('filters a nested condition through the underlying extra expression', () => {
+    const { sql: query, params } = toQuery(getDrizzleCondition(todos, {
+      operator: 'and',
+      conditions: [
+        { operator: 'eq', field: 'id', value: 1 },
+        {
+          operator: 'or',
+          conditions: [
+            { operator: 'gte', field: 'score', value: 2 },
+            { operator: 'isNull', field: 'score' },
+          ],
+        },
+      ],
+    }, extras))
+
+    expect(query).toContain('select count(*) from comments')
+    expect(query).not.toContain('"score"')
+    expect(params).toEqual([1, 2])
+  })
+
+  it('keeps physical columns ahead of same-named extras', () => {
+    const { sql: query, params } = toQuery(getDrizzleCondition(todos, {
+      operator: 'eq',
+      field: 'title',
+      value: 'Original title',
+    }, extras))
+
+    expect(query).toContain('"todos"."title" = ?')
+    expect(query).not.toContain('lower(')
+    expect(params).toEqual(['Original title'])
+  })
+
+  it('still rejects unknown and inherited fields when extras exist', () => {
+    expect400(() => getDrizzleCondition(todos, { operator: 'eq', field: 'nope', value: 1 }, extras))
+    expect400(() => getDrizzleCondition(todos, { operator: 'eq', field: 'constructor', value: 1 }, extras))
+    expect400(() => getDrizzleCondition(todos, { operator: 'eq', field: '__proto__', value: 1 }, extras))
+  })
+})
+
 // `condition.operator` used to index straight into the drizzle-orm namespace
 // (`drizzle[condition.operator]`), letting a client call arbitrary exports
 // such as `sql`. Operators must come from the documented allow-list.
