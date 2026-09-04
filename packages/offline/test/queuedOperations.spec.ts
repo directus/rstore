@@ -1,5 +1,5 @@
 import type { OfflineQueuedOperation } from '../src/plugin/types'
-import { deleteItem, updateItem } from '@rstore/core'
+import { createItem, deleteItem, updateItem } from '@rstore/core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { replayQueuedOperations, shouldDropFailedOperation } from '../src/plugin/queuedOperations'
 import { createRuntime } from './utils/plugin'
@@ -133,5 +133,22 @@ describe('queued operation replay', () => {
     await replayQueuedOperations(runtime, store)
 
     expect(queuedIds()).toEqual([])
+  })
+
+  it('removes a queued create mirror when the server assigns another key', async () => {
+    const localKey = 'local-key'
+    db.stores.set('Todos', new Map([[localKey, { id: localKey, text: 'draft' }]]))
+    store.$cache = { deleteItem: vi.fn() }
+    store.$collections[0].getKey = (item: { id: string }) => item.id
+    queueOperation({ type: 'create', key: localKey, item: { id: localKey, text: 'draft' } })
+    vi.mocked(createItem).mockResolvedValue({ id: 'server-key', text: 'draft' } as any)
+
+    await replayQueuedOperations(runtime, store)
+
+    expect(db.stores.get('Todos')!.has(localKey)).toBe(false)
+    expect(store.$cache.deleteItem).toHaveBeenCalledWith(expect.objectContaining({
+      collection: store.$collections[0],
+      key: localKey,
+    }))
   })
 })

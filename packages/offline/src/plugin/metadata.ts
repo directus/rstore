@@ -1,13 +1,14 @@
 import type { ResolvedCollection } from '@rstore/shared'
 import type { CreateOfflinePluginOptions, OfflineMetadata, OfflinePluginRuntime } from './types'
 import { getLocalStorageItem } from '../localStorage'
+import { getCollectionMetadataKey, offlineOpsStoreName } from './constants'
 
 /** Create runtime state for the offline plugin. */
 export function createOfflineRuntime(options: CreateOfflinePluginOptions): OfflinePluginRuntime {
   const globalMetadataKey = 'rstore-offline-global-metadata'
   return {
     options,
-    opsStoreName: 'rstore-offline-ops-queue',
+    opsStoreName: offlineOpsStoreName,
     globalMetadataKey,
     globalMetadata: getLocalStorageItem(globalMetadataKey) as OfflineMetadata | null,
   }
@@ -15,7 +16,7 @@ export function createOfflineRuntime(options: CreateOfflinePluginOptions): Offli
 
 /** Return the local-storage metadata key for a collection. */
 export function getMetadataKey(collection: ResolvedCollection) {
-  return `rstore-offline-metadata-${collection.name}`
+  return getCollectionMetadataKey(collection.name)
 }
 
 /** Whether a collection should be handled by the offline plugin. */

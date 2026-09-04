@@ -134,4 +134,67 @@ describe('offline cache persistence', () => {
     expect(excluded.db.deleteItem).not.toHaveBeenCalled()
     expect(excluded.db.writeItem).not.toHaveBeenCalled()
   })
+
+  describe('many mutations', () => {
+    it('persists queued createMany results when core skips per-item afterMutation hooks', async () => {
+      // Offline queue hooks abort many mutations after setting the queued
+      // result, so core reaches afterManyMutation without emitting the normal
+      // per-item afterMutation hooks.
+      await collector.run('afterManyMutation', {
+        meta: {},
+        collection,
+        mutation: 'create',
+        items: [
+          { key: 'b', item: { id: 'b', text: 'B' } },
+          { key: 'c', item: { id: 'c', text: 'C' } },
+        ],
+        getResult: () => [
+          { id: 'b', text: 'B' },
+          { id: 'c', text: 'C' },
+        ],
+      })
+
+      expect(db.stores.get('Todos')).toEqual(new Map([
+        ['b', { id: 'b', text: 'B' }],
+        ['c', { id: 'c', text: 'C' }],
+      ]))
+    })
+
+    it('persists queued deleteMany keys when no item results exist', async () => {
+      db.stores.set('Todos', new Map([
+        ['b', { id: 'b' }],
+        ['c', { id: 'c' }],
+      ]))
+
+      await collector.run('afterManyMutation', {
+        meta: {},
+        collection,
+        mutation: 'delete',
+        keys: ['b', 'c'],
+        getResult: () => [],
+      })
+
+      expect(db.stores.get('Todos')!.size).toBe(0)
+    })
+
+    it('skips afterManyMutation when core already emitted per-item hooks', async () => {
+      const meta = {}
+      await collector.run('afterMutation', payload({
+        meta,
+        mutation: 'create',
+        getResult: () => ({ id: 'b', text: 'B' }),
+      }))
+      db.writeItem.mockClear()
+
+      await collector.run('afterManyMutation', {
+        meta,
+        collection,
+        mutation: 'create',
+        items: [{ key: 'b', item: { id: 'b', text: 'B' } }],
+        getResult: () => [{ id: 'b', text: 'B' }],
+      })
+
+      expect(db.writeItem).not.toHaveBeenCalled()
+    })
+  })
 })

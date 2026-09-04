@@ -87,7 +87,7 @@ export interface StoreCore<
   /**
    * Synchronize the store offline storage with remote.
    */
-  $sync: () => Promise<void>
+  $sync: (options?: SyncOptions) => Promise<void>
   /**
    * The state of synchronization of the store.
    */
@@ -121,4 +121,10 @@ export interface StoreCore<
      */
     syncedCollections: Set<string>
   }
+}
+
+/** Options for one store synchronization run. */
+export interface SyncOptions {
+  /** Abort-aware sync plugins stop before applying a remote pull. */
+  signal?: AbortSignal
 }

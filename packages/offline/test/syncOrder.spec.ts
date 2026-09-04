@@ -133,4 +133,82 @@ describe('offline sync orchestration', () => {
       .filter(([name]: [string]) => name === 'syncCollection')
     expect(syncCollectionCalls).toHaveLength(2)
   })
+
+  it('resumes the cache after a collection sync times out', async () => {
+    runtime.options.syncCollectionTimeout = 5
+    store.$hooks.callHook.mockImplementation(async (name: string) => {
+      if (name === 'syncCollection') {
+        await new Promise<void>(() => {})
+      }
+    })
+
+    await expect(collector.run('sync', syncPayload())).rejects.toThrow('Todos')
+
+    expect(store.$cache.resume).toHaveBeenCalledOnce()
+  })
+
+  it('resumes the cache when an in-flight collection pull is aborted', async () => {
+    const controller = new AbortController()
+    store.$hooks.callHook.mockImplementation(async (name: string) => {
+      if (name === 'syncCollection') {
+        await new Promise<void>(() => {})
+      }
+    })
+    const sync = collector.run('sync', {
+      ...syncPayload(),
+      signal: controller.signal,
+    })
+
+    await vi.waitFor(() => expect(store.$hooks.callHook).toHaveBeenCalledWith('syncCollection', expect.anything()))
+    controller.abort(new Error('cancelled by caller'))
+
+    await expect(sync).rejects.toThrow('cancelled by caller')
+    expect(store.$cache.resume).toHaveBeenCalledOnce()
+  })
+
+  it('does not apply a pull after its collection stops being included', async () => {
+    let included = true
+    runtime.options.filterCollection = () => included
+    store.$hooks.callHook.mockImplementation(async (name: string, payload: any) => {
+      if (name === 'syncCollection') {
+        payload.storeItems([{ id: 'server-row' }])
+        included = false
+      }
+    })
+
+    await collector.run('sync', syncPayload())
+
+    expect(db.applyChanges).not.toHaveBeenCalled()
+    expect(store.$cache.writeItem).not.toHaveBeenCalledWith(expect.objectContaining({
+      item: { id: 'server-row' },
+    }))
+  })
+
+  it('keeps the collection cursor unchanged when the pull hook opts out', async () => {
+    store.$hooks.callHook.mockImplementation(async (name: string, payload: any) => {
+      if (name === 'syncCollection') {
+        payload.skipCursor()
+      }
+    })
+
+    await collector.run('sync', syncPayload())
+
+    expect(localStorage.getItem('rstore-offline-metadata-Todos')).toBeNull()
+  })
+
+  it('uses a cursor captured before the remote pull starts', async () => {
+    const now = vi.spyOn(Date, 'now')
+      .mockReturnValueOnce(100)
+      .mockReturnValueOnce(200)
+    store.$hooks.callHook.mockImplementation(async (name: string) => {
+      if (name === 'syncCollection') {
+        Date.now()
+      }
+    })
+
+    await collector.run('sync', syncPayload())
+
+    expect(JSON.parse(localStorage.getItem('rstore-offline-metadata-Todos')!)).toEqual({ updatedAt: 100 })
+    now.mockRestore()
+  })
 })

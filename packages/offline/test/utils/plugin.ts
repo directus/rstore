@@ -52,6 +52,7 @@ export interface FakeOfflineDb {
   readItem: ReturnType<typeof vi.fn>
   writeItem: ReturnType<typeof vi.fn>
   deleteItem: ReturnType<typeof vi.fn>
+  applyChanges: ReturnType<typeof vi.fn>
   clearDatabase: ReturnType<typeof vi.fn>
 }
 
@@ -77,6 +78,15 @@ export function createFakeDb(): FakeOfflineDb {
     }),
     deleteItem: vi.fn(async (storeName: string, key: string) => {
       getStore(storeName).delete(key)
+    }),
+    applyChanges: vi.fn(async (storeName: string, changes: { deleteKeys: string[], writes: Array<{ key: string, value: any }> }) => {
+      const store = getStore(storeName)
+      for (const key of changes.deleteKeys) {
+        store.delete(key)
+      }
+      for (const { key, value } of changes.writes) {
+        store.set(key, value)
+      }
     }),
     clearDatabase: vi.fn(async (storeName: string) => {
       getStore(storeName).clear()

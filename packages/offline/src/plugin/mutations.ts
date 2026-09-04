@@ -23,45 +23,81 @@ function installCacheReadHooks(runtime: OfflinePluginRuntime, hook: any) {
   })
 }
 
+const cachePersistenceMetaKey = Symbol('rstoreOfflineCachePersistenceHandled')
+
 function installCachePersistenceHook(runtime: OfflinePluginRuntime, hook: any) {
-  hook('afterMutation', async ({ collection, mutation, key, item, getResult }: any) => {
-    if (!isCollectionIncluded(runtime, collection)) {
+  hook('afterMutation', async (payload: any) => {
+    await persistMutation(runtime, payload)
+    if (payload.meta) {
+      payload.meta[cachePersistenceMetaKey] = true
+    }
+  })
+
+  hook('afterManyMutation', async (payload: any) => {
+    // Unhandled many mutations emit per-item afterMutation hooks first. Queue
+    // hooks abort many mutations, which skips those item hooks, so only the
+    // latter path must be mirrored here.
+    if (payload.meta?.[cachePersistenceMetaKey]) {
       return
     }
 
-    const db = getOfflineDb(runtime)
-
-    // Deletes are handled before looking at the result: core emits them with a
-    // key but no result at all, so waiting on `getResult()` would leave the
-    // deleted item in the local database forever.
-    if (mutation === 'delete') {
-      const deleteKey = key ?? (item != null ? collection.getKey(item) : null)
-      if (deleteKey != null) {
-        await db.deleteItem(collection.name, String(deleteKey))
+    const results = payload.getResult()
+    if (payload.mutation === 'delete') {
+      for (const [index, key] of (payload.keys ?? []).entries()) {
+        await persistMutation(runtime, {
+          collection: payload.collection,
+          mutation: 'delete',
+          key: key ?? payload.items?.[index]?.key,
+          item: payload.items?.[index]?.item,
+          getResult: () => undefined,
+        })
       }
       return
     }
 
-    const result = getResult()
-    if (!result) {
-      return
-    }
-    // The server result may not echo the key fields back, so fall back to the
-    // key core resolved for the mutation.
-    const itemKey = collection.getKey(result) ?? key
-    if (itemKey == null) {
-      return
-    }
-    if (mutation === 'create') {
-      await db.writeItem(collection.name, String(itemKey), result)
-    }
-    else if (mutation === 'update') {
-      // Update responses may only carry the changed columns; writing the result
-      // as-is would drop every field the server left out.
-      const existing = await db.readItem(collection.name, String(itemKey))
-      await db.writeItem(collection.name, String(itemKey), existing ? { ...existing, ...result } : result)
+    for (const [index, result] of results.entries()) {
+      const source = payload.items?.[index]
+      await persistMutation(runtime, {
+        collection: payload.collection,
+        mutation: payload.mutation,
+        key: source?.key ?? payload.keys?.[index],
+        item: source?.item,
+        getResult: () => result,
+      })
     }
   })
+}
+
+/** Persist one committed single or many-mutation item into the local mirror. */
+async function persistMutation(runtime: OfflinePluginRuntime, { collection, mutation, key, item, getResult }: any): Promise<void> {
+  if (!isCollectionIncluded(runtime, collection)) {
+    return
+  }
+
+  const db = getOfflineDb(runtime)
+  if (mutation === 'delete') {
+    const deleteKey = key ?? (item != null ? collection.getKey(item) : null)
+    if (deleteKey != null) {
+      await db.deleteItem(collection.name, String(deleteKey))
+    }
+    return
+  }
+
+  const result = getResult()
+  if (!result) {
+    return
+  }
+  const itemKey = collection.getKey(result) ?? key
+  if (itemKey == null) {
+    return
+  }
+  if (mutation === 'create') {
+    await db.writeItem(collection.name, String(itemKey), result)
+  }
+  else if (mutation === 'update') {
+    const existing = await db.readItem(collection.name, String(itemKey))
+    await db.writeItem(collection.name, String(itemKey), existing ? { ...existing, ...result } : result)
+  }
 }
 
 function installSingleMutationQueueHooks(runtime: OfflinePluginRuntime, hook: any) {

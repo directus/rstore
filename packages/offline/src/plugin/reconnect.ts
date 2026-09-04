@@ -3,6 +3,8 @@
  * Browsers fire the event repeatedly on flaky links; the debounce collapses a
  * burst into a single sync.
  */
+import type { OfflineSyncOptions } from './types'
+
 export const ONLINE_SYNC_DEBOUNCE_MS = 1000
 
 /**
@@ -36,7 +38,7 @@ export function installReconnectHook(hook: any) {
       }
       syncing = true
       try {
-        await store.$sync()
+        await triggerOfflineSync(store)
       }
       catch (error) {
         // The trigger is fire-and-forget (called from a timer), so a rejection
@@ -56,6 +58,11 @@ export function installReconnectHook(hook: any) {
       window.addEventListener('online', onlineListener)
     }
   })
+}
+
+/** Ask a store to run its configured sync hooks, optionally with cancellation. */
+export function triggerOfflineSync(store: any, options: OfflineSyncOptions = {}): Promise<void> {
+  return store.$sync(options)
 }
 
 /**

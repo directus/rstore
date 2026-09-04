@@ -16,6 +16,16 @@ export interface CreateOfflinePluginOptions {
    * even though they were captured under the previous storage version.
    */
   clearQueueOnVersionChange?: boolean
+  /** Register the built-in browser reconnect listener. Defaults to true. */
+  reconnect?: boolean
+  /** Reject a hung per-collection pull after this many milliseconds. Disabled by default. */
+  syncCollectionTimeout?: number
+}
+
+/** Options forwarded to an offline sync invocation. */
+export interface OfflineSyncOptions {
+  /** Abort a pull that has not applied its changes yet. */
+  signal?: AbortSignal
 }
 
 /** Global offline storage metadata. */

@@ -28,7 +28,8 @@ async function processQueuedOperation(runtime: OfflinePluginRuntime, store: any,
     if (!collection) {
       throw new Error(`[rstore/offline] Cannot process queued operation for unknown collection "${op.collectionName}"`)
     }
-    await replayOperation(store, collection, op)
+    const result = await replayOperation(store, collection, op)
+    await removeReplacedCreateMirror(runtime, store, collection, op, result)
     await getOfflineDb(runtime).deleteItem(runtime.opsStoreName, op.id)
   }
   catch (error) {
@@ -58,47 +59,54 @@ export function shouldDropFailedOperation(error: any): boolean {
 async function replayOperation(store: any, collection: any, op: OfflineQueuedOperation) {
   switch (op.type) {
     case 'create':
-      await createItem({
+      return createItem({
         store,
         collection,
         item: op.item,
       })
-      break
     case 'update':
-      await updateItem({
+      return updateItem({
         store,
         collection,
         item: op.item,
         key: op.key!,
       })
-      break
     case 'delete':
-      await deleteItem({
+      return deleteItem({
         store,
         collection,
         key: op.key!,
       })
-      break
     case 'createMany':
-      await createMany({
+      return createMany({
         store,
         collection,
         items: op.items!,
       })
-      break
     case 'updateMany':
-      await updateMany({
+      return updateMany({
         store,
         collection,
         items: op.items!,
       })
-      break
     case 'deleteMany':
-      await deleteMany({
+      return deleteMany({
         store,
         collection,
         keys: op.keys!,
       })
-      break
   }
+}
+
+/** Remove the optimistic local-key row after a create receives a server key. */
+async function removeReplacedCreateMirror(runtime: OfflinePluginRuntime, store: any, collection: any, op: OfflineQueuedOperation, result: any): Promise<void> {
+  if (op.type !== 'create' || op.key == null || !result) {
+    return
+  }
+  const resultKey = collection.getKey(result)
+  if (resultKey == null || String(resultKey) === String(op.key)) {
+    return
+  }
+  await getOfflineDb(runtime).deleteItem(collection.name, String(op.key))
+  store.$cache?.deleteItem({ collection, key: op.key })
 }

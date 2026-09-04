@@ -1,4 +1,4 @@
-import type { CollectionDefaults, CustomHookMeta, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CollectionDefaults, CustomHookMeta, StoreCore, StoreSchema, SyncOptions } from '@rstore/shared'
 
 /**
  * localStorage key used to persist the date of the last successful sync.
@@ -33,13 +33,13 @@ export function getLastSyncedAt(): Date | undefined {
 export function createSync<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
->(getStore: () => StoreCore<TSchema, TCollectionDefaults>): () => Promise<void> {
+>(getStore: () => StoreCore<TSchema, TCollectionDefaults>): (options?: SyncOptions) => Promise<void> {
   let currentSyncPromise: Promise<void> | undefined
 
   /**
    * Run the sync callbacks and update the sync state.
    */
-  async function runSync(): Promise<void> {
+  async function runSync(options: SyncOptions): Promise<void> {
     const store = getStore()
     store.$syncState.isSyncing = true
     store.$syncState.error = undefined
@@ -55,6 +55,7 @@ export function createSync<
           await callback({
             store: store as any,
             meta,
+            signal: options.signal,
             setProgress: ({ percent, message }) => {
               callbackProgress = percent
               store.$syncState.progress = globalProgress + (callbackProgress / callbacks.length)
@@ -86,12 +87,12 @@ export function createSync<
     }
   }
 
-  return () => {
+  return (options = {}) => {
     // Re-entrancy guard: return the in-flight sync instead of starting another
     if (currentSyncPromise) {
       return currentSyncPromise
     }
-    currentSyncPromise = runSync().finally(() => {
+    currentSyncPromise = runSync(options).finally(() => {
       currentSyncPromise = undefined
     })
     return currentSyncPromise

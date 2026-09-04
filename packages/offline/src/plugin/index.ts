@@ -7,7 +7,7 @@ import { installReconnectHook } from './reconnect'
 import { installOfflineSyncHook } from './syncOrchestrator'
 import { installVersionCleanupHook } from './versionCleanup'
 
-export type { CreateOfflinePluginOptions } from './types'
+export type { CreateOfflinePluginOptions, OfflineSyncOptions } from './types'
 
 /** Create the offline persistence and queued mutation plugin. */
 export function createOfflinePlugin(options: CreateOfflinePluginOptions = {}) {
@@ -28,7 +28,9 @@ export function createOfflinePlugin(options: CreateOfflinePluginOptions = {}) {
       installMutationHooks(runtime, hook)
       // Single ordered `sync` hook: queue replay first, then remote pull.
       installOfflineSyncHook(runtime, hook)
-      installReconnectHook(hook)
+      if (options.reconnect !== false) {
+        installReconnectHook(hook)
+      }
     },
   })
 }

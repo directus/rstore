@@ -658,6 +658,9 @@ importers:
         specifier: workspace:^
         version: link:../shared
     devDependencies:
+      fake-indexeddb:
+        specifier: 6.2.5
+        version: 6.2.5
       typescript:
         specifier: 'catalog:'
         version: 5.9.3

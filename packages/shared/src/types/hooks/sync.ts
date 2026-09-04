@@ -14,6 +14,8 @@ export interface SyncHookDefinitions<
     payload: {
       store: GlobalStoreType
       meta: CustomHookMeta
+      /** Optional cancellation signal from `store.$sync()`. */
+      signal?: AbortSignal
       /** Update sync progress. */
       setProgress: (info: { percent: number, message?: string }) => void
       /** Mark a collection as loaded from local storage. */
@@ -36,6 +38,8 @@ export interface SyncHookDefinitions<
       storeItems: (items: Array<ResolvedCollectionItemBase<Collection, CollectionDefaults, TSchema>>) => void
       /** Delete items if they no longer exist remotely. */
       deleteItems: (keys: Array<string | number>) => void
+      /** Keep the existing pull cursor after a successful no-op pull. */
+      skipCursor: () => void
     },
   ) => Awaitable<void>
 }
