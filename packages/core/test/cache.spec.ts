@@ -1,76 +1,53 @@
-import type { ResolvedCollection } from '@rstore/shared'
 import { describe, expect, it } from 'vitest'
-import { defaultMarker, getMarker } from '../src'
+import { defaultMarker, getMarker, resolveCollections } from '../src'
 
-/**
- * Create a minimal resolved collection stub for marker tests.
- */
-function createCollection(): ResolvedCollection {
-  return {
-    '~resolved': true,
-    'hooks': undefined,
-    'name': 'TestType',
-    'computed': {},
-    'fields': {},
-    'getKey': () => '',
-    'isInstanceOf': () => true,
-    'relations': {},
-    'formSchema': {} as any,
-    'indexes': new Map(),
-    'normalizedRelations': {},
-    'oppositeRelations': {},
-  }
+/** Resolves a collection through the same public schema boundary as a store. */
+function collection(name = 'TestType') {
+  return resolveCollections([{ name }])[0]!
 }
 
 describe('defaultMarker', () => {
-  it('should generate marker with empty findOptions', () => {
-    const result = defaultMarker(createCollection())
-    expect(result).toBe('TestType:{}')
+  it('is stable for equivalent query inputs and scoped by collection', () => {
+    const first = defaultMarker(collection(), { filter: { id: 1 }, sort: 'asc' } as any)
+    const second = defaultMarker(collection(), { filter: { id: 1 }, sort: 'asc' } as any)
+
+    expect(first).toBe(second)
+    expect(defaultMarker(collection('Other'), { filter: { id: 1 }, sort: 'asc' } as any)).not.toBe(first)
   })
 
-  it('should generate marker with findOptions', () => {
-    const findOptions = { filter: { id: 1 } }
-    const result = defaultMarker(createCollection(), findOptions as any)
-    expect(result).toBe('TestType:{"filter":{"id":1}}')
+  it('distinguishes query parameters that can change returned rows', () => {
+    const target = collection()
+
+    expect(defaultMarker(target, { params: { page: 1 } } as any))
+      .not
+      .toBe(defaultMarker(target, { params: { page: 2 } } as any))
   })
 
-  it('should generate marker with findOptions and non-function filter', () => {
-    const findOptions = { filter: { id: 1 }, sort: 'asc' }
-    const result = defaultMarker(createCollection(), findOptions as any)
-    expect(result).toBe('TestType:{"filter":{"id":1},"sort":"asc"}')
+  it('ignores fetch behavior that cannot change result identity', () => {
+    const target = collection()
+    const base = defaultMarker(target, { params: { page: 1 } } as any)
+
+    expect(defaultMarker(target, {
+      params: { page: 1 },
+      fetchPolicy: 'cache-only',
+      fetchOptions: { autoRefresh: 'manual' },
+    } as any)).toBe(base)
   })
 
-  it('should exclude fetchOptions from the marker', () => {
-    const collection = createCollection()
-    const result = defaultMarker(collection, { params: { foo: 'bar' }, fetchOptions: { autoRefresh: 'manual' } } as any)
-    expect(result).toBe(defaultMarker(collection, { params: { foo: 'bar' } } as any))
-  })
+  it('omits function identity from transportable cache markers', () => {
+    const target = collection()
+    const base = defaultMarker(target, { params: { page: 1 } } as any)
 
-  it('should omit function options from the marker', () => {
-    const collection = createCollection()
-    // Markers must be identical across processes: they are computed during
-    // SSR, serialized into the payload and recomputed on the client — no
-    // function id survives that boundary (reference identity is
-    // process-local and server/client bundles transform the same source
-    // differently). A fresh closure per options-getter evaluation must not
-    // mint a fresh marker either.
-    const markerA = defaultMarker(collection, { filter: () => true, params: { foo: 'bar' } })
-    const markerB = defaultMarker(collection, { filter: () => true, params: { foo: 'bar' } })
-    const markerNoFilter = defaultMarker(collection, { params: { foo: 'bar' } })
-
-    expect(markerA).toBe(markerB)
-    expect(markerA).toBe(markerNoFilter)
+    expect(defaultMarker(target, { params: { page: 1 }, filter: () => true })).toBe(base)
+    expect(defaultMarker(target, { params: { page: 1 }, filter: () => false })).toBe(base)
   })
 })
 
 describe('getMarker', () => {
-  it('should generate marker for first', () => {
-    const result = getMarker('first', 'TestType:{}')
-    expect(result).toBe('first:TestType:{}')
-  })
+  it('keeps first and many result spaces separate without pinning encoding', () => {
+    const marker = defaultMarker(collection())
 
-  it('should generate marker for many', () => {
-    const result = getMarker('many', 'TestType:{}')
-    expect(result).toBe('many:TestType:{}')
+    expect(getMarker('first', marker)).not.toBe(getMarker('many', marker))
+    expect(getMarker('first', marker)).toBe(getMarker('first', marker))
   })
 })

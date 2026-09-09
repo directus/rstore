@@ -1,4 +1,4 @@
-import type { HLCTimestamp } from '../src/hlc'
+import type { HLCClockSkewInfo, HLCTimestamp } from '../src'
 import { describe, expect, it, vi } from 'vitest'
 import {
   compareHLC,
@@ -9,7 +9,24 @@ import {
   parseHLC,
   setDefaultClock,
   stringifyHLC,
-} from '../src/hlc'
+} from '../src'
+
+const clockSkewCases: Array<{
+  name: string
+  remote: HLCTimestamp
+  skewMs: number
+}> = [
+  {
+    name: 'far-future physical time',
+    remote: { physical: 1_000_000, logical: 0, nodeId: 'evil' },
+    skewMs: 999_000,
+  },
+  {
+    name: 'NaN physical time',
+    remote: { physical: Number.NaN, logical: 0, nodeId: 'malformed' },
+    skewMs: Number.POSITIVE_INFINITY,
+  },
+]
 
 describe('hybridLogicalClock', () => {
   it('should return monotonically increasing timestamps', () => {
@@ -242,23 +259,38 @@ describe('hybridLogicalClock', () => {
       }
     })
 
-    it('should invoke onClockSkew callback before throwing', () => {
-      const onClockSkew = vi.fn()
+    it.each(clockSkewCases)('reports $name to onClockSkew before throwing', ({ remote, skewMs }) => {
+      const order: string[] = []
+      let callbackInfo: HLCClockSkewInfo | undefined
+      const onClockSkew = vi.fn((info: HLCClockSkewInfo) => {
+        callbackInfo = info
+        order.push('callback')
+      })
       const clock = new HybridLogicalClock({
         nodeId: 'a',
         physicalNow: () => 1000,
         maxClockSkewMs: 5000,
         onClockSkew,
       })
-      const farFuture = { physical: 1_000_000, logical: 0, nodeId: 'evil' }
+      let thrown: unknown
+      try {
+        clock.receive(remote)
+      }
+      catch (error) {
+        thrown = error
+        order.push('error')
+      }
 
-      expect(() => clock.receive(farFuture)).toThrow(HLCClockSkewError)
+      expect(order).toEqual(['callback', 'error'])
       expect(onClockSkew).toHaveBeenCalledOnce()
-      expect(onClockSkew).toHaveBeenCalledWith(expect.objectContaining({
-        remote: farFuture,
-        localPhysical: 1000,
-        skewMs: farFuture.physical - 1000,
-      }))
+      expect(callbackInfo?.remote).toBe(remote)
+      expect(callbackInfo?.localPhysical).toBe(1000)
+      expect(callbackInfo?.skewMs).toBe(skewMs)
+      expect(thrown).toBeInstanceOf(HLCClockSkewError)
+      const error = thrown as HLCClockSkewError
+      expect(error.remote).toBe(remote)
+      expect(error.localPhysical).toBe(1000)
+      expect(error.skewMs).toBe(skewMs)
     })
   })
 })

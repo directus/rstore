@@ -40,7 +40,10 @@ export interface DirectusCollectionLike {
   /**
    * Directus metadata generated on the collection.
    */
-  meta?: Partial<DirectusGeneratedCollectionMeta>
+  meta?: {
+    primaryKeys?: string[]
+    directus?: Partial<DirectusGeneratedCollectionMeta['directus']>
+  }
 }
 
 /**

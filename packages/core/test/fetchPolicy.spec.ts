@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../src/fetchPolicy'
+import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../src'
 
 describe('fetchPolicy', () => {
   describe('shouldReadCacheFromFetchPolicy', () => {

@@ -1,6 +1,7 @@
-import type { BatchingConfig, Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOptions, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { BatchingConfig, Cache, Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOptions, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueCollectionApi } from './api'
+import type { VueCachePrivate } from './cache/types'
 import { createStoreCore, normalizeCollectionRelations, resolveCollection, resolveCollectionOppositeRelations } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
@@ -223,6 +224,9 @@ export function addCollection(store: VueStore, collection: Collection) {
 
   normalizeCollectionRelations([resolvedCollection])
   resolveCollectionOppositeRelations(store.$collections)
+  // New relations add indexes to existing collections. Rebuild from cached
+  // rows so relations work even when their target was cached before this call.
+  ;(store.$cache as Cache & VueCachePrivate)._private.rebuildIndexes()
 }
 
 export function removeCollection(store: VueStore, collectionName: string) {

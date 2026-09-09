@@ -10,6 +10,9 @@ export function itemsMatch(a: any, b: any): boolean {
     return false
   const keysA = Object.keys(a)
   const keysB = Object.keys(b)
-  const [checkKeys, other] = keysA.length <= keysB.length ? [keysA, b] : [keysB, a]
-  return checkKeys.length > 0 && checkKeys.every(k => k in other && a[k] === other[k])
+  // The smaller item drives the comparison, so a partial item matches the full
+  // one it describes. Both sides of the comparison must follow that choice,
+  // otherwise the larger item is compared with itself and always matches.
+  const [checkKeys, source, other] = keysA.length <= keysB.length ? [keysA, a, b] : [keysB, b, a]
+  return checkKeys.length > 0 && checkKeys.every(k => k in other && source[k] === other[k])
 }

@@ -58,7 +58,11 @@ export function peekFirst<
     })
 
     if (isKeyDefined(key)) {
-      result = store.$cache.readItem({ collection, key })
+      // `readItem` answers a miss with `undefined`; the filter branch below
+      // ends in `?? null`. Both are typed `WrappedItem | null`, so a key miss
+      // is normalized here rather than leaving callers to check for two
+      // different empty values.
+      result = store.$cache.readItem({ collection, key }) ?? null
     }
     else if (typeof findOptions?.filter === 'function') {
       const filterFn = findOptions.filter as (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean

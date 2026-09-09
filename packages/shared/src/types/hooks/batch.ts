@@ -1,4 +1,5 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from '../collection'
+import type { FormOperation } from '../formOperation'
 import type { FindOptions } from '../query'
 import type { Awaitable } from '../utils'
 import type { CustomHookMeta } from './meta'
@@ -45,6 +46,13 @@ export interface BatchMutationOperation<
   readonly key?: string | number
   readonly item?: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
   readonly meta: CustomHookMeta
+  /**
+   * Form operations from the form submission that issued this mutation.
+   *
+   * Batching groups operations together, but each one keeps the operations of
+   * its own call, so relational edits survive the batch.
+   */
+  readonly formOperations?: FormOperation[]
   /** Resolve this mutation with the returned item. */
   setResult: (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | undefined) => void
   /** Reject this mutation with an error. */

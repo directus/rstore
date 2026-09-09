@@ -28,18 +28,47 @@ describe('indexedDB storage', () => {
     await storage.dispose()
   })
 
+  it('writes, reads, and deletes one item', async () => {
+    const storage = await useIndexedDb(dbName)
+
+    await storage.writeItem('Todos', '1', { id: '1' })
+    expect(await storage.readItem('Todos', '1')).toEqual({ id: '1' })
+
+    await storage.deleteItem('Todos', '1')
+    expect(await storage.readItem('Todos', '1')).toBeUndefined()
+
+    await storage.dispose()
+  })
+
   it('applies deletes and writes in one readwrite transaction', async () => {
     const storage = await useIndexedDb(dbName)
+
+    await storage.writeItem('Todos', 'gone', { id: 'gone' })
+    await storage.writeItem('Todos', 'keep', { id: 'keep' })
+
     const transactions = vi.spyOn(IDBDatabase.prototype, 'transaction')
+    try {
+      await storage.applyChanges('Todos', {
+        deleteKeys: ['gone'],
+        writes: [{ key: 'new', value: { id: 'new' } }],
+      })
 
-    await storage.applyChanges('Todos', {
-      deleteKeys: ['gone'],
-      writes: [{ key: 'new', value: { id: 'new' } }],
-    })
+      expect(transactions.mock.calls.filter(([, mode]) => mode === 'readwrite')).toHaveLength(1)
+      expect(await storage.readAllItems('Todos')).toEqual([{ id: 'keep' }, { id: 'new' }])
+    }
+    finally {
+      transactions.mockRestore()
+      await storage.dispose()
+    }
+  })
 
-    expect(transactions.mock.calls.filter(([, mode]) => mode === 'readwrite')).toHaveLength(1)
-    expect(await storage.readAllItems('Todos')).toEqual([{ id: 'new' }])
-    transactions.mockRestore()
+  it('rejects uncloneable values', async () => {
+    const storage = await useIndexedDb(dbName)
+
+    await expect(storage.writeItem('Todos', 'bad', { id: 'bad', value: () => undefined }))
+      .rejects
+      .toMatchObject({ name: 'DataCloneError' })
+
     await storage.dispose()
   })
 })

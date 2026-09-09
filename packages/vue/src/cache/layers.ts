@@ -61,6 +61,23 @@ export function ensureLayersForCollection(ctx: CacheRuntime, collectionName: str
   return ctx.layers[collectionName] ??= shallowRef([])
 }
 
+/**
+ * Whether a non-skipped optimistic layer needs the base cache row for rollback.
+ *
+ * Cache identity is canonical: a numeric key and its string form address the
+ * same object state even though hook payloads retain their original key form.
+ */
+export function isKeyPinnedByActiveLayer(ctx: CacheRuntime, collectionName: string, key: string | number): boolean {
+  const keyId = String(key)
+  return (ctx.layers[collectionName]?.value ?? []).some((layer) => {
+    if (layer.skip) {
+      return false
+    }
+    return Object.keys(layer.state).some(candidate => String(candidate) === keyId)
+      || Array.from(layer.deletedItems).some(candidate => String(candidate) === keyId)
+  })
+}
+
 /** Remove a cache layer immediately. */
 export function removeLayer(ctx: CacheRuntime, layerId: string) {
   const collectionName = ctx.layerIdToCollectionName[layerId]

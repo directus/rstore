@@ -21,18 +21,13 @@ export async function emitItemAfterMutationHooks<
   meta: NonNullable<FinalizeMutationOptions<TCollection, TCollectionDefaults, TSchema>['meta']>,
   results: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>,
 ) {
-  if (options.mutation === 'delete') {
-    await Promise.all(getSingleHookEntries(options, results).map(entry =>
-      emitAfterMutationHook(store, options, meta, entry),
-    ))
-    return results
-  }
-
   const nextResults = await Promise.all(getSingleHookEntries(options, results).map(entry =>
     emitAfterMutationHook(store, options, meta, entry),
   ))
 
-  return nextResults.filter(isCommittedResult)
+  return options.mutation === 'delete'
+    ? results
+    : nextResults.filter(isCommittedResult)
 }
 
 export async function emitAfterMutationHook<

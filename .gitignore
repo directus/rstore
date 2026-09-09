@@ -19,3 +19,7 @@ docs/.vitepress/.temp
 
 # Agent skills from npm packages (managed by skills-npm)
 **/skills/npm-*
+
+# Coverage reports (pnpm test:coverage)
+coverage
+.vitest/

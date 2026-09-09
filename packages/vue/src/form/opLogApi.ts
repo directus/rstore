@@ -2,6 +2,7 @@ import type { FormOperation, StandardSchemaV1 } from '@rstore/shared'
 import type { FormObjectRuntime } from './context'
 import { optimizeOpLog } from './opLog'
 import { applyRuntimeOp, initRelationData, rebuildState, snapshotFormOperation, snapshotFormOperations } from './state'
+import { recordUndoneRelationValue } from './undoSnapshots'
 
 /**
  * Create the public op-log API bound to a runtime context.
@@ -28,19 +29,28 @@ export function createOpLogApi<TData extends Record<string, any>, TSchema extend
     clear: (): void => {
       ctx.opLog.length = 0
       ctx.redoStack.length = 0
+      ctx.undoneOps = new WeakSet()
       ctx.form.$changedProps = {}
     },
     undo: (): boolean => {
       if (ctx.opLog.length === 0)
         return false
-      ctx.redoStack.push(ctx.opLog.pop()!)
+      const undoneOp = ctx.opLog.pop()!
+      ctx.redoStack.push(undoneOp)
+      ctx.undoneOps.add(undoneOp)
       rebuildState(ctx)
+      // Recorded after the rebuild, so the remembered relation value is the one
+      // the undo made visible.
+      recordUndoneRelationValue(ctx, undoneOp)
       return true
     },
     redo: (): boolean => {
       if (ctx.redoStack.length === 0)
         return false
-      ctx.opLog.push(ctx.redoStack.pop()!)
+      const redoneOp = ctx.redoStack.pop()!
+      ctx.opLog.push(redoneOp)
+      ctx.undoneOps.delete(redoneOp)
+      ctx.undoneRelationValues.delete(redoneOp)
       rebuildState(ctx)
       return true
     },

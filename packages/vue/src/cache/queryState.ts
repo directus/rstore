@@ -27,6 +27,23 @@ export function clearAllQueryState(ctx: CacheRuntime) {
 }
 
 /**
+ * Drop response references to one evicted item without disturbing other pages
+ * or query metadata.
+ */
+export function invalidatePageRefsForItem(ctx: CacheRuntime, collectionName: string, key: string | number): void {
+  for (const [pageId, ref] of ctx.state.pageRefs) {
+    const queryId = getPageQueryId(pageId)
+    if (!queryId || !isQueryStateKeyForCollection(queryId, collectionName)) {
+      continue
+    }
+    const keys = ref.type === 'ref' ? [ref.key] : ref.keys
+    if (keys.some(candidate => String(candidate) === String(key))) {
+      ctx.state.pageRefs.delete(pageId)
+    }
+  }
+}
+
+/**
  * Extract the serialized query id from a page id.
  */
 function getPageQueryId(pageId: string) {

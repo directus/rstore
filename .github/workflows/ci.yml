@@ -8,14 +8,11 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - name: Set alternate npm integrity keys
-        run: |
-          echo COREPACK_INTEGRITY_KEYS="$(curl https://registry.npmjs.org/-/npm/v1/keys | jq -c '{npm: .keys}')" >> $GITHUB_ENV
       - uses: actions/checkout@v4
-      - run: corepack enable
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 23
+          node-version: 26
           cache: pnpm
       - run: pnpm install
       - run: pnpm lint
@@ -23,14 +20,11 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     steps:
-      - name: Set alternate npm integrity keys
-        run: |
-          echo COREPACK_INTEGRITY_KEYS="$(curl https://registry.npmjs.org/-/npm/v1/keys | jq -c '{npm: .keys}')" >> $GITHUB_ENV
       - uses: actions/checkout@v4
-      - run: corepack enable
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 23
+          node-version: 26
           cache: pnpm
       - run: pnpm install
       - run: pnpm build
@@ -39,18 +33,26 @@ jobs:
   unit-test:
     runs-on: ubuntu-latest
     steps:
-      - name: Set alternate npm integrity keys
-        run: |
-          echo COREPACK_INTEGRITY_KEYS="$(curl https://registry.npmjs.org/-/npm/v1/keys | jq -c '{npm: .keys}')" >> $GITHUB_ENV
       - uses: actions/checkout@v4
-      - run: corepack enable
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 23
+          node-version: 26
           cache: pnpm
       - run: pnpm install
       - run: pnpm build
-      - run: pnpm test
+      - run: pnpm test --project nuxt-boot
+      - run: pnpm test --project integration --sequence.shuffle --sequence.seed=3
+      - run: pnpm test:coverage
+      - run: test -f coverage/coverage-summary.json
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: coverage
+          if-no-files-found: error
+          retention-days: 14
 
   e2e:
     runs-on: ubuntu-latest
@@ -62,14 +64,11 @@ jobs:
           - packages/playground-drizzle
           - packages/playground-nuxt-directus
     steps:
-      - name: Set alternate npm integrity keys
-        run: |
-          echo COREPACK_INTEGRITY_KEYS="$(curl https://registry.npmjs.org/-/npm/v1/keys | jq -c '{npm: .keys}')" >> $GITHUB_ENV
       - uses: actions/checkout@v4
-      - run: corepack enable
+      - uses: pnpm/action-setup@v4
       - uses: actions/setup-node@v4
         with:
-          node-version: 23
+          node-version: 26
           cache: pnpm
       - run: pnpm install
       - run: pnpm build

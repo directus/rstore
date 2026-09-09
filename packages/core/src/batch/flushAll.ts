@@ -3,7 +3,7 @@ import type { InternalBatchFetchOperation, InternalBatchMutationOperation } from
 import type { BatchEntry } from './scheduler'
 import { flushFetchBatch } from './flushFetch'
 import { flushMutationBatch } from './flushMutation'
-import { createFetchOperation, createMutationOperation } from './operations'
+import { createFetchOperation, createMutationOperation, rejectUnresolved } from './operations'
 
 /**
  * Top-level flush entry point for a single batch group.
@@ -81,16 +81,7 @@ async function callUnifiedBatch(
     })
   }
   catch (error) {
-    for (const op of fetchOps) {
-      if (!op.resolved) {
-        op.setError(error as Error)
-      }
-    }
-    for (const op of mutationOps) {
-      if (!op.resolved) {
-        op.setError(error as Error)
-      }
-    }
+    rejectUnresolved([...fetchOps, ...mutationOps], error)
   }
 }
 

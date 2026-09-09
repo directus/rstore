@@ -8,6 +8,7 @@ import {
   getDrizzleTableFromCollection,
   rstoreUseDrizzle,
 } from '../index'
+import { applyTransforms } from './shared'
 
 /**
  * `DELETE /:collection/:key` — delete a row by primary key. Reads the row
@@ -29,12 +30,7 @@ export async function drizzleDelete({ event, collection, key, params, query }: B
 
   const { table, primaryKeys } = getDrizzleTableFromCollection(collection)
   const whereConditions: any[] = [getDrizzleKeyWhere(key, primaryKeys, table)]
-  for (const transform of transforms) {
-    transform({
-      where: condition => whereConditions.push(condition),
-      extras: () => {},
-    })
-  }
+  applyTransforms(transforms, whereConditions)
 
   const db = rstoreUseDrizzle()
   const dbQuery = db.query as unknown as Record<string, RelationalQueryBuilder<any, any>>

@@ -16,17 +16,24 @@ export interface BaseOpArgs {
 
 /**
  * Run the list of query transforms registered by `before` hooks, collecting
- * additional `where` conditions and `extras` into the output objects.
+ * additional `where` conditions and, when supplied, `extras` into the output
+ * objects. Mutations omit `extras` because Drizzle does not select them.
  */
 export function applyTransforms(
   transforms: RstoreDrizzleTransformQuery[],
   whereConditions: any[],
-  extras: Record<string, any>,
+  extras?: Record<string, any>,
 ) {
+  // Mutation transforms still receive an `extras` callback, but it must stay
+  // a no-op so ignored extras are never inspected or copied.
+  const addExtras = extras
+    ? (newExtras: Record<string, any>) => Object.assign(extras, newExtras)
+    : () => {}
+
   for (const transform of transforms) {
     transform({
       where: condition => whereConditions.push(condition),
-      extras: e => Object.assign(extras, e),
+      extras: addExtras,
     })
   }
 }

@@ -1,4 +1,4 @@
-import type { HLCTimestamp, HybridLogicalClockOptions } from './types.js'
+import type { HLCClockSkewInfo, HLCTimestamp, HybridLogicalClockOptions } from './types.js'
 import { createNodeId } from '../utils/nodeId.js'
 import { HLCClockSkewError } from './error.js'
 import { DEFAULT_MAX_CLOCK_SKEW_MS } from './types.js'
@@ -45,26 +45,12 @@ export class HybridLogicalClock {
     const nowPhysical = this.physicalNow()
 
     if (!Number.isFinite(remote.physical)) {
-      const info = {
-        remote,
-        localPhysical: nowPhysical,
-        skewMs: Number.POSITIVE_INFINITY,
-        maxClockSkewMs: this.maxClockSkewMs,
-      }
-      this.onClockSkew?.(info)
-      throw new HLCClockSkewError(info)
+      this.rejectClockSkew(remote, nowPhysical, Number.POSITIVE_INFINITY)
     }
 
     const skewMs = remote.physical - nowPhysical
     if (skewMs > this.maxClockSkewMs) {
-      const info = {
-        remote,
-        localPhysical: nowPhysical,
-        skewMs,
-        maxClockSkewMs: this.maxClockSkewMs,
-      }
-      this.onClockSkew?.(info)
-      throw new HLCClockSkewError(info)
+      this.rejectClockSkew(remote, nowPhysical, skewMs)
     }
 
     const nextPhysical = Math.max(nowPhysical, this.lastPhysical, remote.physical)
@@ -86,6 +72,24 @@ export class HybridLogicalClock {
     this.lastPhysical = nextPhysical
     this.lastLogical = nextLogical
     return { physical: nextPhysical, logical: nextLogical, nodeId: this.nodeId }
+  }
+
+  /**
+   * Notify the skew observer and reject a remote timestamp before state changes.
+   *
+   * @param remote Remote timestamp that violated clock validation.
+   * @param localPhysical Local clock reading at validation time.
+   * @param skewMs Measured skew, or positive infinity for malformed input.
+   */
+  private rejectClockSkew(remote: HLCTimestamp, localPhysical: number, skewMs: number): never {
+    const info: HLCClockSkewInfo = {
+      remote,
+      localPhysical,
+      skewMs,
+      maxClockSkewMs: this.maxClockSkewMs,
+    }
+    this.onClockSkew?.(info)
+    throw new HLCClockSkewError(info)
   }
 }
 

@@ -8,10 +8,12 @@ describe('typed collection', () => {
       name: string
     }
 
-    const collection = withItemType<MyObj>().defineCollection({
+    withItemType<MyObj>().defineCollection({
       name: 'MyObj',
+      getKey: (item) => {
+        expectTypeOf(item).toEqualTypeOf<MyObj>()
+        return item.id
+      },
     })
-
-    expectTypeOf(collection['~item']).toMatchTypeOf<MyObj>()
   })
 })

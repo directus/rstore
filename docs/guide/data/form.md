@@ -25,6 +25,8 @@ It has several special properties:
 - `$schema` the validation schema for the form object (see [schema validation](#schema-validation)).
 - `$onSuccess(cb)`: a method that registers a callback to be called when the form is saved.
 
+Each `$submit()` captures its data and operations before asynchronous validation. Later edits remain local. If submissions overlap, `$loading` stays true until all finish; the most recently started submit controls `$error` and automatic reset. Each call still settles its own promise and emits its success or error callback.
+
 Example:
 
 ```vue
@@ -521,7 +523,7 @@ Use `canUndo` and `canRedo` to check whether undo/redo is available:
 ```
 
 ::: warning
-Performing a new edit after an undo clears the redo stack — the undone operations are lost.
+Performing a new edit after an undo clears the redo stack, so those operations can no longer be redone. If a submit is pending, its acknowledgement still preserves the undo as a local edit, including after edits to other fields. Submit again to persist that value; an explicit `$reset()` or `$opLog.clear()` discards the pending undo intent.
 :::
 
 ### Time travel

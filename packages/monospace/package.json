@@ -40,7 +40,7 @@
     "dev": "unbuild --stub",
     "dev:prepare": "pnpm run dev",
     "prepack": "node ../../scripts/sync-dep-skills.mjs .",
-    "test": "vitest run",
+    "test": "RSTORE_TEST_PACKAGE=monospace pnpm -w exec vitest run --config vitest.config.ts",
     "test:types": "tsc --noEmit"
   },
   "dependencies": {

@@ -9,6 +9,7 @@ import {
   getDrizzleTableFromCollection,
   rstoreUseDrizzle,
 } from '../index'
+import { applyTransforms } from './shared'
 
 /**
  * `PATCH /:collection/:key` — update a row by primary key. Mirrors the
@@ -31,12 +32,7 @@ export async function drizzleUpdate({ event, collection, key, body, params, quer
 
   const { table, primaryKeys } = getDrizzleTableFromCollection(collection)
   const whereConditions: any[] = [getDrizzleKeyWhere(key, primaryKeys, table)]
-  for (const transform of transforms) {
-    transform({
-      where: condition => whereConditions.push(condition),
-      extras: () => {},
-    })
-  }
+  applyTransforms(transforms, whereConditions)
 
   const db = rstoreUseDrizzle()
 

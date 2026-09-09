@@ -1,6 +1,7 @@
 import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
 import { finalizeMutation } from './finalizeMutation'
+import { assertMutationAllowed, createOptimisticLayerLifecycle } from './optimistic'
 
 export interface DeleteOptions<
   TCollection extends Collection,
@@ -38,14 +39,7 @@ export async function deleteItem<
   optimistic = true,
   batch,
 }: DeleteOptions<TCollection, TCollectionDefaults, TSchema>): Promise<void> {
-  const item = store.$cache.readItem({ collection, key })
-  if (item?.$layer) {
-    const layer = item.$layer as CacheLayer
-    if (layer.prevent?.delete) {
-      console.error(layer)
-      throw new Error(`Item deletion prevented by the layer: ${layer.id}`)
-    }
-  }
+  assertMutationAllowed(store, collection, key, 'delete')
 
   const meta: CustomHookMeta = {}
 
@@ -59,40 +53,34 @@ export async function deleteItem<
     setItem: () => {},
   })
 
-  let layer: CacheLayer | undefined
-  const removeOptimisticLayer = () => {
-    if (layer) {
-      store.$cache.removeLayer(layer.id)
-      layer = undefined
-    }
-  }
+  const optimisticLayer = createOptimisticLayerLifecycle(store)
 
   if (!skipCache && optimistic) {
-    layer = {
+    const layer: CacheLayer = {
       id: crypto.randomUUID(),
       collectionName: collection.name,
       state: {},
       deletedItems: new Set([key]),
       optimistic: true,
     }
-    store.$cache.addLayer(layer)
+    optimisticLayer.add(layer)
   }
 
   try {
     // Batching: enqueue into batch scheduler if eligible
     const batchCall = resolveBatchCall(batch)
-    if (store.$batch && batchCall.enabled) {
+    if (store.$batch?.options.mutations && batchCall.enabled) {
       await store.$batch.enqueueDelete(collection, key, meta, batchCall.group)
     }
     else {
-      const abort = store.$hooks.withAbort()
+      const abort = store.$hooks.withAbort({ explicit: true })
       await store.$hooks.callHook('deleteItem', {
         store: store as unknown as GlobalStoreType,
         meta,
         collection,
         key,
         abort,
-      })
+      }, abort)
     }
 
     await finalizeMutation(store, {
@@ -102,12 +90,12 @@ export async function deleteItem<
       key,
       skipCache,
     }, {
-      onBeforeApplyCache: removeOptimisticLayer,
+      onBeforeApplyCache: optimisticLayer.remove,
     })
   }
   catch (error) {
     // Rollback optimistic layer in case of error
-    removeOptimisticLayer()
+    optimisticLayer.remove()
     throw error
   }
 }

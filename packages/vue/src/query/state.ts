@@ -14,8 +14,11 @@ export function createFetchState(): FetchStateController {
   // query) returns immediately instead of hanging forever.
   const promise = shallowRef<Promise<void>>(Promise.resolve())
   let resolveCurrent: (() => void) | null = null
+  // A current result can settle before the superseded request sharing its lane.
+  let hasCurrentSettlement = false
 
   function start() {
+    hasCurrentSettlement = false
     if (count.value === 0) {
       completed.value = false
       promise.value = new Promise<void>((resolve) => {
@@ -33,19 +36,18 @@ export function createFetchState(): FetchStateController {
     count.value--
 
     if (current) {
+      hasCurrentSettlement = true
       if (fetchError) {
         error.value = fetchError
       }
       else {
         lastUpdated.value = Date.now()
       }
-      if (count.value === 0) {
-        completed.value = true
-      }
     }
 
     // Resolved even for a superseded request, otherwise `await lane.promise` could never settle.
     if (count.value === 0) {
+      completed.value = hasCurrentSettlement
       const resolve = resolveCurrent
       resolveCurrent = null
       resolve?.()
@@ -64,6 +66,7 @@ export function createFetchState(): FetchStateController {
       error.value = null
     },
     markIncomplete: () => {
+      hasCurrentSettlement = false
       completed.value = false
     },
   }

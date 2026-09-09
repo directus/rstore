@@ -1,6 +1,6 @@
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
-import { pickNonSpecialProps } from '@rstore/shared'
 import { finalizeMutation } from './finalizeMutation'
+import { createOptimisticLayerLifecycle, prepareMutationItems } from './optimistic'
 
 export interface CreateManyOptions<
   TCollection extends Collection,
@@ -21,21 +21,15 @@ export async function createMany<
 >({
   store,
   collection,
-  items,
+  items: inputItems,
   skipCache,
   optimistic = true,
 }: CreateManyOptions<TCollection, TCollectionDefaults, TSchema>): Promise<Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>> {
   const meta: CustomHookMeta = {}
 
-  const originalItems = items
-
-  items = items.map((item) => {
-    // Serialize the cloned copy so the caller's original item is not mutated
-    // and the serialized values are the ones sent to hooks/adapters
-    const processedItem = pickNonSpecialProps(item, true) as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
-    store.$processItemSerialization(collection, processedItem)
-    return processedItem
-  })
+  let preparedItems = prepareMutationItems(store, collection, inputItems)
+  let layerItems = preparedItems.map(({ optimisticItem }) => optimisticItem)
+  const transportItems = preparedItems.map(({ transportItem }) => transportItem)
 
   let result: Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> = []
 
@@ -44,35 +38,32 @@ export async function createMany<
     meta,
     collection,
     mutation: 'create',
-    items,
+    items: transportItems,
     setItems: (newItems) => {
-      items = newItems as Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>
+      preparedItems = prepareMutationItems(store, collection, newItems as typeof inputItems, preparedItems)
+      layerItems = preparedItems.map(({ optimisticItem }) => optimisticItem)
+      // Keep the hook payload current for later callbacks in the same dispatch.
+      transportItems.splice(0, transportItems.length, ...preparedItems.map(({ transportItem }) => transportItem))
     },
   })
 
-  let layer: CacheLayer | undefined
-  const removeOptimisticLayer = () => {
-    if (layer) {
-      store.$cache.removeLayer(layer.id)
-      layer = undefined
-    }
-  }
+  const optimisticLayer = createOptimisticLayerLifecycle(store)
 
   if (!skipCache && optimistic) {
     const optimisticState: Record<string, any> = {}
-    for (const i in items) {
-      const item = items[i]
+    for (const item of layerItems) {
+      // Key and body share the application/cache shape, including replacements.
       let key = collection.getKey(item)
       if (key == null) {
         key = crypto.randomUUID()
       }
       optimisticState[key] = {
-        ...originalItems[i],
+        ...item,
         ...typeof optimistic === 'object' ? optimistic : {},
         $overrideKey: key,
       }
     }
-    layer = {
+    const layer: CacheLayer = {
       id: crypto.randomUUID(),
       collectionName: collection.name,
       state: optimisticState,
@@ -84,12 +75,12 @@ export async function createMany<
         delete: true,
       },
     }
-    store.$cache.addLayer(layer)
+    optimisticLayer.add(layer)
   }
 
   try {
     let aborted = false
-    const _abort = store.$hooks.withAbort()
+    const _abort = store.$hooks.withAbort({ explicit: true })
     const abort = () => {
       _abort()
       aborted = true
@@ -98,7 +89,7 @@ export async function createMany<
       store: store as unknown as GlobalStoreType,
       meta,
       collection,
-      items,
+      items: transportItems,
       getResult: () => result,
       setResult: (newResult, options) => {
         result = newResult as Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
@@ -107,18 +98,21 @@ export async function createMany<
         }
       },
       abort,
-    })
+    }, _abort)
 
     // In case the createMany didn't abort (= wasn't handled), we call createItem for each item
     if (!aborted) {
-      await Promise.all(items.map(async (item) => {
+      // The per-item calls stay concurrent, so their results are collected by
+      // input index instead of by completion: the returned rows, and the
+      // per-item hooks reading them back, stay aligned with the sent items.
+      const singleResults: Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | undefined> = await Promise.all(transportItems.map(async (transportItem) => {
         let singleResult: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | undefined
-        const abort = store.$hooks.withAbort()
+        const abort = store.$hooks.withAbort({ explicit: true })
         await store.$hooks.callHook('createItem', {
           store: store as unknown as GlobalStoreType,
           meta,
           collection,
-          item,
+          item: transportItem,
           getResult: () => singleResult,
           setResult: (newResult, options) => {
             singleResult = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
@@ -127,31 +121,36 @@ export async function createMany<
             }
           },
           abort,
-        })
+        }, abort)
 
+        return singleResult
+      }))
+
+      for (const singleResult of singleResults) {
+        // An item no plugin answered contributes nothing.
         if (singleResult) {
           result.push(singleResult)
         }
-      }))
+      }
     }
 
     const commitResult = await finalizeMutation(store, {
       meta,
       collection,
       mutation: 'create',
-      items,
+      items: transportItems,
       results: result,
       skipCache,
     }, {
       emitItemHooks: !aborted,
-      onBeforeApplyCache: removeOptimisticLayer,
+      onBeforeApplyCache: optimisticLayer.remove,
     })
 
     result = commitResult.results as Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> ?? []
   }
   catch (error) {
     // Rollback optimistic layer in case of error
-    removeOptimisticLayer()
+    optimisticLayer.remove()
     throw error
   }
 

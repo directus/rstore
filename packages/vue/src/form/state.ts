@@ -130,7 +130,7 @@ export function removeInternalRelationData<TData extends Record<string, any>, TS
     }
     cleanData[key] = value
   }
-  return cleanData as Partial<TData>
+  return pickNonSpecialProps(cleanData, true) as Partial<TData>
 }
 
 /**
@@ -139,6 +139,7 @@ export function removeInternalRelationData<TData extends Record<string, any>, TS
 export function queueChange<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
   ctx: FormObjectRuntime<TData, TSchema, TResult>,
 ) {
+  ctx.validationId++
   if (ctx.changeQueued)
     return
   ctx.changeQueued = true
@@ -146,8 +147,10 @@ export function queueChange<TData extends Record<string, any>, TSchema extends S
     ctx.changeQueued = false
     ctx.onChange.trigger(ctx.changedSinceLastHandled)
     ctx.changedSinceLastHandled = {}
+    const validationId = ctx.validationId
     const { issues } = await ctx.form.$schema['~standard'].validate(pickFormData(ctx))
-    ctx.form.$valid = !issues
+    if (validationId === ctx.validationId)
+      ctx.form.$valid = !issues
   })
 }
 
@@ -262,7 +265,7 @@ export function snapshotFormOperation<TData extends Record<string, any>, TSchema
       oldValue: pickRelationRawPayload(op.oldValue, true, true),
     }
   }
-  return { ...op }
+  return pickNonSpecialProps(op, true) as FormOperation<TData>
 }
 
 /**

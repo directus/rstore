@@ -1,6 +1,6 @@
-import type { Collection, CollectionDefaults, ResolvedCollection, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/shared'
 import { describe, expect, it } from 'vitest'
-import { defaultGetKey, defaultIsInstanceOf, normalizeCollectionRelations, resolveCollections } from '../src/collection'
+import { defaultGetKey, defaultIsInstanceOf, normalizeCollectionRelations, resolveCollections } from '../src'
 
 describe('default get key', () => {
   it('should return id if present', () => {
@@ -248,7 +248,7 @@ describe('collection fields isolation', () => {
 
 describe('normalizeCollectionRelations', () => {
   it('should normalize relations defined with collection function', () => {
-    const collections = [
+    const result = resolveCollections([
       {
         name: 'TestCollection',
         relations: {
@@ -262,11 +262,12 @@ describe('normalizeCollectionRelations', () => {
             },
           },
         },
-        normalizedRelations: {},
       },
-    ] as unknown as ResolvedCollection[]
+      {
+        name: 'Test2',
+      },
+    ])
 
-    const result = collections.slice()
     normalizeCollectionRelations(result)
     expect(result[0]!.normalizedRelations).toEqual({
       test: {

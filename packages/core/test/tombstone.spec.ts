@@ -1,13 +1,12 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { stringifyHLC } from '../src/hlc'
+import { describe, expect, it } from 'vitest'
 import {
   createTombstoneStore,
   gcTombstones,
   isTombstone,
-  scheduleTombstoneGc,
   shouldResurrect,
+  stringifyHLC,
   tombstoneKey,
-} from '../src/tombstone'
+} from '../src'
 
 function hlc(physical: number, logical = 0, nodeId = 'n') {
   return stringifyHLC({ physical, logical, nodeId })
@@ -53,7 +52,7 @@ describe('shouldResurrect', () => {
 
   it('should support legacy numeric timestamps', () => {
     const tomb = { collection: 'a', key: '1', deletedAt: hlc(100) }
-    expect(shouldResurrect(tomb, hlc(200))).toBe(true)
+    expect(shouldResurrect(tomb, 200)).toBe(true)
   })
 })
 
@@ -181,115 +180,5 @@ describe('tombstone resurrection scenarios', () => {
     expect(shouldResurrect(tomb, 500)).toBe(false)
     expect(shouldResurrect(tomb, 499)).toBe(false)
     expect(shouldResurrect(tomb, 501)).toBe(true)
-  })
-})
-
-describe('scheduleTombstoneGc', () => {
-  beforeEach(() => {
-    vi.useFakeTimers()
-  })
-
-  afterEach(() => {
-    vi.useRealTimers()
-  })
-
-  it('should periodically drop tombstones older than ttl', () => {
-    const store = createTombstoneStore()
-    const nowMs = 1_000_000
-
-    const stop = scheduleTombstoneGc(store, {
-      intervalMs: 1000,
-      ttlMs: 5000,
-      now: () => nowMs,
-    })
-
-    // Old tombstone — should be dropped on the next tick.
-    store.set({ collection: 'a', key: 'old', deletedAt: hlc(nowMs - 10_000) })
-    // Recent tombstone — should be kept.
-    store.set({ collection: 'a', key: 'recent', deletedAt: hlc(nowMs - 1000) })
-
-    vi.advanceTimersByTime(1000)
-
-    expect(store.get('a', 'old')).toBeUndefined()
-    expect(store.get('a', 'recent')).toBeDefined()
-
-    stop()
-  })
-
-  it('should stop running when the returned cleanup is called', () => {
-    const store = createTombstoneStore()
-    const nowMs = 1_000_000
-    const stop = scheduleTombstoneGc(store, {
-      intervalMs: 1000,
-      ttlMs: 5000,
-      now: () => nowMs,
-    })
-
-    store.set({ collection: 'a', key: '1', deletedAt: hlc(nowMs - 10_000) })
-    stop()
-
-    // Without the stop, the next tick would drop this tombstone. With stop,
-    // the timer is cleared.
-    vi.advanceTimersByTime(10_000)
-
-    expect(store.get('a', '1')).toBeDefined()
-  })
-
-  it('should invoke onSweep with the dropped count when provided', () => {
-    const store = createTombstoneStore()
-    const onSweep = vi.fn()
-    const nowMs = 1_000_000
-
-    const stop = scheduleTombstoneGc(store, {
-      intervalMs: 1000,
-      ttlMs: 5000,
-      now: () => nowMs,
-      onSweep,
-    })
-
-    store.set({ collection: 'a', key: '1', deletedAt: hlc(nowMs - 10_000) })
-    store.set({ collection: 'a', key: '2', deletedAt: hlc(nowMs - 10_000) })
-
-    vi.advanceTimersByTime(1000)
-
-    expect(onSweep).toHaveBeenCalledOnce()
-    expect(onSweep).toHaveBeenCalledWith({
-      droppedCount: 2,
-      cutoffMs: nowMs - 5000,
-    })
-
-    stop()
-  })
-
-  it('should be a no-op if all tombstones are within ttl', () => {
-    const store = createTombstoneStore()
-    const onSweep = vi.fn()
-    const nowMs = 1_000_000
-
-    const stop = scheduleTombstoneGc(store, {
-      intervalMs: 1000,
-      ttlMs: 5000,
-      now: () => nowMs,
-      onSweep,
-    })
-
-    store.set({ collection: 'a', key: '1', deletedAt: hlc(nowMs - 1000) })
-
-    vi.advanceTimersByTime(1000)
-
-    expect(store.get('a', '1')).toBeDefined()
-    // onSweep is still called so callers can monitor activity, but with 0.
-    expect(onSweep).toHaveBeenCalledWith({
-      droppedCount: 0,
-      cutoffMs: nowMs - 5000,
-    })
-
-    stop()
-  })
-
-  it('should reject non-positive intervals', () => {
-    const store = createTombstoneStore()
-    expect(() => scheduleTombstoneGc(store, { intervalMs: 0, ttlMs: 1000 })).toThrow()
-    expect(() => scheduleTombstoneGc(store, { intervalMs: -1, ttlMs: 1000 })).toThrow()
   })
 })

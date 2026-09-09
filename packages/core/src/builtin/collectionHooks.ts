@@ -53,7 +53,10 @@ export const builtinCollectionHooksPlugin = definePlugin({
     hook('updateMany', async ({ collection, items, setResult, abort }) => {
       if (collection.hooks?.updateMany) {
         abort()
-        setResult(await collection.hooks.updateMany({ items }))
+        // Core keeps `{ key, item }` entries internally so it can route each
+        // result back to its request. Collection hooks are public API though:
+        // their type promises the plain mutation items, never those internals.
+        setResult(await collection.hooks.updateMany({ items: items.map(({ item }) => item) }))
       }
     })
 

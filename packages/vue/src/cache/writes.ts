@@ -1,29 +1,32 @@
 import type { Cache, Collection, CollectionDefaults, CustomCacheState, ResolvedCollection, StoreSchema } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { CacheRuntime } from './types'
-import { isKeyDefined, mergeItemFields, shouldResurrect } from '@rstore/core'
+import { mergeItemFields, shouldResurrect } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { markRaw, ref, shallowRef } from 'vue'
-import { ensureCollectionRef, getItemWrapKey, invalidateCollectionStateCache, mark } from './context'
+import { ensureCollectionRef, getItemWrapKey, invalidateCollectionStateCache, mark, removeFieldTimestampsForItem } from './context'
+import { restoreCausality } from './hydration'
 import { removeItemIndexes, updateItemIndexes } from './indexes'
 import { clearAllQueryState } from './queryState'
+import { resolveRelationWriteParams } from './relationWrite'
 
 /** Delete an item immediately without going through the pause queue. */
 export function deleteItemNow<TCollection extends Collection>(
   ctx: CacheRuntime,
   collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
   key: string | number,
-) {
+): boolean {
   const collectionState = ensureCollectionRef(ctx, collection.name).value
   const item = collectionState[key]
   if (!item) {
-    return
+    return false
   }
 
   removeItemIndexes(ctx, collection, key, item)
   invalidateCollectionStateCache(ctx, collection.name)
   delete collectionState[key]
   invalidateCollectionStateCache(ctx, collection.name)
+  removeFieldTimestampsForItem(ctx, collection.name, key)
 
   const wrapKey = getItemWrapKey(collection, key, undefined)
   ctx.wrappedItems.delete(wrapKey)
@@ -37,6 +40,7 @@ export function deleteItemNow<TCollection extends Collection>(
     key,
     operation: 'delete',
   })
+  return true
 }
 
 /** Write a related nested item before linking it from its parent. */
@@ -48,23 +52,7 @@ export function writeItemForRelationNow({
   childItem,
   meta,
 }: Parameters<Cache['writeItemForRelation']>[0] & { ctx: CacheRuntime }) {
-  const store = ctx.getStore()
-  const possibleCollections = Object.keys(relation.to)
-  const nestedItemCollection = store.$getCollection(childItem, possibleCollections)
-  if (!nestedItemCollection) {
-    throw new Error(`Could not determine type for relation ${parentCollection.name}.${String(relationKey)}`)
-  }
-  const nestedKey = nestedItemCollection.getKey(childItem)
-  if (!isKeyDefined(nestedKey)) {
-    throw new Error(`Could not determine key for relation ${parentCollection.name}.${String(relationKey)}`)
-  }
-
-  writeItemNow(ctx, {
-    collection: nestedItemCollection,
-    key: nestedKey,
-    item: childItem,
-    meta,
-  })
+  writeItemNow(ctx, resolveRelationWriteParams(ctx, { parentCollection, relationKey, relation, childItem, meta }))
 }
 
 /** Write an item immediately without going through the pause queue. */
@@ -116,6 +104,11 @@ export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeI
 export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
   ctx.state.markers = value.markers || {}
 
+  // Replacing the state means replacing everything derived from it. Indexes
+  // are rebuilt below from the incoming items; leaving the old buckets in
+  // place made a relation read return items the payload no longer had.
+  ctx.state.collectionIndexes.clear()
+
   const newCollectionsState: Record<string, Ref<Record<string | number, any>>> = {}
   for (const collectionName in value.collections) {
     const collection = ctx.getStore().$collections.find(c => c.name === collectionName)
@@ -140,6 +133,8 @@ export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
     newModulesState[moduleKey] = ref(value.modules[moduleKey])
   }
   ctx.state.modules = newModulesState
+
+  restoreCausality(ctx, value)
 
   ctx.wrappedItems.clear()
   ctx.wrappedItemsMetadata.clear()
@@ -196,9 +191,8 @@ function writeMutableItem(ctx: CacheRuntime, params: Parameters<Cache['writeItem
   }
 
   const existing = collectionState[key]
-  updateItemIndexes(ctx, collection, key, existing, data)
-
   if (!existing) {
+    updateItemIndexes(ctx, collection, key, undefined, data)
     collectionState[key] = shallowRef(markRaw(data))
     if (params.fieldTimestamps) {
       ensureCollectionTimestamps(ctx, collection.name).set(key, { ...params.fieldTimestamps })
@@ -208,6 +202,7 @@ function writeMutableItem(ctx: CacheRuntime, params: Parameters<Cache['writeItem
     mergeTimestampedItem(ctx, params, collectionState, existing, data)
   }
   else {
+    updateItemIndexes(ctx, collection, key, existing, data)
     collectionState[key] = markRaw({
       ...existing,
       ...data,
@@ -249,6 +244,8 @@ function mergeTimestampedItem(ctx: CacheRuntime, params: Parameters<Cache['write
     localTimestamps,
     params.fieldTimestamps!,
   )
+  // Rejected remote fields must not change relation membership.
+  updateItemIndexes(ctx, params.collection, params.key, existing, merged)
   collectionTs.set(params.key, mergedTimestamps)
   collectionState[params.key] = markRaw(merged)
 

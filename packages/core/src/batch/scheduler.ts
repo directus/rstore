@@ -1,4 +1,4 @@
-import type { BatchOptions, CustomHookMeta, FindOptions, ResolvedCollection, StoreCore } from '@rstore/shared'
+import type { BatchOptions, CustomHookMeta, FindOptions, FormOperation, ResolvedCollection, StoreCore } from '@rstore/shared'
 import type { GroupState } from './group'
 import { flushAll } from './flushAll'
 import { clearGroupTimers, createGroupState } from './group'
@@ -17,6 +17,8 @@ export interface BatchEntry {
   findOptions?: FindOptions<any, any, any>
   item?: any
   meta: CustomHookMeta
+  /** Form operations of the mutation call this entry came from. */
+  formOperations?: FormOperation[]
   resolve: (result: any) => void
   reject: (error: Error) => void
 }
@@ -83,8 +85,9 @@ export class BatchScheduler {
     item: any,
     meta: CustomHookMeta,
     group: string = DEFAULT_GROUP,
+    formOperations?: FormOperation[],
   ): Promise<any> {
-    return this.enqueue({ type: 'create', collection, item, meta }, group)
+    return this.enqueue({ type: 'create', collection, item, meta, formOperations }, group)
   }
 
   /** Enqueue an update mutation into the batch. */
@@ -94,8 +97,9 @@ export class BatchScheduler {
     item: any,
     meta: CustomHookMeta,
     group: string = DEFAULT_GROUP,
+    formOperations?: FormOperation[],
   ): Promise<any> {
-    return this.enqueue({ type: 'update', collection, key, item, meta }, group)
+    return this.enqueue({ type: 'update', collection, key, item, meta, formOperations }, group)
   }
 
   /** Enqueue a delete mutation into the batch. */

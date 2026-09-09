@@ -8,7 +8,7 @@ import { computed, getCurrentInstance, onServerPrefetch, ref, shallowRef, toValu
 import { onWindowFocus } from '../swr'
 import { useQueryTracking } from '../tracking'
 import { loadPage } from './load'
-import { createPage, getPageId, getPageOptions } from './page'
+import { createPage, getPageId, getPageOptions, hasUncachedPage } from './page'
 import { createFetchState, getFetchStateError, isFetchStateLoading, toQueryFetchState } from './state'
 
 /**
@@ -22,12 +22,19 @@ export function createQuery<
   TResult,
 >(options: VueCreateQueryOptions<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>): HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>> {
   const ctx = createQueryContext(options)
+  // In-flight responses may still fill the shared cache after unmount, but
+  // must never publish a page or reacquire ownership for this dead consumer.
+  tryOnScopeDispose(() => {
+    ctx.disposed = true
+  })
   ctx.mainPage = createPage(ctx, {}, true)
   ctx.result = computed(() => mergePages(ctx))
+  ctx.cacheRead = computed(() => ctx.cacheMethod(ctx.getOptions(), { ...ctx.meta.value }) ?? null)
   ctx.cached = computed(() => readCachedResult(ctx))
-  ctx.queryTracking = ctx.queryTrackingEnabled
-    ? useQueryTracking({ store: ctx.store, result: ctx.result, cached: ctx.cached })
-    : null
+  ctx.queryTracking = ctx.store.$isServer
+    ? null
+    : useQueryTracking({ store: ctx.store, result: ctx.result, cached: ctx.cached })
+  ctx.updateQueryTrackingMode()
 
   // `data` is read by the `loading` aggregate, so it has to exist first.
   const data = ctx.queryTracking?.filteredCached ?? ctx.cached
@@ -65,18 +72,31 @@ export function createQuery<
     // the main one: resetting the state of a page without fetching it again would leave it claiming
     // it was never loaded. Any other load means the options changed, which makes those pages
     // meaningless.
+    const previousPages = ctx.pages.value.filter(Boolean)
     const otherPages = forceFetch
       ? ctx.pages.value.filter(page => page && page !== ctx.mainPage)
       : []
+    if (!forceFetch) {
+      for (const page of previousPages) {
+        if (!ctx.pendingTrackingPageIds.includes(page.id)) {
+          ctx.pendingTrackingPageIds.push(page.id)
+        }
+      }
+    }
     // A page the caller left out is re-registered untouched: not loading it is precisely the reason
     // not to reset it.
     const shouldLoad = (index: number) => pageIndexes == null || pageIndexes.includes(index)
     ctx.pages.value = []
     const pageOptions = getPageOptions(ctx, ctx.mainPage)
     const index = pageOptions.pageIndex ?? 0
+    const previousMainId = ctx.mainPage.id
+    const nextMainId = getPageId(ctx, index)
+    if (forceFetch && previousMainId !== nextMainId) {
+      ctx.queryTracking?.releasePage(previousMainId, { collect: true })
+    }
     ctx.mainPage.index = index
     ctx.pages.value[index] = ctx.mainPage
-    ctx.mainPage.id = getPageId(ctx, index)
+    ctx.mainPage.id = nextMainId
     const promises: Array<Promise<unknown>> = []
     if (shouldLoad(index)) {
       ctx.mainPage.requestId = crypto.randomUUID()
@@ -120,8 +140,12 @@ export function createQuery<
     return page
   }
 
+  /** Load a page while superseding any earlier load of the same page. */
   function fetchMore(optionsExtension: Partial<TOptions>) {
     const page = getPage(optionsExtension)
+    // Indexed pages can be loaded again while an earlier fetch is still pending.
+    // Give this load the same supersession protection as an explicit refresh.
+    page.requestId = crypto.randomUUID()
     const nextPromise = loadPage(ctx, page, false) as HybridPromise<{ page: any }>
     Object.assign(nextPromise, { page })
     return nextPromise
@@ -161,14 +185,23 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
   }
   const getAutoRefresh = () => options.store.$resolveFindOptions(options.getCollection(), getOptions() ?? {}, options.many, { ...meta.value }).fetchOptions.autoRefresh
   const initialResolvedOptions = options.store.$resolveFindOptions(options.getCollection(), getOptions() ?? {}, options.many, meta.value)
-  const queryTrackingEnabled = !options.store.$isServer && initialResolvedOptions.fetchPolicy !== 'no-cache' && (
-    options.store.$experimentalGarbageCollection
+  const getQueryTrackingEnabled = () => {
+    if (options.store.$isServer || isDisabled()) {
+      return false
+    }
+    const resolved = options.store.$resolveFindOptions(options.getCollection(), getOptions() ?? {}, options.many, meta.value)
+    if (resolved.fetchPolicy === 'no-cache') {
+      return false
+    }
+    return options.store.$experimentalGarbageCollection
       ? getOptions()?.experimentalGarbageCollection !== false
       : getOptions()?.experimentalGarbageCollection === true
-  )
+  }
 
   const ctx = {
     ...options,
+    /** Whether the owning effect scope has stopped. */
+    disposed: false,
     cache,
     queryId,
     meta,
@@ -177,19 +210,27 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     getAutoRefresh,
     fetchPolicy: initialResolvedOptions.fetchPolicy,
     resultMode: initialResolvedOptions.resultMode,
-    queryTrackingEnabled,
+    queryTrackingEnabled: getQueryTrackingEnabled(),
     pages: ref<any[]>([]),
     foreground: createFetchState(),
     background: createFetchState(),
     mainPage: null as any,
     mainPagePromise: null as Promise<unknown> | null,
     result: null as any,
+    /** Plain cache read of the query options, the source of computed pages. */
+    cacheRead: null as any,
     cached: null as any,
     queryTracking: null as any,
+    updateQueryTrackingMode: () => {},
+    pendingTrackingPageIds: [] as string[],
     returnObject: null as any,
     getPageOptions: null as any,
   }
   ctx.getPageOptions = (page: any) => getPageOptions(ctx, page)
+  ctx.updateQueryTrackingMode = () => {
+    ctx.queryTrackingEnabled = getQueryTrackingEnabled()
+    ctx.queryTracking?.setEnabled(ctx.queryTrackingEnabled)
+  }
   return ctx
 }
 
@@ -216,10 +257,14 @@ function mergePages(ctx: any) {
 
 /**
  * Read current cache data for the query when policy allows it.
+ *
+ * The rows of a page fetched with `no-cache` are not in the cache, so a query
+ * holding such a page aggregates its pages instead: reading the cache alone
+ * would drop them from the result.
  */
 function readCachedResult(ctx: any) {
-  if (ctx.fetchPolicy !== 'no-cache' && ctx.resultMode !== 'responseRefs') {
-    return ctx.cacheMethod(ctx.getOptions(), { ...ctx.meta.value }) ?? null
+  if (ctx.fetchPolicy !== 'no-cache' && ctx.resultMode !== 'responseRefs' && !hasUncachedPage(ctx)) {
+    return ctx.cacheRead.value
   }
   return ctx.result.value
 }
@@ -244,6 +289,7 @@ function watchOptions(ctx: any, loadMainPage: () => unknown) {
   watch(() => toValue(ctx.options), (value) => {
     if (!deepEqual(value, previousOptions)) {
       previousOptions = klona(value)
+      ctx.updateQueryTrackingMode()
       loadMainPage()
     }
   }, { deep: true })

@@ -1,0 +1,49 @@
+{
+  // The integration layer is type-checked here rather than per package.
+  //
+  // `packages/{core,shared,directus,monospace,nuxt-drizzle}/tsconfig.json`
+  // exclude `test/integration` because those suites import `@rstore/vue`
+  // sources, which only resolve in their own package context. This project
+  // maps every `@rstore/*` specifier to package sources — the same aliases the
+  // `integration` vitest project uses — so the suites can be checked together.
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    "paths": {
+      "#test-utils/*": [
+        "./test/utils/*"
+      ],
+      "@rstore/core": [
+        "./packages/core/src/index.ts"
+      ],
+      "@rstore/shared": [
+        "./packages/shared/src/index.ts"
+      ],
+      "@rstore/vue": [
+        "./packages/vue/src/index.ts"
+      ],
+      "@rstore/connector-toolkit": [
+        "./packages/connector-toolkit/src/index.ts"
+      ]
+    },
+    "strict": true,
+    "noImplicitOverride": true,
+    "noImplicitThis": true,
+    "noUncheckedIndexedAccess": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "packages/*/test/integration/**/*.ts",
+    "test/utils/**/*.ts"
+  ],
+  "exclude": [
+    // Nuxt-Drizzle owns its source-backed integration typecheck in
+    // `packages/nuxt-drizzle/tsconfig.integration.json`, where generated
+    // runtime modules have exact declarations and Bundler resolution.
+    "packages/nuxt-drizzle/test/integration/**"
+  ]
+}

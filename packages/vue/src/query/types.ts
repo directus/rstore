@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, HybridPromise, ResolvedCollection, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FetchPolicy, FindOptions, HybridPromise, ResolvedCollection, StoreSchema } from '@rstore/shared'
 import type { MaybeRefOrGetter, Raw, Ref, ShallowRef } from 'vue'
 import type { VueStore } from '../store'
 
@@ -138,6 +138,14 @@ export interface VueQueryPage<
   /** @private */
   _background: FetchStateController
   options: VueQueryPageOptions<TOptions>
+  /**
+   * Fetch policy resolved for the load that produced `rawData`, or `null` while
+   * the page has never been loaded. A `no-cache` page holds rows the cache does
+   * not contain, so it cannot be represented by cache references.
+   *
+   * @private
+   */
+  _fetchPolicy: FetchPolicy | null
   rawData: VueQueryRawData<TResult>
   data: TResult
 }

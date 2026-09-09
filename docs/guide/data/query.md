@@ -354,6 +354,8 @@ Changing the query options is a different query instead: the pages of the previo
 
 All the first consecutive pages data will be reactively computed from the cache, while other "scarce" pages will hold in memory a list of item keys instead - meaning that the list will not be reactive to added items (but it will still react to updates and deletes).
 
+A page fetched with `fetchPolicy: 'no-cache'` keeps its response in memory and breaks that consecutive cached sequence. Later cached pages retain item references, and the full query result includes the uncached page. Refresh respects each page's resolved fetch policy; switching a page to `no-cache` releases its previous cache ownership.
+
 For example, if you fetch the pages 0 and 1, their respective `data` properties will be computed from the cache using `pageIndex` and `pageSize`. If you then fetch the page 3, its `data` property will also be computed from the cache, but the items will only be looked up by their keys stored in the page result and not dynamically from `pageIndex` and `pageSize`.
 
 If you need the full query result to preserve the exact order returned by the backend, use `resultMode: 'responseRefs'`. In that mode, rstore keeps the fetched list as refs and maps those refs back to cached items, so updates and deletes still stay reactive without recomputing the list from cache order.

@@ -200,6 +200,8 @@ hook('batchFetch', async (payload) => {
 
 Called once per `(collection, mutation type)` group with every unresolved mutation op.
 
+Create and update operations carry `op.formOperations` when the caller supplied a form operation log. Handle these operations alongside `op.item` to persist relation changes. Each operation keeps its own log through unified `batch`, `batchMutate`, and individual-hook fallback.
+
 ```ts
 hook('batchMutate', async (payload) => {
   if (payload.collection.name !== 'Todo')

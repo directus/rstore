@@ -1,5 +1,6 @@
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { finalizeMutation } from './finalizeMutation'
+import { assertMutationAllowed, createOptimisticLayerLifecycle } from './optimistic'
 
 export interface DeleteManyOptions<
   TCollection extends Collection,
@@ -25,14 +26,7 @@ export async function deleteMany<
   optimistic = true,
 }: DeleteManyOptions<TCollection, TCollectionDefaults, TSchema>): Promise<void> {
   for (const key of keys) {
-    const item = store.$cache.readItem({ collection, key })
-    if (item?.$layer) {
-      const layer = item.$layer as CacheLayer
-      if (layer.prevent?.delete) {
-        console.error(layer)
-        throw new Error(`Item deletion prevented by the layer: ${layer.id}`)
-      }
-    }
+    assertMutationAllowed(store, collection, key, 'delete')
   }
 
   const meta: CustomHookMeta = {}
@@ -46,27 +40,21 @@ export async function deleteMany<
     setItems: () => {},
   })
 
-  let layer: CacheLayer | undefined
-  const removeOptimisticLayer = () => {
-    if (layer) {
-      store.$cache.removeLayer(layer.id)
-      layer = undefined
-    }
-  }
+  const optimisticLayer = createOptimisticLayerLifecycle(store)
 
   if (!skipCache && optimistic) {
-    layer = {
+    const layer: CacheLayer = {
       id: crypto.randomUUID(),
       collectionName: collection.name,
       state: {},
       deletedItems: new Set(keys),
       optimistic: true,
     }
-    store.$cache.addLayer(layer)
+    optimisticLayer.add(layer)
   }
 
   try {
-    const _abort = store.$hooks.withAbort()
+    const _abort = store.$hooks.withAbort({ explicit: true })
     let aborted = false
     const abort = () => {
       aborted = true
@@ -78,18 +66,18 @@ export async function deleteMany<
       collection,
       keys,
       abort,
-    })
+    }, _abort)
 
     if (!aborted) {
       await Promise.all(keys.map(async (key) => {
-        const abort = store.$hooks.withAbort()
+        const abort = store.$hooks.withAbort({ explicit: true })
         await store.$hooks.callHook('deleteItem', {
           store: store as unknown as GlobalStoreType,
           meta,
           collection,
           key,
           abort,
-        })
+        }, abort)
       }))
     }
 
@@ -101,12 +89,12 @@ export async function deleteMany<
       skipCache,
     }, {
       emitItemHooks: !aborted,
-      onBeforeApplyCache: removeOptimisticLayer,
+      onBeforeApplyCache: optimisticLayer.remove,
     })
   }
   catch (error) {
     // Rollback optimistic layer in case of error
-    removeOptimisticLayer()
+    optimisticLayer.remove()
     throw error
   }
 }

@@ -1,4 +1,4 @@
-import type { CollectionDefaults, HookPayload, Plugin, PluginCategory, RegisteredPlugin, StoreCore, StoreSchema } from '@rstore/shared'
+import type { Awaitable, CollectionDefaults, HookPayload, Plugin, PluginCategory, RegisteredPlugin, StoreCore, StoreSchema } from '@rstore/shared'
 
 const mergedCollectionDefaultsFields = [
   'computed',
@@ -9,11 +9,23 @@ const deepMergedCollectionDefaultsFields = [
   'fields',
 ] as Array<keyof CollectionDefaults>
 
-export async function setupPlugin<
+/**
+ * Runs a plugin's `setup`, returning whatever it returned.
+ *
+ * Deliberately not an `async function`: that would wrap even a synchronous
+ * `setup` in a promise, and the caller awaiting it would push every later
+ * plugin into a microtask — where framework composables that need the
+ * caller's synchronous context (Nuxt's `useNuxtApp`) no longer resolve.
+ *
+ * @param store Store the plugin is registered on.
+ * @param plugin The plugin to set up.
+ * @returns A promise when the plugin's `setup` is async, otherwise nothing.
+ */
+export function setupPlugin<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
->(store: StoreCore<TSchema, TCollectionDefaults>, plugin: RegisteredPlugin) {
-  await plugin.setup({
+>(store: StoreCore<TSchema, TCollectionDefaults>, plugin: RegisteredPlugin): Awaitable<void> {
+  return plugin.setup({
     hook(name, callback, options) {
       plugin.hooks[name] ??= []
       plugin.hooks[name].push({ callback, options })
@@ -72,8 +84,26 @@ const pluginCategories: PluginCategory[] = [
 
 export function sortPlugins(plugins: RegisteredPlugin[]): RegisteredPlugin[] {
   const pluginByName = new Map<string, RegisteredPlugin>()
-  const beforeRelations = new Map<string, Set<string>>()
   const afterRelations = new Map<string, Set<string>>()
+
+  /**
+   * Records that one plugin must run before another.
+   *
+   * The depth-first traversal reads dependencies from the dependent plugin,
+   * so this stores only that reverse adjacency.
+   *
+   * @param beforeName Plugin that must run first.
+   * @param afterName Plugin that depends on it.
+   */
+  function addPluginOrder(beforeName: string, afterName: string): void {
+    const dependencies = afterRelations.get(afterName)
+    if (dependencies) {
+      dependencies.add(beforeName)
+    }
+    else {
+      afterRelations.set(afterName, new Set([beforeName]))
+    }
+  }
 
   // Cache plugins by category for better performance
   const pluginsByCategory = new Map<PluginCategory, RegisteredPlugin[]>()
@@ -88,30 +118,14 @@ export function sortPlugins(plugins: RegisteredPlugin[]): RegisteredPlugin[] {
     // Process 'before' relationships (highest priority)
     if (plugin.before?.plugins) {
       for (const beforeName of plugin.before.plugins) {
-        if (!beforeRelations.has(plugin.name)) {
-          beforeRelations.set(plugin.name, new Set())
-        }
-        beforeRelations.get(plugin.name)!.add(beforeName)
-
-        if (!afterRelations.has(beforeName)) {
-          afterRelations.set(beforeName, new Set())
-        }
-        afterRelations.get(beforeName)!.add(plugin.name)
+        addPluginOrder(plugin.name, beforeName)
       }
     }
 
     // Process 'after' relationships (highest priority)
     if (plugin.after?.plugins) {
       for (const afterName of plugin.after.plugins) {
-        if (!afterRelations.has(plugin.name)) {
-          afterRelations.set(plugin.name, new Set())
-        }
-        afterRelations.get(plugin.name)!.add(afterName)
-
-        if (!beforeRelations.has(afterName)) {
-          beforeRelations.set(afterName, new Set())
-        }
-        beforeRelations.get(afterName)!.add(plugin.name)
+        addPluginOrder(afterName, plugin.name)
       }
     }
 
@@ -121,15 +135,7 @@ export function sortPlugins(plugins: RegisteredPlugin[]): RegisteredPlugin[] {
         const categoryPlugins = pluginsByCategory.get(beforeCategory as PluginCategory) || []
         for (const p of categoryPlugins) {
           if (p.name !== plugin.name) {
-            if (!beforeRelations.has(plugin.name)) {
-              beforeRelations.set(plugin.name, new Set())
-            }
-            beforeRelations.get(plugin.name)!.add(p.name)
-
-            if (!afterRelations.has(p.name)) {
-              afterRelations.set(p.name, new Set())
-            }
-            afterRelations.get(p.name)!.add(plugin.name)
+            addPluginOrder(plugin.name, p.name)
           }
         }
       }
@@ -141,15 +147,7 @@ export function sortPlugins(plugins: RegisteredPlugin[]): RegisteredPlugin[] {
         const categoryPlugins = pluginsByCategory.get(afterCategory as PluginCategory) || []
         for (const p of categoryPlugins) {
           if (p.name !== plugin.name) {
-            if (!afterRelations.has(plugin.name)) {
-              afterRelations.set(plugin.name, new Set())
-            }
-            afterRelations.get(plugin.name)!.add(p.name)
-
-            if (!beforeRelations.has(p.name)) {
-              beforeRelations.set(p.name, new Set())
-            }
-            beforeRelations.get(p.name)!.add(plugin.name)
+            addPluginOrder(p.name, plugin.name)
           }
         }
       }
@@ -166,15 +164,7 @@ export function sortPlugins(plugins: RegisteredPlugin[]): RegisteredPlugin[] {
 
     for (const current of currentPlugins) {
       for (const next of nextPlugins) {
-        if (!beforeRelations.has(current.name)) {
-          beforeRelations.set(current.name, new Set())
-        }
-        beforeRelations.get(current.name)!.add(next.name)
-
-        if (!afterRelations.has(next.name)) {
-          afterRelations.set(next.name, new Set())
-        }
-        afterRelations.get(next.name)!.add(current.name)
+        addPluginOrder(current.name, next.name)
       }
     }
   }

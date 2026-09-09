@@ -57,6 +57,10 @@ function processQueuedOperation(ctx: CacheRuntime, operation: QueuedOperation) {
 }
 
 function processQueuedWriteItem(ctx: CacheRuntime, operation: Extract<QueuedOperation, { type: 'writeItem' }>) {
+  // A paused or staggered write can outlive the query that queued it.
+  if (operation.params.meta?.$canPublishQuery?.() === false) {
+    return true
+  }
   if (!canProcessQueuedWrite(ctx)) {
     return false
   }
@@ -66,6 +70,10 @@ function processQueuedWriteItem(ctx: CacheRuntime, operation: Extract<QueuedOper
 }
 
 function processQueuedWriteItems(ctx: CacheRuntime, operation: Extract<QueuedOperation, { type: 'writeItems' }>) {
+  // Discard stale pages together with their marker and notification.
+  if (operation.params.meta?.$canPublishQuery?.() === false) {
+    return true
+  }
   while (operation.index < operation.params.items.length) {
     if (!canProcessQueuedWrite(ctx)) {
       return false

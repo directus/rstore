@@ -3,6 +3,14 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "Node",
+    // The shared test helpers in `test/utils/`, imported as `#test-utils/…`.
+    // Resolved relative to this file: under `moduleResolution: "Node"`, `paths`
+    // is consulted before any `imports`-field handling, so no `baseUrl` is needed.
+    "paths": {
+      "#test-utils/*": [
+        "../../test/utils/*"
+      ]
+    },
     "strict": true,
     "noImplicitOverride": true,
     "noImplicitThis": true,

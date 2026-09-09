@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { applyTextChanges, createFieldTimestamps, diffFields, diffText, fieldValuesEqual, mergeItemFields, mergeText, rebaseTextPosition, rebaseTextRange, touchFields } from '../src/crdt'
+import { applyTextChanges, createFieldTimestamps, diffFields, diffText, fieldValuesEqual, mergeItemFields, mergeText, rebaseTextPosition, rebaseTextRange, touchFields } from '../src'
 
 /** Supported Temporal object tags used by the equality regression tests. */
 type TemporalTestTag = 'Temporal.PlainDateTime' | 'Temporal.ZonedDateTime'

@@ -20,6 +20,23 @@ export interface InternalBatchMutationOperation extends BatchMutationOperation {
 }
 
 /**
+ * Reject each operation a failed batch hook did not already settle.
+ *
+ * @param operations Operations owned by the failed hook tier.
+ * @param error Original thrown value, forwarded unchanged to each operation.
+ */
+export function rejectUnresolved(
+  operations: readonly (InternalBatchFetchOperation | InternalBatchMutationOperation)[],
+  error: unknown,
+): void {
+  for (const operation of operations) {
+    if (!operation.resolved) {
+      operation.setError(error as Error)
+    }
+  }
+}
+
+/**
  * Build a per-operation fetch handle from a queued `BatchEntry`.
  *
  * The returned object exposes the public `BatchFetchOperation` API to plugins
@@ -63,6 +80,9 @@ export function createFetchOperation(entry: BatchEntry): InternalBatchFetchOpera
  * Callers (`createItem`/`updateItem`/`deleteItem`) own the parse + cache
  * reconciliation pass, so this helper resolves entries with the raw item
  * returned by the plugin (no unwrap, no parse).
+ *
+ * Grouping happens per collection and mutation type, so the form operations
+ * stay on the operation they were submitted with rather than on the batch.
  */
 export function createMutationOperation(entry: BatchEntry): InternalBatchMutationOperation {
   const op: InternalBatchMutationOperation = {
@@ -71,6 +91,7 @@ export function createMutationOperation(entry: BatchEntry): InternalBatchMutatio
     key: entry.key,
     item: entry.item,
     meta: entry.meta,
+    formOperations: entry.formOperations,
     resolved: false,
     setResult(item) {
       if (op.resolved) {

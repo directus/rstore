@@ -1,10 +1,10 @@
 import type { Collection, CollectionDefaults, CustomHookMeta, FindManyOptions, FindOptions, GlobalStoreType, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem, WriteItem } from '@rstore/shared'
-import { dedupePromise } from '@rstore/shared'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { unwrapItem } from '../item'
 import { isKeyDefined } from '../key'
 import { stringifyFindOptions } from '../utils/findOptions'
+import { dedupeQuery } from './dedupe'
 import { peekMany } from './peekMany'
 
 export interface FindManyParams<
@@ -31,7 +31,9 @@ export async function findMany<
   collection,
   findOptions,
 }: FindManyParams<TCollection, TCollectionDefaults, TSchema>): Promise<QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>>> {
-  if (findOptions?.dedupe === false) {
+  meta ??= findOptions?.meta ?? {}
+  findOptions = store.$resolveFindOptions(collection, findOptions ?? {}, true, meta)
+  if (findOptions.dedupe === false) {
     return _findMany({
       store,
       meta,
@@ -43,7 +45,7 @@ export async function findMany<
   // Function-aware serialization: queries that differ only by a function
   // option (e.g. `filter`) must not share the same in-flight promise
   const dedupeKey = stringifyFindOptions(findOptions)
-  return dedupePromise(store.$dedupePromises, `findMany:${collection.name}:${dedupeKey}`, () => _findMany({
+  return dedupeQuery(store.$dedupePromises, `findMany:${collection.name}:${dedupeKey}`, meta, meta => _findMany({
     store,
     meta,
     collection,
@@ -60,11 +62,7 @@ async function _findMany<
   meta,
   collection,
   findOptions,
-}: FindManyParams<TCollection, TCollectionDefaults, TSchema>): Promise<QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>>> {
-  meta ??= findOptions?.meta ?? {}
-  findOptions ??= {}
-
-  findOptions = store.$resolveFindOptions(collection, findOptions, true, meta)
+}: FindManyParams<TCollection, TCollectionDefaults, TSchema> & { findOptions: FindManyOptions<TCollection, TCollectionDefaults, TSchema>, meta: CustomHookMeta }): Promise<QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>>> {
   const fetchPolicy = findOptions.fetchPolicy
 
   let result: any[] | undefined
@@ -99,7 +97,7 @@ async function _findMany<
         },
       })
 
-      const abort = store.$hooks.withAbort()
+      const abort = store.$hooks.withAbort({ explicit: true })
       await store.$hooks.callHook('fetchMany', {
         store: store as unknown as GlobalStoreType,
         meta,
@@ -116,7 +114,7 @@ async function _findMany<
           marker = value
         },
         abort,
-      })
+      }, abort)
 
       await store.$hooks.callHook('afterFetch', {
         store: store as unknown as GlobalStoreType,
@@ -141,7 +139,7 @@ async function _findMany<
 
         result = newResult
 
-        if (fetchPolicy !== 'no-cache') {
+        if (fetchPolicy !== 'no-cache' && meta.$canPublishQuery?.() !== false) {
           const items = result
           const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
           for (const item of items) {
@@ -180,8 +178,8 @@ async function _findMany<
     meta.$queryTracking.skipped = true
   }
 
-  if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
-    const abort = store.$hooks.withAbort()
+  if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy) && meta.$canPublishQuery?.() !== false) {
+    const abort = store.$hooks.withAbort({ explicit: true })
     await store.$hooks.callHook('fetchRelations', {
       store: store as unknown as GlobalStoreType,
       meta,
@@ -190,14 +188,14 @@ async function _findMany<
       many: true,
       getResult: () => result,
       abort,
-    })
+    }, abort)
   }
 
   if (result?.length) {
     result = result.map((item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => store.$cache.wrapItem({
       collection,
       item,
-      noCache: fetchPolicy === 'no-cache',
+      noCache: fetchPolicy === 'no-cache' || meta.$canPublishQuery?.() === false,
     }))
   }
 

@@ -1,6 +1,7 @@
 import type { Hooks } from '../utils/hooks'
 import type { Cache } from './cache'
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionList, StoreSchema } from './collection'
+import type { FormOperation } from './formOperation'
 import type { CustomHookMeta } from './hooks'
 import type { ResolvedModule } from './module'
 import type { MutateCallback, MutateOptions, MutationOperation, MutationSpecialProps } from './mutation'
@@ -12,14 +13,18 @@ import type { FetchPolicy, FindOptions, QueryFetchOptions, QueryResultMode } fro
  *
  * Each `enqueue*` accepts an optional `group` name. Operations sharing the same
  * group are flushed together; different groups have independent queues + timers.
+ *
+ * The mutation methods also carry the `formOperations` of their call, so a
+ * batched mutation reaches connectors with the same relational edits a direct
+ * one does.
  */
 export interface BatchScheduler {
   /** Enqueue a findFirst-by-key operation into the batch */
   enqueueFetchFirst: (collection: ResolvedCollection, key: string | number, findOptions: FindOptions<any, any, any>, meta: CustomHookMeta, group?: string) => Promise<any>
   /** Enqueue a create mutation into the batch */
-  enqueueCreate: (collection: ResolvedCollection, item: any, meta: CustomHookMeta, group?: string) => Promise<any>
+  enqueueCreate: (collection: ResolvedCollection, item: any, meta: CustomHookMeta, group?: string, formOperations?: FormOperation[]) => Promise<any>
   /** Enqueue an update mutation into the batch */
-  enqueueUpdate: (collection: ResolvedCollection, key: string | number, item: any, meta: CustomHookMeta, group?: string) => Promise<any>
+  enqueueUpdate: (collection: ResolvedCollection, key: string | number, item: any, meta: CustomHookMeta, group?: string, formOperations?: FormOperation[]) => Promise<any>
   /** Enqueue a delete mutation into the batch */
   enqueueDelete: (collection: ResolvedCollection, key: string | number, meta: CustomHookMeta, group?: string) => Promise<void>
   /** The resolved batching configuration */

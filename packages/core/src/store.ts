@@ -1,11 +1,12 @@
-import type { BatchingConfig, Cache, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, Hooks, MutationSpecialProps, Plugin, QueryFetchOptions, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import type { Awaitable, BatchingConfig, Cache, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, Hooks, MutationSpecialProps, Plugin, QueryFetchOptions, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { get, set } from '@rstore/shared'
 import { createBatchScheduler } from './batch'
 import { builtinCollectionHooksPlugin } from './builtin/collectionHooks'
-import { addCollectionRelations, isCollectionRelations, mergeCollectionDefaultsFields, normalizeCollectionRelations, resolveCollectionOppositeRelations, resolveCollections } from './collection'
+import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollectionOppositeRelations, resolveCollections } from './collection'
 import { defaultFetchPolicy } from './fetchPolicy'
 import { mutate } from './mutation/mutate'
 import { setupPlugin, sortPlugins } from './plugin'
+import { applyPluginCollectionDefaults } from './pluginCollectionDefaults'
 import { createSync, getLastSyncedAt } from './sync'
 
 export interface CreateStoreCoreOptions<
@@ -31,6 +32,19 @@ export interface CreateStoreCoreOptions<
 
 const resolvedFindOptionsMarker = Symbol('resolvedFindOptions')
 const defaultResultMode = 'computed'
+
+/**
+ * Tells a promise-compatible value apart from a synchronous one.
+ *
+ * Structural on purpose: `value instanceof Promise` is false for a native
+ * promise built in another JS realm, such as a `node:vm` context, which is
+ * still a supported `Promise<void>` return.
+ *
+ * @param value Value to test, typically what a plugin's `setup` returned.
+ */
+function isThenable<T>(value: Awaitable<T>): value is Promise<T> {
+  return typeof (value as Promise<T> | undefined)?.then === 'function'
+}
 
 export async function createStoreCore<
   TSchema extends StoreSchema = StoreSchema,
@@ -163,11 +177,25 @@ export async function createStoreCore<
 
   // Setup plugins
 
-  store.$plugins.forEach(plugin => setupPlugin(store, plugin))
+  // Sequential, and awaited only when a plugin's `setup` is actually async.
+  //
+  // `$plugins.forEach(...)` dropped the returned promise, so a rejecting
+  // `setup` never failed `createStore` (it surfaced as an unhandled rejection)
+  // and an `addCollectionDefaults` call made after an `await` landed too late
+  // for the merge below. Awaiting unconditionally is not the fix either: it
+  // would move every plugin after the first into a microtask, and a plugin
+  // whose `setup` is synchronous may rely on the caller's synchronous context
+  // (`useNuxtApp` in the Nuxt connectors).
+  for (const plugin of store.$plugins) {
+    const setupResult = setupPlugin(store, plugin)
+    if (isThenable(setupResult)) {
+      await setupResult
+    }
+  }
 
-  // Propagate field defaults added by plugins (via `addCollectionDefaults`)
-  // to the collections that were resolved before the plugins ran
-  mergeCollectionDefaultsFields(store.$collections, store.$collectionDefaults)
+  // Plugins run after collection resolution. Refresh only default-derived
+  // properties while retaining collection and relation object identities.
+  applyPluginCollectionDefaults(store.$collections, options.schema, store.$collectionDefaults)
 
   // Init store hook
 

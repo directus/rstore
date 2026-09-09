@@ -1,5 +1,6 @@
 import type { CustomHookMeta, GlobalStoreType, StoreCore } from '@rstore/shared'
 import type { InternalBatchMutationOperation } from './operations'
+import { rejectUnresolved } from './operations'
 
 /**
  * Flush a set of per-collection/per-type mutation operations.
@@ -32,11 +33,7 @@ export async function flushMutationBatch(
     })
   }
   catch (error) {
-    for (const op of operations) {
-      if (!op.resolved) {
-        op.setError(error as Error)
-      }
-    }
+    rejectUnresolved(operations, error)
     return
   }
 
@@ -55,6 +52,9 @@ export async function flushMutationBatch(
  * Delete resolves with `undefined`; create/update resolve with the raw item
  * returned by the hook. Callers (`createItem` / `updateItem`) own parsing and
  * cache reconciliation, so nothing is transformed here.
+ *
+ * The op's own `formOperations` travel with it, so a batch falling back to the
+ * individual hook hands over the same relational edits a direct call would.
  */
 async function dispatchIndividualMutation(
   store: StoreCore<any, any>,
@@ -62,21 +62,21 @@ async function dispatchIndividualMutation(
 ): Promise<void> {
   try {
     if (op.type === 'delete') {
-      const abort = store.$hooks.withAbort()
+      const abort = store.$hooks.withAbort({ explicit: true })
       await store.$hooks.callHook('deleteItem', {
         store: store as unknown as GlobalStoreType,
         meta: op.meta,
         collection: op.collection,
         key: op.key!,
         abort,
-      })
+      }, abort)
       op.setResult(undefined)
       return
     }
 
     if (op.type === 'create') {
       let result: any
-      const abort = store.$hooks.withAbort()
+      const abort = store.$hooks.withAbort({ explicit: true })
       await store.$hooks.callHook('createItem', {
         store: store as unknown as GlobalStoreType,
         meta: op.meta,
@@ -90,14 +90,15 @@ async function dispatchIndividualMutation(
           }
         },
         abort,
-      })
+        formOperations: op.formOperations,
+      }, abort)
       op.setResult(result)
       return
     }
 
     // update
     let result: any
-    const abort = store.$hooks.withAbort()
+    const abort = store.$hooks.withAbort({ explicit: true })
     await store.$hooks.callHook('updateItem', {
       store: store as unknown as GlobalStoreType,
       meta: op.meta,
@@ -112,7 +113,8 @@ async function dispatchIndividualMutation(
         }
       },
       abort,
-    })
+      formOperations: op.formOperations,
+    }, abort)
     op.setResult(result)
   }
   catch (error) {

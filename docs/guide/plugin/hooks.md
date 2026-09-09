@@ -565,6 +565,8 @@ hook('batchMutate', async (payload) => {
 
 For `create` and `update`, resolve each op with `op.setResult(returnedItem)`. For `delete`, `op.setResult(undefined)` is enough to mark the op handled. Unresolved ops fall back to the individual `createItem` / `updateItem` / `deleteItem` hooks.
 
+Each create/update operation also exposes `op.formOperations` when supplied by the caller. These logs remain separate for mutations grouped into one batch and reach individual hooks unchanged on fallback.
+
 ## Cache lifecycle
 
 ### afterCacheWrite

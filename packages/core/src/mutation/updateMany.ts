@@ -3,6 +3,7 @@ import { pickNonSpecialProps } from '@rstore/shared'
 import { isKeyDefined } from '../key'
 import { peekMany } from '../query'
 import { finalizeMutation } from './finalizeMutation'
+import { assertMutationAllowed, createOptimisticLayerLifecycle, prepareMutationItems } from './optimistic'
 
 export interface UpdateManyOptions<
   TCollection extends Collection,
@@ -29,48 +30,45 @@ export async function updateMany<
 }: UpdateManyOptions<TCollection, TCollectionDefaults, TSchema>): Promise<Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>> {
   const meta: CustomHookMeta = {}
 
-  const originalItems = items
-  const allKeys = new Set<string | number>()
+  let preparedItems: ReturnType<typeof prepareMutationItems<TCollection, TCollectionDefaults, TSchema>> = []
 
+  /** Rebuild aligned wire entries, optimistic values, and validated keys after a hook replacement. */
   function getItemsWithKey(items: Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>) {
-    return items.map((item) => {
-      const key = collection.getKey(item)
+    const keys = new Set<string | number>()
+    const layerItems: Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>> = []
+    preparedItems = prepareMutationItems(store, collection, items, preparedItems)
+    const entries = preparedItems.map((prepared) => {
+      const key = collection.getKey(prepared.optimisticItem)
       if (!isKeyDefined(key)) {
         throw new Error('Item update failed: key is not defined')
       }
-      allKeys.add(key)
+      keys.add(key)
 
-      // Check if existing item has a layer that prevents update
-      const existingItem = store.$cache.readItem({ collection, key })
-      if (existingItem?.$layer) {
-        const layer = existingItem.$layer as CacheLayer
-        if (layer.prevent?.update) {
-          console.error(layer)
-          throw new Error(`Item update prevented by the layer: ${layer.id}`)
-        }
-      }
+      assertMutationAllowed(store, collection, key, 'update')
 
-      // Serialize the cloned copy so the caller's original item is not mutated
-      // and the serialized values are the ones sent to hooks/adapters
-      const processedItem = pickNonSpecialProps(item, true) as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
-      store.$processItemSerialization(collection, processedItem)
+      layerItems.push(prepared.optimisticItem)
       return {
         key,
-        item: processedItem,
+        item: prepared.transportItem,
       }
     })
+    return { entries, keys, layerItems }
   }
 
-  let itemsWithKey = getItemsWithKey(items)
-
+  let { entries: itemsWithKey, keys: allKeys, layerItems } = getItemsWithKey(items)
+  const transportItems = itemsWithKey.map(entry => entry.item)
   await store.$hooks.callHook('beforeManyMutation', {
     store: store as unknown as GlobalStoreType,
     meta,
     collection,
     mutation: 'update',
-    items: itemsWithKey,
+    items: transportItems,
     setItems: (newItems) => {
-      itemsWithKey = getItemsWithKey(newItems as Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>)
+      const prepared = getItemsWithKey(newItems as Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>)
+      itemsWithKey = prepared.entries
+      allKeys = prepared.keys
+      layerItems = prepared.layerItems
+      transportItems.splice(0, transportItems.length, ...itemsWithKey.map(entry => entry.item))
     },
   })
 
@@ -83,7 +81,7 @@ export async function updateMany<
       findOptions: {
         filter: (item) => {
           const key = collection.getKey(item)
-          return key && allKeys.has(key)
+          return isKeyDefined(key) && allKeys.has(key)
         },
       },
     }).result
@@ -92,19 +90,12 @@ export async function updateMany<
     result = result.map(item => pickNonSpecialProps(item) as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>)
   }
 
-  let layer: CacheLayer | undefined
-  const removeOptimisticLayer = () => {
-    if (layer) {
-      store.$cache.removeLayer(layer.id)
-      layer = undefined
-    }
-  }
+  const optimisticLayer = createOptimisticLayerLifecycle(store)
 
   if (!skipCache && optimistic) {
     const optimisticState: Record<string, any> = {}
-    for (const i in itemsWithKey) {
-      const { key } = itemsWithKey[i]!
-      const originalItem = originalItems[i]!
+    for (const [i, { key }] of itemsWithKey.entries()) {
+      const originalItem = layerItems[i]!
       const optimisticOverride = Array.isArray(optimistic) ? optimistic[i] : {}
       optimisticState[key] = {
         ...originalItem,
@@ -112,7 +103,7 @@ export async function updateMany<
         $overrideKey: key,
       }
     }
-    layer = {
+    const layer: CacheLayer = {
       id: crypto.randomUUID(),
       collectionName: collection.name,
       state: optimisticState,
@@ -120,11 +111,11 @@ export async function updateMany<
       optimistic: true,
     }
 
-    store.$cache.addLayer(layer)
+    optimisticLayer.add(layer)
   }
 
   try {
-    const _abort = store.$hooks.withAbort()
+    const _abort = store.$hooks.withAbort({ explicit: true })
     let aborted = false
     const abort = () => {
       _abort()
@@ -143,14 +134,14 @@ export async function updateMany<
         }
       },
       abort,
-    })
+    }, _abort)
 
     // If the operation wasn't aborted (= wasn't handled), we perform updateItem for each item
     if (!aborted) {
       await Promise.all(itemsWithKey.map(async ({ key, item }) => {
         let singleResult: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | undefined
 
-        const abort = store.$hooks.withAbort()
+        const abort = store.$hooks.withAbort({ explicit: true })
         await store.$hooks.callHook('updateItem', {
           store: store as unknown as GlobalStoreType,
           meta,
@@ -165,7 +156,7 @@ export async function updateMany<
             }
           },
           abort,
-        })
+        }, abort)
 
         if (singleResult) {
           const index = result.findIndex(r => collection.getKey(r) === key)
@@ -191,7 +182,7 @@ export async function updateMany<
       skipCache,
     }, {
       emitItemHooks: !aborted,
-      onBeforeApplyCache: removeOptimisticLayer,
+      onBeforeApplyCache: optimisticLayer.remove,
     })
 
     result = commitResult.results as Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> ?? []
@@ -210,7 +201,7 @@ export async function updateMany<
   }
   catch (error) {
     // Rollback optimistic layer in case of error
-    removeOptimisticLayer()
+    optimisticLayer.remove()
     throw error
   }
 

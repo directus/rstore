@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { get, isPublicKey, pickNonSpecialProps, pickSpecialProps, set } from '../../src/utils/obj.js'
+import { get, isPublicKey, pickNonSpecialProps, pickSpecialProps, set } from '../../src'
 
 describe('get', () => {
   it('should return the value at the given path', () => {
@@ -94,5 +94,117 @@ describe('pickSpecialProps', () => {
   it('should return the same object if all properties start with $', () => {
     const obj = { $a: 1, $b: 2 }
     expect(pickSpecialProps(obj)).toEqual({ $a: 1, $b: 2 })
+  })
+})
+
+describe('set prototype safety', () => {
+  it('should not pollute Object.prototype through a __proto__ path segment (field paths are user data)', () => {
+    const target: Record<string, any> = {}
+    try {
+      set(target, '__proto__.polluted' as any, 'yes' as never)
+
+      expect(({} as any).polluted).toBeUndefined()
+      expect(target.polluted).toBeUndefined()
+    }
+    finally {
+      delete (Object.prototype as any).polluted
+    }
+  })
+
+  it('should not pollute Object.prototype through a constructor path segment (reachable from mutation/update.ts field paths)', () => {
+    const target: Record<string, any> = {}
+    try {
+      set(target, 'constructor.prototype.polluted' as any, 'yes' as never)
+
+      expect(({} as any).polluted).toBeUndefined()
+    }
+    finally {
+      delete (Object.prototype as any).polluted
+    }
+  })
+})
+
+describe('set intermediate segments', () => {
+  it('should create a plain object for a numeric segment instead of an array', () => {
+    const obj: Record<string, any> = {}
+
+    set(obj, 'a.0.b' as any, 42 as never)
+
+    // Documented shape: `set` never infers an array from a numeric segment, so
+    // a field path like `items.0.title` produces `{ '0': { title } }`.
+    expect(Array.isArray(obj.a)).toBe(false)
+    expect(obj.a).toEqual({ 0: { b: 42 } })
+  })
+
+  it('should replace a null intermediate with an object', () => {
+    const obj: Record<string, any> = { a: null }
+
+    set(obj, 'a.b' as any, 1 as never)
+
+    expect(obj.a).toEqual({ b: 1 })
+  })
+})
+
+describe('get edge paths', () => {
+  it('should return undefined when the path crosses a null value', () => {
+    expect(get({ a: null } as any, 'a.b' as any)).toBeUndefined()
+    expect(get({ a: { b: undefined } } as any, 'a.b.c' as any)).toBeUndefined()
+  })
+
+  it('should read through a primitive instead of stopping at it', () => {
+    // Only `null`/`undefined` short-circuit, so a path crossing a string keeps
+    // walking and resolves the string's own properties.
+    expect(get({ a: 'text' } as any, 'a.length' as any)).toBe(4)
+    expect(get({ a: 'text' } as any, 'a.b' as any)).toBeUndefined()
+    expect(get({ a: 1 } as any, 'a.b' as any)).toBeUndefined()
+  })
+
+  it('should propagate an error thrown by a getter on the path', () => {
+    const obj = {
+      get a(): { b: number } {
+        throw new Error('getter exploded')
+      },
+    }
+
+    expect(() => get(obj as any, 'a.b' as any)).toThrowError(/getter exploded/)
+  })
+})
+
+describe('isPublicKey edges', () => {
+  it('should classify prefixed string keys', () => {
+    expect(isPublicKey('$')).toBe(false)
+    expect(isPublicKey('_$')).toBe(false)
+    expect(isPublicKey('_private')).toBe(true)
+    expect(isPublicKey('')).toBe(true)
+  })
+
+  it('should never reject a non-string key', () => {
+    const symbol = Symbol('$loading')
+    expect(isPublicKey(symbol)).toBe(true)
+    expect(isPublicKey(0)).toBe(true)
+  })
+})
+
+describe('pickNonSpecialProps cloning', () => {
+  it('should detach nested values when cloning', () => {
+    const source = { nested: { list: [1, 2] }, date: new Date(1000) }
+
+    const copy = pickNonSpecialProps(source, true)
+    source.nested.list.push(3)
+
+    expect(copy.nested).not.toBe(source.nested)
+    expect(copy.nested.list).toEqual([1, 2])
+    expect(copy.date).toEqual(new Date(1000))
+    expect(copy.date).not.toBe(source.date)
+  })
+
+  it('should keep references when not cloning', () => {
+    const source = { nested: { list: [1, 2] } }
+
+    const copy = pickNonSpecialProps(source)
+    source.nested.list.push(3)
+
+    expect(copy.nested).toBe(source.nested)
+    expect(copy.nested.list).toEqual([1, 2, 3])
   })
 })

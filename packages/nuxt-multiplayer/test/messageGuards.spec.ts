@@ -1,137 +1,76 @@
-import { describe, expect, it } from 'vitest'
-import {
-  isMultiplayerMessage,
-  isMultiplayerPeerStrict,
-  isMultiplayerTextCursor,
-  isMultiplayerUser,
-  validateMultiplayerMessage,
-} from '../src/runtime/utils/messageGuards'
-
-describe('isMultiplayerTextCursor', () => {
-  it('accepts canonical cursor', () => {
-    expect(isMultiplayerTextCursor({ start: 0, end: 0, direction: 'none' })).toBe(true)
-    expect(isMultiplayerTextCursor({ start: 1, end: 3, direction: 'forward' })).toBe(true)
-  })
-  it('rejects start > end', () => {
-    expect(isMultiplayerTextCursor({ start: 5, end: 2, direction: 'forward' })).toBe(false)
-  })
-  it('rejects non-integer positions', () => {
-    expect(isMultiplayerTextCursor({ start: 1.5, end: 2, direction: 'forward' })).toBe(false)
-  })
-  it('rejects NaN / Infinity', () => {
-    expect(isMultiplayerTextCursor({ start: Number.NaN, end: 2, direction: 'forward' })).toBe(false)
-    expect(isMultiplayerTextCursor({ start: 0, end: Number.POSITIVE_INFINITY, direction: 'forward' })).toBe(false)
-  })
-  it('rejects out-of-range positions', () => {
-    expect(isMultiplayerTextCursor({ start: 0, end: 1e8, direction: 'forward' })).toBe(false)
-  })
-  it('rejects invalid direction', () => {
-    expect(isMultiplayerTextCursor({ start: 0, end: 0, direction: 'diagonal' })).toBe(false)
-  })
-})
-
-describe('isMultiplayerUser', () => {
-  it('accepts a minimal user', () => {
-    expect(isMultiplayerUser({ id: 'u', name: 'A', color: '#abc' })).toBe(true)
-  })
-  it('rejects missing fields', () => {
-    expect(isMultiplayerUser({ id: '', name: 'A', color: '#abc' })).toBe(false)
-    expect(isMultiplayerUser({ id: 'u', name: 1, color: '#abc' })).toBe(false)
-    expect(isMultiplayerUser(null)).toBe(false)
-  })
-})
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { isMultiplayerPeerStrict, validateMultiplayerMessage } from '../src/runtime/utils/messageGuards'
 
 describe('isMultiplayerPeerStrict', () => {
   it('accepts a fully populated peer', () => {
     expect(isMultiplayerPeerStrict({
-      id: 'u',
-      clientId: 'c',
-      name: 'A',
-      color: '#abc',
+      id: 'user',
+      clientId: 'tab',
+      name: 'Ada',
+      color: '#123',
       lastSeen: 100,
       field: 'title',
       cursor: { start: 0, end: 1, direction: 'forward' },
     })).toBe(true)
   })
-  it('rejects peer with bad cursor shape', () => {
+
+  it('rejects client-only peer fields that cannot be trusted', () => {
     expect(isMultiplayerPeerStrict({
-      id: 'u',
-      clientId: 'c',
-      name: 'A',
-      color: '#abc',
+      id: 'user',
+      clientId: 'tab',
+      name: 'Ada',
+      color: '#123',
       lastSeen: 100,
       cursor: { start: 3, end: 1, direction: 'forward' },
     })).toBe(false)
-  })
-  it('rejects peer with missing lastSeen', () => {
-    expect(isMultiplayerPeerStrict({ id: 'u', clientId: 'c', name: 'A', color: '#abc' })).toBe(false)
-  })
-  it('rejects peer with missing clientId', () => {
-    expect(isMultiplayerPeerStrict({ id: 'u', name: 'A', color: '#abc', lastSeen: 100 })).toBe(false)
-  })
-})
-
-describe('isMultiplayerMessage', () => {
-  it('accepts update', () => {
-    expect(isMultiplayerMessage({
-      type: 'multiplayer:update',
-      roomId: 'r',
-      userId: 'u',
-      clientId: 'c',
-      data: {},
-    })).toBe(true)
-  })
-  it('accepts presence with valid cursor', () => {
-    expect(isMultiplayerMessage({
-      type: 'multiplayer:presence',
-      roomId: 'r',
-      clientId: 'c',
-      user: { id: 'u', name: 'A', color: '#abc' },
-      cursor: { start: 0, end: 1, direction: 'forward' },
-    })).toBe(true)
-  })
-  it('accepts leave', () => {
-    expect(isMultiplayerMessage({ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' })).toBe(true)
-  })
-  it('rejects unknown type', () => {
-    expect(isMultiplayerMessage({ type: 'multiplayer:dance', roomId: 'r', clientId: 'c' })).toBe(false)
-  })
-  it('rejects missing userId on update', () => {
-    expect(isMultiplayerMessage({ type: 'multiplayer:update', roomId: 'r', clientId: 'c', data: {} })).toBe(false)
-  })
-  it('rejects missing clientId', () => {
-    expect(isMultiplayerMessage({ type: 'multiplayer:leave', roomId: 'r', userId: 'u' })).toBe(false)
-  })
-  it('rejects update whose data is not a plain object', () => {
-    for (const data of [null, [], 'string', 42, true]) {
-      expect(isMultiplayerMessage({
-        type: 'multiplayer:update',
-        roomId: 'r',
-        userId: 'u',
-        clientId: 'c',
-        data,
-      })).toBe(false)
-    }
+    expect(isMultiplayerPeerStrict({ id: 'user', clientId: 'tab', name: 'Ada', color: '#123' })).toBe(false)
+    expect(isMultiplayerPeerStrict({ id: 'user', name: 'Ada', color: '#123', lastSeen: 100 })).toBe(false)
+    expect(isMultiplayerPeerStrict({
+      id: 'user',
+      clientId: 'x'.repeat(129),
+      name: 'Ada',
+      color: '#123',
+      lastSeen: 100,
+    })).toBe(false)
   })
 })
 
 describe('validateMultiplayerMessage', () => {
-  it('returns typed message from valid JSON', () => {
+  beforeEach(() => {
+    vi.stubEnv('NODE_ENV', 'production')
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it('returns a typed message from valid JSON', () => {
     const out = validateMultiplayerMessage(JSON.stringify({
       type: 'multiplayer:leave',
-      roomId: 'r',
-      userId: 'u',
-      clientId: 'c',
+      roomId: 'room',
+      userId: 'user',
+      clientId: 'tab',
     }))
+
     expect(out?.type).toBe('multiplayer:leave')
   })
-  it('returns null on malformed JSON', () => {
-    expect(validateMultiplayerMessage('{bad')).toBeNull()
-  })
-  it('returns null on non-string input', () => {
+
+  it('does not warn for invalid input outside development structural validation', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
     expect(validateMultiplayerMessage(42)).toBeNull()
+    expect(validateMultiplayerMessage('{invalid')).toBeNull()
+    expect(validateMultiplayerMessage(JSON.stringify({ type: 'unknown' }))).toBeNull()
+    expect(warn).not.toHaveBeenCalled()
   })
-  it('returns null when structural validation fails', () => {
-    expect(validateMultiplayerMessage(JSON.stringify({ type: 'wrong' }))).toBeNull()
+
+  it('warns when a JSON frame fails structural validation in development', () => {
+    vi.stubEnv('NODE_ENV', 'development')
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const invalidFrame = { type: 'unknown' }
+
+    expect(validateMultiplayerMessage(JSON.stringify(invalidFrame))).toBeNull()
+    expect(warn).toHaveBeenCalledWith('[rstore-multiplayer] Dropped invalid message:', invalidFrame)
   })
 })

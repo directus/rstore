@@ -1,7 +1,34 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, StoreSchema } from '@rstore/shared'
 import type { CacheRuntime } from './types'
-import { ref } from 'vue'
+import { isKeyDefined } from '@rstore/core'
+import { ref, toValue } from 'vue'
 import { getCollectionIndex } from './context'
+
+/** Reads the effective collection state, including every active cache layer. */
+export type CollectionStateReader = (collectionName: string) => Record<string | number, any>
+
+/** Rebuild every relation index from visible cached items after schema changes. */
+export function rebuildIndexes(ctx: CacheRuntime, readCollectionState: CollectionStateReader) {
+  ctx.state.collectionIndexes.clear()
+
+  for (const collection of ctx.getStore().$collections) {
+    const items = readCollectionState(collection.name)
+
+    for (const item of Object.values(items)) {
+      const data = toValue(item)
+      if (!data) {
+        continue
+      }
+      const key = collection.getKey(data)
+      if (!isKeyDefined(key)) {
+        continue
+      }
+      // Resolve the collection key before applying the same canonical index
+      // identity used by live writes and hydrated rows.
+      updateItemIndexes(ctx, collection, key, undefined, data)
+    }
+  }
+}
 
 /** Remove an item from every index it previously occupied. */
 export function removeItemIndexes<TCollection extends Collection>(
@@ -15,7 +42,7 @@ export function removeItemIndexes<TCollection extends Collection>(
     const previousValue = indexFields.map(f => item[f]).join(':')
     const existingKeys = index.get(previousValue)
     if (existingKeys) {
-      existingKeys.value.delete(key)
+      existingKeys.value.delete(String(key))
     }
   }
 }
@@ -40,7 +67,7 @@ export function updateItemIndexes<TCollection extends Collection>(
         const previousValue = values.join(':')
         const existingKeys = index.get(previousValue)
         if (existingKeys) {
-          existingKeys.value.delete(key)
+          existingKeys.value.delete(String(key))
         }
       }
     }
@@ -56,7 +83,9 @@ export function updateItemIndexes<TCollection extends Collection>(
         existingKeys = ref(new Set())
         index.set(newValue, existingKeys)
       }
-      existingKeys.value.add(key)
+      // Index membership follows object-backed cache identity, including keys
+      // restored from a snapshot and later addressed through numeric APIs.
+      existingKeys.value.add(String(key))
     }
   }
 }

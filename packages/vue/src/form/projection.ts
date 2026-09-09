@@ -1,6 +1,7 @@
 import type { Collection, CollectionDefaults, FormOperation, ResolvedCollection, StoreSchema } from '@rstore/shared'
 import { leafFieldName } from './utils/fieldPath'
 import { itemsMatch } from './utils/items'
+import { forEachRelationSourceField } from './utils/relationFields'
 
 /**
  * Apply a single operation to a projected form state.
@@ -88,9 +89,7 @@ function applyDisconnect<TData extends Record<string, any>>(
     return
   }
 
-  for (const to of relation.to) {
-    for (const [, sourceField] of Object.entries(to.on)) {
-      target[leafFieldName(sourceField as string)] = null
-    }
-  }
+  forEachRelationSourceField(relation, (field) => {
+    target[field] = null
+  })
 }

@@ -26,6 +26,7 @@ export function createFormObject<
       ctx.initialData = await getResetInitialData(ctx)
       ctx.opLog.length = 0
       ctx.redoStack.length = 0
+      ctx.undoneOps = new WeakSet()
       rebuildFormFromBase(ctx)
     },
     async $submit() {
@@ -72,11 +73,13 @@ export function createFormObject<
 async function submitForm<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
   ctx: ReturnType<typeof createFormRuntime<TData, TSchema, TResult>>,
 ) {
+  const submissionId = ++ctx.submissionId
+  ctx.pendingSubmits++
   ctx.form.$loading = true
   ctx.form.$error = null
   try {
     const submittedBaseData = pickFormData(ctx, true)
-    const submittedOpCount = ctx.opLog.length
+    const submittedOps = new Set(ctx.opLog)
     const submittedOperations = snapshotFormOperations(ctx)
     const submittedFormOperations = optimizeOpLog(submittedOperations, ctx.options.collection)
     const transformedData = ctx.options.transformData
@@ -95,18 +98,19 @@ async function submitForm<TData extends Record<string, any>, TSchema extends Sta
 
     const item = await ctx.options.submit(data, { formOperations: submittedFormOperations as FormOperation<TData>[] })
     ctx.onSuccess.trigger(item)
-    if (ctx.options.resetOnSuccess ?? true) {
-      await rebasePendingSubmitEdits(ctx, submittedOpCount, submittedBaseData)
+    if ((ctx.options.resetOnSuccess ?? true) && submissionId === ctx.submissionId) {
+      await rebasePendingSubmitEdits(ctx, submittedOps, submittedBaseData, () => submissionId === ctx.submissionId)
     }
     return item
   }
   catch (error: any) {
-    ctx.form.$error = error
+    if (submissionId === ctx.submissionId)
+      ctx.form.$error = error
     ctx.onError.trigger(error)
     throw error
   }
   finally {
-    ctx.form.$loading = false
+    ctx.form.$loading = --ctx.pendingSubmits > 0
   }
 }
 

@@ -3,24 +3,38 @@ import type { FormObjectRuntime } from './context'
 import { diffFields, mergeText } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { getResetInitialData, rebuildState } from './state'
+import { buildUndoneSubmitOps } from './undoneEdits'
 
 /**
  * Reset after submit while keeping edits made after submit began.
  */
 export async function rebasePendingSubmitEdits<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
   ctx: FormObjectRuntime<TData, TSchema, TResult>,
-  submittedOpCount: number,
+  submittedOps: Set<FormOperation<TData>>,
   submittedBaseData: Partial<TData>,
+  isCurrent: () => boolean,
 ) {
   const nextInitialData = await getResetInitialData(ctx)
-  const pendingOps = ctx.opLog.slice(submittedOpCount).map((op) => {
+  if (!isCurrent())
+    return
+  // An undo of a submitted operation leaves no inverse in the log, so it is
+  // rebuilt against the acknowledged data before the log is rewritten.
+  const undoneOps = buildUndoneSubmitOps(ctx, submittedOps, submittedBaseData)
+  // Reset and undo can remove the submitted prefix; operation identity keeps
+  // subsequent edits independent of their current position in the log.
+  const rebasedFields = new Set<keyof TData>()
+  const pendingOps = ctx.opLog.filter(op => !submittedOps.has(op)).map((op) => {
     const pendingOp = { ...op }
+    if (pendingOp.type === 'set' && !rebasedFields.has(pendingOp.field)) {
+      pendingOp.oldValue = submittedBaseData[pendingOp.field]
+      rebasedFields.add(pendingOp.field)
+    }
     if (ctx.relationPayloadSetOps.has(op))
       ctx.relationPayloadSetOps.add(pendingOp)
     return pendingOp
   })
   ctx.opLog.length = 0
-  ctx.opLog.push(...pendingOps)
+  ctx.opLog.push(...undoneOps, ...pendingOps)
   ctx.redoStack.length = 0
   ctx.initialData = pickNonSpecialProps(submittedBaseData, true) as Partial<TData>
   rebaseForm(ctx, nextInitialData)

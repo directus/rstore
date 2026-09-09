@@ -1,5 +1,6 @@
 import type { CustomHookMeta, GlobalStoreType, StoreCore } from '@rstore/shared'
 import type { InternalBatchFetchOperation } from './operations'
+import { rejectUnresolved } from './operations'
 
 /**
  * Flush a set of per-collection fetch operations.
@@ -35,11 +36,7 @@ export async function flushFetchBatch(
   }
   catch (error) {
     // Unhandled error in a batchFetch plugin fails every op it could touch.
-    for (const op of operations) {
-      if (!op.resolved) {
-        op.setError(error as Error)
-      }
-    }
+    rejectUnresolved(operations, error)
     return
   }
 
@@ -67,7 +64,7 @@ async function dispatchIndividualFetch(
     let result: any
     let marker: string | undefined
 
-    const abort = store.$hooks.withAbort()
+    const abort = store.$hooks.withAbort({ explicit: true })
     await store.$hooks.callHook('fetchFirst', {
       store: store as unknown as GlobalStoreType,
       meta: op.meta,
@@ -85,7 +82,7 @@ async function dispatchIndividualFetch(
         marker = value
       },
       abort,
-    })
+    }, abort)
 
     op.setResult(result, { marker })
   }

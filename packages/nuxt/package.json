@@ -42,8 +42,8 @@
     "client:build": "pnpm --filter @rstore/devtools build",
     "client:dev": "pnpm --filter @rstore/devtools dev",
     "client:prepare": "pnpm --filter @rstore/devtools dev:prepare",
-    "test": "vitest run",
-    "test:watch": "vitest watch",
+    "test": "RSTORE_TEST_PACKAGE=nuxt pnpm -w exec vitest run --config vitest.config.ts",
+    "test:watch": "RSTORE_TEST_PACKAGE=nuxt pnpm -w exec vitest watch --config vitest.config.ts",
     "test:types": "vue-tsc --noEmit",
     "prepack": "node ../../scripts/sync-dep-skills.mjs ."
   },

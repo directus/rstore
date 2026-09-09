@@ -1,12 +1,14 @@
 import type { Cache, CollectionDefaults, CustomCacheState, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CacheRuntime, VueCachePrivate } from './types'
-import { gcTombstones, isKeyDefined } from '@rstore/core'
-import { ref, toValue } from 'vue'
+import { gcTombstones } from '@rstore/core'
+import { ref, toRaw, toValue } from 'vue'
 import { getCollectionIndex, invalidateCollectionStateCache } from './context'
+import { rebuildIndexes } from './indexes'
 import { ensureLayersForCollection, getStateForCollection } from './layers'
 import { applyMutationToCache } from './mutations'
 import { clearQueryStateForCollection } from './queryState'
 import { enqueueOperation, flushQueuedOperations } from './queue'
+import { resolveRelationWriteParams } from './relationWrite'
 import { garbageCollectItem, getWrappedItem } from './wrapped'
 
 /** Create the public Cache implementation from a cache runtime. */
@@ -31,7 +33,7 @@ export function createCacheApi<
       enqueueOperation(ctx, { type: 'writeItems', params, index: 0 })
     },
     writeItemForRelation(params) {
-      writeItemForRelation(ctx, params)
+      enqueueOperation(ctx, { type: 'writeItem', params: resolveRelationWriteParams(ctx, params) })
     },
     applyMutation(params) {
       return applyMutationToCache(ctx, params)
@@ -114,6 +116,7 @@ export function createCacheApi<
       getWrappedItem: (collection, item, noCache) => getWrappedItem(ctx, collection, item, noCache),
       layers: ctx.layers,
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
+      rebuildIndexes: () => rebuildIndexes(ctx, collectionName => getStateForCollection(ctx, collectionName)),
     },
   } satisfies Cache & VueCachePrivate as any
 }
@@ -150,33 +153,27 @@ function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit,
   return result
 }
 
-function writeItemForRelation(ctx: CacheRuntime, { parentCollection, relationKey, relation, childItem, meta }: Parameters<Cache['writeItemForRelation']>[0]) {
-  const possibleCollections = Object.keys(relation.to)
-  const nestedItemCollection = ctx.getStore().$getCollection(childItem, possibleCollections)
-  if (!nestedItemCollection) {
-    throw new Error(`Could not determine type for relation ${parentCollection.name}.${String(relationKey)}`)
-  }
-  const nestedKey = nestedItemCollection.getKey(childItem)
-  if (!isKeyDefined(nestedKey)) {
-    throw new Error(`Could not determine key for relation ${parentCollection.name}.${String(relationKey)}`)
-  }
-  enqueueOperation(ctx, {
-    type: 'writeItem',
-    params: {
-      collection: nestedItemCollection,
-      key: nestedKey,
-      item: childItem,
-      meta,
-    },
-  })
-}
-
 function getState(ctx: CacheRuntime): CustomCacheState {
   const result: CustomCacheState = {
     collections: {},
     markers: toValue(ctx.state.markers),
     modules: {},
     queryMeta: ctx.state.queryMeta,
+    fieldTimestamps: {},
+    // Serialized as a list: `TombstoneStore` is a Map behind an interface, and
+    // the payload has to survive JSON/devalue.
+    tombstones: Array.from(ctx.state.tombstones.entries(), ([, tombstone]) => ({
+      collection: tombstone.collection,
+      key: tombstone.key,
+      deletedAt: tombstone.deletedAt,
+    })),
+  }
+
+  for (const [collectionName, keys] of ctx.state.fieldTimestamps) {
+    const target: Record<string | number, any> = result.fieldTimestamps![collectionName] = {}
+    for (const [key, timestamps] of keys) {
+      target[key] = { ...timestamps }
+    }
   }
 
   for (const collectionName in ctx.state.collections) {
@@ -191,7 +188,10 @@ function getState(ctx: CacheRuntime): CustomCacheState {
   }
 
   for (const moduleKey in ctx.state.modules) {
-    result.modules[moduleKey] = toValue(ctx.state.modules[moduleKey]!)
+    // Module refs are reactive, but cache snapshots are transport values.
+    // Detachment belongs to the transport (`structuredClone`/devalue), not this
+    // synchronous cache read, which preserves non-plain values such as Date.
+    result.modules[moduleKey] = toRaw(toValue(ctx.state.modules[moduleKey]!))
   }
 
   return result

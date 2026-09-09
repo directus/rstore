@@ -1,6 +1,6 @@
 import { withItemType } from '@rstore/core'
 import { describe, expect, it, vi } from 'vitest'
-import { createStore } from '../src/store'
+import { createStore } from '../src'
 
 describe('mutate', () => {
   it('should run a custom mutation through the collection API', async () => {

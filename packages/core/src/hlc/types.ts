@@ -1,3 +1,5 @@
+export type { FieldTimestampValue } from '@rstore/shared'
+
 /**
  * Hybrid Logical Clock (HLC) timestamp.
  */
@@ -17,11 +19,6 @@ export interface HLCTimestamp {
  * zero-padded hex so lexicographic comparison agrees with causal ordering.
  */
 export type HLCString = string
-
-/**
- * Legacy value accepted by field-level LWW merge paths.
- */
-export type FieldTimestampValue = number | HLCString
 
 /**
  * Diagnostic payload produced when a remote HLC timestamp is too far ahead.

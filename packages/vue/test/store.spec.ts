@@ -1,7 +1,7 @@
 import { until } from '@vueuse/core'
 import { describe, expect, it } from 'vitest'
 import { nextTick, ref } from 'vue'
-import { createStore } from '../src/store'
+import { createStore } from '../src'
 
 describe('store', () => {
   it('should preserve wrapped mutation return values', async () => {

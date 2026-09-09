@@ -8,7 +8,7 @@
   "license": "MIT",
   "keywords": [],
   "engines": {
-    "node": ">=23.0.0"
+    "node": ">=26.0.0"
   },
   "scripts": {
     "build": "pnpm run -r --filter \"@rstore/*\" build",
@@ -17,8 +17,10 @@
     "lint": "eslint --cache .",
     "test": "vitest run",
     "test:e2e": "pnpm run -r --workspace-concurrency=1 --filter ./packages/playground --filter ./packages/playground-drizzle --filter ./packages/playground-nuxt-directus test:e2e",
+    "test:coverage": "vitest run --coverage --project unit --project nuxt --project integration",
     "test:dev": "vitest",
-    "test:types": "pnpm run --parallel -r test:types",
+    "test:types": "pnpm run --parallel -r test:types && pnpm run test:types:integration",
+    "test:types:integration": "tsc --noEmit -p tsconfig.integration.json",
     "copy-readme": "echo ./packages/* | xargs -n 1 cp README.md",
     "sync-skills": "node scripts/sync-dep-skills.mjs packages/vue packages/nuxt packages/nuxt-drizzle packages/directus packages/vite-directus packages/monospace packages/vite-monospace packages/nuxt-monospace",
     "release": "pnpm run copy-readme && pnpm run lint && pnpm run build && pnpm run test && pnpm run test:types && sheep release -b main --force",
@@ -36,6 +38,8 @@
     "@tailwindcss/vite": "catalog:",
     "@tresjs/core": "catalog:",
     "@tresjs/post-processing": "catalog:",
+    "@types/node": "catalog:",
+    "@vitest/coverage-v8": "catalog:",
     "animejs": "catalog:",
     "eslint": "catalog:",
     "lint-staged": "catalog:",

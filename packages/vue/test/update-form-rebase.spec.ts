@@ -1,6 +1,6 @@
 import { withItemType } from '@rstore/core'
 import { describe, expect, it } from 'vitest'
-import { createStore } from '../src/store'
+import { createStore } from '../src'
 
 describe('updateForm realtime rebases', () => {
   it('does not mark structurally equal array fields changed after submit rebase', async () => {

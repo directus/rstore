@@ -51,42 +51,49 @@ async function readItem(db: IDBDatabase, storeName: string, key: string): Promis
   })
 }
 
-async function writeItem(db: IDBDatabase, storeName: string, key: string, value: any): Promise<void> {
+/**
+ * Queue writes in one IndexedDB transaction.
+ *
+ * @param db Open database that owns the target store.
+ * @param storeName Target object store name.
+ * @param write Synchronous callback that queues object store requests.
+ */
+function runWriteTransaction(
+  db: IDBDatabase,
+  storeName: string,
+  write: (objectStore: IDBObjectStore) => void,
+): Promise<void> {
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction([storeName], 'readwrite')
     const objectStore = transaction.objectStore(storeName)
-    objectStore.put(value, key)
+    write(objectStore)
     transaction.oncomplete = () => resolve()
     transaction.onerror = () => reject(transaction.error)
     transaction.onabort = () => reject(transaction.error)
   })
 }
 
+async function writeItem(db: IDBDatabase, storeName: string, key: string, value: any): Promise<void> {
+  return runWriteTransaction(db, storeName, (objectStore) => {
+    objectStore.put(value, key)
+  })
+}
+
 async function deleteItem(db: IDBDatabase, storeName: string, key: string): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction([storeName], 'readwrite')
-    const objectStore = transaction.objectStore(storeName)
+  return runWriteTransaction(db, storeName, (objectStore) => {
     objectStore.delete(key)
-    transaction.oncomplete = () => resolve()
-    transaction.onerror = () => reject(transaction.error)
-    transaction.onabort = () => reject(transaction.error)
   })
 }
 
 /** Write and delete a collection's changed rows in one atomic transaction. */
 async function applyChanges(db: IDBDatabase, storeName: string, changes: IndexedDbChanges): Promise<void> {
-  return new Promise<void>((resolve, reject) => {
-    const transaction = db.transaction([storeName], 'readwrite')
-    const objectStore = transaction.objectStore(storeName)
+  return runWriteTransaction(db, storeName, (objectStore) => {
     for (const key of changes.deleteKeys) {
       objectStore.delete(key)
     }
     for (const { key, value } of changes.writes) {
       objectStore.put(value, key)
     }
-    transaction.oncomplete = () => resolve()
-    transaction.onerror = () => reject(transaction.error)
-    transaction.onabort = () => reject(transaction.error)
   })
 }
 

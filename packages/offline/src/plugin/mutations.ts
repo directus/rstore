@@ -111,7 +111,7 @@ function installSingleMutationQueueHooks(runtime: OfflinePluginRuntime, hook: an
       console.warn('[rstore/offline] Cannot createItem operation without a key. Please make sure to provide as much data as possible when creating offline items.')
       return
     }
-    await queueSingleMutation(runtime, {
+    await queueMutation(runtime, {
       type: 'create',
       collectionName: collection.name,
       item,
@@ -124,7 +124,7 @@ function installSingleMutationQueueHooks(runtime: OfflinePluginRuntime, hook: an
     if (!shouldQueueMutation(runtime, collection)) {
       return
     }
-    await queueSingleMutation(runtime, {
+    await queueMutation(runtime, {
       type: 'update',
       collectionName: collection.name,
       item,
@@ -137,7 +137,7 @@ function installSingleMutationQueueHooks(runtime: OfflinePluginRuntime, hook: an
     if (!shouldQueueMutation(runtime, collection)) {
       return
     }
-    await queueSingleMutation(runtime, {
+    await queueMutation(runtime, {
       type: 'delete',
       collectionName: collection.name,
       key,
@@ -155,7 +155,7 @@ function installManyMutationQueueHooks(runtime: OfflinePluginRuntime, hook: any)
     if (!queued) {
       return
     }
-    await queueManyMutation(runtime, {
+    await queueMutation(runtime, {
       type: 'createMany',
       collectionName: collection.name,
       ...queued,
@@ -171,7 +171,7 @@ function installManyMutationQueueHooks(runtime: OfflinePluginRuntime, hook: any)
     if (!queued) {
       return
     }
-    await queueManyMutation(runtime, {
+    await queueMutation(runtime, {
       type: 'updateMany',
       collectionName: collection.name,
       ...queued,
@@ -183,7 +183,7 @@ function installManyMutationQueueHooks(runtime: OfflinePluginRuntime, hook: any)
     if (!shouldQueueMutation(runtime, collection) || keys.length === 0) {
       return
     }
-    await queueManyMutation(runtime, {
+    await queueMutation(runtime, {
       type: 'deleteMany',
       collectionName: collection.name,
       keys,
@@ -196,22 +196,22 @@ function shouldQueueMutation(runtime: OfflinePluginRuntime, collection: any) {
   return isCollectionIncluded(runtime, collection) && !navigator.onLine
 }
 
-async function queueSingleMutation(runtime: OfflinePluginRuntime, data: Omit<QueuedMutation, 'id' | 'time'>) {
-  const id = crypto.randomUUID()
-  await getOfflineDb(runtime).writeItem(runtime.opsStoreName, id, {
-    id,
-    ...data,
-    time: new Date(),
-  } satisfies QueuedMutation)
-}
+/** Queue payload before persistence assigns its id and insertion time. */
+type QueuedMutationData = Omit<QueuedMutation, 'id' | 'time'> | Omit<QueuedManyMutation, 'id' | 'time'>
 
-async function queueManyMutation(runtime: OfflinePluginRuntime, data: Omit<QueuedManyMutation, 'id' | 'time'>) {
+/**
+ * Persist one queued single-item or many-item mutation.
+ *
+ * @param runtime Offline plugin runtime that owns the queue store.
+ * @param data Queue payload before persistence assigns its id and insertion time.
+ */
+async function queueMutation(runtime: OfflinePluginRuntime, data: QueuedMutationData): Promise<void> {
   const id = crypto.randomUUID()
   await getOfflineDb(runtime).writeItem(runtime.opsStoreName, id, {
     id,
     ...data,
     time: new Date(),
-  } satisfies QueuedManyMutation)
+  } satisfies QueuedMutation | QueuedManyMutation)
 }
 
 function collectKeyedItems(collection: any, items: any[], operation: 'createMany' | 'updateMany') {

@@ -104,5 +104,7 @@ export interface VueCachePrivate {
     ) => WrappedItem<TCollection, CollectionDefaults, StoreSchema> | undefined
     layers: Record<string, Ref<CacheLayer[]>>
     ensureLayersForCollection: (collectionName: string) => Ref<CacheLayer[]>
+    /** Rebuild relation indexes after the store schema changes at runtime. */
+    rebuildIndexes: () => void
   }
 }

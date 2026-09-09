@@ -1,5 +1,6 @@
 import type { CollectionDefaults, StoreSchema } from './collection.js'
 import type { HookDefinitions } from './hooks.js'
+import type { Awaitable } from './utils'
 
 export interface CustomPluginMeta {
   description?: string
@@ -20,11 +21,17 @@ export interface Plugin {
   category?: PluginCategory
 
   /**
-   * Setups the adapter
+   * Setups the adapter.
+   *
+   * A synchronous `setup` runs in the caller's synchronous context, so it may
+   * use framework composables that need it (Nuxt's `useNuxtApp`). Returning a
+   * promise is supported and awaited, but every plugin set up after an async
+   * one runs in a microtask and loses that context.
+   *
    * @param api
    * @returns
    */
-  setup: (api: PluginSetupApi) => void
+  setup: (api: PluginSetupApi) => Awaitable<void>
 
   /**
    * Allows scoping the plugin to specific collections with the same scopeId.

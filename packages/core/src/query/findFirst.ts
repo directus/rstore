@@ -1,11 +1,11 @@
 import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, FindOptions, GlobalStoreType, QueryResult, ResolvedCollection, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
-import { dedupePromise } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
 import { defaultMarker, getMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { unwrapItem } from '../item'
 import { isKeyDefined } from '../key'
 import { stringifyFindOptions } from '../utils/findOptions'
+import { dedupeQuery } from './dedupe'
 import { peekFirst } from './peekFirst'
 
 export interface FindFirstParams<
@@ -32,7 +32,10 @@ export async function findFirst<
   collection,
   findOptions: keyOrOptions,
 }: FindFirstParams<TCollection, TCollectionDefaults, TSchema>): Promise<QueryResult<WrappedItem<TCollection, TCollectionDefaults, TSchema> | null>> {
-  if (typeof keyOrOptions === 'object' && keyOrOptions?.dedupe === false) {
+  const options = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number' ? { key: keyOrOptions } : keyOrOptions
+  meta ??= options?.meta ?? {}
+  keyOrOptions = store.$resolveFindOptions(collection, options ?? {}, false, meta)
+  if (keyOrOptions.dedupe === false) {
     return _findFirst({
       store,
       meta,
@@ -43,8 +46,8 @@ export async function findFirst<
 
   // Function-aware serialization: queries that differ only by a function
   // option (e.g. `filter`) must not share the same in-flight promise
-  const dedupeKey = typeof keyOrOptions === 'string' ? keyOrOptions : stringifyFindOptions(keyOrOptions)
-  return dedupePromise(store.$dedupePromises, `findFirst:${collection.name}:${dedupeKey}`, () => _findFirst({
+  const dedupeKey = stringifyFindOptions(keyOrOptions)
+  return dedupeQuery(store.$dedupePromises, `findFirst:${collection.name}:${dedupeKey}`, meta, meta => _findFirst({
     store,
     meta,
     collection,
@@ -60,18 +63,8 @@ async function _findFirst<
   store,
   meta,
   collection,
-  findOptions: keyOrOptions,
-}: FindFirstParams<TCollection, TCollectionDefaults, TSchema>): Promise<QueryResult<WrappedItem<TCollection, TCollectionDefaults, TSchema> | null>> {
-  let findOptions: FindFirstOptions<TCollection, TCollectionDefaults, TSchema> = typeof keyOrOptions === 'string' || typeof keyOrOptions === 'number'
-    ? {
-        key: keyOrOptions,
-      }
-    : keyOrOptions
-
-  meta ??= findOptions?.meta ?? {}
-
-  findOptions = store.$resolveFindOptions(collection, findOptions, false, meta)
-
+  findOptions,
+}: FindFirstParams<TCollection, TCollectionDefaults, TSchema> & { findOptions: FindFirstOptions<TCollection, TCollectionDefaults, TSchema>, meta: CustomHookMeta }): Promise<QueryResult<WrappedItem<TCollection, TCollectionDefaults, TSchema> | null>> {
   const fetchPolicy = findOptions.fetchPolicy
 
   let result: any
@@ -111,7 +104,7 @@ async function _findFirst<
       // Only key-based findFirst calls can be batched (filter-only queries cannot).
       // beforeFetch/afterFetch still run so plugins (e.g. query tracking) see the op.
       const batchCall = resolveBatchCall(findOptions.batch)
-      if (store.$batch && findOptions.key != null && batchCall.enabled) {
+      if (store.$batch?.options.fetch && findOptions.key != null && batchCall.enabled) {
         const batched = await store.$batch.enqueueFetchFirst(collection, findOptions.key, findOptions, meta, batchCall.group) as { item: any, marker: string | undefined }
         result = batched.item
         if (batched.marker) {
@@ -119,7 +112,7 @@ async function _findFirst<
         }
       }
       else {
-        const abort = store.$hooks.withAbort()
+        const abort = store.$hooks.withAbort({ explicit: true })
         await store.$hooks.callHook('fetchFirst', {
           store: store as unknown as GlobalStoreType,
           meta,
@@ -137,7 +130,7 @@ async function _findFirst<
             marker = value
           },
           abort,
-        })
+        }, abort)
       }
 
       await store.$hooks.callHook('afterFetch', {
@@ -158,7 +151,7 @@ async function _findFirst<
 
         store.$processItemParsing(collection, result)
 
-        if (fetchPolicy !== 'no-cache') {
+        if (fetchPolicy !== 'no-cache' && meta.$canPublishQuery?.() !== false) {
           const key = collection.getKey(result)
           if (!isKeyDefined(key)) {
             console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
@@ -192,8 +185,8 @@ async function _findFirst<
     meta.$queryTracking.skipped = true
   }
 
-  if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
-    const abort = store.$hooks.withAbort()
+  if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy) && meta.$canPublishQuery?.() !== false) {
+    const abort = store.$hooks.withAbort({ explicit: true })
     await store.$hooks.callHook('fetchRelations', {
       store: store as unknown as GlobalStoreType,
       meta,
@@ -203,15 +196,19 @@ async function _findFirst<
       many: false,
       getResult: () => result,
       abort,
-    })
+    }, abort)
   }
 
   if (result) {
-    result = store.$cache.wrapItem({ collection, item: result, noCache: fetchPolicy === 'no-cache' })
+    result = store.$cache.wrapItem({ collection, item: result, noCache: fetchPolicy === 'no-cache' || meta.$canPublishQuery?.() === false })
   }
 
   return {
-    result,
+    // A miss is `null`, never `undefined`: the batched branch and a `no-cache`
+    // read both leave `result` unassigned, while `peekFirst` reports a miss as
+    // `null`. Normalising here keeps every path inside the declared
+    // `QueryResult<WrappedItem | null>`.
+    result: result ?? null,
     marker,
     fetchPromise,
   }

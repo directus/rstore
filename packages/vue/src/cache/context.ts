@@ -69,7 +69,7 @@ export function invalidateCollectionStateCache(ctx: CacheRuntime, collectionName
 
 /** Build the cache key for a wrapped item proxy. */
 export function getItemWrapKey(collection: ResolvedCollection<any, any, any>, key: string | number, layer: { id: string } | undefined) {
-  return [layer?.id, collection.name, key].filter(Boolean).join(':')
+  return [layer?.id, collection.name, String(key)].filter(part => part != null && part !== '').join(':')
 }
 
 /** Resolve an item primary key or throw a cache-friendly error. */
@@ -100,6 +100,18 @@ export function ensureCollectionRef(ctx: CacheRuntime, collectionName: string) {
     ctx.state.collections[collectionName] = ref({})
   }
   return ctx.state.collections[collectionName]
+}
+
+/** Remove causality metadata for an evicted or deleted cache row. */
+export function removeFieldTimestampsForItem(ctx: CacheRuntime, collectionName: string, key: string | number): void {
+  const timestamps = ctx.state.fieldTimestamps.get(collectionName)
+  if (!timestamps) {
+    return
+  }
+  timestamps.delete(key)
+  if (timestamps.size === 0) {
+    ctx.state.fieldTimestamps.delete(collectionName)
+  }
 }
 
 /** Mark a query marker as fetched. */

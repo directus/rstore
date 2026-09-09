@@ -1,4 +1,4 @@
-import type { FindOptions } from '@rstore/shared'
+import type { FetchPolicy, FindOptions } from '@rstore/shared'
 import type { VueQueryPage, VueQueryPageOptions } from './types'
 import { isKeyDefined } from '@rstore/core'
 import { shallowReactive, toValue } from 'vue'
@@ -38,6 +38,7 @@ export function createPage(
     _foreground: foreground,
     _background: background,
     options: optionsExtension,
+    _fetchPolicy: null,
     rawData: cached ?? { type: 'data', value: toValue(ctx.defaultValue) },
     get data(): any {
       return readPageData(ctx, page)
@@ -55,7 +56,7 @@ export function isCurrentPageRequest(
   page: VueQueryPage<any, any, any, any, any>,
   savedPageRequestId: string,
 ): boolean {
-  return page.requestId === savedPageRequestId && ctx.pages.value.includes(page)
+  return !ctx.disposed && page.requestId === savedPageRequestId && ctx.pages.value.includes(page)
 }
 
 /**
@@ -83,48 +84,92 @@ export async function setPageResult(
   page: VueQueryPage<any, any, any, any, any>,
   savedPageRequestId: string,
   pageResult: any,
+  fetchPolicy: FetchPolicy | undefined,
 ): Promise<{ valid: boolean }> {
   if (!isCurrentPageRequest(ctx, page, savedPageRequestId)) {
     return { valid: false }
   }
   if (!page.main && ctx.mainPagePromise) {
     await ctx.mainPagePromise
+    // Waiting for the main page can outlive this request or its consumer.
+    if (!isCurrentPageRequest(ctx, page, savedPageRequestId)) {
+      return { valid: false }
+    }
   }
 
-  const options = getPageOptions(ctx, page)
-  if (options.fetchPolicy === 'no-cache') {
-    page.rawData = { type: 'data', value: pageResult }
-  }
-  else if (Array.isArray(pageResult)) {
-    page.rawData = { type: 'refs', keys: collectResultKeys(ctx, pageResult) }
-  }
-  else if (pageResult && typeof pageResult === 'object') {
-    setObjectPageResult(ctx, page, pageResult)
-  }
-  else {
-    page.rawData = { type: 'data', value: pageResult }
-  }
-
-  if (page.rawData.type === 'ref' || page.rawData.type === 'refs') {
-    ctx.cache._private.state.pageRefs.set(page.id, page.rawData)
-  }
+  // Use the policy resolved for this load, including defaults and hook changes.
+  // A no-cache response cannot be represented by references into the cache.
+  page._fetchPolicy = fetchPolicy ?? null
+  setPageRepresentation(ctx, page, pageResult, fetchPolicy === 'no-cache')
   markPagesAsComputed(ctx)
   return { valid: true }
 }
 
 /**
+ * Whether a page of the query holds rows that were never written to the cache.
+ */
+export function hasUncachedPage(ctx: any): boolean {
+  return ctx.pages.value.some((page: VueQueryPage<any, any, any, any, any> | undefined) => page?._fetchPolicy === 'no-cache')
+}
+
+/**
+ * Store a page value as cache references, or as plain data when the cache does
+ * not hold it.
+ *
+ * @param ctx Query context owning the page.
+ * @param page Page to represent.
+ * @param value Value the page has to expose.
+ * @param uncached Whether the value was obtained without writing to the cache.
+ */
+function setPageRepresentation(ctx: any, page: VueQueryPage<any, any, any, any, any>, value: any, uncached: boolean) {
+  if (uncached) {
+    page.rawData = { type: 'data', value }
+  }
+  else if (Array.isArray(value)) {
+    page.rawData = { type: 'refs', keys: collectResultKeys(ctx, value) }
+  }
+  else if (value && typeof value === 'object') {
+    setObjectPageResult(ctx, page, value)
+  }
+  else {
+    page.rawData = { type: 'data', value }
+  }
+
+  if (page.rawData.type === 'ref' || page.rawData.type === 'refs') {
+    ctx.cache._private.state.pageRefs.set(page.id, page.rawData)
+  }
+  else {
+    ctx.cache._private.state.pageRefs.delete(page.id)
+  }
+}
+
+/**
  * Mark consecutive pages as computed when cache can represent the result.
+ *
+ * A page is a slice of the cached result only when every page before it wrote
+ * its rows to the cache. A page loaded with `no-cache` wrote none, so it keeps
+ * its own data and the pages after it fall back to their item keys, exactly
+ * like a page loaded after a hole.
  */
 function markPagesAsComputed(ctx: any) {
   const resolvedOptions = ctx.store.$resolveFindOptions(ctx.getCollection(), ctx.getOptions() ?? {}, ctx.many, ctx.meta.value)
-  if (ctx.fetchPolicy === 'no-cache' || ctx.resultMode !== 'computed' || resolvedOptions.pageSize == null) {
-    return
-  }
+  let cacheComputable = ctx.fetchPolicy !== 'no-cache' && ctx.resultMode === 'computed' && resolvedOptions.pageSize != null
   for (const page of ctx.pages.value) {
-    if (!page)
-      break
-    page.rawData = { type: 'computed' }
-    ctx.cache._private.state.pageRefs.delete(page.id)
+    // Both a missing page and an uncached one break the cached sequence the
+    // following pages would be sliced out of.
+    if (!page || page._fetchPolicy === 'no-cache') {
+      cacheComputable = false
+      continue
+    }
+    if (cacheComputable) {
+      page.rawData = { type: 'computed' }
+      ctx.cache._private.state.pageRefs.delete(page.id)
+    }
+    else if (page.rawData.type === 'computed') {
+      // The page stops being a cache slice, but its rows are still cached:
+      // keep the ones it currently shows by their keys.
+      setPageRepresentation(ctx, page, page.data, false)
+    }
   }
 }
 
@@ -149,8 +194,10 @@ function readPageData(ctx: any, page: VueQueryPage<any, any, any, any, any>) {
  * Read data for pages represented by cache-computed slices.
  */
 function readComputedPageData(ctx: any, page: VueQueryPage<any, any, any, any, any>) {
-  const value = ctx.cached.value
-  const pageSize = ctx.getOptions()?.pageSize
+  // The plain cache read, never the aggregate: a mixed-policy query builds its
+  // result from the pages, which would read this page back.
+  const value = ctx.cacheRead.value
+  const { pageSize } = ctx.store.$resolveFindOptions(ctx.getCollection(), getPageOptions(ctx, page), ctx.many, ctx.meta.value)
   if (pageSize == null || !Array.isArray(value)) {
     return value
   }
