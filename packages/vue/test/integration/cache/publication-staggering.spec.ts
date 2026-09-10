@@ -58,6 +58,83 @@ describe('cache writeItems', () => {
     }
   })
 
+  it('settles an already-written stale slice without marking or emitting the outer batch hook', async () => {
+    vi.useFakeTimers()
+
+    try {
+      const store = await createStore({
+        schema: [
+          {
+            name: 'Parent',
+            relations: {
+              child: { to: { Child: { on: { id: 'childId' } } }, many: false },
+            },
+          },
+          { name: 'Child' },
+        ],
+        plugins: [],
+        cacheStaggering: 1,
+      })
+      const cache = store.$cache
+      const parentCollection = store.$collections[0]!
+      const childCollection = store.$collections[1]!
+      const parentLengths: number[] = []
+      const childLengths: number[] = []
+      const hookEvents: string[] = []
+      let canPublish = true
+      const stopParent = watchSyncEffect(() => {
+        parentLengths.push(cache.readItems({ collection: parentCollection }).length)
+      })
+      const stopChild = watchSyncEffect(() => {
+        childLengths.push(cache.readItems({ collection: childCollection }).length)
+      })
+      store.$hooks.hook('afterCacheWrite', ({ collection, key, result }) => {
+        if (collection.name === childCollection.name) {
+          hookEvents.push(`${collection.name}:${key}`)
+        }
+        else if (collection.name === parentCollection.name && Array.isArray(result)) {
+          hookEvents.push('outer')
+        }
+      })
+
+      try {
+        cache.writeItems({
+          collection: parentCollection,
+          marker: 'stale-marker',
+          meta: { $canPublishQuery: () => canPublish },
+          items: [
+            {
+              key: 1,
+              value: {
+                id: 1,
+                childId: 11,
+                child: { id: 11, name: 'Already written child' },
+              },
+            },
+            { key: 2, value: { id: 2 } },
+          ],
+        })
+
+        canPublish = false
+        vi.advanceTimersByTime(10)
+
+        expect(parentLengths).toEqual([0, 1])
+        expect(childLengths).toEqual([0, 1])
+        expect(cache.readItems({ collection: parentCollection }).map(item => item.id)).toEqual([1])
+        expect(cache.readItems({ collection: childCollection }).map(item => item.id)).toEqual([11])
+        expect(cache.readItems({ collection: parentCollection, marker: 'stale-marker' })).toEqual([])
+        expect(hookEvents).toEqual(['Child:11'])
+      }
+      finally {
+        stopParent()
+        stopChild()
+      }
+    }
+    finally {
+      vi.useRealTimers()
+    }
+  })
+
   it('settles a staggered nested failure before corrected retry and later work progress', async () => {
     vi.useFakeTimers()
 

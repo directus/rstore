@@ -103,9 +103,13 @@ function processQueuedWriteItem(ctx: CacheRuntime, operation: Extract<QueuedOper
 }
 
 function processQueuedWriteItems(ctx: CacheRuntime, operation: Extract<QueuedOperation, { type: 'writeItems' }>) {
-  // Discard stale pages together with their marker and notification.
+  // A stale page that has not started can be discarded without publication.
+  // Once a staggered slice wrote raw state, settle it so readers and nested
+  // hooks cannot remain behind the cache. The marker and outer hook stay stale.
   if (operation.params.meta?.$canPublishQuery?.() === false) {
-    return true
+    return operation.index === 0
+      ? true
+      : { settlementErrors: settleWriteBatch(ctx, operation.batch) }
   }
   try {
     while (operation.index < operation.params.items.length) {
