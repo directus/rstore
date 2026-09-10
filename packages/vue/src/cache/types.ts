@@ -1,5 +1,5 @@
 import type { TombstoneStore } from '@rstore/core'
-import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from '../item'
 import type { VueStore } from '../store'
@@ -7,12 +7,23 @@ import type { VueStore } from '../store'
 /** Cache operations delayed while the cache is paused or write staggering is active. */
 export type QueuedOperation
   = | { type: 'writeItem', params: Parameters<Cache['writeItem']>[0] }
-    | { type: 'writeItems', params: Parameters<Cache['writeItems']>[0], index: number }
+    | { type: 'writeItems', params: Parameters<Cache['writeItems']>[0], index: number, batch: CacheWriteBatch }
     | { type: 'deleteItem', params: Parameters<Cache['deleteItem']>[0] }
     | { type: 'addLayer', layer: Parameters<Cache['addLayer']>[0] }
     | { type: 'removeLayer', layerId: Parameters<Cache['removeLayer']>[0] }
     | { type: 'setState', state: CustomCacheState }
     | { type: 'clear' }
+
+/** Public hook payload retained until its complete batch becomes visible. */
+type AfterCacheWritePayload = Parameters<CacheHookDefinitions<StoreSchema, CollectionDefaults>['afterCacheWrite']>[0]
+
+/** Reactive collection publications and nested hooks deferred until a writeItems operation settles. */
+export interface CacheWriteBatch {
+  /** Collections needing one reactive publication at settlement. */
+  affectedCollections: Set<string>
+  /** Nested write notifications delivered after collection publication. */
+  deferredAfterCacheWrites: AfterCacheWritePayload[]
+}
 
 /** Reactive state owned by the Vue cache implementation. */
 export interface InternalCacheState {

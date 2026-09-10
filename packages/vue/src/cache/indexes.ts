@@ -1,7 +1,7 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, StoreSchema } from '@rstore/shared'
-import type { CacheRuntime } from './types'
+import type { CacheRuntime, CacheWriteBatch } from './types'
 import { isKeyDefined } from '@rstore/core'
-import { ref, toValue } from 'vue'
+import { ref, toRaw, toValue } from 'vue'
 import { getCollectionIndex } from './context'
 
 /** Reads the effective collection state, including every active cache layer. */
@@ -54,6 +54,7 @@ export function updateItemIndexes<TCollection extends Collection>(
   key: string | number,
   previousData: any,
   newData: any = {},
+  batch?: CacheWriteBatch,
 ) {
   for (const [indexKey, indexFields] of collection.indexes) {
     if (!indexFields.some(f => f in newData && (!previousData || newData[f] !== previousData[f]))) {
@@ -67,7 +68,8 @@ export function updateItemIndexes<TCollection extends Collection>(
         const previousValue = values.join(':')
         const existingKeys = index.get(previousValue)
         if (existingKeys) {
-          existingKeys.value.delete(String(key))
+          const keys = batch ? toRaw(existingKeys.value) : existingKeys.value
+          keys.delete(String(key))
         }
       }
     }
@@ -83,9 +85,9 @@ export function updateItemIndexes<TCollection extends Collection>(
         existingKeys = ref(new Set())
         index.set(newValue, existingKeys)
       }
-      // Index membership follows object-backed cache identity, including keys
-      // restored from a snapshot and later addressed through numeric APIs.
-      existingKeys.value.add(String(key))
+      // Keep index membership aligned with object-backed cache identity.
+      const keys = batch ? toRaw(existingKeys.value) : existingKeys.value
+      keys.add(String(key))
     }
   }
 }

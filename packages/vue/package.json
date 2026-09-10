@@ -32,6 +32,7 @@
     "skills"
   ],
   "scripts": {
+    "benchmark:write-items": "vite-node benchmark/write-items-publication.ts",
     "build": "unbuild",
     "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",
     "prepack": "node ../../scripts/sync-dep-skills.mjs .",
@@ -50,6 +51,7 @@
   "devDependencies": {
     "typescript": "catalog:",
     "unbuild": "catalog:",
+    "vite-node": "catalog:",
     "vitest": "catalog:",
     "vue": "catalog:"
   }

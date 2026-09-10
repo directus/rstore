@@ -63,8 +63,13 @@ export function ensureCollectionStateCacheReactivityMarker(ctx: CacheRuntime, co
 
 /** Drop a cached overlay state and notify reactive readers. */
 export function invalidateCollectionStateCache(ctx: CacheRuntime, collectionName: string) {
-  ctx.collectionStateCache.delete(collectionName)
+  evictCollectionStateCache(ctx, collectionName)
   ensureCollectionStateCacheReactivityMarker(ctx, collectionName).value++
+}
+
+/** Drop a cached overlay state without notifying reactive readers. */
+export function evictCollectionStateCache(ctx: CacheRuntime, collectionName: string) {
+  ctx.collectionStateCache.delete(collectionName)
 }
 
 /** Build the cache key for a wrapped item proxy. */

@@ -1,7 +1,14 @@
-import type { CacheRuntime, QueuedOperation } from './types'
-import { mark } from './context'
+import type { CacheRuntime, CacheWriteBatch, QueuedOperation } from './types'
+import { triggerRef } from 'vue'
+import { ensureCollectionRef, evictCollectionStateCache, mark } from './context'
 import { addLayerNow, removeLayer } from './layers'
 import { clearNow, deleteItemNow, setStateNow, writeItemNow } from './writes'
+
+/** Completed queue entry whose observer errors must not replay the write. */
+interface CompletedOperation {
+  /** Observer errors raised after data was written successfully. */
+  settlementErrors: unknown[]
+}
 
 /** Enqueue an operation and flush it immediately when the cache is active. */
 export function enqueueOperation(ctx: CacheRuntime, operation: QueuedOperation) {
@@ -11,6 +18,19 @@ export function enqueueOperation(ctx: CacheRuntime, operation: QueuedOperation) 
   }
 }
 
+/** Enqueue a collection write batch with its publication state. */
+export function enqueueWriteItems(ctx: CacheRuntime, params: Extract<QueuedOperation, { type: 'writeItems' }>['params']) {
+  enqueueOperation(ctx, {
+    type: 'writeItems',
+    params,
+    index: 0,
+    batch: {
+      affectedCollections: new Set(),
+      deferredAfterCacheWrites: [],
+    },
+  })
+}
+
 /** Flush queued cache operations while respecting pause and staggering state. */
 export function flushQueuedOperations(ctx: CacheRuntime) {
   if (ctx.isFlushingQueue || ctx.state.paused) {
@@ -18,14 +38,27 @@ export function flushQueuedOperations(ctx: CacheRuntime) {
   }
 
   ctx.isFlushingQueue = true
+  const deferredErrors: unknown[] = []
   try {
     while (ctx.state.queue.length) {
       const operation = ctx.state.queue[0]!
-      if (!processQueuedOperation(ctx, operation)) {
+      let result: boolean | CompletedOperation
+      try {
+        result = processQueuedOperation(ctx, operation)
+      }
+      catch (error) {
+        throwWithSecondaryErrors(error, deferredErrors)
+      }
+      if (!result) {
+        throwSettlementErrors(deferredErrors)
         return
       }
       ctx.state.queue.shift()
+      if (result !== true) {
+        deferredErrors.push(...result.settlementErrors)
+      }
     }
+    throwSettlementErrors(deferredErrors)
   }
   finally {
     ctx.isFlushingQueue = false
@@ -70,38 +103,113 @@ function processQueuedWriteItem(ctx: CacheRuntime, operation: Extract<QueuedOper
 }
 
 function processQueuedWriteItems(ctx: CacheRuntime, operation: Extract<QueuedOperation, { type: 'writeItems' }>) {
-  // Discard stale pages together with their marker and notification.
+  // A stale page that has not started can be discarded without publication.
+  // Once a staggered slice wrote raw state, settle it so readers and nested
+  // hooks cannot remain behind the cache. The marker and outer hook stay stale.
   if (operation.params.meta?.$canPublishQuery?.() === false) {
-    return true
+    return operation.index === 0
+      ? true
+      : { settlementErrors: settleWriteBatch(ctx, operation.batch) }
   }
-  while (operation.index < operation.params.items.length) {
-    if (!canProcessQueuedWrite(ctx)) {
-      return false
+  try {
+    while (operation.index < operation.params.items.length) {
+      if (!canProcessQueuedWrite(ctx)) {
+        return false
+      }
+      const { key, value: item } = operation.params.items[operation.index]!
+      writeItemNow(ctx, {
+        collection: operation.params.collection,
+        key,
+        item,
+        meta: operation.params.meta,
+        fromWriteItems: true,
+        batch: operation.batch,
+      })
+      operation.index++
+      consumeQueuedWrite(ctx)
     }
-    const { key, value: item } = operation.params.items[operation.index]!
-    writeItemNow(ctx, {
-      collection: operation.params.collection,
-      key,
-      item,
-      meta: operation.params.meta,
-      fromWriteItems: true,
-    })
-    operation.index++
-    consumeQueuedWrite(ctx)
+  }
+  catch (error) {
+    throwWithSecondaryErrors(error, settleWriteBatch(ctx, operation.batch))
   }
   if (operation.params.marker) {
     mark(ctx, operation.params.marker)
   }
+
+  const settlementErrors = settleWriteBatch(ctx, operation.batch)
   const store = ctx.getStore()
-  store.$hooks.callHookSync('afterCacheWrite', {
-    store,
-    meta: {},
-    collection: operation.params.collection,
-    result: operation.params.items,
-    marker: operation.params.marker,
-    operation: 'write',
-  })
-  return true
+  try {
+    store.$hooks.callHookSync('afterCacheWrite', {
+      store,
+      meta: {},
+      collection: operation.params.collection,
+      result: operation.params.items,
+      marker: operation.params.marker,
+      operation: 'write',
+    })
+  }
+  catch (error) {
+    settlementErrors.push(error)
+  }
+  return { settlementErrors }
+}
+
+/** Publish data before invoking deferred nested hooks, collecting observer failures. */
+function settleWriteBatch(ctx: CacheRuntime, batch: CacheWriteBatch) {
+  const errors = publishWriteBatch(ctx, batch)
+  const deferredAfterCacheWrites = batch.deferredAfterCacheWrites.splice(0)
+  const store = ctx.getStore()
+  for (const payload of deferredAfterCacheWrites) {
+    try {
+      store.$hooks.callHookSync('afterCacheWrite', payload)
+    }
+    catch (error) {
+      errors.push(error)
+    }
+  }
+  return errors
+}
+
+/** Notify each affected collection once, continuing past failing observers. */
+function publishWriteBatch(ctx: CacheRuntime, batch: CacheWriteBatch) {
+  const errors: unknown[] = []
+  try {
+    for (const collectionName of batch.affectedCollections) {
+      evictCollectionStateCache(ctx, collectionName)
+      try {
+        triggerRef(ensureCollectionRef(ctx, collectionName))
+      }
+      catch (error) {
+        errors.push(error)
+      }
+    }
+  }
+  finally {
+    batch.affectedCollections.clear()
+  }
+  return errors
+}
+
+/** Keep the write failure primary when publication also fails. */
+function throwWithSecondaryErrors(primaryError: unknown, secondaryErrors: unknown[]): never {
+  if (!secondaryErrors.length) {
+    throw primaryError
+  }
+  throw new AggregateError(
+    [primaryError, ...secondaryErrors],
+    'Cache operation failed and batch settlement reported additional errors',
+    { cause: primaryError },
+  )
+}
+
+/** Surface observer failures after completed queue entries are removed. */
+function throwSettlementErrors(errors: unknown[]) {
+  if (errors.length === 1) {
+    throw errors[0]
+  }
+  if (errors.length > 1) {
+    throw new AggregateError(errors, 'Cache batch settlement reported multiple errors', { cause: errors[0] })
+  }
 }
 
 function processQueuedDelete(ctx: CacheRuntime, operation: Extract<QueuedOperation, { type: 'deleteItem' }>) {

@@ -2,7 +2,7 @@ import type { ApplyMutationOptions, ApplyMutationResult, Collection, CollectionD
 import type { CacheRuntime } from './types'
 import { isKeyDefined } from '@rstore/core'
 import { getMutationItemKey, unwrapMutationItem } from '@rstore/shared'
-import { enqueueOperation } from './queue'
+import { enqueueOperation, enqueueWriteItems } from './queue'
 
 /** Apply a mutation-shaped cache update without emitting mutation hooks. */
 export function applyMutationToCache<TCollection extends Collection, TCollectionDefaults extends CollectionDefaults, TSchema extends StoreSchema>(
@@ -51,14 +51,10 @@ function applyWriteMutation<TCollection extends Collection, TCollectionDefaults 
     })
   }
   else if (writes.length) {
-    enqueueOperation(ctx, {
-      type: 'writeItems',
-      params: {
-        collection: params.collection,
-        items: writes,
-        meta: params.meta,
-      },
-      index: 0,
+    enqueueWriteItems(ctx, {
+      collection: params.collection,
+      items: writes,
+      meta: params.meta,
     })
   }
 
