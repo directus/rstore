@@ -2,12 +2,11 @@ import type { Cache, Collection, CollectionDefaults, FindOptions, HybridPromise,
 import type { VueCachePrivate } from '../cache'
 import type { VueCreateQueryOptions, VueQueryRefreshOptions, VueQueryReturn } from './types'
 import { tryOnScopeDispose } from '@vueuse/core'
-import { deepEqual } from 'fast-equals'
-import { klona } from 'klona'
 import { computed, getCurrentInstance, onServerPrefetch, ref, shallowRef, toValue, watch } from 'vue'
 import { onWindowFocus } from '../swr'
 import { useQueryTracking } from '../tracking'
 import { loadPage } from './load'
+import { watchQueryOptions } from './options'
 import { createPage, getPageId, getPageOptions, hasUncachedPage } from './page'
 import { createFetchState, getFetchStateError, isFetchStateLoading, toQueryFetchState } from './state'
 
@@ -63,20 +62,22 @@ export function createQuery<
   }
 
   installAutoRefresh(ctx, refresh)
-  watchOptions(ctx, () => loadMainPage())
+  const queryOptions = watchQueryOptions(() => toValue(ctx.options), () => {
+    ctx.updateQueryTrackingMode()
+    loadMainPage()
+  })
   let promise = loadMainPage() as unknown as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
   Object.assign(promise, returnObject)
 
-  function loadMainPage(forceFetch = false, pageIndexes?: number[]) {
-    // A forced load is a refresh of this very query, so the other pages are kept and reloaded with
-    // the main one: resetting the state of a page without fetching it again would leave it claiming
-    // it was never loaded. Any other load means the options changed, which makes those pages
-    // meaningless.
+  function loadMainPage(forceFetch = false, pageIndexes?: number[], resetPages = !forceFetch) {
+    // A normal forced refresh keeps and reloads every page. A reset discards
+    // them because the options now identify a different query; leaving a page
+    // reset but unloaded would falsely claim it had never been fetched.
     const previousPages = ctx.pages.value.filter(Boolean)
-    const otherPages = forceFetch
-      ? ctx.pages.value.filter(page => page && page !== ctx.mainPage)
-      : []
-    if (!forceFetch) {
+    const otherPages = resetPages
+      ? []
+      : ctx.pages.value.filter(page => page && page !== ctx.mainPage)
+    if (resetPages) {
       for (const page of previousPages) {
         if (!ctx.pendingTrackingPageIds.includes(page.id)) {
           ctx.pendingTrackingPageIds.push(page.id)
@@ -91,7 +92,7 @@ export function createQuery<
     const index = pageOptions.pageIndex ?? 0
     const previousMainId = ctx.mainPage.id
     const nextMainId = getPageId(ctx, index)
-    if (forceFetch && previousMainId !== nextMainId) {
+    if (forceFetch && !resetPages && previousMainId !== nextMainId) {
       ctx.queryTracking?.releasePage(previousMainId, { collect: true })
     }
     ctx.mainPage.index = index
@@ -155,7 +156,13 @@ export function createQuery<
     // `pages` selects what to reload; the rest is the main page's find options.
     const { pages, ...optionsExtension } = options ?? {}
     ctx.mainPage.options = optionsExtension
-    promise = loadMainPage(true, pages) as unknown as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
+    const mainPageIndex = getPageOptions(ctx, ctx.mainPage).pageIndex ?? 0
+    const includesMainPage = pages == null || pages.includes(mainPageIndex)
+    const changedOptions = includesMainPage && queryOptions.consume()
+    if (changedOptions) {
+      ctx.updateQueryTrackingMode()
+    }
+    promise = loadMainPage(true, pages, changedOptions) as unknown as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
     Object.assign(promise, returnObject)
     return promise
   }
@@ -279,18 +286,4 @@ function installAutoRefresh(ctx: any, refresh: () => unknown) {
     stopAutoRefresh = autoRefresh === 'windowFocus' ? onWindowFocus(() => refresh()) : undefined
   }, { immediate: true })
   tryOnScopeDispose(() => stopAutoRefresh?.())
-}
-
-/**
- * Reload the main page when options change meaningfully.
- */
-function watchOptions(ctx: any, loadMainPage: () => unknown) {
-  let previousOptions = klona(toValue(ctx.options))
-  watch(() => toValue(ctx.options), (value) => {
-    if (!deepEqual(value, previousOptions)) {
-      previousOptions = klona(value)
-      ctx.updateQueryTrackingMode()
-      loadMainPage()
-    }
-  }, { deep: true })
 }
