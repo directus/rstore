@@ -1,3 +1,4 @@
+import type { MonospaceCollectionLike } from './collection'
 import { createBatchedRelationFilter, isRecord, toArray } from '@rstore/connector-toolkit'
 import { getMonospacePrimaryKeys } from './collection'
 
@@ -38,41 +39,7 @@ export interface MonospaceRelationLike {
 /**
  * Collection shape required by Monospace relation helpers.
  */
-export interface MonospaceRelationCollectionLike {
-  /**
-   * Collection name used in error messages and store lookups.
-   */
-  name: string
-
-  /**
-   * Generated Monospace collection metadata.
-   */
-  meta?: {
-    /**
-     * Primary key fields generated for REST item endpoints.
-     */
-    primaryKeys?: string[]
-
-    /**
-     * Monospace-specific generated collection metadata.
-     */
-    monospace?: {
-      /**
-       * Original Monospace collection name.
-       */
-      collection?: string
-
-      /**
-       * Generated relation metadata keyed by relation field.
-       */
-      relations?: Record<string, {
-        /**
-         * Connect key columns accepted by `_connect` operations.
-         */
-        connectKeys?: string[]
-      }>
-    }
-  }
+export interface MonospaceRelationCollectionLike extends MonospaceCollectionLike {
 
   /**
    * Computes the rstore cache key for an item of this collection.

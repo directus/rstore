@@ -5,6 +5,7 @@ import type { MonospaceOpenApiDocument, MonospacePrimaryKeyConfig } from './type
 import { readFile } from 'node:fs/promises'
 import { resolve } from 'node:path'
 import process from 'node:process'
+import { trimTrailingSlash } from '../runtime/url'
 import { buildMonospaceCollections } from './introspection'
 import { assertMonospaceSchemaMetadata } from './metadata'
 
@@ -214,11 +215,4 @@ function createSchemaHeaders(schemaApiKey: string | undefined): Record<string, s
   return schemaApiKey
     ? { Authorization: `Bearer ${schemaApiKey}` }
     : {}
-}
-
-/**
- * Removes one trailing slash from a URL.
- */
-function trimTrailingSlash(value: string): string {
-  return value.endsWith('/') ? value.slice(0, -1) : value
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createMonospaceQuery, stripPrimaryKeys } from '../src'
+import { createMonospaceQuery, getMonospacePrimaryKeys, stripPrimaryKeys } from '../src'
 
 describe('createMonospaceQuery', () => {
   it('copies supported Monospace REST query options from top-level and params', () => {
@@ -89,5 +89,18 @@ describe('stripPrimaryKeys', () => {
     }, ['id', 'slug'])).toEqual({
       title: 'Todo',
     })
+  })
+})
+
+describe('getMonospacePrimaryKeys', () => {
+  it('keeps generated keys and returns a fresh id fallback', () => {
+    const generatedKeys = ['tenantId', 'id']
+    const missingFallback = getMonospacePrimaryKeys({ name: 'Todos' })
+    const emptyFallback = getMonospacePrimaryKeys({ name: 'Todos', meta: { primaryKeys: [] } })
+
+    expect(getMonospacePrimaryKeys({ name: 'Todos', meta: { primaryKeys: generatedKeys } })).toBe(generatedKeys)
+    expect(missingFallback).toEqual(['id'])
+    expect(emptyFallback).toEqual(['id'])
+    expect(missingFallback).not.toBe(emptyFallback)
   })
 })
