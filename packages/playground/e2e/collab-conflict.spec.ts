@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
+import { uniqueText } from '../../../test/e2e/todoUi'
 import { closePages, getCollabFields, openCollabEditor, openMultiplayerPeer, setTextFieldValue } from './collab-helpers'
-import { uniqueText } from './utils'
 
 test('shows conflict banner and accepts remote title in collab editor', async ({ browser }) => {
   const page = await openCollabEditor(browser, 'doc3')

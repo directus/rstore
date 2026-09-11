@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test'
-import { createTodo, todoByTitle, uniqueText } from './utils'
+import { createTodo, todoByTitle, uniqueText } from '../../../test/e2e/todoUi'
 
 test('can create and filter todos', async ({ page }) => {
   const todoText = uniqueText('playwright-directus')
