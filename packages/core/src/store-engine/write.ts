@@ -1,7 +1,7 @@
 import type { ChangeRecorder } from './change-recorder.js'
 import type { CollectionMetadata } from './collection-metadata.js'
 import type { EngineCollectionState, EngineContext, EngineEffect, WriteCommitResult } from './internal-types.js'
-import type { DeleteItemParams, EngineWriteChange, WriteItemParams } from './types.js'
+import type { DeleteItemParams, WriteItemParams } from './types.js'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { mergeItemFields } from '../crdt/index.js'
 import { shouldResurrect } from '../tombstone.js'
@@ -9,7 +9,7 @@ import { fieldValuesEqual } from '../utils/equality.js'
 import { recordItem, recordList } from './change-recorder.js'
 import { getCollectionMetadata } from './collection-metadata.js'
 import { getFieldTimestamps, setFieldTimestamps } from './crdt-state.js'
-import { clearKeyOverride, getPublicKey, isEntityKey, matchesKeyId, registerBaseKeyValue, releaseUnusedKey, toKeyId } from './identity.js'
+import { clearKeyOverride, getPublicKey, matchesKeyId, ownsDefaultKey, readDefaultKey, registerBaseKeyValue, releaseUnusedKey, toKeyId } from './identity.js'
 import { reconcileItemIndexes } from './indexes.js'
 import { planWriteTree, resolveRelationWriteParams, validateRelationCardinality, validateWriteInput } from './relations.js'
 import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
@@ -21,8 +21,6 @@ export interface DeleteCommitResult {
   removed: boolean
   /** Deferred delete hook. */
   effects: EngineEffect[]
-  /** Visibility/key-form metadata when removed. */
-  change?: EngineWriteChange
 }
 
 /** Mutable merge result with observable-value identity information. */
@@ -41,7 +39,7 @@ export interface PartialWriteProgress {
   effects: EngineEffect[]
 }
 
-/** Commit a preflighted write tree and collect callbacks in legacy order. */
+/** Commit a preflighted write tree and collect post-commit callbacks. */
 export function writeItemNow(
   ctx: EngineContext,
   changes: ChangeRecorder | undefined,
@@ -54,16 +52,16 @@ export function writeItemNow(
     validateWriteInput(params)
     const mutable = !Object.isFrozen(params.item)
     const data = mutable ? pickNonSpecialProps(params.item, true) : params.item
-    const change = commitWrite(ctx, changes, params, data, mutable, effects, metadata)
-    return { effects, change }
+    commitWrite(ctx, changes, params, data, mutable, effects, metadata)
+    return { effects }
   }
   // Vue publishes each staggered slice. Preserve child-first progress when a
   // later nested payload is malformed, while Core keeps full preflight rules.
   if (ctx.callbacks.stateChangeSink) {
     const progress = { committed: false }
     try {
-      const change = writeRelationTreeInOrder(ctx, changes, params, effects, new WeakSet(), progress)
-      return { effects, change }
+      writeRelationTreeInOrder(ctx, changes, params, effects, new WeakSet(), progress)
+      return { effects }
     }
     catch (error) {
       if (progress.committed && partial) {
@@ -73,9 +71,8 @@ export function writeItemNow(
       throw error
     }
   }
-  let rootChange: EngineWriteChange | undefined
   for (const planned of planWriteTree(ctx, params)) {
-    const change = commitWrite(
+    commitWrite(
       ctx,
       changes,
       planned.params,
@@ -84,11 +81,8 @@ export function writeItemNow(
       effects,
       getCollectionMetadata(planned.params.collection),
     )
-    if (planned.root) {
-      rootChange = change
-    }
   }
-  return { effects, change: rootChange }
+  return { effects }
 }
 
 /** Commit nested relations in field order for observable staggered writes. */
@@ -99,7 +93,7 @@ function writeRelationTreeInOrder(
   effects: EngineEffect[],
   path: WeakSet<object>,
   progress: { committed: boolean },
-): EngineWriteChange | undefined {
+): void {
   validateWriteInput(params)
   if (path.has(params.item)) {
     throw new Error(`Cyclic nested relation detected in collection ${params.collection.name}`)
@@ -108,9 +102,9 @@ function writeRelationTreeInOrder(
   try {
     const metadata = getCollectionMetadata(params.collection)
     if (Object.isFrozen(params.item)) {
-      const change = commitWrite(ctx, changes, params, params.item, false, effects, metadata)
+      commitWrite(ctx, changes, params, params.item, false, effects, metadata)
       progress.committed = true
-      return change
+      return
     }
 
     const rawData = pickNonSpecialProps(params.item, true)
@@ -137,9 +131,8 @@ function writeRelationTreeInOrder(
         writeRelationTreeInOrder(ctx, changes, childParams, effects, path, progress)
       }
     }
-    const change = commitWrite(ctx, changes, params, data, true, effects, metadata)
+    commitWrite(ctx, changes, params, data, true, effects, metadata)
     progress.committed = true
-    return change
   }
   finally {
     path.delete(params.item)
@@ -156,7 +149,7 @@ export function commitWrite(
   effects: EngineEffect[] | undefined,
   metadata: CollectionMetadata,
   preparedState?: EngineCollectionState,
-): EngineWriteChange | undefined {
+): void {
   const { collection, key, item, marker, fromRelation, fromWriteItems, meta } = params
   const state = preparedState ?? ctx.ensureCollection(collection.name)
   const id = toKeyId(key)
@@ -164,7 +157,7 @@ export function commitWrite(
   const derivedKey = metadata.usesDefaultKey
     ? readDefaultKey(item)
     : collection.getKey(item)
-  const itemOwnsKey = metadata.usesDefaultKey && (derivedKey !== undefined || ownsKeyField(item))
+  const itemOwnsKey = metadata.usesDefaultKey && (derivedKey !== undefined || ownsDefaultKey(item))
   const derivedKeyIsCanonical = matchesKeyId(derivedKey, id)
   const existing = state.base.get(id)
   const previousPublicKey = existing === undefined && !state.layeredKeyCounts?.has(id)
@@ -175,7 +168,7 @@ export function commitWrite(
   const tombstone = ctx.tombstones.get(collection.name, key)
   if (tombstone) {
     if (params.fieldTimestamps && !shouldResurrect(tombstone, params.fieldTimestamps)) {
-      return undefined
+      return
     }
     ctx.tombstones.clear(collection.name, key)
   }
@@ -207,15 +200,16 @@ export function commitWrite(
   // state unchanged. Layerless writes retain their historical notification
   // semantics, including same-value response refreshes.
   const visibleValueChanged = !fieldValuesEqual(previous, next)
+  const keyFormChange = keyFormChanged && previousPublicKey !== undefined
+    ? { previousKey: previousPublicKey, key: publicKey }
+    : undefined
   if ((layerless ? mergedBase.valueChanged : visibleValueChanged) || keyFormChanged) {
     recordItem(
       changes,
       collection.name,
       id,
       next,
-      keyFormChanged && previousPublicKey !== undefined
-        ? { previousKey: previousPublicKey, key: publicKey }
-        : undefined,
+      keyFormChange,
     )
   }
   if (visibilityChanged || keyFormChanged) {
@@ -235,14 +229,6 @@ export function commitWrite(
     meta.$queryTracking.items[collection.name] ??= new Set()
     meta.$queryTracking.items[collection.name]!.add(publicKey)
   }
-  const change = !fromWriteItems || ctx.callbacks.onAfterWrite
-    ? {
-        key: publicKey,
-        previousKey: previousPublicKey,
-        visibilityChanged,
-        keyFormChanged,
-      }
-    : undefined
   if (!fromWriteItems) {
     appendWriteEffects(
       ctx,
@@ -257,10 +243,8 @@ export function commitWrite(
         marker,
         operation: 'write',
       },
-      [change!],
     )
   }
-  return change
 }
 /** Check whether one mutable patch can change any materialized membership. */
 function touchesIndexedField(metadata: CollectionMetadata, data: any): boolean {
@@ -271,17 +255,6 @@ function touchesIndexedField(metadata: CollectionMetadata, data: any): boolean {
   }
   return false
 }
-/** Check whether default key derivation can change public key representation. */
-function ownsKeyField(item: object): boolean {
-  return Object.hasOwn(item, '$overrideKey') || Object.hasOwn(item, 'id') || Object.hasOwn(item, '__id')
-}
-
-/** Read default override/id/__id public-key policy. */
-function readDefaultKey(item: any): string | number | undefined {
-  const key = item?.$overrideKey ?? item?.id ?? item?.__id
-  return isEntityKey(key) ? key : undefined
-}
-
 /** Merge relation-free mutable data and defer any CRDT conflict hook. */
 function mergeMutableItem(
   ctx: EngineContext,
@@ -339,34 +312,30 @@ export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder |
   const next = layerless ? undefined : resolveItemById(state, id)
   if (getCollectionMetadata(collection).hasIndexes)
     reconcileItemIndexes(ctx, changes, collection, id, previous, next)
-  const change: EngineWriteChange = {
-    key: next === undefined ? publicKey : getPublicKey(state, id),
-    previousKey: publicKey,
-    visibilityChanged: (previous !== undefined) !== (next !== undefined),
-    keyFormChanged: next !== undefined && publicKey !== getPublicKey(state, id),
-  }
+  const nextPublicKey = next === undefined ? publicKey : getPublicKey(state, id)
+  const visibilityChanged = (previous !== undefined) !== (next !== undefined)
+  const keyFormChanged = next !== undefined && publicKey !== nextPublicKey
   recordItem(
     changes,
     collection.name,
     id,
     next,
-    change.keyFormChanged ? { previousKey: publicKey, key: change.key } : undefined,
+    keyFormChanged ? { previousKey: publicKey, key: nextPublicKey } : undefined,
   )
-  if (change.visibilityChanged || change.keyFormChanged) {
+  if (visibilityChanged || keyFormChanged) {
     invalidateVisibleKeys(state)
     recordList(changes, collection.name)
   }
   releaseUnusedKey(state, id)
   return {
     removed: true,
-    change,
     effects: createWriteEffects(ctx, {
       collection,
       key: publicKey,
-      previousKey: change.previousKey,
-      keyFormChanged: change.keyFormChanged,
-      visibilityChanged: change.visibilityChanged,
+      previousKey: publicKey,
+      keyFormChanged,
+      visibilityChanged,
       operation: 'delete',
-    }, [change]),
+    }),
   }
 }

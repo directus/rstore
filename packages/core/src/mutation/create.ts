@@ -1,9 +1,8 @@
 import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
-import { set } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
 import { isKeyDefined } from '../key'
 import { finalizeMutation } from './finalizeMutation'
-import { createOptimisticLayerLifecycle, prepareMutationItem, replaceTransportItem } from './optimistic'
+import { createMutationHookState, createOptimisticLayerLifecycle } from './optimistic'
 
 export interface CreateOptions<
   TCollection extends Collection,
@@ -49,9 +48,8 @@ export async function createItem<
 }: CreateOptions<TCollection, TCollectionDefaults, TSchema>): Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> {
   const meta: CustomHookMeta = {}
 
-  let preparedItem = prepareMutationItem(store, collection, inputItem)
-  let optimisticItem = preparedItem.optimisticItem
-  const transportItem = preparedItem.transportItem
+  const mutationHookState = createMutationHookState(store, collection, inputItem)
+  const { transportItem } = mutationHookState
 
   let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | undefined
 
@@ -61,24 +59,15 @@ export async function createItem<
     collection,
     mutation: 'create',
     item: transportItem,
-    modifyItem: (path: any, value: any) => {
-      set(optimisticItem, path, value)
-      preparedItem = prepareMutationItem(store, collection, optimisticItem)
-      replaceTransportItem(transportItem, preparedItem.transportItem)
-    },
-    setItem: (newItem) => {
-      const prepared = prepareMutationItem(store, collection, newItem as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>, preparedItem)
-      preparedItem = prepared
-      optimisticItem = prepared.optimisticItem
-      replaceTransportItem(transportItem, prepared.transportItem)
-    },
+    modifyItem: mutationHookState.modifyItem,
+    setItem: mutationHookState.setItem,
     formOperations: formOperations as FormOperation[],
   })
 
   const optimisticLayer = createOptimisticLayerLifecycle(store)
 
   if (!skipCache && optimistic) {
-    let key = collection.getKey(optimisticItem)
+    let key = collection.getKey(mutationHookState.optimisticItem)
     if (!isKeyDefined(key)) {
       key = crypto.randomUUID()
     }
@@ -87,7 +76,7 @@ export async function createItem<
       collectionName: collection.name,
       state: {
         [key]: {
-          ...optimisticItem,
+          ...mutationHookState.optimisticItem,
           ...typeof optimistic === 'object' ? optimistic : {},
           $overrideKey: key,
         },

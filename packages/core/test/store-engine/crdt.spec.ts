@@ -15,27 +15,23 @@ describe('store-engine: CRDT field merge', () => {
 
   it('keeps resolved identity and skips item invalidation for a stale write', () => {
     const collection = buildCollection('User')
-    const stateChange = vi.fn()
-    const afterWrite = vi.fn()
+    const writeCommitted = vi.fn()
     const engine = createStoreEngine({
       isServer: true,
       callbacks: {
         getCollection: name => name === collection.name ? collection : undefined,
         resolveChildCollection: () => null,
-        onStateChange: stateChange,
-        onAfterWrite: afterWrite,
+        onWriteCommitted: writeCommitted,
       },
     })
     engine.writeItem({ collection, key: 1, item: { id: 1, name: 'Local' }, fieldTimestamps: { name: 100 } })
     const before = engine.readItemRaw({ collection, key: 1 })
-    stateChange.mockClear()
-    afterWrite.mockClear()
+    writeCommitted.mockClear()
 
     engine.writeItem({ collection, key: 1, item: { id: 1, name: 'Remote' }, fieldTimestamps: { name: 50 } })
 
     expect(engine.readItemRaw({ collection, key: 1 })).toBe(before)
-    expect(stateChange).not.toHaveBeenCalled()
-    expect(afterWrite).toHaveBeenCalledTimes(1)
+    expect(writeCommitted).toHaveBeenCalledTimes(1)
   })
 
   it('takes the incoming field when its timestamp is newer', () => {

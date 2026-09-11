@@ -7,6 +7,23 @@ import type { GlobalStoreType } from './global'
 import type { CustomHookMeta } from './hooks'
 import type { Awaitable } from './utils'
 
+/** One mutation item with an optional explicit cache key. */
+export interface MutationItemEntry<T> {
+  key?: string | number
+  item: T
+}
+
+/** One mutation item whose explicit cache key is required. */
+export interface KeyedMutationItemEntry<T> extends MutationItemEntry<T> {
+  key: string | number
+}
+
+/** Mutation input accepted as either a plain item or a keyed entry wrapper. */
+export type MutationItemInput<T> = T | MutationItemEntry<T>
+
+/** Mutable list form accepted by many-mutation inputs. */
+export type MutationItemsInput<T> = Array<MutationItemInput<T>>
+
 export interface MutationOperation<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -54,7 +71,7 @@ export interface ApplyMutationOptions<
   key?: string | number
   keys?: Array<string | number>
   item?: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
-  items?: Array<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> | { key?: string | number, item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> }>
+  items?: MutationItemsInput<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>>
   result?: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
   results?: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
   meta?: CustomHookMeta
@@ -91,7 +108,7 @@ export interface MutateContext<
   key?: string | number
   keys?: Array<string | number>
   item?: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
-  items?: Array<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> | { key?: string | number, item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> }>
+  items?: MutationItemsInput<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>>
 }
 
 export type MutateCallback<

@@ -1,15 +1,14 @@
 import type { CustomCacheState, FieldTimestamps, ResolvedCollection } from '@rstore/shared'
 import type { ChangeRecorder } from './change-recorder.js'
 import type { EngineCollectionState, EngineContext, EngineEffect, NormalizedCacheSnapshot, NormalizedCollectionRows } from './internal-types.js'
-import { needsCollectionResetKeys, recordCollectionReset } from './change-recorder.js'
+import { recordCollectionReset } from './change-recorder.js'
 import { getCollectionMetadata } from './collection-metadata.js'
 import { createCollectionState } from './context.js'
 import { getPublicKey, isEntityKey, registerBaseKeyValue } from './identity.js'
 import { rebuildIndexes } from './indexes.js'
 import { restoreLayerOwnership } from './layers.js'
 import { applyModuleHydration, prepareModuleClear, prepareModuleHydration, serializeModules } from './modules.js'
-import { copyNullRecord, createNullRecord } from './records.js'
-import { getVisibleKeyIds } from './view.js'
+import { copyNullRecord, createNullRecord, replaceRecordContents } from './records.js'
 import { deleteItemFromBase } from './write.js'
 
 /** Detached collection state plus snapshot-key identities derived during staging. */
@@ -147,10 +146,8 @@ export function clearCollectionNow(
   }
   ctx.fieldTimestamps.delete(collection.name)
   clearCollectionTombstones(ctx, collection.name)
-  const current = ctx.collections.get(collection.name)
   if (changes) {
-    const ids = current && needsCollectionResetKeys(changes, collection.name) ? getVisibleKeyIds(current) : []
-    recordCollectionReset(changes, collection.name, ids, ids)
+    recordCollectionReset(changes, collection.name)
   }
   return effects
 }
@@ -212,16 +209,8 @@ function restoreCollection(
 function commitCollections(ctx: EngineContext, changes: ChangeRecorder | undefined, staged: Map<string, EngineCollectionState>): void {
   const names = new Set([...ctx.collections.keys(), ...staged.keys()])
   for (const name of names) {
-    const previous = ctx.collections.get(name)
-    const next = staged.get(name)
     if (changes) {
-      const needsKeys = needsCollectionResetKeys(changes, name)
-      recordCollectionReset(
-        changes,
-        name,
-        previous && needsKeys ? getVisibleKeyIds(previous) : [],
-        next && needsKeys ? getVisibleKeyIds(next) : [],
-      )
+      recordCollectionReset(changes, name)
     }
   }
   ctx.collections.clear()
@@ -235,10 +224,7 @@ function replaceQueryMeta(ctx: EngineContext, source: Record<string, any>): void
   if (source === ctx.queryMeta) {
     return
   }
-  for (const key of Object.keys(ctx.queryMeta)) {
-    delete ctx.queryMeta[key]
-  }
-  Object.assign(ctx.queryMeta, source)
+  replaceRecordContents(ctx.queryMeta, source)
 }
 
 /** Clear every tombstone without depending on encoded entry identities. */

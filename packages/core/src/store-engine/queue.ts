@@ -221,10 +221,8 @@ function processBatch(
   if (prepared) {
     while (operation.index < operation.params.items.length) {
       const { key, value } = operation.params.items[operation.index]!
-      const change = writePreparedBatchItem(ctx, prepared, key, value)
+      writePreparedBatchItem(ctx, prepared, key, value)
       operation.index++
-      if (change && operation.changes)
-        operation.changes.push(change)
     }
     return finishBatch(ctx, operation, flushChanges)
   }
@@ -247,8 +245,6 @@ function processBatch(
         fromWriteItems: true,
       }, partial)
       operation.index++
-      if (result.change && operation.changes)
-        operation.changes.push(result.change)
       // Core callers historically receive nested relation hooks as each row
       // commits. Vue has a bridge sink, so it delays them until final state is
       // visible with the outer batch hook.
@@ -358,7 +354,7 @@ function finishBatch(
     result: operation.params.items,
     marker: operation.params.marker,
     operation: 'write',
-  }, operation.changes)]
+  })]
   advance(ctx)
   try {
     dispatchCommitted(ctx, recorder, effects)

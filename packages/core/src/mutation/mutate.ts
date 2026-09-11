@@ -1,7 +1,7 @@
 import type { Collection, CollectionDefaults, CollectionMutationType, GlobalStoreType, MutateCallback, MutateOptions, ResolvedCollectionItemBase, StoreCore, StoreSchema } from '@rstore/shared'
 import { getMutationItemKey, isMutationItemEntry, pickNonSpecialProps, set, unwrapMutationItem } from '@rstore/shared'
-import { isKeyDefined } from '../key'
 import { finalizeMutation } from './finalizeMutation'
+import { getDefinedKeys, getItemKey, normalizeKey } from './keys'
 
 /** Run custom remote work through rstore's collection mutation lifecycle. */
 export async function mutate<
@@ -31,7 +31,7 @@ async function mutateSingle<
 ): Promise<TResult> {
   const meta = options.meta ?? {}
   let item = prepareSingleItem(store, options)
-  let key = options.key ?? getItemKey(options, item)
+  let key = options.key ?? getItemKey(options.collection, item)
 
   await store.$hooks.callHook('beforeMutation', {
     store: store as unknown as GlobalStoreType,
@@ -50,7 +50,7 @@ async function mutateSingle<
     formOperations: options.formOperations,
   })
 
-  key = options.key ?? getItemKey(options, item)
+  key = options.key ?? getItemKey(options.collection, item)
 
   const callbackResult = await callback({
     store: store as unknown as GlobalStoreType,
@@ -97,7 +97,7 @@ async function mutateMany<
     },
   })
 
-  const keys = options.keys ?? getItemKeys(options, items)
+  const keys = options.keys ?? getItemKeys(options.collection, items)
 
   const callbackResult = await callback({
     store: store as unknown as GlobalStoreType,
@@ -184,20 +184,8 @@ function getManyResults(result: unknown) {
   return Array.isArray(result) ? result : [result]
 }
 
-function getItemKeys(options: MutateOptions, items: MutateOptions['items']) {
+function getItemKeys(collection: MutateOptions['collection'], items: MutateOptions['items']) {
   const keys = items
-    ?.map(item => getMutationItemKey(item) ?? getItemKey(options, item))
-    .filter(isKeyDefined)
-  return keys?.length ? keys : undefined
-}
-
-function getItemKey(options: MutateOptions, item: unknown) {
-  if (!item || typeof item !== 'object') {
-    return undefined
-  }
-  return options.collection.getKey(isMutationItemEntry(item) ? item.item : item)
-}
-
-function normalizeKey(key: string | number | null | undefined) {
-  return key ?? undefined
+    ?.map(item => getMutationItemKey(item) ?? getItemKey(collection, item))
+  return keys ? getDefinedKeys(keys) : undefined
 }

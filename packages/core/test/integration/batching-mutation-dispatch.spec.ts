@@ -189,4 +189,25 @@ describe('batched mutation dispatch', () => {
     expect(stack.remote.callCount('createItem')).toBe(0)
     expect(stack.readMany('todos')).toEqual([])
   })
+
+  it('keeps the first terminal mutation resolution when later calls disagree', async () => {
+    const stack = await batchStack({
+      on: {
+        batchMutate: ({ payload }: any) => {
+          const [operation] = payload.operations
+          operation.setError(new Error('First failure'))
+          operation.setResult({ id: '1', title: 'Late result' })
+        },
+      },
+    })
+
+    await expect(createItem({
+      store: stack.store,
+      collection: stack.collection('todos'),
+      item: { id: '1', title: 'One' } as any,
+    })).rejects.toThrow('First failure')
+
+    expect(stack.remote.callCount('createItem')).toBe(0)
+    expect(stack.read('todos', '1')).toBeUndefined()
+  })
 })

@@ -1,5 +1,12 @@
 import type { EngineContext, EngineEffect } from './internal-types.js'
 
+/** Lazily allocate error storage and retain callback failure order. */
+export function appendError(errors: unknown[] | undefined, error: unknown): unknown[] {
+  const result = errors ?? []
+  result.push(error)
+  return result
+}
+
 /** Dispatch every effect and preserve one error or aggregate many errors. */
 export function dispatchEffects(ctx: EngineContext, effects: readonly EngineEffect[]): void {
   if (!effects.length)
@@ -14,8 +21,7 @@ export function dispatchEffects(ctx: EngineContext, effects: readonly EngineEffe
       dispatchEffect(ctx, effect)
     }
     catch (error) {
-      errors ??= []
-      errors.push(error)
+      errors = appendError(errors, error)
     }
   }
   throwCollectedErrors(errors, 'Multiple store engine effects failed')
@@ -26,9 +32,6 @@ function dispatchEffect(ctx: EngineContext, effect: EngineEffect): void {
   switch (effect.type) {
     case 'writeCommitted':
       ctx.callbacks.onWriteCommitted?.(effect.payload)
-      break
-    case 'afterWrite':
-      ctx.callbacks.onAfterWrite?.(effect.payload)
       break
     case 'conflict':
       ctx.callbacks.onConflict?.(effect.payload)

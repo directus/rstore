@@ -1,5 +1,7 @@
 import type { CacheStateInput, CacheTombstone, CustomHookMeta, FieldTimestamps, FieldTimestampValue } from '@rstore/shared'
 import type { NormalizedCacheSnapshot, NormalizedCollectionRows } from './internal-types.js'
+import { isCacheTombstone } from '@rstore/shared'
+import { getLegacyModuleKey } from './module-key.js'
 import { createNullRecord, isObjectRecord } from './records.js'
 
 /** Validate and detach snapshot containers before queueing hydration. */
@@ -80,13 +82,10 @@ function normalizeTombstones(value: unknown): CacheTombstone[] | undefined {
     throw new TypeError('Cache snapshot tombstones must be an array')
   }
   return value.map((entry, index) => {
-    if (!isObjectRecord(entry)
-      || typeof entry.collection !== 'string'
-      || (typeof entry.key !== 'string' && typeof entry.key !== 'number')
-      || (typeof entry.deletedAt !== 'string' && typeof entry.deletedAt !== 'number')) {
+    if (!isCacheTombstone(entry)) {
       throw new TypeError(`Cache snapshot tombstone at index ${index} is invalid`)
     }
-    return { collection: entry.collection, key: entry.key, deletedAt: entry.deletedAt as FieldTimestampValue }
+    return { ...entry }
   })
 }
 
@@ -157,7 +156,7 @@ function normalizeVersionedModules(value: unknown): Pick<NormalizedCacheSnapshot
       legacyModules.set(entry.legacyKey, entry.state)
       continue
     }
-    const legacyKey = `${entry.name}:${entry.key}`
+    const legacyKey = getLegacyModuleKey(entry.name, entry.key)
     if (legacyModules.has(legacyKey)) {
       throw new TypeError(`Cache snapshot contains exact and legacy module entries for "${legacyKey}"`)
     }

@@ -10,6 +10,17 @@ export function isEntityKey(value: unknown): value is string | number {
   return typeof value === 'string' || typeof value === 'number'
 }
 
+/** Read the default override/id/__id key policy without canonical coercion. */
+export function readDefaultKey(item: any): string | number | undefined {
+  const key = item?.$overrideKey ?? item?.id ?? item?.__id
+  return isEntityKey(key) ? key : undefined
+}
+
+/** Return whether a patch owns any field used by the default key policy. */
+export function ownsDefaultKey(item: object): boolean {
+  return Object.hasOwn(item, '$overrideKey') || Object.hasOwn(item, 'id') || Object.hasOwn(item, '__id')
+}
+
 /** Check one public key against canonical internal identity. */
 export function matchesKeyId(value: unknown, id: KeyId): value is string | number {
   return isEntityKey(value) && toKeyId(value) === id
@@ -107,6 +118,6 @@ function deriveItemKey(state: EngineCollectionState, id: KeyId, item: any): stri
 function readItemKey(state: EngineCollectionState, item: any): string | number | undefined {
   if (item == null)
     return undefined
-  const derived = state.usesDefaultKey ? item.$overrideKey ?? item.id ?? item.__id : state.collection?.getKey(item)
+  const derived = state.usesDefaultKey ? readDefaultKey(item) : state.collection?.getKey(item)
   return isEntityKey(derived) ? derived : undefined
 }
