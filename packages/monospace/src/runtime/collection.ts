@@ -1,4 +1,5 @@
 import type { Collection } from '@rstore/shared'
+import { resolveGeneratedPrimaryKeys } from '@rstore/connector-toolkit'
 
 /* eslint-disable unused-imports/no-unused-vars */
 
@@ -106,7 +107,7 @@ declare module '@rstore/shared' {
  * Returns generated Monospace primary keys or the default `id` key.
  */
 export function getMonospacePrimaryKeys(collection: MonospaceCollectionLike): string[] {
-  return collection.meta?.primaryKeys?.length ? collection.meta.primaryKeys : ['id']
+  return resolveGeneratedPrimaryKeys(collection.meta?.primaryKeys)
 }
 
 /**

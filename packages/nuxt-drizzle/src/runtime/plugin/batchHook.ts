@@ -1,9 +1,9 @@
 import type { BatchWireOperation, BatchWireResponse } from '../utils/batch'
 import type { DrizzlePluginContext } from './context'
+import { stripPrimaryKeys } from '@rstore/connector-toolkit'
 import SuperJSON from 'superjson'
 import { fromBatchWireError } from '../utils/batch'
 import { clientIdHeaders } from './context'
-import { stripPrimaryKeys } from './mutationHooks'
 
 /** Register the unified batch hook. */
 export function installBatchHook(ctx: DrizzlePluginContext, hook: any) {
@@ -85,7 +85,7 @@ function toWireOperation(op: any): BatchWireOperation | undefined {
       type: 'update',
       collection: op.collection.name,
       key: String(op.key),
-      item: stripPrimaryKeys(op.collection, op.item as Record<string, any>),
+      item: stripPrimaryKeys(op.item as Record<string, any>, op.collection.meta?.primaryKeys),
     }
   }
   if (op.type === 'delete') {

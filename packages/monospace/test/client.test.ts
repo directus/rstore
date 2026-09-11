@@ -46,6 +46,22 @@ describe('createMonospaceRestClient', () => {
     })
   })
 
+  it('removes only one trailing slash from the runtime API URL', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: [] }))
+    const client = createMonospaceRestClient({
+      url: 'https://example.monospace.io//',
+      project: 'blog',
+      fetch: fetchMock,
+    })
+
+    await client.readMany('Todos')
+
+    expect(fetchMock).toHaveBeenCalledWith(
+      'https://example.monospace.io//api/blog/items/Todos',
+      expect.any(Object),
+    )
+  })
+
   it('posts createOne as a one-item array and returns the first result item', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: [{ id: 7, title: 'Created' }] }))
     const client = createMonospaceRestClient({

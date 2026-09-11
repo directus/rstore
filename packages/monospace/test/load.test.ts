@@ -45,6 +45,20 @@ describe('loadRemoteOpenApiDocument', () => {
       url: 'https://example.monospace.io',
     })).rejects.toThrow('Failed to load Monospace OpenAPI schema: 404')
   })
+
+  it('removes only one trailing slash from the schema API URL', async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(createOpenApiFixture()))
+
+    await loadRemoteOpenApiDocument({
+      fetch: fetchMock,
+      project: 'blog',
+      url: 'https://example.monospace.io//',
+    })
+
+    expect(fetchMock).toHaveBeenCalledWith('https://example.monospace.io//api/blog/openapi', {
+      headers: {},
+    })
+  })
 })
 
 describe('loadRemoteSchemaMetadata', () => {

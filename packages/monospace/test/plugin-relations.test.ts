@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMockClient, createProfilesCollection, createRelationStore, createTodosCollection, runHook, setupPlugin } from './utils/plugin'
+import { runConnectorHook as runHook } from '../../../test/utils/connectorPlugin'
+import { createMockClient, createProfilesCollection, createRelationStore, createTodosCollection, setupPlugin } from './utils/plugin'
 
 const client = createMockClient()
 
