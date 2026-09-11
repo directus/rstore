@@ -1,15 +1,11 @@
 import type { PayloadBenchmarkReport, PayloadBenchmarkRow, PayloadBenchmarkRunSet, PayloadImplementationName, PayloadProfile, PayloadProfileRow, PayloadWorkerRequest, PayloadWorkerResult } from './types'
-import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { createRequire } from 'node:module'
-import { tmpdir } from 'node:os'
-import { dirname, join, resolve } from 'node:path'
+import { readFile } from 'node:fs/promises'
+import { dirname, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
-import { promisify } from 'node:util'
+import { runIsolatedWorkerProcess } from '../worker-process'
 
-const execFileAsync = promisify(execFile)
 const REPORT_START = 'RSTORE_PAYLOAD_REPORT_START'
 const REPORT_END = 'RSTORE_PAYLOAD_REPORT_END'
 
@@ -90,26 +86,17 @@ export function selectPayloadRows(profile: PayloadProfile): PayloadProfileRow[] 
 /** Spawn one actual Node worker with explicit GC. */
 export async function runPayloadWorkerProcess(row: PayloadProfileRow, implementation: PayloadImplementationName): Promise<PayloadWorkerResult> {
   const request: PayloadWorkerRequest = { scenarioId: row.scenario.id, implementation, dimensions: row.dimensions }
-  const require = createRequire(import.meta.url)
-  const viteNode = require.resolve('vite-node/cli')
   const worker = resolve(dirname(fileURLToPath(import.meta.url)), 'worker-entry.ts')
-  const config = resolve(process.cwd(), 'vitest.config.ts')
-  const outputDirectory = await mkdtemp(join(tmpdir(), 'rstore-payload-worker-'))
-  const outputPath = join(outputDirectory, 'result.json')
-  try {
-    await execFileAsync(process.execPath, ['--expose-gc', viteNode, '--config', config, worker, JSON.stringify(request)], {
-      cwd: process.cwd(),
-      env: { ...process.env, RSTORE_BENCHMARK_RESULT_PATH: outputPath },
-      maxBuffer: 8 * 1024 * 1024,
-    })
-    const result = JSON.parse(await readFile(outputPath, 'utf8')) as PayloadWorkerResult
-    if (result.scenarioId !== row.scenario.id || result.implementation !== implementation)
-      throw new TypeError(`Payload worker identity mismatch for ${row.scenario.id}/${implementation}`)
-    return result
-  }
-  finally {
-    await rm(outputDirectory, { recursive: true, force: true })
-  }
+  return runIsolatedWorkerProcess<PayloadWorkerResult>({
+    maxBuffer: 8 * 1024 * 1024,
+    request,
+    resultPrefix: 'rstore-payload-worker-',
+    validateResult: (result) => {
+      if (result.scenarioId !== row.scenario.id || result.implementation !== implementation)
+        throw new TypeError(`Payload worker identity mismatch for ${row.scenario.id}/${implementation}`)
+    },
+    workerPath: worker,
+  })
 }
 
 /** Pair equivalent isolated worker results. */

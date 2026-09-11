@@ -39,13 +39,11 @@ export function runApiQuery(
   if (isLive && !runtime.store.$isServer) {
     // `realtimeReconnectEventHook` is module-level: skip registration on the
     // server (server scopes are never disposed, so every SSR request would
-    // leak the query graph) and detach the listener on scope dispose.
-    const { off } = realtimeReconnectEventHook.on(() => query.refresh())
-    tryOnScopeDispose(off)
+    // leak the query graph). VueUse EventHook owns scope disposal for `on()`.
+    realtimeReconnectEventHook.on(() => query.refresh())
   }
   if (runtime.onInvalidate) {
-    const { off } = runtime.onInvalidate(() => query.refresh())
-    tryOnScopeDispose(() => off())
+    runtime.onInvalidate(() => query.refresh())
   }
   return query
 }
@@ -137,8 +135,7 @@ export function subscribeToApiQuery(
   tryOnScopeDispose(unsub)
   if (runtime.onInvalidate) {
     // Force: the collection may have changed even though options are equal.
-    const { off } = runtime.onInvalidate(() => sub(toValue(keyOrFindOptions), true))
-    tryOnScopeDispose(() => off())
+    runtime.onInvalidate(() => sub(toValue(keyOrFindOptions), true))
   }
   return { unsubscribe: unsub, meta }
 }
