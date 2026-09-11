@@ -88,8 +88,10 @@ describe('public cache protocol', () => {
   it('queues relation targets while validating public relation writes immediately', async () => {
     const stack = await createVueStack({
       schema: [
-        { name: 'notes', relations: { owner: { to: { users: { on: { id: 'ownerId' } } } } } },
+        { name: 'notes', relations: { owner: { to: { users: { on: { id: 'ownerId' } }, teams: { on: { id: 'ownerId' } } } } } },
         { name: 'users' },
+        { name: 'teams' },
+        { name: 'admins' },
       ],
       remote: false,
     })
@@ -97,14 +99,18 @@ describe('public cache protocol', () => {
     const relation = parentCollection.relations.owner!
     stack.store.notes.writeItem({ id: '1', ownerId: 0 })
     stack.cache.pause()
-    expect(() => stack.cache.writeItemForRelation({ parentCollection, relationKey: 'owner', relation, childItem: { name: 'Invalid' } }))
+    expect(() => stack.cache.writeItemForRelation({ parentCollection, relationKey: 'owner', relation, childItem: { $collection: 'users', name: 'Invalid' } }))
       .toThrow('Could not determine key for relation notes.owner')
-    stack.cache.writeItemForRelation({ parentCollection, relationKey: 'owner', relation, childItem: { id: 0, name: 'Ada' } })
+    expect(() => stack.cache.writeItemForRelation({ parentCollection, relationKey: 'owner', relation, childItem: { $collection: 'admins', id: 1, name: 'Eve' } }))
+      .toThrow('Could not determine type for relation notes.owner')
+    stack.cache.writeItemForRelation({ parentCollection, relationKey: 'owner', relation, childItem: { $collection: 'users', id: 0, name: 'Ada' } })
     expect(stack.read('users', 0)).toBeUndefined()
+    expect(stack.read('admins', 1)).toBeUndefined()
     stack.cache.resume()
 
     expect(stack.store.notes.peekFirst('1').owner.name).toBe('Ada')
     expect(stack.read('users', 0)).toMatchObject({ id: 0, name: 'Ada' })
     expect(stack.readMany('users')).toEqual([{ id: 0, name: 'Ada' }])
+    expect(stack.read('admins', 1)).toBeUndefined()
   })
 })
