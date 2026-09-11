@@ -1,5 +1,6 @@
-import type { CacheLayer, CustomHookMeta, FieldTimestamps, ResolvedCollection } from '@rstore/shared'
+import type { CacheLayer, CacheTombstone, CustomHookMeta, FieldTimestamps, ResolvedCollection } from '@rstore/shared'
 import type { TombstoneStore } from '../tombstone.js'
+import type { ChangeRecorder } from './change-recorder.js'
 import type { MutableEngineChangeSet } from './change-set.js'
 import type {
   DeleteItemParams,
@@ -143,6 +144,10 @@ export interface NormalizedCacheSnapshot {
   legacyModules: Map<string, unknown>
   /** Validated query metadata. */
   queryMeta: Record<string, CustomHookMeta>
+  /** Per-row causal stamps, keyed by serialized public key. */
+  fieldTimestamps: Map<string, Map<string, FieldTimestamps>>
+  /** Validated causal deletes, omitted when legacy state must retain them. */
+  tombstones?: CacheTombstone[]
 }
 
 /** Detached collection container using aligned key and item arrays. */
@@ -173,7 +178,18 @@ export interface WriteCommitResult {
 /** FIFO engine operation. */
 export type QueuedOperation
   = | { type: 'writeItem', params: WriteItemParams }
-    | { type: 'writeItems', params: WriteItemsParams, index: number, changes?: EngineWriteChange[] }
+    | {
+      type: 'writeItems'
+      params: WriteItemsParams
+      index: number
+      changes?: EngineWriteChange[]
+      /** One recorder keeps a batch invisible to adapters until it settles. */
+      recorder?: ChangeRecorder
+      /** Nested callbacks run only after final bridge publication. */
+      effects?: EngineEffect[]
+      /** A failed nested row committed earlier children and can be retried. */
+      partialCommit?: true
+    }
     | { type: 'deleteItem', params: DeleteItemParams }
     | { type: 'addLayer', layer: CacheLayer }
     | { type: 'removeLayer', layerId: string }

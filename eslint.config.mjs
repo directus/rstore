@@ -59,6 +59,29 @@ export default antfu({
     ],
   },
 }, {
+  // These specs intentionally exercise private bridge algorithms. Keep the
+  // public-boundary rule active for every integration and behavior spec.
+  files: [
+    'packages/vue/test/cache-differential.spec.ts',
+    'packages/vue/test/change-interest.spec.ts',
+    'packages/vue/test/index-result-cache.spec.ts',
+    'packages/vue/test/signals.spec.ts',
+    'packages/vue/test/state-sink.spec.ts',
+    'packages/vue/test/wrapped-item-metadata.spec.ts',
+  ],
+  rules: {
+    'no-restricted-imports': 'off',
+  },
+}, {
+  // Bridge lifecycle assertions need the deliberately exposed private cache
+  // handle; other behavior in this file still uses public cache operations.
+  files: [
+    'packages/vue/test/cache-data-core.spec.ts',
+  ],
+  rules: {
+    'no-restricted-syntax': 'off',
+  },
+}, {
   files: [
     'packages/*/benchmark/**/*.ts',
   ],

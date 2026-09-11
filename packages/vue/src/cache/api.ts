@@ -1,6 +1,6 @@
 import type { Cache, CollectionDefaults, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CacheRuntime, VueCachePrivate } from './types'
-import { reactive } from 'vue'
+import { reactive, toRaw } from 'vue'
 import { ensureLayersForCollection, readRawCacheItem } from './context'
 import { applyMutationToCache } from './mutations'
 import { garbageCollectItem, getWrappedItem } from './wrapped'
@@ -60,7 +60,14 @@ export function createCacheApi<
       return reactive(ctx.engine.getModuleState(name, key, initState))
     },
     getState() {
-      return ctx.engine.getState()
+      const state = ctx.engine.getState()
+      return {
+        ...state,
+        modules: state.modules.map(module => ({
+          ...module,
+          state: toRaw(module.state),
+        })),
+      }
     },
     setState(state) {
       ctx.engine.setState(state)
@@ -108,6 +115,7 @@ export function createCacheApi<
       getWrappedItem: (collection, item, noCache) => getWrappedItem(ctx, collection, item, noCache),
       layers: ctx.layers,
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
+      rebuildIndexes: () => ctx.engine.rebuildIndexes(),
     },
   } satisfies Cache & VueCachePrivate as any
 }

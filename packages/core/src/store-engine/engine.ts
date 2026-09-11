@@ -4,9 +4,9 @@ import { createTombstoneStore, gcTombstones as gcTombstonesStore, scheduleTombst
 import { createChangeRecorder, createFlushChangeRecorder, discardStateChangeSink } from './change-recorder.js'
 import { createEngineContext } from './context.js'
 import { getFieldTimestamps, setFieldTimestamps } from './crdt-state.js'
-import { getPublicKey } from './identity.js'
+import { getPublicKey, toKeyId } from './identity.js'
 import { cacheIndexDependencyId } from './index-dependencies.js'
-import { getIndexBucket, getIndexBucketIds, getIndexObserverId, getIndexRead } from './indexes.js'
+import { getIndexBucket, getIndexBucketIds, getIndexObserverId, getIndexRead, rebuildIndexes } from './indexes.js'
 import { getLayerNow } from './layers.js'
 import { getModuleState } from './modules.js'
 import { createObserverRegistry } from './observers.js'
@@ -177,15 +177,26 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     },
 
     garbageCollectKey(collection, key) {
-      // Field timestamps intentionally outlive cache eviction: GC is not a
-      // causal delete, so a later refill still merges against local history.
+      const state = ctx.collections.get(collection.name)
+      // A visible optimistic patch/delete owns its base row until its layer is
+      // removed; collecting it would make rollback lose authoritative data.
+      if (state?.layeredKeyCounts?.has(toKeyId(key))) {
+        return false
+      }
       const flush = createFlushChangeRecorder()
       const changes = createChangeRecorder(ctx, flush)
       try {
         const result = deleteItemFromBase(ctx, changes, { collection, key })
-        if (result.removed)
+        if (result.removed) {
+          const timestamps = ctx.fieldTimestamps.get(collection.name)
+          timestamps?.delete(toKeyId(key))
+          if (timestamps?.size === 0)
+            ctx.fieldTimestamps.delete(collection.name)
           dispatchImmediate(ctx, changes, flush, result.effects)
-        else discardStateChangeSink(changes)
+        }
+        else {
+          discardStateChangeSink(changes)
+        }
         return result.removed
       }
       catch (error) {
@@ -201,6 +212,15 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       }
       for (const id of Array.from(state.base.keys())) {
         callback(getPublicKey(state, id))
+      }
+    },
+
+    rebuildIndexes() {
+      for (const [name, state] of ctx.collections) {
+        const collection = callbacks.getCollection(name)
+        if (collection) {
+          rebuildIndexes(collection, state)
+        }
       }
     },
 

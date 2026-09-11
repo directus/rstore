@@ -1,3 +1,4 @@
+// @ts-nocheck -- Verbatim historical benchmark baseline uses its original cache types.
 import type { TombstoneStore } from '@rstore/core'
 import type { Cache, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, FieldTimestampValue, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
