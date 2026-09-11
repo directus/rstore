@@ -9,10 +9,15 @@ import type { SignalRegistry } from './signals'
 import type { CacheVersionRegistry } from './versions'
 import type { WrappedItemRegistry } from './wrappedRegistry'
 
+/** Cached response reference stored by one query page. */
+export type QueryPageRef
+  = | { type: 'ref', key: string | number }
+    | { type: 'refs', keys: Array<string | number> }
+
 /** Bridge-owned state surfaced to Vue internals. */
 export interface VueCacheState {
   /** Cached raw page data keyed by page id, used by query pagination. */
-  pageRefs: Map<string, any>
+  pageRefs: Map<string, QueryPageRef>
   /** Live per-query metadata, backed by the engine for SSR round-trips. */
   readonly queryMeta: Record<string, CustomHookMeta>
 }
@@ -76,5 +81,7 @@ export interface VueCachePrivate {
     layers: Record<string, Ref<CacheLayer[]>>
     /** Ensure a devtools layer mirror exists for a collection. */
     ensureLayersForCollection: (collectionName: string) => Ref<CacheLayer[]>
+    /** Rebuild engine indexes after a runtime schema change. */
+    rebuildIndexes: () => void
   }
 }

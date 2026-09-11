@@ -1,4 +1,4 @@
-import type { StoreSchema } from '@rstore/shared'
+import type { CacheModuleSnapshot, StoreSchema } from '@rstore/shared'
 import { hydrate } from '#test-utils/store/ssr'
 import { createVueStack } from '#test-utils/store/vueStack'
 import { describe, expect, it, vi } from 'vitest'
@@ -140,9 +140,9 @@ describe('ssr hydration round trip', () => {
     const server = await createSide(true)
     const serverModule: any = await useSession(server.store as any)
     const snapshot = server.store.$cache.getState()
-    const moduleSnapshot = snapshot.modules['session:main']
+    const moduleSnapshot = snapshot.modules.find((module: CacheModuleSnapshot) => 'name' in module && module.name === 'session' && module.key === 'main')!.state as any
     const payload = structuredClone(snapshot)
-    const modulePayload = payload.modules['session:main']
+    const modulePayload = payload.modules.find((module: CacheModuleSnapshot) => 'name' in module && module.name === 'session' && module.key === 'main')!.state as any
 
     // The cache returns raw module state. Transport owns detachment, preserving
     // Date and Map while ensuring neither side can mutate the other.
@@ -162,6 +162,32 @@ describe('ssr hydration round trip', () => {
     expect(clientModule.state.nested.updatedAt).toBeInstanceOf(Date)
     expect(clientModule.state.nested.labels).toBeInstanceOf(Map)
     expect(clientModule.state.nested.labels.get('owner')).toBe('Ada')
+  })
+
+  it('round-trips module tuples whose joined legacy keys collide', async () => {
+    const useFirst = defineModule('a:b', ({ defineState }: any) => ({
+      state: defineState({ value: 'first' }, 'c'),
+    }))
+    const useSecond = defineModule('a', ({ defineState }: any) => ({
+      state: defineState({ value: 'second' }, 'b:c'),
+    }))
+    const server = await createSide(true)
+    await useFirst(server.store as any)
+    await useSecond(server.store as any)
+
+    const payload = structuredClone(server.store.$cache.getState())
+    expect(payload.modules).toEqual(expect.arrayContaining([
+      { name: 'a:b', key: 'c', state: { value: 'first' } },
+      { name: 'a', key: 'b:c', state: { value: 'second' } },
+    ]))
+
+    const client = await createSide(false)
+    hydrate(client.store.$cache, payload)
+    const first: any = await useFirst(client.store as any)
+    const second: any = await useSecond(client.store as any)
+
+    expect(first.state.value).toBe('first')
+    expect(second.state.value).toBe('second')
   })
 
   it('hydrates page 0 of a paginated query without refetching and fetches page 1', async () => {

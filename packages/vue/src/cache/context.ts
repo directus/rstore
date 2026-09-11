@@ -1,6 +1,6 @@
 import type { EngineCallbacks, EngineConflictPayload, EngineResetPayload, EngineStateChangeSink, EngineWriteCommitPayload } from '@rstore/core'
 import type { CacheLayer, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
-import type { CacheRuntime, CreateCacheOptions } from './types'
+import type { CacheRuntime, CreateCacheOptions, QueryPageRef } from './types'
 import { createStoreEngine, isKeyDefined } from '@rstore/core'
 import { reactive, shallowRef } from 'vue'
 import { createCacheChangeInterestRegistry } from './changeInterest'
@@ -27,7 +27,7 @@ export function createCacheRuntime<
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): CacheRuntime<TSchema, TCollectionDefaults> {
   let runtime: CacheRuntime<TSchema, TCollectionDefaults>
   let sinkImplementation: EngineStateChangeSink
-  const pageRefs = new Map<string, any>()
+  const pageRefs = new Map<string, QueryPageRef>()
   const changeInterest = createCacheChangeInterestRegistry()
   const stateChangeSink: EngineStateChangeSink = {
     getInterest: () => changeInterest.value,
@@ -104,20 +104,37 @@ function synchronizeBridge(
   resets: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[3],
   deletions: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[4],
 ): void {
+  const orderedChanges = {
+    ...changes,
+    // Relation writes are child-first internally. Publish collection signals
+    // in schema order so parent readers never observe child-only state.
+    lists: orderListChanges(ctx, changes.lists),
+  }
   let errors: unknown[] | undefined
-  for (const collection of changes.lists) ctx.visibleListCache.delete(collection)
+  for (const collection of orderedChanges.lists) ctx.visibleListCache.delete(collection)
   for (const collection of resets) ctx.visibleListCache.delete(collection)
   for (const dependency of changes.indexes) ctx.indexResultCache.invalidate(dependency)
   for (const collection of resets) ctx.indexResultCache.reset(collection)
   // Flush existing missing/list/index dependencies before item deletion can
   // install a new missing-item dependency during its synchronous cell rerun.
-  errors = runBridgeSink(ctx.versions.flush, changes, errors)
-  errors = runBridgeSink(ctx.signals.flush, changes, errors)
-  if (changes.items.size)
-    errors = runBridgeSinkWithValues(ctx.itemCells.flush, changes, values, errors)
+  errors = runBridgeSink(ctx.versions.flush, orderedChanges, errors)
+  errors = runBridgeSink(ctx.signals.flush, orderedChanges, errors)
+  if (orderedChanges.items.size)
+    errors = runBridgeSinkWithValues(ctx.itemCells.flush, orderedChanges, values, errors)
   if (deletions.length || keyForms.length)
     errors = cleanupChangedWrappers(ctx, deletions, keyForms, errors)
   throwSyncErrors(errors, 'Vue cache synchronization failed')
+}
+
+/** Return changed collections in the store's stable schema order. */
+function orderListChanges(ctx: CacheRuntime, changed: ReadonlySet<string>): Set<string> {
+  const ordered = new Set<string>()
+  for (const collection of ctx.getStore().$collections) {
+    if (changed.has(collection.name))
+      ordered.add(collection.name)
+  }
+  for (const collection of changed) ordered.add(collection)
+  return ordered
 }
 
 /** Run one relevant bridge sink without starving later sinks after failure. */

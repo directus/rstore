@@ -4,6 +4,7 @@ import { shallowRef } from 'vue'
 import { wrapItem } from '../item'
 import { createWrappedItemMetadata } from '../itemMetadata'
 import { getItemKey, readRawCacheItem } from './context'
+import { invalidatePageRefsForItem } from './queryState'
 
 /** Return the cached wrapped proxy for an item, creating it when needed. */
 export function getWrappedItem<
@@ -74,7 +75,10 @@ export function garbageCollectItem<TCollection extends Collection>(
     return
   }
   const key = knownKey ?? getItemKey(collection, item)
-  ctx.engine.garbageCollectKey(collection, key)
+  if (!ctx.engine.garbageCollectKey(collection, key)) {
+    return
+  }
+  invalidatePageRefsForItem(ctx, collection.name, key)
   const store = ctx.getStore()
   store.$hooks.callHookSync('itemGarbageCollect', {
     store,

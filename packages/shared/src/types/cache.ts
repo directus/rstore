@@ -70,10 +70,14 @@ export interface CustomCacheState {
   collections: Record<string, Record<string | number, any>>
   /** Query markers set by completed writes. */
   markers: Record<string, boolean>
-  /** Module state with collision-free tuple identities. */
+  /** Module state with exact tuples or legacy delimiter-joined identities. */
   modules: CacheModuleSnapshot[]
   /** Serializable query metadata. */
   queryMeta: Record<string, CustomHookMeta>
+  /** Per-field causal timestamps retained across SSR hydration. */
+  fieldTimestamps?: Record<string, Record<string | number, FieldTimestamps>>
+  /** Deletes known before hydration, preventing stale resurrection. */
+  tombstones?: CacheTombstone[]
 }
 
 /** Versionless snapshot accepted for backward-compatible hydration. */

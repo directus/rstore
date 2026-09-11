@@ -1,8 +1,9 @@
+import type { CustomHookMeta } from '@rstore/shared'
 import type { ChangeRecorder, FlushChangeRecorder } from './change-recorder.js'
 import type { EngineContext, EngineEffect, QueuedOperation } from './internal-types.js'
 import { prepareBatchWrite, writePreparedBatchItem } from './batch-write.js'
 import { createChangeRecorder, createFlushChangeRecorder, discardStateChangeSink, recordList } from './change-recorder.js'
-import { throwCollectedErrors } from './effects.js'
+import { dispatchEffects, throwCollectedErrors } from './effects.js'
 import { getPublicKey, toKeyId } from './identity.js'
 import { sweepEmptyIndexBuckets } from './index-sweep.js'
 import { addLayerNow, removeLayerNow } from './layers.js'
@@ -42,7 +43,7 @@ export function flushQueuedOperations(
       }
     }
     while (ctx.queueHead < ctx.queue.length) {
-      if (errors)
+      if (errors && !ctx.callbacks.stateChangeSink)
         break
       const operation = ctx.queue[ctx.queueHead]!
       const headBefore = ctx.queueHead
@@ -54,12 +55,20 @@ export function flushQueuedOperations(
       catch (error) {
         // Validation failures did not commit; callback failures already moved
         // their cursor, preventing replay of committed state.
+        const partialCommit = operation.type === 'writeItems' && operation.partialCommit === true
+        if (operation.type === 'writeItems') {
+          operation.partialCommit = undefined
+        }
         if (ctx.queueHead === headBefore
-          && (operation.type !== 'writeItems' || operation.index === batchIndexBefore)) {
+          && (operation.type !== 'writeItems'
+            || (operation.index === batchIndexBefore && !partialCommit))) {
           advance(ctx)
         }
         errors = appendError(errors, error)
-        break
+        // A partially committed batch stays at its current cursor for a
+        // corrected retry. Other committed Vue operations must still drain.
+        if (ctx.queueHead === headBefore)
+          break
       }
     }
   }
@@ -93,14 +102,16 @@ function processDirectWrite(
   operation: Extract<QueuedOperation, { type: 'writeItem' }>,
   flushChanges: FlushChangeRecorder,
 ): void {
+  if (!canPublishQuery(operation.params.meta))
+    return
   const changes = createChangeRecorder(ctx, flushChanges)
+  const partial = { committed: false, effects: [] }
   try {
-    const result = writeItemNow(ctx, changes, operation.params)
+    const result = writeItemNow(ctx, changes, operation.params, partial)
     dispatchCommitted(ctx, changes, result.effects)
   }
   catch (error) {
-    discardStateChangeSink(changes)
-    throw error
+    return settleFailedWrite(ctx, changes, partial, error)
   }
 }
 
@@ -112,19 +123,27 @@ function processOperation(
 ): boolean {
   switch (operation.type) {
     case 'writeItem': {
+      if (!canPublishQuery(operation.params.meta)) {
+        advance(ctx)
+        return true
+      }
       if (!ctx.staggering.canProcess())
         return false
       const changes = createChangeRecorder(ctx, flushChanges)
+      const partial = { committed: false, effects: [] }
       try {
-        const result = writeItemNow(ctx, changes, operation.params)
+        const result = writeItemNow(ctx, changes, operation.params, partial)
         ctx.staggering.consume()
         advance(ctx)
         dispatchCommitted(ctx, changes, result.effects)
         return true
       }
       catch (error) {
-        discardStateChangeSink(changes)
-        throw error
+        if (partial.committed) {
+          ctx.staggering.consume()
+          advance(ctx)
+        }
+        return settleFailedWrite(ctx, changes, partial, error)
       }
     }
     case 'writeItems':
@@ -195,6 +214,9 @@ function processBatch(
   operation: Extract<QueuedOperation, { type: 'writeItems' }>,
   flushChanges: FlushChangeRecorder,
 ): boolean {
+  if (!canPublishQuery(operation.params.meta)) {
+    return settleStaleBatch(ctx, operation)
+  }
   const prepared = operation.index === 0 ? prepareBatchWrite(ctx, operation.params) : undefined
   if (prepared) {
     while (operation.index < operation.params.items.length) {
@@ -207,16 +229,15 @@ function processBatch(
     return finishBatch(ctx, operation, flushChanges)
   }
 
-  let skipItemRecorders = false
+  // Keep one recorder for every slice. Adapters see only the completed batch,
+  // including when staggering yields between slices.
+  const changes = operation.recorder ??= createChangeRecorder(ctx, flushChanges)
+  const effects = operation.effects ??= []
   while (operation.index < operation.params.items.length) {
     if (!ctx.staggering.canProcess())
       return false
-    const changes = skipItemRecorders ? undefined : createChangeRecorder(ctx, flushChanges)
-    // Batch items dispatch no hooks until aggregate completion, so consumer
-    // interest cannot change synchronously between unobserved item commits.
-    if (!changes)
-      skipItemRecorders = true
     const { key, value } = operation.params.items[operation.index]!
+    const partial = { committed: false, effects: [] }
     try {
       const result = writeItemNow(ctx, changes, {
         collection: operation.params.collection,
@@ -224,20 +245,100 @@ function processBatch(
         item: value,
         meta: operation.params.meta,
         fromWriteItems: true,
-      })
+      }, partial)
       operation.index++
       if (result.change && operation.changes)
         operation.changes.push(result.change)
+      // Core callers historically receive nested relation hooks as each row
+      // commits. Vue has a bridge sink, so it delays them until final state is
+      // visible with the outer batch hook.
+      if (ctx.callbacks.stateChangeSink) {
+        effects.push(...result.effects)
+      }
+      else {
+        dispatchEffects(ctx, result.effects)
+      }
       ctx.staggering.consume()
-      dispatchCommitted(ctx, changes, result.effects)
     }
     catch (error) {
-      discardStateChangeSink(changes)
+      if (partial.committed) {
+        effects.push(...partial.effects)
+        operation.partialCommit = true
+      }
+      const publicationError = ctx.callbacks.stateChangeSink
+        ? publishPartialBatch(ctx, changes, effects)
+        : undefined
+      operation.recorder = undefined
+      operation.effects = undefined
+      if (publicationError) {
+        throw new AggregateError([error, publicationError], 'Store engine batch failed', { cause: error })
+      }
       throw error
     }
   }
 
-  return finishBatch(ctx, operation, flushChanges)
+  return finishBatch(ctx, operation, flushChanges, changes, effects)
+}
+
+/** Publish child-first progress before surfacing its later relation failure. */
+function settleFailedWrite(
+  ctx: EngineContext,
+  changes: ChangeRecorder | undefined,
+  partial: { committed: boolean, effects: EngineEffect[] },
+  error: unknown,
+): never {
+  if (!partial.committed) {
+    discardStateChangeSink(changes)
+    throw error
+  }
+  try {
+    dispatchCommitted(ctx, changes, partial.effects)
+  }
+  catch (publicationError) {
+    throw new AggregateError([error, publicationError], 'Store engine write failed', { cause: error })
+  }
+  throw error
+}
+
+/** Publish committed slices while dropping a superseded batch remainder. */
+function settleStaleBatch(
+  ctx: EngineContext,
+  operation: Extract<QueuedOperation, { type: 'writeItems' }>,
+): true {
+  const recorder = operation.recorder
+  const effects = operation.effects ?? []
+  advance(ctx)
+  operation.recorder = undefined
+  operation.effects = undefined
+  if (!recorder)
+    return true
+  try {
+    dispatchCommitted(ctx, recorder, effects)
+  }
+  catch (error) {
+    discardStateChangeSink(recorder)
+    throw error
+  }
+  return true
+}
+
+/** Return false only when live query ownership explicitly rejected publication. */
+function canPublishQuery(meta: CustomHookMeta | undefined): boolean {
+  return meta?.$canPublishQuery?.() !== false
+}
+
+/** Publish valid earlier batch rows before surfacing a later write failure. */
+function publishPartialBatch(
+  ctx: EngineContext,
+  changes: ChangeRecorder | undefined,
+  effects: readonly EngineEffect[],
+): unknown {
+  try {
+    dispatchCommitted(ctx, changes, effects)
+  }
+  catch (error) {
+    return error
+  }
 }
 
 /** Publish marker and aggregate hooks after every batch item committed. */
@@ -245,26 +346,29 @@ function finishBatch(
   ctx: EngineContext,
   operation: Extract<QueuedOperation, { type: 'writeItems' }>,
   flushChanges: FlushChangeRecorder,
+  recorder = createChangeRecorder(ctx, flushChanges),
+  pendingEffects: readonly EngineEffect[] = [],
 ): true {
-  const changes = createChangeRecorder(ctx, flushChanges)
   if (operation.params.marker !== undefined) {
     ctx.markers[operation.params.marker] = true
-    recordList(changes, operation.params.collection.name)
+    recordList(recorder, operation.params.collection.name)
   }
-  const effects = createWriteEffects(ctx, {
+  const effects = [...pendingEffects, ...createWriteEffects(ctx, {
     collection: operation.params.collection,
     result: operation.params.items,
     marker: operation.params.marker,
     operation: 'write',
-  }, operation.changes)
+  }, operation.changes)]
   advance(ctx)
   try {
-    dispatchCommitted(ctx, changes, effects)
+    dispatchCommitted(ctx, recorder, effects)
   }
   catch (error) {
-    discardStateChangeSink(changes)
+    discardStateChangeSink(recorder)
     throw error
   }
+  operation.recorder = undefined
+  operation.effects = undefined
   return true
 }
 
