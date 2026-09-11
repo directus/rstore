@@ -1,4 +1,4 @@
-import type { CacheStateInput, CustomHookMeta } from '@rstore/shared'
+import type { CacheStateInput, CacheTombstone, CustomHookMeta, FieldTimestamps, FieldTimestampValue } from '@rstore/shared'
 import type { NormalizedCacheSnapshot, NormalizedCollectionRows } from './internal-types.js'
 import { createNullRecord, isObjectRecord } from './records.js'
 
@@ -20,6 +20,8 @@ export function normalizeSnapshotInput(value: CacheStateInput): NormalizedCacheS
       markers: normalizeMarkers(value.markers),
       ...modules,
       queryMeta: normalizeQueryMeta(value.queryMeta),
+      fieldTimestamps: normalizeFieldTimestamps(value.fieldTimestamps),
+      tombstones: normalizeTombstones(value.tombstones),
     }
   }
 
@@ -29,7 +31,63 @@ export function normalizeSnapshotInput(value: CacheStateInput): NormalizedCacheS
     modules: new Map(),
     legacyModules: normalizeLegacyModules(value.modules ?? {}),
     queryMeta: normalizeQueryMeta(value.queryMeta ?? {}),
+    fieldTimestamps: normalizeFieldTimestamps(value.fieldTimestamps),
+    tombstones: normalizeTombstones(value.tombstones),
   }
+}
+
+/** Validate detached per-field causal timestamps from an optional snapshot field. */
+function normalizeFieldTimestamps(value: unknown): Map<string, Map<string, FieldTimestamps>> {
+  const result = new Map<string, Map<string, FieldTimestamps>>()
+  if (value === undefined) {
+    return result
+  }
+  if (!isObjectRecord(value)) {
+    throw new TypeError('Cache snapshot fieldTimestamps must be an object record')
+  }
+  for (const collectionName of Object.keys(value)) {
+    const rows = value[collectionName]
+    if (!isObjectRecord(rows)) {
+      throw new TypeError(`Cache snapshot fieldTimestamps for "${collectionName}" must be an object record`)
+    }
+    const normalized = new Map<string, FieldTimestamps>()
+    for (const key of Object.keys(rows)) {
+      const timestamps = rows[key]
+      if (!isObjectRecord(timestamps)) {
+        throw new TypeError(`Cache snapshot timestamps for "${collectionName}"/${key} must be an object record`)
+      }
+      const copy: FieldTimestamps = {}
+      for (const field of Object.keys(timestamps)) {
+        const timestamp = timestamps[field]
+        if (typeof timestamp !== 'string' && typeof timestamp !== 'number') {
+          throw new TypeError(`Cache snapshot timestamp for "${collectionName}"/${key}/${field} must be string or number`)
+        }
+        copy[field] = timestamp as FieldTimestampValue
+      }
+      normalized.set(key, copy)
+    }
+    result.set(collectionName, normalized)
+  }
+  return result
+}
+
+/** Validate detached deletion tombstones from an optional snapshot field. */
+function normalizeTombstones(value: unknown): CacheTombstone[] | undefined {
+  if (value === undefined) {
+    return undefined
+  }
+  if (!Array.isArray(value)) {
+    throw new TypeError('Cache snapshot tombstones must be an array')
+  }
+  return value.map((entry, index) => {
+    if (!isObjectRecord(entry)
+      || typeof entry.collection !== 'string'
+      || (typeof entry.key !== 'string' && typeof entry.key !== 'number')
+      || (typeof entry.deletedAt !== 'string' && typeof entry.deletedAt !== 'number')) {
+      throw new TypeError(`Cache snapshot tombstone at index ${index} is invalid`)
+    }
+    return { collection: entry.collection, key: entry.key, deletedAt: entry.deletedAt as FieldTimestampValue }
+  })
 }
 
 /** Validate collection container shapes while retaining item values. */
@@ -84,6 +142,9 @@ function normalizeQueryMeta(value: unknown): Record<string, CustomHookMeta> {
 function normalizeVersionedModules(value: unknown): Pick<NormalizedCacheSnapshot, 'modules' | 'legacyModules'> {
   const modules = new Map<string, Map<string, unknown>>()
   const legacyModules = new Map<string, unknown>()
+  if (!Array.isArray(value)) {
+    throw new TypeError('Version 1 cache snapshot modules must be an array')
+  }
   const exactLegacyKeys = new Set<string>()
   for (const entry of normalizeModuleArray(value)) {
     if ('legacyKey' in entry) {
@@ -112,10 +173,7 @@ function normalizeVersionedModules(value: unknown): Pick<NormalizedCacheSnapshot
 }
 
 /** Validate and normalize every version-1 module array entry. */
-function normalizeModuleArray(value: unknown): Array<{ name: string, key: string, state: unknown } | { legacyKey: string, state: unknown }> {
-  if (!Array.isArray(value)) {
-    throw new TypeError('Version 1 cache snapshot modules must be an array')
-  }
+function normalizeModuleArray(value: unknown[]): Array<{ name: string, key: string, state: unknown } | { legacyKey: string, state: unknown }> {
   return value.map((entry, index) => {
     if (!isObjectRecord(entry) || !own(entry, 'state')) {
       throw new TypeError(`Cache snapshot module at index ${index} must be an object with state`)

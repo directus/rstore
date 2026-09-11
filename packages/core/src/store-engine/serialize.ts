@@ -1,4 +1,4 @@
-import type { CustomCacheState, ResolvedCollection } from '@rstore/shared'
+import type { CustomCacheState, FieldTimestamps, ResolvedCollection } from '@rstore/shared'
 import type { ChangeRecorder } from './change-recorder.js'
 import type { EngineCollectionState, EngineContext, EngineEffect, NormalizedCacheSnapshot, NormalizedCollectionRows } from './internal-types.js'
 import { needsCollectionResetKeys, recordCollectionReset } from './change-recorder.js'
@@ -11,6 +11,14 @@ import { applyModuleHydration, prepareModuleClear, prepareModuleHydration, seria
 import { copyNullRecord, createNullRecord } from './records.js'
 import { getVisibleKeyIds } from './view.js'
 import { deleteItemFromBase } from './write.js'
+
+/** Detached collection state plus snapshot-key identities derived during staging. */
+interface StagedCollections {
+  /** Fully restored collection states ready for commit. */
+  states: Map<string, EngineCollectionState>
+  /** Serialized row keys mapped to canonical internal ids. */
+  keyIds: Map<string, Map<string, string>>
+}
 
 /** Serialize base data only; optimistic layers stay process-local. */
 export function getState(ctx: EngineContext): CustomCacheState {
@@ -31,13 +39,30 @@ export function getState(ctx: EngineContext): CustomCacheState {
       }
     }
   }
+  const fieldTimestamps = serializeFieldTimestamps(ctx)
+  const tombstones = Array.from(ctx.tombstones.entries(), ([, tombstone]) => ({ ...tombstone }))
   return {
     $rstoreVersion: 1,
     collections,
     markers: copyNullRecord(ctx.markers),
     modules: serializeModules(ctx),
     queryMeta: copyNullRecord(ctx.queryMeta),
+    ...(Object.keys(fieldTimestamps).length ? { fieldTimestamps } : {}),
+    ...(tombstones.length ? { tombstones } : {}),
   }
+}
+
+/** Serialize causal stamps with their public key form for transport. */
+function serializeFieldTimestamps(ctx: EngineContext): Record<string, Record<string | number, FieldTimestamps>> {
+  const result = createNullRecord<Record<string | number, FieldTimestamps>>()
+  for (const [collectionName, rows] of ctx.fieldTimestamps) {
+    const state = ctx.collections.get(collectionName)
+    const target = result[collectionName] = createNullRecord<FieldTimestamps>()
+    for (const [id, timestamps] of rows) {
+      target[state ? getPublicKey(state, id) : id] = { ...timestamps }
+    }
+  }
+  return result
 }
 
 /** Hydrate a staged snapshot while preserving active layers and identities. */
@@ -45,14 +70,50 @@ export function setStateNow(ctx: EngineContext, changes: ChangeRecorder | undefi
   // Every throwable collection key derivation, index rebuild, module kind
   // check, and new module wrapper runs before the live state swap.
   const collections = stageCollections(ctx, snapshot.collections)
+  const fieldTimestamps = stageFieldTimestamps(snapshot, collections.keyIds)
   const modules = prepareModuleHydration(ctx, snapshot)
 
   ctx.markers = snapshot.markers
-  ctx.fieldTimestamps.clear()
-  commitCollections(ctx, changes, collections)
+  commitCollections(ctx, changes, collections.states)
+  replaceFieldTimestamps(ctx, fieldTimestamps)
+  restoreTombstones(ctx, snapshot)
   applyModuleHydration(ctx, modules)
   replaceQueryMeta(ctx, snapshot.queryMeta)
   return [{ type: 'reset', payload: { source: 'setState' } }]
+}
+
+/** Stage causal stamps from collection identities derived before commit. */
+function stageFieldTimestamps(
+  snapshot: NormalizedCacheSnapshot,
+  keyIds: Map<string, Map<string, string>>,
+): Map<string, Map<string, FieldTimestamps>> {
+  const staged = new Map<string, Map<string, FieldTimestamps>>()
+  for (const [collectionName, rows] of snapshot.fieldTimestamps) {
+    const timestamps = new Map<string, FieldTimestamps>()
+    for (const [key, value] of rows) {
+      timestamps.set(keyIds.get(collectionName)?.get(key) ?? key, { ...value })
+    }
+    if (timestamps.size)
+      staged.set(collectionName, timestamps)
+  }
+  return staged
+}
+
+/** Replace staged causal stamps without invoking collection callbacks. */
+function replaceFieldTimestamps(ctx: EngineContext, staged: Map<string, Map<string, FieldTimestamps>>): void {
+  ctx.fieldTimestamps.clear()
+  for (const [collectionName, timestamps] of staged)
+    ctx.fieldTimestamps.set(collectionName, timestamps)
+}
+
+/** Restore optional causal tombstones after every throwable stage completed. */
+function restoreTombstones(ctx: EngineContext, snapshot: NormalizedCacheSnapshot): void {
+  if (snapshot.tombstones) {
+    clearTombstones(ctx)
+    for (const tombstone of snapshot.tombstones) {
+      ctx.tombstones.set(tombstone)
+    }
+  }
 }
 
 /** Clear base state while retaining installed optimistic layers. */
@@ -61,7 +122,7 @@ export function clearNow(ctx: EngineContext, changes: ChangeRecorder | undefined
   const modules = prepareModuleClear(ctx)
   ctx.markers = createNullRecord<boolean>()
   ctx.fieldTimestamps.clear()
-  commitCollections(ctx, changes, collections)
+  commitCollections(ctx, changes, collections.states)
   applyModuleHydration(ctx, modules)
   clearTombstones(ctx)
   replaceQueryMeta(ctx, createNullRecord())
@@ -98,8 +159,9 @@ export function clearCollectionNow(
 function stageCollections(
   ctx: EngineContext,
   incoming: Map<string, NormalizedCollectionRows>,
-): Map<string, EngineCollectionState> {
-  const result = new Map<string, EngineCollectionState>()
+): StagedCollections {
+  const states = new Map<string, EngineCollectionState>()
+  const keyIds = new Map<string, Map<string, string>>()
   const names = new Set([...ctx.collections.keys(), ...incoming.keys()])
   for (const name of names) {
     const collection = ctx.callbacks.getCollection(name)
@@ -111,16 +173,16 @@ function stageCollections(
     const state = createCollectionState(collection)
     state.layers = previous?.layers ?? []
     if (collection) {
-      restoreCollection(state, collection, incoming.get(name))
+      keyIds.set(name, restoreCollection(state, collection, incoming.get(name)))
       if (getCollectionMetadata(collection).hasIndexes)
         rebuildIndexes(collection, state)
     }
     else {
       restoreLayerOwnership(state)
     }
-    result.set(name, state)
+    states.set(name, state)
   }
-  return result
+  return { states, keyIds }
 }
 
 /** Restore snapshot rows using collection-derived canonical key forms. */
@@ -128,7 +190,8 @@ function restoreCollection(
   state: EngineCollectionState,
   collection: ResolvedCollection<any, any, any>,
   incoming: NormalizedCollectionRows | undefined,
-): void {
+): Map<string, string> {
+  const keyIds = new Map<string, string>()
   for (let index = 0; index < (incoming?.keys.length ?? 0); index++) {
     const rawKey = incoming!.keys[index]!
     const item = incoming!.values[index]
@@ -139,8 +202,10 @@ function restoreCollection(
     const key = isEntityKey(derived) ? derived : rawKey
     const id = registerBaseKeyValue(state, key, derived)
     state.base.set(id, item)
+    keyIds.set(rawKey, id)
   }
   restoreLayerOwnership(state)
+  return keyIds
 }
 
 /** Swap staged collections and invalidate every old/new observed scope. */

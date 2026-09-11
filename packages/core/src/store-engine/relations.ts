@@ -31,7 +31,7 @@ export function resolveRelationWriteParams(
   if (!isKeyDefined(key)) {
     throw new Error(`Could not determine key for relation ${parentCollection.name}.${String(relationKey)}`)
   }
-  return { collection, key, item: childItem, meta }
+  return { collection, key, item: childItem, meta, fromRelation: true }
 }
 
 /** Validate a complete nested relation tree and return child-first writes. */
@@ -105,7 +105,7 @@ export function validateWriteInput(params: WriteItemParams): void {
 }
 
 /** Reject malformed to-one and to-many payload shapes deterministically. */
-function validateRelationCardinality(
+export function validateRelationCardinality(
   collection: ResolvedCollection<any, any, any>,
   field: string,
   many: boolean,

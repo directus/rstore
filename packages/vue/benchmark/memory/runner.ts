@@ -1,9 +1,10 @@
 import type { MemoryBenchmarkReport, MemoryBenchmarkRow, MemoryBenchmarkRunSet, MemoryImplementationName, MemoryProfile, MemoryProfileRow, MemoryWorkerRequest, MemoryWorkerResult } from './types'
 import { execFile } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { readFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm } from 'node:fs/promises'
 import { createRequire } from 'node:module'
-import { dirname, resolve } from 'node:path'
+import { tmpdir } from 'node:os'
+import { dirname, join, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { promisify } from 'node:util'
@@ -87,19 +88,25 @@ export function selectMemoryRows(profile: MemoryProfile): MemoryProfileRow[] {
 async function runWorker(row: MemoryProfileRow, implementation: MemoryImplementationName): Promise<MemoryWorkerResult> {
   const request: MemoryWorkerRequest = { scenarioId: row.scenario.id, implementation, dimensions: row.dimensions }
   const require = createRequire(import.meta.url)
-  const viteNode = require.resolve('vite-node/vite-node.mjs')
+  const viteNode = require.resolve('vite-node/cli')
   const worker = resolve(dirname(fileURLToPath(import.meta.url)), 'worker-entry.ts')
-  const { stdout } = await execFileAsync(process.execPath, ['--expose-gc', viteNode, worker, JSON.stringify(request)], {
-    cwd: process.cwd(),
-    maxBuffer: 4 * 1024 * 1024,
-  })
-  const line = stdout.trim().split('\n').at(-1)
-  if (!line)
-    throw new TypeError(`Memory worker returned no result for ${row.scenario.id}/${implementation}`)
-  const result = JSON.parse(line) as MemoryWorkerResult
-  if (result.scenarioId !== row.scenario.id || result.implementation !== implementation)
-    throw new TypeError(`Memory worker identity mismatch for ${row.scenario.id}/${implementation}`)
-  return result
+  const config = resolve(process.cwd(), 'vitest.config.ts')
+  const outputDirectory = await mkdtemp(join(tmpdir(), 'rstore-memory-worker-'))
+  const outputPath = join(outputDirectory, 'result.json')
+  try {
+    await execFileAsync(process.execPath, ['--expose-gc', viteNode, '--config', config, worker, JSON.stringify(request)], {
+      cwd: process.cwd(),
+      env: { ...process.env, RSTORE_BENCHMARK_RESULT_PATH: outputPath },
+      maxBuffer: 4 * 1024 * 1024,
+    })
+    const result = JSON.parse(await readFile(outputPath, 'utf8')) as MemoryWorkerResult
+    if (result.scenarioId !== row.scenario.id || result.implementation !== implementation)
+      throw new TypeError(`Memory worker identity mismatch for ${row.scenario.id}/${implementation}`)
+    return result
+  }
+  finally {
+    await rm(outputDirectory, { recursive: true, force: true })
+  }
 }
 
 /** Pair equivalent isolated worker results. */

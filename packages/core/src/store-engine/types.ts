@@ -105,6 +105,8 @@ export interface WriteItemParams {
   marker?: string
   /** Internal batch flag retained for bridge compatibility. */
   fromWriteItems?: boolean
+  /** Internal relation-child flag used by framework publication adapters. */
+  fromRelation?: boolean
   /** Hook metadata. */
   meta?: CustomHookMeta
   /** Optional CRDT field timestamps. */
@@ -211,6 +213,8 @@ export interface StoreEngine<
   garbageCollectKey: (collection: ResolvedCollection<any, any, any>, key: string | number) => boolean
   /** Iterate current base keys. */
   forEachKey: (collection: string, callback: (key: string | number) => void) => void
+  /** Rebuild indexes after runtime schema augmentation. */
+  rebuildIndexes: () => void
   /** Queue an optimistic layer. */
   addLayer: (layer: CacheLayer) => void
   /** Read one optimistic layer. */
