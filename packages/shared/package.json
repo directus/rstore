@@ -36,10 +36,10 @@
     "test:types": "tsc --noEmit"
   },
   "dependencies": {
-    "@standard-schema/spec": "^1.0.0",
-    "klona": "^2.0.6"
+    "@standard-schema/spec": "^1.0.0"
   },
   "devDependencies": {
+    "klona": "^2.0.6",
     "typescript": "catalog:",
     "unbuild": "catalog:",
     "vitest": "catalog:"
