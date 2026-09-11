@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createDirectusQuery, stripPrimaryKeys } from '../src'
+import { createDirectusQuery, getDirectusPrimaryKeys, stripPrimaryKeys } from '../src'
 
 describe('createDirectusQuery', () => {
   it('copies supported Directus query options from find options', () => {
@@ -85,5 +85,18 @@ describe('stripPrimaryKeys', () => {
     }, ['id', 'slug'])).toEqual({
       title: 'Todo',
     })
+  })
+})
+
+describe('getDirectusPrimaryKeys', () => {
+  it('keeps generated keys and returns a fresh id fallback', () => {
+    const generatedKeys = ['tenantId', 'id']
+    const missingFallback = getDirectusPrimaryKeys({ name: 'Todos' })
+    const emptyFallback = getDirectusPrimaryKeys({ name: 'Todos', meta: { primaryKeys: [] } })
+
+    expect(getDirectusPrimaryKeys({ name: 'Todos', meta: { primaryKeys: generatedKeys } })).toBe(generatedKeys)
+    expect(missingFallback).toEqual(['id'])
+    expect(emptyFallback).toEqual(['id'])
+    expect(missingFallback).not.toBe(emptyFallback)
   })
 })
