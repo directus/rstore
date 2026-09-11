@@ -52,6 +52,32 @@ describe('store-engine: serialize', () => {
     expect(engine.resolveKeys({ collection, indexKey: 'authorId', indexValue: 'a' }).map(String).sort()).toEqual(['1', '2'])
   })
 
+  it('derives each collection key once before committing hydrated causality', () => {
+    let keyReads = 0
+    const collection = buildCollection('User', {
+      getKey: (item) => {
+        keyReads++
+        if (keyReads > 1)
+          throw new Error('key resolver ran after collection commit')
+        return item.id
+      },
+    })
+    const { engine } = createTestEngine([collection])
+
+    expect(() => engine.setState({
+      $rstoreVersion: 1,
+      collections: { User: { 1: { id: 1, name: 'Ada' } } },
+      markers: {},
+      modules: [],
+      queryMeta: {},
+      fieldTimestamps: { User: { 1: { name: 10 } } },
+    })).not.toThrow()
+
+    expect(keyReads).toBe(1)
+    expect(engine.readItemRaw({ collection, key: 1 })).toEqual({ id: 1, name: 'Ada' })
+    expect(engine.readFieldTimestamps({ collectionName: 'User', key: 1 })).toEqual({ name: 10 })
+  })
+
   it('keeps query metadata when hydrating its own live snapshot', () => {
     const collection = buildCollection('User')
     const { engine } = createTestEngine([collection])

@@ -3,6 +3,113 @@ import { describe, expect, it, vi } from 'vitest'
 import { watchSyncEffect } from 'vue'
 
 describe('cache writeItems', () => {
+  it('publishes valid relation children committed before a direct write fails', async () => {
+    const store = await createStore({
+      schema: [
+        {
+          name: 'ParentCollection',
+          relations: {
+            validChild: { to: { ChildCollection: { on: { id: 'validChildId' } } }, many: false },
+            invalidChild: { to: { ChildCollection: { on: { id: 'invalidChildId' } } }, many: false },
+          },
+        },
+        { name: 'ChildCollection' },
+      ],
+      plugins: [],
+    })
+    const cache = store.$cache
+    const parentCollection = store.$collections[0]!
+    const childCollection = store.$collections[1]!
+    const observedChildLengths: number[] = []
+    const childHookKeys: Array<string | number> = []
+    const stop = watchSyncEffect(() => {
+      observedChildLengths.push(cache.readItems({ collection: childCollection }).length)
+    })
+    store.$hooks.hook('afterCacheWrite', ({ collection, key }) => {
+      if (collection.name === childCollection.name && key !== undefined)
+        childHookKeys.push(key)
+    })
+
+    try {
+      expect(() => cache.writeItem({
+        collection: parentCollection,
+        key: 1,
+        item: {
+          id: 1,
+          validChildId: 11,
+          validChild: { id: 11, name: 'Committed child' },
+          invalidChildId: 12,
+          invalidChild: [{ id: 12, name: 'Invalid to-one child' }],
+        },
+      })).toThrow('Expected object for relation ParentCollection.invalidChild')
+
+      expect(cache.readItem({ collection: childCollection, key: 11 }))
+        .toEqual({ id: 11, name: 'Committed child' })
+      expect(cache.readItem({ collection: parentCollection, key: 1 })).toBeUndefined()
+      expect(observedChildLengths).toEqual([0, 1])
+      expect(childHookKeys).toEqual([11])
+    }
+    finally {
+      stop()
+    }
+  })
+
+  it('publishes queued relation progress and continues with later writes', async () => {
+    const store = await createStore({
+      schema: [
+        {
+          name: 'ParentCollection',
+          relations: {
+            validChild: { to: { ChildCollection: { on: { id: 'validChildId' } } }, many: false },
+            invalidChild: { to: { ChildCollection: { on: { id: 'invalidChildId' } } }, many: false },
+          },
+        },
+        { name: 'ChildCollection' },
+        { name: 'IndependentCollection' },
+      ],
+      plugins: [],
+    })
+    const cache = store.$cache
+    const parentCollection = store.$collections[0]!
+    const childCollection = store.$collections[1]!
+    const independentCollection = store.$collections[2]!
+    const observedChildLengths: number[] = []
+    const stop = watchSyncEffect(() => {
+      observedChildLengths.push(cache.readItems({ collection: childCollection }).length)
+    })
+
+    try {
+      cache.pause()
+      cache.writeItem({
+        collection: parentCollection,
+        key: 1,
+        item: {
+          id: 1,
+          validChildId: 11,
+          validChild: { id: 11, name: 'Committed child' },
+          invalidChildId: 12,
+          invalidChild: [{ id: 12, name: 'Invalid to-one child' }],
+        },
+      })
+      cache.writeItem({
+        collection: independentCollection,
+        key: 1,
+        item: { id: 1, name: 'Later queued write' },
+      })
+
+      expect(() => cache.resume()).toThrow('Expected object for relation ParentCollection.invalidChild')
+      expect(cache.readItem({ collection: childCollection, key: 11 }))
+        .toEqual({ id: 11, name: 'Committed child' })
+      expect(cache.readItem({ collection: parentCollection, key: 1 })).toBeUndefined()
+      expect(cache.readItem({ collection: independentCollection, key: 1 }))
+        .toEqual({ id: 1, name: 'Later queued write' })
+      expect(observedChildLengths).toEqual([0, 1])
+    }
+    finally {
+      stop()
+    }
+  })
+
   it('publishes partial state and preserves write and settlement errors', async () => {
     const store = await createStore({
       schema: [

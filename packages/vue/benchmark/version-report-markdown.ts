@@ -73,7 +73,10 @@ function renderResidual(label: string, rows: readonly any[]): string {
 
 /** Render one numeric interval. */
 function formatRange(values: readonly number[]): string {
-  return `${format(values[0])}–${format(values[1])}`
+  const [start, end] = values
+  if (start === undefined || end === undefined)
+    throw new TypeError('Benchmark interval must contain two values')
+  return `${format(start)}–${format(end)}`
 }
 
 /** Render benchmark values without meaningless trailing precision. */
