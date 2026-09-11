@@ -33,7 +33,8 @@ function sweepIndex(ctx: EngineContext, index: EngineIndexState): void {
 function hasIndexConsumer(ctx: EngineContext, dependency: string): boolean {
   if (ctx.observers.hasIndex(dependency) || ctx.callbacks.stateChangeSink?.wantsIndex(dependency))
     return true
-  for (const dependencies of ctx.callbacks.getStateChangeInterest?.()?.indexes.values() ?? []) {
+  const interest = ctx.callbacks.stateChangeSink?.getInterest?.()
+  for (const dependencies of interest?.indexes.values() ?? []) {
     if (dependencies.has(dependency))
       return true
   }

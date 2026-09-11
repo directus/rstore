@@ -1,7 +1,9 @@
 import type { ChangeRecorder, FlushChangeRecorder } from './change-recorder.js'
 import type { EngineContext, EngineEffect } from './internal-types.js'
-import { commitStateChangeSink, getFlushChanges, getOperationChanges } from './change-recorder.js'
-import { dispatchEffects, throwCollectedErrors } from './effects.js'
+import { commitStateChangeSink, getFlushChanges } from './change-recorder.js'
+import { appendError, dispatchEffects, throwCollectedErrors } from './effects.js'
+
+export { appendError } from './effects.js'
 
 /** Publish framework state before hooks, collecting every callback failure. */
 export function dispatchCommitted(
@@ -16,15 +18,6 @@ export function dispatchCommitted(
   catch (error) {
     errors = appendError(errors, error)
   }
-  const operationChanges = getOperationChanges(changes)
-  if (operationChanges) {
-    try {
-      ctx.callbacks.onStateChange?.(operationChanges)
-    }
-    catch (error) {
-      errors = appendError(errors, error)
-    }
-  }
   try {
     dispatchEffects(ctx, effects)
   }
@@ -35,7 +28,7 @@ export function dispatchCommitted(
   throwCollectedErrors(errors, 'Store engine operation callbacks failed')
 }
 
-/** Run bridge flush then direct observers, even when bridge flush fails. */
+/** Run direct observers even when framework publication fails. */
 export function dispatchFinalObservers(
   ctx: EngineContext,
   flush: FlushChangeRecorder,
@@ -44,21 +37,8 @@ export function dispatchFinalObservers(
   const changes = getFlushChanges(flush)
   if (!changes)
     return errors
-  try {
-    ctx.callbacks.onObserverFlush?.(changes)
-  }
-  catch (error) {
-    errors = appendError(errors, error)
-  }
   ctx.observers.dispatch(changes)
   return errors
-}
-
-/** Lazily allocate callback error storage. */
-export function appendError(errors: unknown[] | undefined, error: unknown): unknown[] {
-  const result = errors ?? []
-  result.push(error)
-  return result
 }
 
 /** Dispatch immediate GC callbacks while preserving final observers on errors. */

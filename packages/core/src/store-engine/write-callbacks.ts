@@ -1,34 +1,6 @@
 import type { ResolvedCollection } from '@rstore/shared'
 import type { EngineChangeInterest } from './observer-changes.js'
 
-/** Visibility and public-key metadata for one committed write. */
-export interface EngineWriteChange {
-  /** Canonical public key after operation. */
-  key: string | number
-  /** Public key form before operation, when one existed. */
-  previousKey?: string | number
-  /** Whether item entered or left visible collection view. */
-  visibilityChanged: boolean
-  /** Whether canonical numeric/string key representation changed. */
-  keyFormChanged: boolean
-}
-
-/** Payload passed to compatibility `onAfterWrite` callback. */
-export interface EngineAfterWritePayload {
-  /** Collection targeted by public write. */
-  collection: ResolvedCollection<any, any, any>
-  /** Single-write key retained for hook compatibility. */
-  key?: string | number
-  /** Hook result retained for hook compatibility. */
-  result?: any
-  /** Optional query marker set by write. */
-  marker?: string
-  /** Applied operation kind. */
-  operation: 'write' | 'delete'
-  /** Every item change committed by this payload. */
-  changes: readonly EngineWriteChange[]
-}
-
 /** Allocation-light write payload for framework adapters. */
 export interface EngineWriteCommitPayload {
   /** Collection targeted by public write. */

@@ -342,6 +342,43 @@ describe('store-engine: serialize', () => {
     expect(engine.resolveKeys({ collection })).toEqual([1])
   })
 
+  it('hydrates detached object tombstones', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+    const tombstone = { collection: 'User', key: 1, deletedAt: 10 }
+
+    engine.pause()
+    engine.setState({
+      $rstoreVersion: 1,
+      collections: {},
+      markers: {},
+      modules: [],
+      queryMeta: {},
+      tombstones: [tombstone],
+    })
+    tombstone.deletedAt = 20
+    engine.resume()
+
+    expect(engine.tombstones.get('User', 1)).toEqual({ collection: 'User', key: 1, deletedAt: 10 })
+  })
+
+  it('rejects array values as tombstone entries before queueing hydration', () => {
+    const collection = buildCollection('User')
+    const { engine } = createTestEngine([collection])
+    engine.writeItem({ collection, key: 1, item: { id: 1 } })
+
+    expect(() => engine.setState({
+      $rstoreVersion: 1,
+      collections: {},
+      markers: {},
+      modules: [],
+      queryMeta: {},
+      tombstones: [[]],
+    } as any)).toThrow('Cache snapshot tombstone at index 0 is invalid')
+
+    expect(engine.resolveKeys({ collection })).toEqual([1])
+  })
+
   it('detaches serialized marker and query-meta records from live containers', () => {
     const collection = buildCollection('User')
     const { engine } = createTestEngine([collection])

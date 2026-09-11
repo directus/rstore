@@ -1,5 +1,6 @@
 import type { CacheIndexValue } from '@rstore/shared'
 import type { IndexValueId } from './internal-types.js'
+import { encodeLengthPrefixedPart } from './encoding.js'
 
 /** Encode one public scalar or exact tuple lookup. */
 export function encodeIndexLookup(indexKey: string, arity: number, value: CacheIndexValue): IndexValueId {
@@ -15,12 +16,12 @@ export function encodeIndexLookup(indexKey: string, arity: number, value: CacheI
 
 /** Encode a joined-string composite lookup in a separate namespace. */
 export function encodeLegacyValue(value: string): IndexValueId {
-  return `l${encodePart(value)}`
+  return `l${encodeLengthPrefixedPart(value)}`
 }
 
 /** Encode scalar and tuple shape using arity plus length-prefixed values. */
 export function encodeValues(values: readonly string[]): IndexValueId {
-  return `${values.length === 1 ? 's' : `t${values.length}:`}${values.map(encodePart).join('')}`
+  return `${values.length === 1 ? 's' : `t${values.length}:`}${values.map(encodeLengthPrefixedPart).join('')}`
 }
 
 /** Read complete coerced index values from one item. */
@@ -35,9 +36,4 @@ export function readIndexValues(item: any, fields: readonly string[]): string[] 
     values.push(String(raw))
   }
   return values
-}
-
-/** Length-prefix one coerced index component. */
-function encodePart(value: string): string {
-  return `${value.length}:${value}`
 }

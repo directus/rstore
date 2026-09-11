@@ -141,6 +141,9 @@ export function resolveCollection<
  * plugins through `addCollectionDefaults` reach the collections that were
  * resolved earlier (collections are resolved before plugins run). Field
  * configs already present on a collection win over the defaults.
+ *
+ * @deprecated Collections now receive defaults during resolution. Retained
+ * for consumers that still resolve collections before plugin setup.
  */
 export function mergeCollectionDefaultsFields(
   collections: ResolvedCollection[],

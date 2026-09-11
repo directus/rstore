@@ -4,11 +4,9 @@ import type { ChangeRecorder } from './change-recorder.js'
 import type { MutableEngineChangeSet } from './change-set.js'
 import type {
   DeleteItemParams,
-  EngineAfterWritePayload,
   EngineCallbacks,
   EngineConflictPayload,
   EngineResetPayload,
-  EngineWriteChange,
   EngineWriteCommitPayload,
   ObserverCallback,
   Unsubscribe,
@@ -161,7 +159,6 @@ export interface NormalizedCollectionRows {
 /** Post-commit callback effect. */
 export type EngineEffect
   = | { type: 'writeCommitted', payload: EngineWriteCommitPayload }
-    | { type: 'afterWrite', payload: EngineAfterWritePayload }
     | { type: 'conflict', payload: EngineConflictPayload }
     | { type: 'layerAdd', layer: CacheLayer }
     | { type: 'layerRemove', layer: CacheLayer }
@@ -169,10 +166,8 @@ export type EngineEffect
 
 /** Result of a committed item mutation. */
 export interface WriteCommitResult {
-  /** Deferred callbacks in legacy hook order. */
+  /** Deferred callbacks for committed writes. */
   effects: EngineEffect[]
-  /** Root collection write change, when state committed. */
-  change?: EngineWriteChange
 }
 
 /** FIFO engine operation. */
@@ -182,7 +177,6 @@ export type QueuedOperation
       type: 'writeItems'
       params: WriteItemsParams
       index: number
-      changes?: EngineWriteChange[]
       /** One recorder keeps a batch invisible to adapters until it settles. */
       recorder?: ChangeRecorder
       /** Nested callbacks run only after final bridge publication. */

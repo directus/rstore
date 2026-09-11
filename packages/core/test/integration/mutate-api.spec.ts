@@ -85,6 +85,47 @@ describe('$mutate', () => {
     })
   })
 
+  it('keeps explicit keys ahead of inferred item keys in single and many callbacks', async () => {
+    const stack = await setup()
+    const collection = stack.collection('todos')
+    let singleContext: unknown
+    let manyContext: unknown
+
+    await stack.store.$mutate({
+      collection,
+      mutation: 'update',
+      key: 'single-explicit',
+      item: { id: 'single-inferred', title: 'Single' },
+      skipCache: true,
+    }, (context) => {
+      singleContext = { key: context.key, item: context.item }
+    })
+
+    await stack.store.$mutate({
+      collection,
+      mutation: 'update',
+      items: [
+        { key: 'entry-explicit', item: { id: 'entry-inferred', title: 'Entry' } },
+        { id: 'item-inferred', title: 'Item' },
+      ],
+      skipCache: true,
+    }, (context) => {
+      manyContext = { keys: context.keys, items: context.items }
+    })
+
+    expect(singleContext).toEqual({
+      key: 'single-explicit',
+      item: { id: 'single-inferred', title: 'Single' },
+    })
+    expect(manyContext).toEqual({
+      keys: ['entry-explicit', 'item-inferred'],
+      items: [
+        { key: 'entry-explicit', item: { id: 'entry-inferred', title: 'Entry' } },
+        { id: 'item-inferred', title: 'Item' },
+      ],
+    })
+  })
+
   it('removes exactly the deleted keys from the cache in many mode', async () => {
     const stack = await setup()
     for (const item of [{ id: 1 }, { id: 2 }, { id: 3 }]) {

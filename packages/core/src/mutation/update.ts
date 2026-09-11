@@ -1,11 +1,11 @@
 import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
-import { pickNonSpecialProps, set } from '@rstore/shared'
+import { pickNonSpecialProps } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
 import { isKeyDefined } from '../key'
 import { peekFirst } from '../query'
 import { reportOperationError } from '../utils/operationError'
 import { finalizeMutation } from './finalizeMutation'
-import { assertMutationAllowed, createOptimisticLayerLifecycle, prepareMutationItem, replaceTransportItem } from './optimistic'
+import { assertMutationAllowed, createMutationHookState, createOptimisticLayerLifecycle } from './optimistic'
 
 export interface UpdateOptions<
   TCollection extends Collection,
@@ -57,9 +57,8 @@ export async function updateItem<
 }: UpdateOptions<TCollection, TCollectionDefaults, TSchema>): Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> {
   const operation = {}
   try {
-    let preparedItem = prepareMutationItem(store, collection, inputItem)
-    let optimisticItem = preparedItem.optimisticItem
-    const transportItem = preparedItem.transportItem
+    const mutationHookState = createMutationHookState(store, collection, inputItem)
+    const { transportItem } = mutationHookState
 
     key ??= collection.getKey(transportItem)
 
@@ -77,17 +76,8 @@ export async function updateItem<
       mutation: 'update',
       key,
       item: transportItem,
-      modifyItem: (path: any, value: any) => {
-        set(optimisticItem, path, value)
-        preparedItem = prepareMutationItem(store, collection, optimisticItem)
-        replaceTransportItem(transportItem, preparedItem.transportItem)
-      },
-      setItem: (newItem) => {
-        const prepared = prepareMutationItem(store, collection, newItem as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>, preparedItem)
-        preparedItem = prepared
-        optimisticItem = prepared.optimisticItem
-        replaceTransportItem(transportItem, prepared.transportItem)
-      },
+      modifyItem: mutationHookState.modifyItem,
+      setItem: mutationHookState.setItem,
       formOperations: formOperations as FormOperation[],
     })
 
@@ -114,7 +104,7 @@ export async function updateItem<
         collectionName: collection.name,
         state: {
           [key]: {
-            ...optimisticItem,
+            ...mutationHookState.optimisticItem,
             ...typeof optimistic === 'object' ? optimistic : {},
             $overrideKey: key,
           },

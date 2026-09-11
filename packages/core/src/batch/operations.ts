@@ -19,6 +19,15 @@ export interface InternalBatchMutationOperation extends BatchMutationOperation {
   resolved: boolean
 }
 
+/** Claim an operation's only terminal result or error. */
+function claimTerminalResolution(operation: { resolved: boolean }): boolean {
+  if (operation.resolved) {
+    return false
+  }
+  operation.resolved = true
+  return true
+}
+
 /**
  * Reject each operation a failed batch hook did not already settle.
  *
@@ -56,18 +65,16 @@ export function createFetchOperation(entry: BatchEntry): InternalBatchFetchOpera
     meta: entry.meta,
     resolved: false,
     setResult(item, options) {
-      if (op.resolved) {
+      if (!claimTerminalResolution(op)) {
         return
       }
-      op.resolved = true
       const unwrapped = item ? unwrapItem(item as any) : undefined
       entry.resolve({ item: unwrapped, marker: options?.marker })
     },
     setError(error) {
-      if (op.resolved) {
+      if (!claimTerminalResolution(op)) {
         return
       }
-      op.resolved = true
       entry.reject(error)
     },
   }
@@ -94,17 +101,15 @@ export function createMutationOperation(entry: BatchEntry): InternalBatchMutatio
     formOperations: entry.formOperations,
     resolved: false,
     setResult(item) {
-      if (op.resolved) {
+      if (!claimTerminalResolution(op)) {
         return
       }
-      op.resolved = true
       entry.resolve(item)
     },
     setError(error) {
-      if (op.resolved) {
+      if (!claimTerminalResolution(op)) {
         return
       }
-      op.resolved = true
       entry.reject(error)
     },
   }
