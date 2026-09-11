@@ -12,6 +12,14 @@ export function copyNullRecord<T>(source?: Record<string, T>): Record<string, T>
   return target
 }
 
+/** Replace own record contents while retaining the target object identity. */
+export function replaceRecordContents(target: object, source: object): void {
+  for (const key of Object.keys(target)) {
+    delete (target as Record<string, unknown>)[key]
+  }
+  Object.assign(target, source)
+}
+
 /** Check for a non-null, non-array object record. */
 export function isObjectRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value)

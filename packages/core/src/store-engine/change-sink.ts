@@ -1,5 +1,6 @@
 import type { EngineChangeInterest } from './observer-changes.js'
 import type { EngineStateChangeSink } from './types.js'
+import { matchesItemInterest } from './interest.js'
 
 /** Lazy operation-local state for one advanced framework sink. */
 export interface OperationChangeSink {
@@ -33,7 +34,7 @@ export function createOperationChangeSink(
 
 /** Record one matching item after lazily starting sink operation. */
 export function recordSinkItem(state: OperationChangeSink | undefined, collection: string, key: string, value: unknown, keyForm?: { previousKey: string | number, key: string | number }): void {
-  if (!state || (state.selective && !wantsItem(state.interest, collection, key)) || !beginSink(state) || (!state.selective && !state.sink.wantsItem(collection, key)))
+  if (!state || (state.selective && !matchesItemInterest(state.interest, collection, key)) || !beginSink(state) || (!state.selective && !state.sink.wantsItem(collection, key)))
     return
   state.sink.recordItem(collection, key, value, keyForm)
   state.changed = true
@@ -100,12 +101,6 @@ function beginSink(state: OperationChangeSink): boolean {
 /** Return whether selector contains any immediate dependency. */
 function hasInterest(interest: EngineChangeInterest | undefined): boolean {
   return Boolean(interest && (interest.itemKeys.size || interest.lists.size || interest.indexes.size))
-}
-
-/** Match exact or collection-wide item interest. */
-function wantsItem(interest: EngineChangeInterest | undefined, collection: string, key: string): boolean {
-  const keys = interest?.itemKeys.get(collection)
-  return keys === true || Boolean(keys?.has(key))
 }
 
 /** Match any dependency owned by one collection reset. */

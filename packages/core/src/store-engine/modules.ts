@@ -1,5 +1,7 @@
 import type { CacheModuleSnapshot } from '@rstore/shared'
 import type { EngineContext, ModuleHolder, ModuleIdentity, NormalizedCacheSnapshot } from './internal-types.js'
+import { getLegacyModuleKey } from './module-key.js'
+import { replaceRecordContents } from './records.js'
 
 /** Preflighted module registry replacement. */
 export interface PreparedModuleHydration {
@@ -213,19 +215,11 @@ function replaceModuleValue(holder: ModuleHolder, source: unknown): void {
     target.splice(0, target.length, ...(source as unknown[]))
   }
   else if (target !== null && typeof target === 'object') {
-    for (const key of Object.keys(target)) {
-      delete target[key]
-    }
-    Object.assign(target, source)
+    replaceRecordContents(target, source as object)
   }
   else {
     holder.value = source
   }
-}
-
-/** Build old delimiter-joined identity only for migration matching. */
-function getLegacyModuleKey(name: string, key: string): string {
-  return `${name}:${key}`
 }
 
 /** Build explicit error for a legacy tuple collision. */

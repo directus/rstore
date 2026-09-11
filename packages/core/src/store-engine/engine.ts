@@ -136,7 +136,6 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
         type: 'writeItems',
         params,
         index: 0,
-        changes: callbacks.onAfterWrite ? [] : undefined,
       })
     },
 

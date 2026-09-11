@@ -1,8 +1,8 @@
+import { isCacheTombstone } from '@rstore/shared'
 import { describe, expect, it } from 'vitest'
 import {
   createTombstoneStore,
   gcTombstones,
-  isTombstone,
   shouldResurrect,
   stringifyHLC,
   tombstoneKey,
@@ -23,16 +23,16 @@ describe('tombstoneKey', () => {
   })
 })
 
-describe('isTombstone', () => {
+describe('isCacheTombstone', () => {
   it('should recognize tombstone shape', () => {
-    expect(isTombstone({ collection: 'a', key: '1', deletedAt: hlc(1) })).toBe(true)
+    expect(isCacheTombstone({ collection: 'a', key: '1', deletedAt: hlc(1) })).toBe(true)
   })
 
   it('should reject other shapes', () => {
-    expect(isTombstone(null)).toBe(false)
-    expect(isTombstone({})).toBe(false)
-    expect(isTombstone({ collection: 'a' })).toBe(false)
-    expect(isTombstone({ collection: 'a', key: '1' })).toBe(false)
+    expect(isCacheTombstone(null)).toBe(false)
+    expect(isCacheTombstone({})).toBe(false)
+    expect(isCacheTombstone({ collection: 'a' })).toBe(false)
+    expect(isCacheTombstone({ collection: 'a', key: '1' })).toBe(false)
   })
 })
 

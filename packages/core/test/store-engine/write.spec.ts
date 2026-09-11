@@ -63,9 +63,9 @@ describe('store-engine: write & read', () => {
 
     expect(engine.hasMarker('all')).toBe(true)
     expect(engine.resolveKeys({ collection })).toEqual([1, 2])
-    // One batch-level afterWrite, no per-item ones.
-    expect(events.afterWrite).toHaveLength(1)
-    expect(events.afterWrite[0]!.operation).toBe('write')
+    // One batch-level write callback, no per-item ones.
+    expect(events.writeCommitted).toHaveLength(1)
+    expect(events.writeCommitted[0]!.operation).toBe('write')
   })
 
   it('resolveKeys returns [] for an unset marker', () => {
@@ -87,14 +87,14 @@ describe('store-engine: write & read', () => {
     expect(engine.resolveKeys({ collection, marker: '' })).toEqual([1])
   })
 
-  it('fires afterWrite on single write and delete', () => {
+  it('fires writeCommitted on single write and delete', () => {
     const collection = buildCollection('User')
     const { engine, events } = createTestEngine([collection])
 
     engine.writeItem({ collection, key: 1, item: { id: 1 } })
     engine.deleteItem({ collection, key: 1 })
 
-    expect(events.afterWrite.map(e => e.operation)).toEqual(['write', 'delete'])
+    expect(events.writeCommitted.map(e => e.operation)).toEqual(['write', 'delete'])
   })
 
   it('writes nested relation items into their own collection', () => {

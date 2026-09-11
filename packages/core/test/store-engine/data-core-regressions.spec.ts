@@ -39,6 +39,29 @@ describe('store-engine: data-core regressions', () => {
     expect(engine.resolveKeys({ collection })).toEqual(['1'])
   })
 
+  it('keeps optimized writeItems key fallback aligned with single writes', () => {
+    const collection = buildCollection('Post')
+    const callbacks = {
+      getCollection: (name: string) => name === collection.name ? collection : undefined,
+      resolveChildCollection: () => null,
+    }
+    const single = createStoreEngine({ isServer: true, callbacks })
+    const batch = createStoreEngine({ isServer: true, callbacks })
+
+    single.writeItem({ collection, key: 1, item: { id: 1, title: 'first' } })
+    single.writeItem({ collection, key: '1', item: { id: null, title: 'patched' } })
+    batch.writeItems({
+      collection,
+      items: [
+        { key: 1, value: { id: 1, title: 'first' } },
+        { key: '1', value: { id: null, title: 'patched' } },
+      ],
+    })
+
+    expect(batch.resolveKeys({ collection })).toEqual(single.resolveKeys({ collection }))
+    expect(batch.readItemRaw({ collection, key: 1 })).toEqual(single.readItemRaw({ collection, key: 1 }))
+  })
+
   it('reconciles indexes and observers for layer deletes', () => {
     const collection = buildCollection('Post', { indexes: new Map([['authorId', ['authorId']]]) })
     const { engine } = createTestEngine([collection])
@@ -161,7 +184,7 @@ describe('store-engine: data-core regressions', () => {
     engine.resume()
 
     expect(engine.resolveKeys({ collection })).toHaveLength(2_000)
-    expect(events.afterWrite.map(event => event.key).slice(0, 3)).toEqual([1, 2, 3])
+    expect(events.writeCommitted.map(event => event.key).slice(0, 3)).toEqual([1, 2, 3])
     expect('_ctx' in engine).toBe(false)
   })
 
