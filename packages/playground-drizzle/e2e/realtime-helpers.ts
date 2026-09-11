@@ -1,6 +1,6 @@
 import type { BrowserContext, Page } from '@playwright/test'
 import { expect } from '@playwright/test'
-import { createTodo, todoByTitle } from './utils'
+import { createTodo, todoByTitle } from '../../../test/e2e/todoUi'
 
 export interface RealtimeAppPage {
   page: Page
