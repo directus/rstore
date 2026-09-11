@@ -6,13 +6,13 @@ import { arch, cpus, platform, release } from 'node:os'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { computed, watchSyncEffect } from 'vue'
-import { assertLegacyPreconditions, createBenchmarkStore, createItems, legacyWriteItems } from './publicationStore'
+import { createBenchmarkStore, createItems, writeItemsPerItem } from './publicationStore'
 
 const benchmarkName = '@rstore/vue writeItems atomic publication'
 const itemCounts = [100, 1000]
 const warmupIterations = 2
 const measuredIterations = 20
-const modes = ['legacy-per-item-control', 'optimized-public-writeItems'] as const
+const modes = ['per-item-public-control', 'optimized-public-writeItems'] as const
 
 type Mode = typeof modes[number]
 
@@ -48,7 +48,7 @@ function normalizeItems(items: any[]) {
 
 /** Measure one isolated write and assert its visible results and publications. */
 async function runSample(itemCount: number, mode: Mode): Promise<SampleResult> {
-  const { cache, runtime, store } = await createBenchmarkStore()
+  const { cache, store } = await createBenchmarkStore()
   const collection = store.$collections[0]!
   const items = createItems(itemCount)
   const expected = items.map(({ value }) => value)
@@ -80,15 +80,12 @@ async function runSample(itemCount: number, mode: Mode): Promise<SampleResult> {
   })
 
   try {
-    if (mode === 'legacy-per-item-control') {
-      assertLegacyPreconditions(runtime)
-    }
     const startedAt = performance.now()
     if (mode === 'optimized-public-writeItems') {
       cache.writeItems(writeParams)
     }
     else {
-      legacyWriteItems(runtime, writeParams)
+      writeItemsPerItem(cache, store, writeParams)
     }
     const durationMs = performance.now() - startedAt
 
@@ -103,7 +100,7 @@ async function runSample(itemCount: number, mode: Mode): Promise<SampleResult> {
     assert.equal(cacheWrite!.operation, 'write', `${mode} hook must report a write operation`)
     assert.equal(cacheWrite!.result, items, `${mode} hook must retain the complete batch result`)
 
-    const expectedWatcherNotifications = mode === 'optimized-public-writeItems' ? 1 : itemCount * 3
+    const expectedWatcherNotifications = mode === 'optimized-public-writeItems' ? 1 : itemCount
     const expectedQueryRecomputations = expectedWatcherNotifications + 1
     const expectedVisibleTransitions = mode === 'optimized-public-writeItems' ? 1 : itemCount
     assert.equal(watcherNotifications, expectedWatcherNotifications, `${mode} watcher notification count changed`)
@@ -188,7 +185,7 @@ async function runSize(itemCount: number) {
   }
 
   const measurements: Record<Mode, { rawMs: number[], structural?: ModeMeasurements['structural'] }> = {
-    'legacy-per-item-control': { rawMs: [], structural: undefined },
+    'per-item-public-control': { rawMs: [], structural: undefined },
     'optimized-public-writeItems': { rawMs: [], structural: undefined },
   }
 
@@ -204,30 +201,30 @@ async function runSize(itemCount: number) {
     }
   }
 
-  const legacy = measurements['legacy-per-item-control']
+  const control = measurements['per-item-public-control']
   const optimized = measurements['optimized-public-writeItems']
-  assert(legacy.structural, 'Legacy control produced no measured structural evidence')
+  assert(control.structural, 'Per-item control produced no measured structural evidence')
   assert(optimized.structural, 'Optimized path produced no measured structural evidence')
-  assert.equal(legacy.structural.semanticDigest, optimized.structural.semanticDigest, 'Control and optimized cache/query results differ')
-  const legacySummary = summarize(legacy.rawMs)
+  assert.equal(control.structural.semanticDigest, optimized.structural.semanticDigest, 'Control and optimized cache/query results differ')
+  const controlSummary = summarize(control.rawMs)
   const optimizedSummary = summarize(optimized.rawMs)
 
   return {
     itemCount,
     structuralEvidence: {
-      'legacy-per-item-control': legacy.structural,
+      'per-item-public-control': control.structural,
       'optimized-public-writeItems': optimized.structural,
     },
     timings: {
-      'legacy-per-item-control': {
-        rawMs: legacy.rawMs.map(round),
-        summary: roundSummary(legacySummary),
+      'per-item-public-control': {
+        rawMs: control.rawMs.map(round),
+        summary: roundSummary(controlSummary),
       },
       'optimized-public-writeItems': {
         rawMs: optimized.rawMs.map(round),
         summary: roundSummary(optimizedSummary),
       },
-      'medianSpeedup': round(legacySummary.medianMs / optimizedSummary.medianMs),
+      'medianSpeedup': round(controlSummary.medianMs / optimizedSummary.medianMs),
     },
   }
 }

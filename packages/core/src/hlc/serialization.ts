@@ -2,6 +2,7 @@ import type { FieldTimestampValue, HLCString, HLCTimestamp } from './types.js'
 
 const PHYSICAL_DIGITS = 12
 const LOGICAL_DIGITS = 4
+const CANONICAL_HLC_PATTERN = /^[0-9a-f]{12}:[0-9a-f]{4}:.*$/
 
 /**
  * Serialize an HLC timestamp to a lexicographically-orderable string.
@@ -41,6 +42,15 @@ function coerceHLC(value: FieldTimestampValue): HLCTimestamp {
  * Compare two HLC-compatible timestamp values.
  */
 export function compareHLC(a: FieldTimestampValue | HLCTimestamp, b: FieldTimestampValue | HLCTimestamp): number {
+  if (typeof a === 'number' && typeof b === 'number')
+    return a - b
+  if (typeof a === 'string' && typeof b === 'string' && CANONICAL_HLC_PATTERN.test(a) && CANONICAL_HLC_PATTERN.test(b)) {
+    if (a < b)
+      return -1
+    if (a > b)
+      return 1
+    return 0
+  }
   const left = typeof a === 'object' ? a : coerceHLC(a)
   const right = typeof b === 'object' ? b : coerceHLC(b)
   if (left.physical !== right.physical) {

@@ -1,3 +1,4 @@
+import { klona } from 'klona'
 import { describe, expect, it } from 'vitest'
 import { get, isPublicKey, pickNonSpecialProps, pickSpecialProps, set } from '../../src'
 
@@ -61,6 +62,102 @@ describe('pickNonSpecialProps', () => {
   it('should return the same object if no properties start with $', () => {
     const obj = { a: 1, b: 2 }
     expect(pickNonSpecialProps(obj)).toEqual({ a: 1, b: 2 })
+  })
+
+  it('deeply detaches supported mutable values while preserving their kinds', () => {
+    class PayloadValue {
+      /** Create one custom payload value. */
+      constructor(public value: string) {}
+    }
+
+    const source = {
+      nested: { label: 'before' },
+      list: [{ value: 1 }],
+      map: new Map([['entry', { value: 2 }]]),
+      set: new Set([{ value: 3 }]),
+      date: new Date('2026-01-01T00:00:00.000Z'),
+      regexp: /payload/gi,
+      bytes: new Uint8Array([1, 2, 3]),
+      custom: new PayloadValue('before'),
+      $private: { retained: false },
+    }
+
+    const result = pickNonSpecialProps(source, true)
+    source.nested.label = 'after'
+    source.list[0]!.value = 9
+    source.map.get('entry')!.value = 9
+    ;[...source.set][0]!.value = 9
+    source.bytes[0] = 9
+    source.custom.value = 'after'
+
+    expect(result).toMatchObject({
+      nested: { label: 'before' },
+      list: [{ value: 1 }],
+      date: new Date('2026-01-01T00:00:00.000Z'),
+      regexp: /payload/gi,
+      custom: { value: 'before' },
+    })
+    expect(result.map.get('entry')).toEqual({ value: 2 })
+    expect([...result.set]).toEqual([{ value: 3 }])
+    expect([...result.bytes]).toEqual([1, 2, 3])
+    expect(result.custom).toBeInstanceOf(PayloadValue)
+    expect(result).not.toHaveProperty('$private')
+  })
+
+  it('retains primitive-only clone semantics without sharing the root object', () => {
+    const source = { id: 1, title: 'wide', active: true, empty: null }
+    const result = pickNonSpecialProps(source, true)
+
+    expect(result).toEqual(source)
+    expect(result).not.toBe(source)
+  })
+
+  it('matches historical klona behavior for every supported payload kind', () => {
+    class CustomPayload {
+      /** Create one prototype-bearing payload. */
+      constructor(public nested = { value: 1 }) {}
+    }
+    const protoValue = Object.create(null)
+    Object.defineProperty(protoValue, '__proto__', { value: { safe: true }, enumerable: true })
+    const buffer = new Uint8Array([1, 2, 3, 4]).buffer
+    const source = Object.freeze({
+      array: [{ value: 1 }],
+      custom: new CustomPayload(),
+      map: new Map<any, any>([[{ key: 1 }, { value: 2 }]]),
+      set: new Set([{ value: 3 }]),
+      date: new Date('2026-02-03T04:05:06.000Z'),
+      regexp: Object.assign(/clone/gi, { lastIndex: 2 }),
+      buffer,
+      view: new DataView(buffer),
+      typed: new Uint16Array([4, 5]),
+      protoValue,
+      $private: { ignored: true },
+    })
+    const expected = Object.fromEntries(Object.entries(source)
+      .filter(([key]) => !key.startsWith('$'))
+      .map(([key, value]) => [key, klona(value)]))
+    const result = pickNonSpecialProps(source, true)
+
+    expect(result).toEqual(expected)
+    expect(result.custom).toBeInstanceOf(CustomPayload)
+    expect(Object.getOwnPropertyDescriptor(result.protoValue, '__proto__')?.value).toEqual({ safe: true })
+    expect(result.array).not.toBe(source.array)
+    expect(result.map).not.toBe(source.map)
+    expect(result.buffer).not.toBe(source.buffer)
+  })
+
+  it('preserves clone construction failures and resets clone state', () => {
+    class RequiredArgument {
+      /** Reject klona-style zero-argument construction. */
+      constructor(value?: string) {
+        if (value === undefined)
+          throw new Error('required payload argument')
+      }
+    }
+    const source = { nested: new RequiredArgument('value') }
+
+    expect(() => klona(source.nested)).toThrow('required payload argument')
+    expect(() => pickNonSpecialProps(source, true)).toThrow('required payload argument')
   })
 })
 

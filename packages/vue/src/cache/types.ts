@@ -1,121 +1,87 @@
-import type { TombstoneStore } from '@rstore/core'
-import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { StoreEngine, TombstoneGcOptions } from '@rstore/core'
+import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
-import type { WrappedItemMetadata } from '../item'
 import type { VueStore } from '../store'
+import type { CacheChangeInterestRegistry } from './changeInterest'
+import type { IndexResultCache } from './indexResultCache'
+import type { ItemCellRegistry } from './itemCells'
+import type { SignalRegistry } from './signals'
+import type { CacheVersionRegistry } from './versions'
+import type { WrappedItemRegistry } from './wrappedRegistry'
 
-/** Cache operations delayed while the cache is paused or write staggering is active. */
-export type QueuedOperation
-  = | { type: 'writeItem', params: Parameters<Cache['writeItem']>[0] }
-    | { type: 'writeItems', params: Parameters<Cache['writeItems']>[0], index: number, batch: CacheWriteBatch }
-    | { type: 'deleteItem', params: Parameters<Cache['deleteItem']>[0] }
-    | { type: 'addLayer', layer: Parameters<Cache['addLayer']>[0] }
-    | { type: 'removeLayer', layerId: Parameters<Cache['removeLayer']>[0] }
-    | { type: 'setState', state: CustomCacheState }
-    | { type: 'clear' }
+/** Cached response reference stored by one query page. */
+export type QueryPageRef
+  = | { type: 'ref', key: string | number }
+    | { type: 'refs', keys: Array<string | number> }
 
-/** Public hook payload retained until its complete batch becomes visible. */
-type AfterCacheWritePayload = Parameters<CacheHookDefinitions<StoreSchema, CollectionDefaults>['afterCacheWrite']>[0]
-
-/** Reactive collection publications and nested hooks deferred until a writeItems operation settles. */
-export interface CacheWriteBatch {
-  /** Collections needing one reactive publication at settlement. */
-  affectedCollections: Set<string>
-  /** Nested write notifications delivered after collection publication. */
-  deferredAfterCacheWrites: AfterCacheWritePayload[]
+/** Bridge-owned state surfaced to Vue internals. */
+export interface VueCacheState {
+  /** Cached raw page data keyed by page id, used by query pagination. */
+  pageRefs: Map<string, QueryPageRef>
+  /** Live per-query metadata, backed by the engine for SSR round-trips. */
+  readonly queryMeta: Record<string, CustomHookMeta>
 }
 
-/** Reactive state owned by the Vue cache implementation. */
-export interface InternalCacheState {
-  /** Query markers used to know whether list results were fetched before. */
-  markers: Record<string, boolean>
-  /** Collection item state by collection name. */
-  collections: Record<string, Ref<Record<string | number, any>>>
-  /** Relation/index lookups by collection, index key, and index value. */
-  collectionIndexes: Map<string, Map<string, Map<any, Ref<Set<string | number>>>>>
-  /** Module state by module cache key. */
-  modules: Record<string, Ref<any>>
-  /** Last hook metadata for query ids. */
-  queryMeta: Record<string, CustomHookMeta>
-  /** Saved page references for query pagination. */
-  pageRefs: Map<string, { type: 'ref', key: string | number } | { type: 'refs', keys: Array<string | number> }>
-  /** Whether writes should be queued instead of applied immediately. */
-  paused: boolean
-  /** Pending cache operations. */
-  queue: QueuedOperation[]
-  /** Per-field timestamps for CRDT field-level LWW merge. */
-  fieldTimestamps: Map<string, Map<string | number, FieldTimestamps>>
-  /** Deletion tombstones used to reject stale writes after deletes. */
-  tombstones: TombstoneStore
-}
-
+/** Options used to create the Vue cache bridge. */
 export interface CreateCacheOptions<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
 > {
   /** Resolve the owning Vue store. */
   getStore: () => VueStore<TSchema, TCollectionDefaults>
-  /** Maximum number of queued writes processed per 10ms. */
+  /** Maximum number of queued writes processed per 10ms by the engine. */
   cacheStaggering?: number
   /** Auto-GC settings for the per-cache tombstone store. */
-  tombstoneGc?: false | {
-    /** Sweep interval in ms. Defaults to 60_000. */
-    intervalMs?: number
-    /** Drop tombstones older than this many ms. Defaults to 86_400_000. */
-    ttlMs?: number
-  }
+  tombstoneGc?: TombstoneGcOptions
   /** Whether this cache belongs to a server-side store instance. */
   isServer?: boolean
 }
 
-/** Mutable runtime shared by cache helper modules. */
+/** Mutable runtime shared by the Vue cache bridge modules. */
 export interface CacheRuntime<
   TSchema extends StoreSchema = StoreSchema,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > {
   /** Resolve the owning Vue store. */
   getStore: () => VueStore<TSchema, TCollectionDefaults>
-  /** Write staggering budget. */
-  cacheStaggering: number
-  /** Internal reactive cache state. */
-  state: InternalCacheState
-  /** Stop the tombstone GC timer, when one is active. */
-  stopTombstoneGc?: () => void
-  /** Optimistic/cache layers by collection name. */
+  /** Framework-agnostic engine that owns storage and write semantics. */
+  engine: StoreEngine<TSchema, TCollectionDefaults>
+  /** Active dependencies exposed to Core's selective journal. */
+  changeInterest: CacheChangeInterestRegistry
+  /** Bridge-owned state used by Vue query helpers. */
+  state: VueCacheState
+  /** Vue signal registry subscribed to engine observers. */
+  signals: SignalRegistry
+  /** Wrapper-owned exact item cells synchronized after commits. */
+  itemCells: ItemCellRegistry
+  /** Reactive fallback for Vue computed getters without a scope owner. */
+  versions: CacheVersionRegistry
+  /** Devtools layer mirror by collection name. */
   layers: Record<string, Ref<CacheLayer[]>>
-  /** Collection lookup for layer ids. */
-  layerIdToCollectionName: Record<string, string>
-  /** Wrapped item proxies by wrap key. */
-  wrappedItems: Map<string, WrappedItem<Collection, TCollectionDefaults, TSchema>>
-  /** Wrapped item metadata by wrap key. */
-  wrappedItemsMetadata: Map<string, WrappedItemMetadata<Collection, TCollectionDefaults, TSchema>>
-  /** Wrap keys created for each layer. */
-  wrappedItemKeysPerLayer: Map<string, Set<string>>
-  /** Cached overlay collection states. */
-  collectionStateCache: Map<string, Record<string | number, any>>
-  /** Reactivity markers for cached overlay states. */
-  collectionStateCacheReactivityMarker: Map<string, Ref<number>>
-  /** Whether queued operations are currently being flushed. */
-  isFlushingQueue: boolean
-  /** Remaining writes before the next staggering pause. */
-  staggeringBudget: number
-  /** Timer that resets the staggering budget. */
-  staggeringResetTimer?: ReturnType<typeof setTimeout>
+  /** Structured wrapped-item identities and metadata. */
+  wrappedItems: WrappedItemRegistry<TCollectionDefaults, TSchema>
+  /** Stable visible-list wrappers reused until cache membership can change. */
+  visibleListCache: Map<string, Array<WrappedItem<Collection, TCollectionDefaults, TSchema>>>
+  /** Bounded weak exact-index wrapper results retained until membership changes. */
+  indexResultCache: IndexResultCache
 }
 
+/** Private Vue cache surface consumed by existing Vue internals and devtools. */
 export interface VueCachePrivate {
   _private: {
-    state: InternalCacheState
-    wrappedItems: Map<string, WrappedItem<Collection, CollectionDefaults, StoreSchema>>
-    wrappedItemsMetadata: Map<string, WrappedItemMetadata<Collection, CollectionDefaults, StoreSchema>>
+    /** Bridge-owned cache state. */
+    state: VueCacheState
+    /** Return an existing wrapped item or create one for the raw item. */
     getWrappedItem: <TCollection extends Collection>(
       collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
       item: ResolvedCollectionItem<TCollection, CollectionDefaults, StoreSchema> | null | undefined,
       noCache?: boolean,
     ) => WrappedItem<TCollection, CollectionDefaults, StoreSchema> | undefined
+    /** Devtools layer mirror by collection name. */
     layers: Record<string, Ref<CacheLayer[]>>
+    /** Ensure a devtools layer mirror exists for a collection. */
     ensureLayersForCollection: (collectionName: string) => Ref<CacheLayer[]>
-    /** Rebuild relation indexes after the store schema changes at runtime. */
+    /** Rebuild engine indexes after a runtime schema change. */
     rebuildIndexes: () => void
   }
 }

@@ -1,3 +1,5 @@
+import { resolveGeneratedPrimaryKeys } from '../utils'
+
 /**
  * rstore find options shape consumed by {@link createConnectorQuery}.
  */
@@ -87,7 +89,7 @@ export function stripPrimaryKeys<TItem extends Record<string, any>>(
   primaryKeys: string[] | undefined,
 ): TItem {
   const result = { ...item }
-  for (const key of primaryKeys?.length ? primaryKeys : ['id']) {
+  for (const key of resolveGeneratedPrimaryKeys(primaryKeys)) {
     delete result[key]
   }
   return result

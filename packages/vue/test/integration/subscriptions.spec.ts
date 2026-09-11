@@ -166,6 +166,33 @@ describe('realtime subscriptions', () => {
     expect(remote.callCount('fetchFirst')).toBe(one + 2)
   })
 
+  it('does not reconnect or resubscribe a disposed dynamic live query', async () => {
+    const { store, remote, run, scope } = await createVueStack({
+      schema: [{ name: 'todos' }, { name: 'archived' }],
+      data: {
+        todos: [{ id: '1', title: 'One', done: false }],
+        archived: [{ id: '2', title: 'Archived', done: true }],
+      },
+    })
+    const collectionName = ref('todos')
+    const api = run(() => store.$collection(collectionName))
+    const live = scope(() => api.liveQuery((q: any) => q.many()))
+    await live.result
+    await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(1))
+
+    live.stop()
+    await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(0))
+    const fetches = remote.callCount('fetchMany')
+    const subscribes = remote.callCount('subscribe')
+
+    collectionName.value = 'archived'
+    await nextTick()
+    await realtimeReconnectEventHook.trigger()
+
+    expect(remote.callCount('fetchMany')).toBe(fetches)
+    expect(remote.callCount('subscribe')).toBe(subscribes)
+  })
+
   it('opens no subscription and registers no reconnect listener on the server', async () => {
     const { store, run, remote } = await setup({ isServer: true })
     const list = await run(() => store.todos.liveQuery((q: any) => q.many()))

@@ -1,11 +1,10 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CacheRuntime } from './types'
-import { computed, shallowRef } from 'vue'
+import { shallowRef } from 'vue'
 import { wrapItem } from '../item'
-import { addWrappedItemKeyToLayer, ensureCollectionRef, getItemKey, getItemWrapKey } from './context'
-import { isKeyPinnedByActiveLayer } from './layers'
+import { createWrappedItemMetadata } from '../itemMetadata'
+import { getItemKey, readRawCacheItem } from './context'
 import { invalidatePageRefsForItem } from './queryState'
-import { deleteItemNow } from './writes'
 
 /** Return the cached wrapped proxy for an item, creating it when needed. */
 export function getWrappedItem<
@@ -17,6 +16,8 @@ export function getWrappedItem<
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>,
   item: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null | undefined,
   noCache = false,
+  knownKey?: string | number,
+  track = false,
 ): WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined {
   if (!item) {
     return undefined
@@ -27,38 +28,40 @@ export function getWrappedItem<
       store: ctx.getStore(),
       collection,
       item: shallowRef(item),
-      metadata: {
-        queries: new Set(),
-        dirtyQueries: new Set(),
-      },
+      metadata: createWrappedItemMetadata(),
     })
   }
 
-  const key = getItemKey(collection, item)
-  const layer = item.$layer
-  const wrapKey = getItemWrapKey(collection, key, layer)
-  let wrappedItem = ctx.wrappedItems.get(wrapKey)
-  if (!wrappedItem) {
-    let metadata = ctx.wrappedItemsMetadata.get(wrapKey)
-    if (!metadata) {
-      metadata = {
-        queries: new Set(),
-        dirtyQueries: new Set(),
-      }
-      ctx.wrappedItemsMetadata.set(wrapKey, metadata)
-    }
-    wrappedItem = wrapItem({
+  const key = knownKey ?? getItemKey(collection, item)
+  // Public wrapItem calls can carry embedded relation payloads that engine
+  // normalized into child rows. Seed cached wrappers from canonical engine
+  // state so relation fields keep resolving through indexes.
+  const current = knownKey === undefined
+    ? readRawCacheItem(ctx, collection, key) ?? item
+    : item
+  const layer = current.$layer
+  let entry = ctx.wrappedItems.get(collection.name, key, layer?.id)
+  if (!entry) {
+    const metadata = createWrappedItemMetadata()
+    const cell = ctx.itemCells.create(collection.name, key, current, track)
+    const wrappedItem = wrapItem({
       store: ctx.getStore(),
       collection,
-      item: computed(() => layer
-        ? item
-        : ensureCollectionRef(ctx, collection.name).value[key] ?? item),
+      item: cell.source,
       metadata,
+      seed: current,
     })
-    ctx.wrappedItems.set(wrapKey, wrappedItem)
-    addWrappedItemKeyToLayer(ctx, item.$layer, wrapKey)
+    entry = { item: wrappedItem, metadata, cell }
+    ctx.wrappedItems.set(
+      collection.name,
+      key,
+      layer?.id,
+      entry as unknown as Parameters<typeof ctx.wrappedItems.set>[3],
+    )
   }
-  return wrappedItem as WrappedItem<TCollection, TCollectionDefaults, TSchema>
+  if (track)
+    entry.cell.track()
+  return entry.item as WrappedItem<TCollection, TCollectionDefaults, TSchema>
 }
 
 /** Delete an unreferenced item from cache and emit garbage collection hooks. */
@@ -66,15 +69,13 @@ export function garbageCollectItem<TCollection extends Collection>(
   ctx: CacheRuntime,
   collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
   item: WrappedItem<TCollection, CollectionDefaults, StoreSchema>,
+  knownKey?: string | number,
 ) {
   if (item.$meta.queries.size !== 0) {
     return
   }
-  const key = getItemKey(collection, item)
-  if (isKeyPinnedByActiveLayer(ctx, collection.name, key)) {
-    return
-  }
-  if (!deleteItemNow(ctx, collection, key)) {
+  const key = knownKey ?? getItemKey(collection, item)
+  if (!ctx.engine.garbageCollectKey(collection, key)) {
     return
   }
   invalidatePageRefsForItem(ctx, collection.name, key)

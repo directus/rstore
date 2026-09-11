@@ -36,6 +36,20 @@
     "build": "unbuild",
     "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",
     "prepack": "node ../../scripts/sync-dep-skills.mjs .",
+    "benchmark": "vite-node benchmark/cache.bench.ts",
+    "benchmark:decomposition": "vite-node benchmark/decomposition.ts",
+    "benchmark:read-decomposition": "vite-node benchmark/read-decomposition.ts",
+    "benchmark:read-regressions": "vite-node benchmark/read-regressions.ts",
+    "benchmark:engine-profile": "vite-node benchmark/engine-profile.ts",
+    "benchmark:memory": "vite-node benchmark/memory.ts",
+    "benchmark:memory:full": "vite-node benchmark/memory-full.ts",
+    "benchmark:memory:versions": "vite-node benchmark/memory-versions.ts",
+    "benchmark:payload": "vite-node benchmark/payload.ts",
+    "benchmark:payload:full": "vite-node benchmark/payload-full.ts",
+    "benchmark:payload:versions": "vite-node benchmark/payload-versions.ts",
+    "benchmark:write-decomposition": "vite-node benchmark/write-decomposition.ts",
+    "benchmark:combine-reports": "vite-node benchmark/combine-version-reports.ts",
+    "benchmark:full": "vite-node benchmark/full.ts",
     "test:types": "tsc --noEmit"
   },
   "peerDependencies": {
@@ -49,6 +63,7 @@
     "klona": "^2.0.6"
   },
   "devDependencies": {
+    "tinybench": "^2.9.0",
     "typescript": "catalog:",
     "unbuild": "catalog:",
     "vite-node": "catalog:",

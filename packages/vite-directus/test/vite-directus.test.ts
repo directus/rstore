@@ -1,10 +1,16 @@
 import type { DirectusCollectionDefinition } from '@rstore/directus/schema'
-import type { Plugin, ResolvedConfig } from 'vite'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
+import { readFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { build } from 'vite'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import {
+  createViteTempRoots,
+  loadViteVirtualModule,
+  resolveViteConfig,
+  resolveViteVirtualModule,
+  runViteBuildStart,
+  writeViteVirtualModuleEntry,
+} from '../../../test/utils/viteVirtualModule'
 
 const fixtures = vi.hoisted(() => {
   const collections: DirectusCollectionDefinition[] = [{
@@ -58,14 +64,11 @@ vi.mock('@rstore/directus/schema', async () => {
   }
 })
 
-const tempDirs: string[] = []
+const tempRoots = createViteTempRoots()
 
 afterEach(async () => {
   fixtures.loadDirectusCollections.mockClear()
-  await Promise.all(tempDirs.splice(0).map(dir => rm(dir, {
-    force: true,
-    recursive: true,
-  })))
+  await tempRoots.cleanup()
 })
 
 describe('rstoreDirectus', () => {
@@ -73,24 +76,35 @@ describe('rstoreDirectus', () => {
     const { rstoreDirectus } = await import('../src')
     const plugin = rstoreDirectus({})
 
-    await expect(runBuildStart(plugin)).rejects.toThrow('@rstore/vite-directus requires url and adminToken options')
+    await expect(runViteBuildStart(plugin)).rejects.toThrow('@rstore/vite-directus requires url and adminToken options')
   })
 
-  it('generates virtual schema, plugin, index, and declarations without leaking the admin token', async () => {
+  it('resolves generated modules with Vite internal IDs', async () => {
     const { rstoreDirectus } = await import('../src')
-    const root = await createTempRoot()
     const plugin = rstoreDirectus({
       url: 'https://directus.example.com',
       adminToken: 'secret-admin-token',
       scopeId: 'test-scope',
     })
 
-    runConfigResolved(plugin, root)
-    await runBuildStart(plugin)
+    expect(resolveViteVirtualModule(plugin, 'virtual:rstore-directus/schema')).toBe('\0virtual:rstore-directus/schema')
+  })
 
-    const indexCode = await runLoad(plugin, 'virtual:rstore-directus')
-    const schemaCode = await runLoad(plugin, 'virtual:rstore-directus/schema')
-    const pluginCode = await runLoad(plugin, 'virtual:rstore-directus/plugin')
+  it('generates virtual schema, plugin, index, and declarations without leaking the admin token', async () => {
+    const { rstoreDirectus } = await import('../src')
+    const root = await tempRoots.create('rstore-vite-directus-')
+    const plugin = rstoreDirectus({
+      url: 'https://directus.example.com',
+      adminToken: 'secret-admin-token',
+      scopeId: 'test-scope',
+    })
+
+    resolveViteConfig(plugin, root)
+    await runViteBuildStart(plugin)
+
+    const indexCode = await loadViteVirtualModule(plugin, 'virtual:rstore-directus')
+    const schemaCode = await loadViteVirtualModule(plugin, 'virtual:rstore-directus/schema')
+    const pluginCode = await loadViteVirtualModule(plugin, 'virtual:rstore-directus/plugin')
     const declarations = await readFile(join(root, 'rstore-directus.d.ts'), 'utf8')
 
     expect(indexCode).toContain('virtual:rstore-directus/schema')
@@ -113,8 +127,8 @@ describe('rstoreDirectus', () => {
 
   it('builds the virtual schema module as plain JavaScript', async () => {
     const { rstoreDirectus } = await import('../src')
-    const root = await createTempRoot()
-    await writeViteEntry(root)
+    const root = await tempRoots.create('rstore-vite-directus-')
+    await writeViteVirtualModuleEntry(root, 'virtual:rstore-directus/schema')
 
     await build({
       root,
@@ -129,58 +143,3 @@ describe('rstoreDirectus', () => {
     })
   })
 })
-
-/**
- * Creates and tracks a temporary Vite root directory.
- */
-async function createTempRoot(): Promise<string> {
-  const dir = await mkdtemp(join(tmpdir(), 'rstore-vite-directus-'))
-  tempDirs.push(dir)
-  return dir
-}
-
-/**
- * Writes a minimal Vite app that imports the generated schema virtual module.
- */
-async function writeViteEntry(root: string): Promise<void> {
-  await mkdir(join(root, 'src'), { recursive: true })
-  await writeFile(join(root, 'index.html'), '<script type="module" src="/src/main.ts"></script>')
-  await writeFile(join(root, 'src/main.ts'), `import schema from 'virtual:rstore-directus/schema'
-
-console.log(schema.length)
-`)
-}
-
-/**
- * Runs the Vite configResolved hook with the minimum config shape used by tests.
- */
-function runConfigResolved(plugin: Plugin, root: string): void {
-  const hook = plugin.configResolved
-  if (typeof hook === 'function') {
-    ;(hook as any)({ root } as ResolvedConfig)
-  }
-}
-
-/**
- * Runs the Vite buildStart hook.
- */
-async function runBuildStart(plugin: Plugin): Promise<void> {
-  const hook = plugin.buildStart
-  if (typeof hook === 'function') {
-    await (hook as any).call({} as any, {} as any)
-  }
-}
-
-/**
- * Resolves and loads one virtual module from the plugin.
- */
-async function runLoad(plugin: Plugin, id: string): Promise<string> {
-  const resolved = typeof plugin.resolveId === 'function'
-    ? await (plugin.resolveId as any).call({} as any, id, undefined, {} as any)
-    : id
-  const code = typeof plugin.load === 'function'
-    ? await (plugin.load as any).call({} as any, String(resolved ?? id), {} as any)
-    : undefined
-
-  return String(code ?? '')
-}

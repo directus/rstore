@@ -53,6 +53,11 @@ const otherPackageExcludes = process.env.RSTORE_TEST_PACKAGE
   : []
 
 export default defineConfig({
+  resolve: {
+    // vite-node benchmark workers are outside a Vitest project but must load
+    // current workspace source, like unit and integration projects do.
+    alias: sourceAliases,
+  },
   test: {
     // Inline projects inherit these exclusions. Unlike positional CLI filters,
     // this boundary still applies when a caller supplies another filename.

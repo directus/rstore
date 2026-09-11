@@ -333,6 +333,11 @@ describe('compareHLC', () => {
   it('should treat equal numeric timestamps as equal', () => {
     expect(compareHLC(100, 100)).toBe(0)
   })
+
+  it('preserves parsing behavior for malformed and non-canonical strings', () => {
+    expect(compareHLC('64:0:a' as any, 'c8:0:a' as any)).toBeLessThan(0)
+    expect(() => compareHLC('invalid' as any, 'also-invalid' as any)).toThrow('Invalid HLC string')
+  })
 })
 
 describe('stringifyHLC / parseHLC', () => {

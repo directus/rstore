@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
+import { createTodo, todoByTitle, uniqueText } from '../../../test/e2e/todoUi'
 import { openRealtimeApp, waitForOnlineState } from './realtime-helpers'
-import { createTodo, todoByTitle, uniqueText } from './utils'
 
 test('reconnect catches up on todo created while another tab was offline', async ({ browser }) => {
   const ctxA = await browser.newContext()

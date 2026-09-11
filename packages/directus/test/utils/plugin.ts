@@ -1,5 +1,5 @@
-import type { PluginSetupApi } from '@rstore/shared'
 import { vi } from 'vitest'
+import { capturePluginHooks } from '../../../../test/utils/connectorPlugin'
 import { createDirectusRstorePlugin } from '../../src'
 
 /**
@@ -22,36 +22,10 @@ export function createMockDirectusClient(): MockDirectusClient {
  * Creates a test plugin and captures registered rstore hooks.
  */
 export function setupPlugin(client: MockDirectusClient): Record<string, any> {
-  const hooks: Record<string, any> = {}
-  const plugin = createDirectusRstorePlugin({
+  return capturePluginHooks(createDirectusRstorePlugin({
     client: client as any,
     scopeId: 'test-scope',
-  })
-  plugin.setup({
-    addCollectionDefaults: vi.fn(),
-    hook: vi.fn((name, callback) => {
-      hooks[name] = callback
-      return vi.fn()
-    }),
-  } as unknown as PluginSetupApi)
-  return hooks
-}
-
-/**
- * Runs a data hook and returns the value passed to `setResult`.
- */
-export async function runHook(callback: any, payload: Record<string, any>): Promise<unknown> {
-  let result: unknown
-  await callback({
-    abort: vi.fn(),
-    findOptions: {},
-    getResult: () => result,
-    setResult: (value: unknown) => {
-      result = value
-    },
-    ...payload,
-  })
-  return result
+  }))
 }
 
 /**
