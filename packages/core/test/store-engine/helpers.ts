@@ -1,5 +1,5 @@
 import type { CacheLayer, CollectionRelation, ResolvedCollection } from '@rstore/shared'
-import type { EngineAfterWritePayload, EngineConflictPayload, StoreEngine } from '../../src'
+import type { EngineConflictPayload, EngineWriteCommitPayload, StoreEngine } from '../../src'
 import { createStoreEngine } from '../../src'
 
 /**
@@ -29,7 +29,7 @@ export function buildCollection(name: string, options: {
 
 /** Captured engine callback events, for assertions. */
 export interface RecordedEvents {
-  afterWrite: EngineAfterWritePayload[]
+  writeCommitted: EngineWriteCommitPayload[]
   conflicts: EngineConflictPayload[]
   layerAdd: CacheLayer[]
   layerRemove: CacheLayer[]
@@ -46,7 +46,7 @@ export function createTestEngine(
 ): { engine: StoreEngine, events: RecordedEvents, byName: Map<string, ResolvedCollection<any, any, any>> } {
   const byName = new Map(collections.map(c => [c.name, c]))
   const events: RecordedEvents = {
-    afterWrite: [],
+    writeCommitted: [],
     conflicts: [],
     layerAdd: [],
     layerRemove: [],
@@ -67,7 +67,7 @@ export function createTestEngine(
         }
         return null
       },
-      onAfterWrite: payload => events.afterWrite.push(payload),
+      onWriteCommitted: payload => events.writeCommitted.push(payload),
       onConflict: payload => events.conflicts.push(payload),
       onLayerAdd: layer => events.layerAdd.push(layer),
       onLayerRemove: layer => events.layerRemove.push(layer),

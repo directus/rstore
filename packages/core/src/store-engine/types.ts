@@ -14,10 +14,9 @@ import type {
   StoreSchema,
 } from '@rstore/shared'
 import type { TombstoneStore } from '../tombstone.js'
-import type { EngineChangeInterest, EngineChangeSet, ObserverChanges } from './observer-changes.js'
-import type { EngineAfterWritePayload, EngineStateChangeSink, EngineWriteCommitPayload } from './write-callbacks.js'
+import type { EngineStateChangeSink, EngineWriteCommitPayload } from './write-callbacks.js'
 
-export type { EngineAfterWritePayload, EngineStateChangeSink, EngineWriteChange, EngineWriteCommitPayload } from './write-callbacks.js'
+export type { EngineStateChangeSink, EngineWriteCommitPayload } from './write-callbacks.js'
 
 /** Unsubscribe handle returned by engine observer methods. */
 export type Unsubscribe = () => void
@@ -49,16 +48,10 @@ export interface EngineCallbacks {
   getCollection: (name: string) => ResolvedCollection<any, any, any> | undefined
   /** Resolve a related child item among candidate collection names. */
   resolveChildCollection: (item: any, possibleNames: string[]) => ResolvedCollection<any, any, any> | null
-  /** Synchronize framework state immediately after each committed operation. */
-  onStateChange?: (changes: EngineChangeSet) => void
-  /** Return dependencies currently consumed by a selective state bridge. */
-  getStateChangeInterest?: () => EngineChangeInterest | undefined
   /** Allocation-light state bridge used by framework adapters. */
   stateChangeSink?: EngineStateChangeSink
-  /** Allocation-light write callback not requiring `EngineWriteChange` objects. */
+  /** Allocation-light write callback for embedding adapters. */
   onWriteCommitted?: (payload: EngineWriteCommitPayload) => void
-  /** Fired after a write or delete commits. */
-  onAfterWrite?: (payload: EngineAfterWritePayload) => void
   /** Fired when a CRDT merge reports field conflicts. */
   onConflict?: (payload: EngineConflictPayload) => void
   /** Fired after an optimistic layer commits. */
@@ -69,8 +62,6 @@ export interface EngineCallbacks {
   onReset?: (payload: EngineResetPayload) => void
   /** Wrap newly created module state for the embedding framework. */
   wrapModuleState?: (value: any) => any
-  /** Bridge hook for batched observer invalidations. */
-  onObserverFlush?: (changes: ObserverChanges) => void
 }
 
 /** Tombstone auto-GC configuration. `false` disables background sweeps. */

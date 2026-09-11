@@ -1,10 +1,10 @@
-import type { EngineChangeInterest, EngineChangeSet, EngineStateChangeSink } from '../../src'
+import type { EngineChangeInterest, EngineStateChangeSink } from '../../src'
 import { describe, expect, it, vi } from 'vitest'
 import { createStoreEngine } from '../../src'
 import { buildCollection, createTestEngine } from './helpers'
 
 describe('store-engine: observers', () => {
-  it('commits compact sink state before generic callbacks and write hooks', () => {
+  it('commits compact sink state before write hooks', () => {
     const collection = buildCollection('User')
     const order: string[] = []
     let buffered: unknown
@@ -32,15 +32,13 @@ describe('store-engine: observers', () => {
         getCollection: name => name === collection.name ? collection : undefined,
         resolveChildCollection: () => null,
         stateChangeSink: sink,
-        onStateChange: () => order.push('state'),
         onWriteCommitted: () => order.push('compact'),
-        onAfterWrite: () => order.push('full'),
       },
     })
 
     engine.writeItem({ collection, key: 1, item: { id: 1, name: 'A' } })
 
-    expect(order).toEqual(['record', 'sink', 'state', 'compact', 'full'])
+    expect(order).toEqual(['record', 'sink', 'compact'])
   })
 
   it('discards a compact sink buffer after failed validation', () => {
@@ -111,39 +109,6 @@ describe('store-engine: observers', () => {
     expect(sink.commit).toHaveBeenCalledOnce()
   })
 
-  it('does not apply generic state selector to an independent compact sink', () => {
-    const collection = buildCollection('User')
-    const recordItem = vi.fn()
-    const onStateChange = vi.fn()
-    const sink: EngineStateChangeSink = {
-      begin: () => true,
-      wantsItem: () => true,
-      wantsList: () => false,
-      wantsIndex: () => false,
-      recordItem,
-      recordList: vi.fn(),
-      recordIndex: vi.fn(),
-      recordCollectionReset: vi.fn(),
-      commit: vi.fn(),
-      discard: vi.fn(),
-    }
-    const engine = createStoreEngine({
-      isServer: true,
-      callbacks: {
-        getCollection: name => name === collection.name ? collection : undefined,
-        resolveChildCollection: () => null,
-        getStateChangeInterest: () => ({ itemKeys: new Map(), lists: new Set(), indexes: new Map() }),
-        onStateChange,
-        stateChangeSink: sink,
-      },
-    })
-
-    engine.writeItem({ collection, key: 1, item: { id: 1 } })
-    expect(recordItem).toHaveBeenCalledOnce()
-    expect(sink.commit).toHaveBeenCalledOnce()
-    expect(onStateChange).not.toHaveBeenCalled()
-  })
-
   it('scans raw index items with dependency tracking before visitation', () => {
     const post = buildCollection('Post')
     const comment = buildCollection('Comment', {
@@ -199,7 +164,7 @@ describe('store-engine: observers', () => {
     expect(cb).toHaveBeenCalledTimes(1)
   })
 
-  it('publishes committed state before hooks and final observers', () => {
+  it('publishes committed state before write hooks and final observers', () => {
     const collection = buildCollection('User')
     const order: string[] = []
     const engine = createStoreEngine({
@@ -207,101 +172,29 @@ describe('store-engine: observers', () => {
       callbacks: {
         getCollection: name => name === collection.name ? collection : undefined,
         resolveChildCollection: () => null,
-        onStateChange(changes) {
-          expect(engine.readItemRaw({ collection, key: 1 })).toEqual({ id: 1, name: 'A' })
-          expect(changes.items.get('User')).toEqual(new Set(['1']))
-          order.push('state')
+        stateChangeSink: {
+          begin: () => true,
+          wantsItem: () => true,
+          wantsList: () => false,
+          wantsIndex: () => false,
+          recordItem: vi.fn(),
+          recordList: vi.fn(),
+          recordIndex: vi.fn(),
+          recordCollectionReset: vi.fn(),
+          commit: () => {
+            expect(engine.readItemRaw({ collection, key: 1 })).toEqual({ id: 1, name: 'A' })
+            order.push('sink')
+          },
+          discard: vi.fn(),
         },
-        onAfterWrite: () => order.push('hook'),
-        onObserverFlush: () => order.push('flush'),
+        onWriteCommitted: () => order.push('hook'),
       },
     })
     engine.observeItem('User', 1, () => order.push('observer'))
 
     engine.writeItem({ collection, key: 1, item: { id: 1, name: 'A' } })
 
-    expect(order).toEqual(['state', 'hook', 'flush', 'observer'])
-  })
-
-  it('publishes stable operation-local change sets during one queue flush', () => {
-    const collection = buildCollection('User')
-    const operations: EngineChangeSet[] = []
-    const engine = createStoreEngine({
-      isServer: true,
-      callbacks: {
-        getCollection: name => name === collection.name ? collection : undefined,
-        resolveChildCollection: () => null,
-        onStateChange: changes => operations.push(changes),
-      },
-    })
-    engine.pause()
-    engine.writeItem({ collection, key: 1, item: { id: 1 } })
-    engine.writeItem({ collection, key: 2, item: { id: 2 } })
-
-    engine.resume()
-
-    expect(operations).toHaveLength(2)
-    expect(operations[0]).not.toBe(operations[1])
-    expect(operations[0]!.items.get('User')).toEqual(new Set(['1']))
-    expect(operations[1]!.items.get('User')).toEqual(new Set(['2']))
-  })
-
-  it('filters immediate state changes without filtering direct observers', () => {
-    const collection = buildCollection('User')
-    const itemKeys = new Map<string, true | ReadonlySet<string>>([
-      ['User', new Set(['1'])],
-    ])
-    const interest: EngineChangeInterest = {
-      itemKeys,
-      lists: new Set(),
-      indexes: new Map(),
-    }
-    const operations: EngineChangeSet[] = []
-    const otherObserver = vi.fn()
-    const engine = createStoreEngine({
-      isServer: true,
-      callbacks: {
-        getCollection: name => name === collection.name ? collection : undefined,
-        resolveChildCollection: () => null,
-        getStateChangeInterest: () => interest,
-        onStateChange: changes => operations.push(changes),
-      },
-    })
-    engine.observeItem('User', 2, otherObserver)
-
-    engine.writeItem({ collection, key: 2, item: { id: 2 } })
-    expect(operations).toHaveLength(0)
-    expect(otherObserver).toHaveBeenCalledTimes(1)
-
-    engine.writeItem({ collection, key: 1, item: { id: 1 } })
-    expect(operations).toHaveLength(1)
-    expect(operations[0]!.items.get('User')).toEqual(new Set(['1']))
-  })
-
-  it('reads state-change interests for every queued operation', () => {
-    const collection = buildCollection('User')
-    const itemKeys = new Map<string, true | ReadonlySet<string>>([
-      ['User', new Set(['1'])],
-    ])
-    const operations: EngineChangeSet[] = []
-    const engine = createStoreEngine({
-      isServer: true,
-      callbacks: {
-        getCollection: name => name === collection.name ? collection : undefined,
-        resolveChildCollection: () => null,
-        getStateChangeInterest: () => ({ itemKeys, lists: new Set(), indexes: new Map() }),
-        onStateChange: changes => operations.push(changes),
-      },
-    })
-    engine.pause()
-    engine.writeItem({ collection, key: 1, item: { id: 1 } })
-    engine.writeItem({ collection, key: 2, item: { id: 2 } })
-    itemKeys.set('User', new Set(['2']))
-
-    engine.resume()
-
-    expect(operations).toHaveLength(1)
-    expect(operations[0]!.items.get('User')).toEqual(new Set(['2']))
+    expect(order).toEqual(['sink', 'hook', 'observer'])
   })
 
   it('a field update does NOT re-run the list observer (perf win)', () => {

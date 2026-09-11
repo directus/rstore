@@ -19,6 +19,3 @@ export interface EngineChangeSet {
   /** Changed opaque index dependencies. */
   indexes: ReadonlySet<string>
 }
-
-/** Backward-compatible name for observer flush payloads. */
-export type ObserverChanges = EngineChangeSet

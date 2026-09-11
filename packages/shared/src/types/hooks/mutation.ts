@@ -1,6 +1,7 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from '../collection'
 import type { FormOperation } from '../formOperation'
 import type { GlobalStoreType } from '../global'
+import type { KeyedMutationItemEntry, MutationItemEntry } from '../mutation'
 import type { Awaitable, Path, PathValue } from '../utils'
 import type { AbortableOptions, CustomHookMeta } from './meta'
 
@@ -67,7 +68,7 @@ export interface MutationHookDefinitions<
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       keys?: Array<string | number>
-      items?: Array<{ key?: number | string, item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> }>
+      items?: Array<MutationItemEntry<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>>>
       mutation: 'create' | 'update' | 'delete'
       getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
       setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>) => void
@@ -143,7 +144,7 @@ export interface MutationHookDefinitions<
       store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
-      items: Array<{ key: number | string, item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> }>
+      items: Array<KeyedMutationItemEntry<Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>>>
       getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> | undefined
       setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>, options?: AbortableOptions) => void
       /** Don't call remaining hooks in the queue. */

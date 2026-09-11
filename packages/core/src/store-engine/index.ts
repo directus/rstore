@@ -1,14 +1,12 @@
 export { createStoreEngine } from './engine.js'
-export type { EngineChangeInterest, EngineChangeSet, ObserverChanges } from './observer-changes.js'
+export type { EngineChangeInterest, EngineChangeSet } from './observer-changes.js'
 export type {
   DeleteItemParams,
-  EngineAfterWritePayload,
   EngineCallbacks,
   EngineConflictPayload,
   EngineOptions,
   EngineResetPayload,
   EngineStateChangeSink,
-  EngineWriteChange,
   EngineWriteCommitPayload,
   ObserverCallback,
   ResolveKeysParams,
@@ -19,4 +17,3 @@ export type {
   WriteItemParams,
   WriteItemsParams,
 } from './types.js'
-export type { CacheIndexValue, CacheModuleSnapshot, CacheStateInput, CustomCacheState } from '@rstore/shared'

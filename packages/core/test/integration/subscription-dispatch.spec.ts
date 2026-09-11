@@ -79,6 +79,43 @@ describe('subscription registration', () => {
     expect(remote.lastRequest('subscribe')).toMatchObject({ collection: 'todos', key: '1', findOptions })
     expect(remote.lastRequest('unsubscribe')).toMatchObject({ collection: 'todos', key: '1', findOptions })
   })
+
+  it('uses matching default payloads when callers omit metadata and query details', async () => {
+    const payloads: Record<'subscribe' | 'unsubscribe', any[]> = { subscribe: [], unsubscribe: [] }
+    const stack = await createCoreStack({
+      schema,
+      plugins: [{
+        name: 'payload-observer',
+        setup({ hook }: any) {
+          for (const name of ['subscribe', 'unsubscribe'] as const) {
+            hook(name, (payload: any) => payloads[name].push(payload))
+          }
+        },
+      }],
+    })
+    const collection = stack.collection('todos')
+
+    await subscribe({ store: stack.store, collection, subscriptionId: 'sub-defaults' })
+    expect(stack.remote.subscriptions()).toEqual(['sub-defaults'])
+    await unsubscribe({ store: stack.store, collection, subscriptionId: 'sub-defaults' })
+
+    expect(stack.remote.subscriptions()).toEqual([])
+    expect(payloads.subscribe[0]).toMatchObject({
+      collection,
+      subscriptionId: 'sub-defaults',
+      key: undefined,
+      findOptions: undefined,
+      meta: {},
+    })
+    expect(payloads.unsubscribe[0]).toMatchObject({
+      collection,
+      subscriptionId: 'sub-defaults',
+      key: undefined,
+      findOptions: undefined,
+      meta: {},
+    })
+    expect(payloads.subscribe[0].meta).not.toBe(payloads.unsubscribe[0].meta)
+  })
 })
 
 describe('subscription meta', () => {

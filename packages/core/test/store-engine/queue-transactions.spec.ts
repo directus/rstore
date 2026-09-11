@@ -1,5 +1,5 @@
 import type { EngineCallbacks, StoreEngine } from '../../src'
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import { createStoreEngine } from '../../src'
 import { buildCollection, buildLayer } from './helpers'
 
@@ -27,7 +27,7 @@ describe('store-engine: transactional queue', () => {
     const error = new Error('write hook failed')
     const calls: Array<string | number | undefined> = []
     const { engine, user } = createEngine({
-      onAfterWrite(payload) {
+      onWriteCommitted(payload) {
         calls.push(payload.key)
         if (payload.key === 1) {
           throw error
@@ -53,7 +53,7 @@ describe('store-engine: transactional queue', () => {
     const calls: Array<string | number | undefined> = []
     let engine: StoreEngine
     const result = createEngine({
-      onAfterWrite(payload) {
+      onWriteCommitted(payload) {
         calls.push(payload.key)
         if (payload.key === 1) {
           engine.writeItem({ collection: result.user, key: 2, item: { id: 2 } })
@@ -75,7 +75,7 @@ describe('store-engine: transactional queue', () => {
     const error = new Error('first child hook failed')
     const calls: Array<string | number | undefined> = []
     const { engine, user } = createEngine({
-      onAfterWrite(payload) {
+      onWriteCommitted(payload) {
         calls.push(payload.key)
         if (payload.key === 2) {
           throw error
@@ -107,56 +107,6 @@ describe('store-engine: transactional queue', () => {
     expect(engine.resolveKeys({ collection: user })).toEqual([4])
   })
 
-  it('notifies observers after a bridge flush callback throws', () => {
-    const error = new Error('bridge failed')
-    let shouldThrow = true
-    const observer = vi.fn()
-    const { engine, user } = createEngine({
-      onObserverFlush() {
-        if (shouldThrow) {
-          throw error
-        }
-      },
-    })
-    engine.observeItem('User', 1, observer)
-
-    expect(() => engine.writeItem({ collection: user, key: 1, item: { id: 1 } })).toThrow(error)
-    expect(observer).toHaveBeenCalledTimes(1)
-
-    shouldThrow = false
-    engine.writeItem({ collection: user, key: 1, item: { id: 1, name: 'updated' } })
-    expect(observer).toHaveBeenCalledTimes(2)
-  })
-
-  it('runs hooks and final observers after immediate state synchronization fails', () => {
-    const error = new Error('state bridge failed')
-    let shouldThrow = true
-    const hooks: Array<string | number | undefined> = []
-    const observer = vi.fn()
-    const { engine, user } = createEngine({
-      onStateChange() {
-        if (shouldThrow)
-          throw error
-      },
-      onAfterWrite(payload) {
-        hooks.push(payload.key)
-      },
-    })
-    engine.observeItem('User', 1, observer)
-    engine.pause()
-    engine.writeItem({ collection: user, key: 1, item: { id: 1 } })
-    engine.writeItem({ collection: user, key: 2, item: { id: 2 } })
-
-    expect(() => engine.resume()).toThrow(error)
-    expect(hooks).toEqual([1])
-    expect(observer).toHaveBeenCalledTimes(1)
-    expect(engine.readItemRaw({ collection: user, key: 2 })).toBeUndefined()
-
-    shouldThrow = false
-    engine.resume()
-    expect(hooks).toEqual([1, 2])
-  })
-
   it('consumes a layer operation before its callback throws', () => {
     const error = new Error('layer hook failed')
     let calls = 0
@@ -180,7 +130,7 @@ describe('store-engine: transactional queue', () => {
     let shouldThrow = true
     const calls: Array<string | number | undefined> = []
     const { engine, user } = createEngine({
-      onAfterWrite(payload) {
+      onWriteCommitted(payload) {
         calls.push(payload.key)
         if (payload.key === 100 && shouldThrow) {
           throw error
@@ -232,7 +182,7 @@ describe('store-engine: transactional queue', () => {
   it('aggregates multiple failed effects after running all of them', () => {
     const calls: Array<string | number | undefined> = []
     const { engine, user } = createEngine({
-      onAfterWrite(payload) {
+      onWriteCommitted(payload) {
         calls.push(payload.key)
         if (payload.key === 2 || payload.key === 3) {
           throw new Error(`failed ${payload.key}`)
