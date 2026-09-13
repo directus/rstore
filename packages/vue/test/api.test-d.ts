@@ -40,6 +40,13 @@ describe('consumer API inference', () => {
     store.missing.findMany()
   })
 
+  test('writeItem accepts a partial item but keeps declared field types', () => {
+    const written = store.users.writeItem({ id: '1' })
+    expectTypeOf(written.name).toEqualTypeOf<string>()
+    // @ts-expect-error declared fields keep their type even in a partial write
+    store.users.writeItem({ id: '1', email: 42 })
+  })
+
   test('factory inference preserves a schema without a store type assertion', async () => {
     const users = withItemType<UserItem>().defineCollection({ name: 'users', getKey: item => item.id })
     const inferred = await createStore({ schema: [users], plugins: [] })

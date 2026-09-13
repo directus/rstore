@@ -149,7 +149,7 @@ export interface VueCollectionApi<
     callback: CollectionMutateCallback<TCollection, TCollectionDefaults, TSchema, TResult>,
   ) => Promise<TResult>
   getKey: (item: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>) => string | number | null | undefined
-  writeItem: (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => WrappedItem<TCollection, TCollectionDefaults, TSchema>
+  writeItem: (item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>) => WrappedItem<TCollection, TCollectionDefaults, TSchema>
   clearItem: (key: string | number) => void
 }
 
