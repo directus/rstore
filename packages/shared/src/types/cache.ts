@@ -68,7 +68,7 @@ export interface Cache<
   writeItem: <TCollection extends Collection = Collection>(params: {
     collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
     key: string | number
-    item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
+    item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
     marker?: string
     fromWriteItems?: boolean
     meta?: CustomHookMeta
