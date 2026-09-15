@@ -159,50 +159,6 @@ export default defineRstorePlugin({
       }
     })
 
-    const storeStats = useStoreStats()
-
-    hook('beforeFetch', (payload) => {
-      payload.meta.storeHistoryItem = {
-        started: new Date(),
-      }
-    })
-
-    hook('afterFetch', (payload) => {
-      if (payload.meta.storeHistoryItem) {
-        storeStats.value.store.push({
-          operation: payload.many ? 'fetchMany' : 'fetchFirst',
-          collection: payload.collection.name,
-          started: payload.meta.storeHistoryItem.started,
-          ended: new Date(),
-          result: payload.getResult(),
-          key: payload.key,
-          findOptions: convertFunctionsToString(payload.findOptions),
-          server: import.meta.server,
-        })
-      }
-    })
-
-    hook('beforeMutation', (payload) => {
-      payload.meta.storeHistoryItem = {
-        started: new Date(),
-      }
-    })
-
-    hook('afterMutation', (payload) => {
-      if (payload.meta.storeHistoryItem) {
-        storeStats.value.store.push({
-          operation: payload.mutation,
-          collection: payload.collection.name,
-          started: payload.meta.storeHistoryItem.started,
-          ended: new Date(),
-          result: payload.getResult(),
-          key: payload.key,
-          item: payload.item,
-          server: import.meta.server,
-        })
-      }
-    })
-
     if (import.meta.client) {
       const runtimeConfig = useRuntimeConfig()
 

@@ -22,7 +22,6 @@ export function clearQueryStateForCollection(ctx: CacheRuntime, collectionName: 
  * Drop all query metadata and page refs.
  */
 export function clearAllQueryState(ctx: CacheRuntime) {
-  ctx.state.queryMeta = {}
   ctx.state.pageRefs.clear()
 }
 

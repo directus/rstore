@@ -278,6 +278,8 @@ describe('normalizeCollectionRelations', () => {
             on: {
               id: 'testId',
             },
+            indexKey: 'id',
+            indexFields: ['id'],
             filter: undefined,
           },
         ],

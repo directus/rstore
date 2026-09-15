@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { createConnectorQuery, stripPrimaryKeys } from '../src'
+import { createConnectorQuery, resolveGeneratedPrimaryKeys, stripPrimaryKeys } from '../src'
 
 const KNOWN_KEYS = ['fields', 'filter', 'sort', 'limit', 'offset', 'page'] as const
 
@@ -116,5 +116,18 @@ describe('stripPrimaryKeys', () => {
     const item = { id: 1, title: 'x' }
     stripPrimaryKeys(item, undefined)
     expect(item).toEqual({ id: 1, title: 'x' })
+  })
+})
+
+describe('resolveGeneratedPrimaryKeys', () => {
+  it('keeps generated keys and creates a fresh id fallback', () => {
+    const generatedKeys = ['tenantId', 'id']
+    const missingFallback = resolveGeneratedPrimaryKeys(undefined)
+    const emptyFallback = resolveGeneratedPrimaryKeys([])
+
+    expect(resolveGeneratedPrimaryKeys(generatedKeys)).toBe(generatedKeys)
+    expect(missingFallback).toEqual(['id'])
+    expect(emptyFallback).toEqual(['id'])
+    expect(missingFallback).not.toBe(emptyFallback)
   })
 })

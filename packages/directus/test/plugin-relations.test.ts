@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import { runConnectorHook as runHook } from '../../../test/utils/connectorPlugin'
 import {
   createMockDirectusClient,
   createOrderItemsCollection,
@@ -6,7 +7,6 @@ import {
   createProfilesCollection,
   createRelationStore,
   createTodosCollection,
-  runHook,
   setupPlugin,
 } from './utils/plugin'
 

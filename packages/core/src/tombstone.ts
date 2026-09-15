@@ -1,32 +1,9 @@
-import type { FieldTimestampValue } from './hlc/index.js'
+import type { CacheTombstone, CacheTombstones, FieldTimestampValue } from '@rstore/shared'
 import { compareHLC, stringifyHLC } from './hlc/index.js'
-
-/**
- * A tombstone records a deletion with its causal timestamp so that concurrent
- * writes arriving after the delete can be suppressed (or applied, if they
- * are newer than the delete).
- */
-export interface Tombstone {
-  collection: string
-  key: string | number
-  /** Serialized HLC — or legacy numeric wall-clock — of the delete. */
-  deletedAt: FieldTimestampValue
-}
 
 /** Compute the storage key used internally to index tombstones. */
 export function tombstoneKey(collection: string, key: string | number): string {
-  return `${collection}:${key}`
-}
-
-/** Narrowing guard for arbitrary values that look like a {@link Tombstone}. */
-export function isTombstone(value: unknown): value is Tombstone {
-  if (!value || typeof value !== 'object') {
-    return false
-  }
-  const t = value as Partial<Tombstone>
-  return typeof t.collection === 'string'
-    && (typeof t.key === 'string' || typeof t.key === 'number')
-    && (typeof t.deletedAt === 'string' || typeof t.deletedAt === 'number')
+  return JSON.stringify([collection, String(key)])
 }
 
 /**
@@ -37,7 +14,7 @@ export function isTombstone(value: unknown): value is Tombstone {
  * number) is equivalent to passing `{ field: ts }` with one field.
  */
 export function shouldResurrect(
-  tombstone: Tombstone,
+  tombstone: CacheTombstone,
   updateTimestamp: FieldTimestampValue | Record<string, FieldTimestampValue>,
 ): boolean {
   const updateMax = maxTimestamp(updateTimestamp)
@@ -62,13 +39,10 @@ function maxTimestamp(
   return best
 }
 
-/** In-memory tombstone index. */
-export interface TombstoneStore {
-  get: (collection: string, key: string | number) => Tombstone | undefined
-  set: (tombstone: Tombstone) => void
+/** Mutable Core tombstone index extending Shared's read-only cache contract. */
+export interface TombstoneStore extends CacheTombstones {
+  set: (tombstone: CacheTombstone) => void
   clear: (collection: string, key: string | number) => void
-  entries: () => IterableIterator<[string, Tombstone]>
-  size: () => number
 }
 
 /**
@@ -77,27 +51,47 @@ export interface TombstoneStore {
  * is the max of all observed delete timestamps.
  */
 export function createTombstoneStore(): TombstoneStore {
-  const map = new Map<string, Tombstone>()
+  const collections = new Map<string, Map<string, CacheTombstone>>()
+  let count = 0
   return {
     get(collection, key) {
-      return map.get(tombstoneKey(collection, key))
+      return collections.get(collection)?.get(String(key))
     },
     set(tombstone) {
-      const id = tombstoneKey(tombstone.collection, tombstone.key)
-      const existing = map.get(id)
+      const id = String(tombstone.key)
+      let entries = collections.get(tombstone.collection)
+      const existing = entries?.get(id)
       if (existing && compareHLC(existing.deletedAt, tombstone.deletedAt) >= 0) {
         return
       }
-      map.set(id, tombstone)
+      if (!entries) {
+        entries = new Map()
+        collections.set(tombstone.collection, entries)
+      }
+      if (!existing) {
+        count++
+      }
+      entries.set(id, tombstone)
     },
     clear(collection, key) {
-      map.delete(tombstoneKey(collection, key))
+      const entries = collections.get(collection)
+      if (!entries?.delete(String(key))) {
+        return
+      }
+      count--
+      if (entries.size === 0) {
+        collections.delete(collection)
+      }
     },
-    entries() {
-      return map.entries()
+    * entries() {
+      for (const [collection, entries] of collections) {
+        for (const tombstone of entries.values()) {
+          yield [tombstoneKey(collection, tombstone.key), tombstone]
+        }
+      }
     },
     size() {
-      return map.size
+      return count
     },
   }
 }

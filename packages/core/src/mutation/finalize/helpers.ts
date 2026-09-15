@@ -2,6 +2,7 @@ import type { ApplyMutationOptions, ApplyMutationResult, Collection, CollectionD
 import { getMutationItemKey, isMutationItemEntry, unwrapMutationItem } from '@rstore/shared'
 import { unwrapItem } from '../../item'
 import { isKeyDefined } from '../../key'
+import { getDefinedKeys, getItemKey, normalizeKey } from '../keys'
 import { validateCommittedCacheKeys } from './validation'
 
 export interface FinalizeMutationRuntimeOptions {
@@ -152,12 +153,12 @@ export function getHookItems(options: FinalizeMutationOptions, results: Array<Re
     return options.items.map((item, index) => {
       if (isMutationItemEntry(item)) {
         return {
-          key: normalizeKey(item.key ?? getItemKey(options, item.item)),
+          key: normalizeKey(item.key ?? getItemKey(options.collection, item.item)),
           item: item.item,
         }
       }
       return {
-        key: normalizeKey(options.keys?.[index] ?? getItemKey(options, item)),
+        key: normalizeKey(options.keys?.[index] ?? getItemKey(options.collection, item)),
         item,
       }
     })
@@ -166,7 +167,7 @@ export function getHookItems(options: FinalizeMutationOptions, results: Array<Re
     return undefined
   }
   return results.map(item => ({
-    key: normalizeKey(getItemKey(options, item)),
+    key: normalizeKey(getItemKey(options.collection, item)),
     item,
   }))
 }
@@ -176,9 +177,9 @@ export function getHookKeys(options: FinalizeMutationOptions, results: Array<Res
     return options.keys
   }
   if (options.items) {
-    return getDefinedKeys(options.items.map(item => getMutationItemKey(item) ?? getItemKey(options, item)))
+    return getDefinedKeys(options.items.map(item => getMutationItemKey(item) ?? getItemKey(options.collection, item)))
   }
-  return getDefinedKeys(results.map(item => getItemKey(options, item)))
+  return getDefinedKeys(results.map(item => getItemKey(options.collection, item)))
 }
 
 export function parseCommittedItem<
@@ -219,17 +220,6 @@ export function withManyResults<
   return results.length ? { ...applyResult, results } : applyResult
 }
 
-export function getItemKey(options: FinalizeMutationOptions, item: unknown) {
-  if (!item || typeof item !== 'object') {
-    return undefined
-  }
-  return options.collection.getKey(isMutationItemEntry(item) ? item.item : item)
-}
-
-export function normalizeKey(key: string | number | null | undefined) {
-  return key ?? undefined
-}
-
 interface SingleHookEntry<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -254,16 +244,11 @@ function getSingleHookEntries<
     const item = sourceItem === undefined ? undefined : unwrapMutationItem(sourceItem)
     const result = results[index]
     return {
-      key: normalizeKey(options.keys?.[index] ?? getMutationItemKey(sourceItem) ?? getItemKey(options, result ?? item)),
+      key: normalizeKey(options.keys?.[index] ?? getMutationItemKey(sourceItem) ?? getItemKey(options.collection, result ?? item)),
       item: item as Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>> | undefined,
       result,
     }
   })
-}
-
-function getDefinedKeys(keys: Array<string | number | null | undefined>) {
-  const definedKeys = keys.filter(isKeyDefined)
-  return definedKeys.length ? definedKeys : undefined
 }
 
 function isWrappedItem(item: unknown) {

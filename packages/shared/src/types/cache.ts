@@ -45,7 +45,71 @@ If there wasn't a marker, the cache would return a list with the single user tha
 
 */
 
-export interface CustomCacheState {}
+/** Exact module identity or an unclaimed legacy module entry. */
+export type CacheModuleSnapshot
+  = | {
+    /** Exact module name. */
+    name: string
+    /** Module-local state key. */
+    key: string
+    /** Serializable module state. */
+    state: unknown
+  }
+  | {
+    /** Unclaimed versionless delimiter-joined identity. */
+    legacyKey: string
+    /** Serializable legacy module state. */
+    state: unknown
+  }
+
+/** Versioned serializable snapshot written by current caches. */
+export interface CustomCacheState {
+  /** Snapshot schema version. */
+  $rstoreVersion: 1
+  /** Canonical base items grouped by collection. */
+  collections: Record<string, Record<string | number, any>>
+  /** Query markers set by completed writes. */
+  markers: Record<string, boolean>
+  /** Module state with exact tuples or legacy delimiter-joined identities. */
+  modules: CacheModuleSnapshot[]
+  /** Serializable query metadata. */
+  queryMeta: Record<string, CustomHookMeta>
+  /** Per-field causal timestamps retained across SSR hydration. */
+  fieldTimestamps?: Record<string, Record<string | number, FieldTimestamps>>
+  /** Deletes known before hydration, preventing stale resurrection. */
+  tombstones?: CacheTombstone[]
+}
+
+/** Versionless snapshot accepted for backward-compatible hydration. */
+export interface LegacyCacheStateInput {
+  /** Versionless snapshots must not declare a version. */
+  $rstoreVersion?: undefined
+  /** Legacy base items; missing means empty. */
+  collections?: Record<string, Record<string | number, any>>
+  /** Legacy markers; missing means empty. */
+  markers?: Record<string, boolean>
+  /** Legacy delimiter-joined module identities; missing means empty. */
+  modules?: Record<string, unknown>
+  /** Legacy query metadata; missing means empty. */
+  queryMeta?: Record<string, CustomHookMeta>
+}
+
+/** Snapshot accepted by cache hydration. */
+export type CacheStateInput = CustomCacheState | LegacyCacheStateInput
+
+/**
+ * Index lookup input. Single-field indexes accept scalar values. Composite
+ * indexes should use a tuple; joined legacy strings remain conditionally read.
+ */
+export type CacheIndexValue
+  = | string
+    | number
+    | boolean
+    | bigint
+    | symbol
+    | null
+    | undefined
+    | readonly unknown[]
 
 export interface WriteItem<
   TCollection extends Collection = Collection,
@@ -118,7 +182,7 @@ export interface Cache<
     /**
      * Value of the index to filter items by.
      */
-    indexValue?: any
+    indexValue?: CacheIndexValue
   }) => Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>
 
   writeItems: <TCollection extends Collection = Collection>(params: {
@@ -166,7 +230,7 @@ export interface Cache<
 
   getState: () => CustomCacheState
 
-  setState: (state: CustomCacheState) => void
+  setState: (state: CacheStateInput) => void
 
   clear: () => void
 
@@ -206,12 +270,14 @@ export interface Cache<
   removeLayer: (layerId: string) => void
 
   /**
-   * Pause cache updates to prevent flickering. Queued updates will be applied when `resume()` is called.
+   * Increment cache pause depth. Every call must have a matching `resume()`.
+   * Queued updates remain pending until the depth returns to zero.
    */
   pause: () => void
 
   /**
-   * Resume cache updates and apply all queued updates.
+   * Decrement positive pause depth and apply queued updates only when it
+   * reaches zero.
    */
   resume: () => void
 

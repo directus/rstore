@@ -1,8 +1,8 @@
+import { isCacheTombstone } from '@rstore/shared'
 import { describe, expect, it } from 'vitest'
 import {
   createTombstoneStore,
   gcTombstones,
-  isTombstone,
   shouldResurrect,
   stringifyHLC,
   tombstoneKey,
@@ -14,21 +14,25 @@ function hlc(physical: number, logical = 0, nodeId = 'n') {
 
 describe('tombstoneKey', () => {
   it('should include collection and key', () => {
-    expect(tombstoneKey('users', 42)).toBe('users:42')
-    expect(tombstoneKey('posts', 'abc')).toBe('posts:abc')
+    expect(tombstoneKey('users', 42)).toBe('["users","42"]')
+    expect(tombstoneKey('posts', 'abc')).toBe('["posts","abc"]')
+  })
+
+  it('should keep delimiter-containing tuples distinct', () => {
+    expect(tombstoneKey('a:b', 'c')).not.toBe(tombstoneKey('a', 'b:c'))
   })
 })
 
-describe('isTombstone', () => {
+describe('isCacheTombstone', () => {
   it('should recognize tombstone shape', () => {
-    expect(isTombstone({ collection: 'a', key: '1', deletedAt: hlc(1) })).toBe(true)
+    expect(isCacheTombstone({ collection: 'a', key: '1', deletedAt: hlc(1) })).toBe(true)
   })
 
   it('should reject other shapes', () => {
-    expect(isTombstone(null)).toBe(false)
-    expect(isTombstone({})).toBe(false)
-    expect(isTombstone({ collection: 'a' })).toBe(false)
-    expect(isTombstone({ collection: 'a', key: '1' })).toBe(false)
+    expect(isCacheTombstone(null)).toBe(false)
+    expect(isCacheTombstone({})).toBe(false)
+    expect(isCacheTombstone({ collection: 'a' })).toBe(false)
+    expect(isCacheTombstone({ collection: 'a', key: '1' })).toBe(false)
   })
 })
 

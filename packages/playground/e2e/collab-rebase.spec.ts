@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
+import { uniqueText } from '../../../test/e2e/todoUi'
 import { closePages, getCollabFields, openCollabEditor, openCollabEditors, openMultiplayerPeer, setTextFieldValue } from './collab-helpers'
-import { uniqueText } from './utils'
 
 test('keeps focused caret position when remote editor inserts text before it', async ({ browser }) => {
   const editors = await openCollabEditors(browser)

@@ -1,84 +1,286 @@
-import type { CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
-import type { CacheRuntime, CreateCacheOptions } from './types'
-import { createTombstoneStore, isKeyDefined, scheduleTombstoneGc } from '@rstore/core'
-import { ref } from 'vue'
+import type { EngineCallbacks, EngineConflictPayload, EngineResetPayload, EngineStateChangeSink, EngineWriteCommitPayload } from '@rstore/core'
+import type { CacheLayer, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
+import type { CacheRuntime, CreateCacheOptions, QueryPageRef } from './types'
+import { createStoreEngine, isKeyDefined } from '@rstore/core'
+import { reactive, shallowRef } from 'vue'
+import { createCacheChangeInterestRegistry } from './changeInterest'
+import { createIndexResultCache } from './indexResultCache'
+import { createItemCellRegistry } from './itemCells'
+import { clearAllQueryState, clearQueryStateForCollection } from './queryState'
+import { createSignalRegistry } from './signals'
+import { createCacheStateSink } from './stateSink'
+import { synchronizeBridgeIndex } from './stateSinkIndex'
+import { synchronizeBridgeItem } from './stateSinkItem'
+import { appendSyncError, throwSyncErrors } from './syncErrors'
+import { createCacheVersionRegistry } from './versions'
+import { createWrappedItemRegistry } from './wrappedRegistry'
 
-/** Create the mutable runtime shared by all cache modules. */
+/** Create mutable runtime shared by all Vue cache modules. */
 export function createCacheRuntime<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
 >({
   getStore,
-  cacheStaggering: rawCacheStaggering = 0,
+  cacheStaggering,
   tombstoneGc = {},
   isServer = (import.meta as unknown as { server?: boolean }).server === true,
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): CacheRuntime<TSchema, TCollectionDefaults> {
-  const cacheStaggering = Math.max(0, Math.floor(rawCacheStaggering))
-  const runtime: CacheRuntime<TSchema, TCollectionDefaults> = {
+  let runtime: CacheRuntime<TSchema, TCollectionDefaults>
+  let sinkImplementation: EngineStateChangeSink
+  const pageRefs = new Map<string, QueryPageRef>()
+  const changeInterest = createCacheChangeInterestRegistry()
+  const stateChangeSink: EngineStateChangeSink = {
+    getInterest: () => changeInterest.value,
+    begin: () => sinkImplementation.begin(),
+    wantsItem: (collection, key) => sinkImplementation.wantsItem(collection, key),
+    wantsList: collection => sinkImplementation.wantsList(collection),
+    wantsIndex: dependency => sinkImplementation.wantsIndex(dependency),
+    recordItem: (collection, key, value, keyForm) => sinkImplementation.recordItem(collection, key, value, keyForm),
+    recordList: collection => sinkImplementation.recordList(collection),
+    recordIndex: dependency => sinkImplementation.recordIndex(dependency),
+    recordCollectionReset: collection => sinkImplementation.recordCollectionReset(collection),
+    commit: () => sinkImplementation.commit(),
+    discard: () => sinkImplementation.discard(),
+  }
+
+  const callbacks: EngineCallbacks = {
+    getCollection: name => getStore().$collections.find(collection => collection.name === name),
+    resolveChildCollection: (item, possibleNames) => getStore().$getCollection(item, possibleNames),
+    wrapModuleState: value => value && typeof value === 'object' ? reactive(value) : value,
+    stateChangeSink,
+    onWriteCommitted: payload => handleAfterWrite(runtime, payload),
+    onConflict: payload => handleConflict(getStore, payload),
+    onLayerAdd: layer => handleLayerAdd(runtime, layer),
+    onLayerRemove: layer => handleLayerRemove(runtime, layer),
+    onReset: payload => handleReset(runtime, payload),
+  }
+
+  const engine = createStoreEngine({ callbacks, cacheStaggering, tombstoneGc, isServer })
+  const versions = createCacheVersionRegistry(changeInterest)
+  const signals = createSignalRegistry({ isServer, interest: changeInterest })
+  runtime = {
     getStore,
-    cacheStaggering,
+    engine,
+    changeInterest,
     state: {
-      markers: {},
-      collections: {},
-      collectionIndexes: new Map(),
-      modules: {},
-      queryMeta: {},
-      pageRefs: new Map(),
-      paused: false,
-      queue: [],
-      fieldTimestamps: new Map(),
-      tombstones: createTombstoneStore(),
+      pageRefs,
+      get queryMeta() {
+        return engine.getQueryMeta()
+      },
     },
-    layers: {},
-    layerIdToCollectionName: {},
-    wrappedItems: new Map(),
-    wrappedItemsMetadata: new Map(),
-    wrappedItemKeysPerLayer: new Map(),
-    collectionStateCache: new Map(),
-    collectionStateCacheReactivityMarker: new Map(),
-    isFlushingQueue: false,
-    staggeringBudget: cacheStaggering,
+    signals,
+    itemCells: createItemCellRegistry({
+      read: (collectionName, key) => {
+        const collection = getStore().$collections.find(candidate => candidate.name === collectionName)
+        return collection ? engine.readItemRaw({ collection, key }) : undefined
+      },
+      trackFallback: (collectionName, key) => {
+        if (!signals.trackItem(collectionName, key))
+          versions.trackItem(collectionName)
+      },
+      interest: changeInterest,
+    }),
+    versions,
+    layers: Object.create(null) as CacheRuntime<TSchema, TCollectionDefaults>['layers'],
+    wrappedItems: createWrappedItemRegistry(),
+    visibleListCache: new Map(),
+    indexResultCache: createIndexResultCache(changeInterest),
   }
-
-  const canScheduleTombstoneGc = !isServer && typeof setInterval !== 'undefined'
-  if (tombstoneGc !== false && canScheduleTombstoneGc) {
-    runtime.stopTombstoneGc = scheduleTombstoneGc(runtime.state.tombstones, {
-      intervalMs: tombstoneGc.intervalMs ?? 60_000,
-      ttlMs: tombstoneGc.ttlMs ?? 24 * 60 * 60 * 1000,
-    })
-  }
-
+  sinkImplementation = createCacheStateSink({
+    interest: changeInterest,
+    flush: (changes, values, keyForms, resets, deletions) => synchronizeBridge(runtime, changes, values, keyForms, resets, deletions),
+    flushItem: (collection, key, value, keyForm) => synchronizeBridgeItem(runtime, collection, key, value, keyForm),
+    flushIndex: dependency => synchronizeBridgeIndex(runtime, dependency),
+  })
   return runtime
 }
 
-/** Ensure the reactivity marker for a collection overlay cache exists. */
-export function ensureCollectionStateCacheReactivityMarker(ctx: CacheRuntime, collectionName: string) {
-  let marker = ctx.collectionStateCacheReactivityMarker.get(collectionName)
-  if (!marker) {
-    marker = ref(0)
-    ctx.collectionStateCacheReactivityMarker.set(collectionName, marker)
+/** Synchronize every bridge registry even when one reactive effect fails. */
+function synchronizeBridge(
+  ctx: CacheRuntime,
+  changes: Parameters<CacheRuntime['signals']['flush']>[0],
+  values: Parameters<CacheRuntime['itemCells']['flush']>[1],
+  keyForms: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[2],
+  resets: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[3],
+  deletions: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[4],
+): void {
+  const orderedChanges = {
+    ...changes,
+    // Relation writes are child-first internally. Publish collection signals
+    // in schema order so parent readers never observe child-only state.
+    lists: orderListChanges(ctx, changes.lists),
   }
-  return marker
+  let errors: unknown[] | undefined
+  for (const collection of orderedChanges.lists) ctx.visibleListCache.delete(collection)
+  for (const collection of resets) ctx.visibleListCache.delete(collection)
+  for (const dependency of changes.indexes) ctx.indexResultCache.invalidate(dependency)
+  for (const collection of resets) ctx.indexResultCache.reset(collection)
+  // Flush existing missing/list/index dependencies before item deletion can
+  // install a new missing-item dependency during its synchronous cell rerun.
+  errors = runBridgeSink(ctx.versions.flush, orderedChanges, errors)
+  errors = runBridgeSink(ctx.signals.flush, orderedChanges, errors)
+  if (orderedChanges.items.size)
+    errors = runBridgeSinkWithValues(ctx.itemCells.flush, orderedChanges, values, errors)
+  if (deletions.length || keyForms.length)
+    errors = cleanupChangedWrappers(ctx, deletions, keyForms, errors)
+  throwSyncErrors(errors, 'Vue cache synchronization failed')
 }
 
-/** Drop a cached overlay state and notify reactive readers. */
-export function invalidateCollectionStateCache(ctx: CacheRuntime, collectionName: string) {
-  evictCollectionStateCache(ctx, collectionName)
-  ensureCollectionStateCacheReactivityMarker(ctx, collectionName).value++
+/** Return changed collections in the store's stable schema order. */
+function orderListChanges(ctx: CacheRuntime, changed: ReadonlySet<string>): Set<string> {
+  const ordered = new Set<string>()
+  for (const collection of ctx.getStore().$collections) {
+    if (changed.has(collection.name))
+      ordered.add(collection.name)
+  }
+  for (const collection of changed) ordered.add(collection)
+  return ordered
 }
 
-/** Drop a cached overlay state without notifying reactive readers. */
-export function evictCollectionStateCache(ctx: CacheRuntime, collectionName: string) {
-  ctx.collectionStateCache.delete(collectionName)
+/** Run one relevant bridge sink without starving later sinks after failure. */
+function runBridgeSink(
+  flush: CacheRuntime['signals']['flush'],
+  changes: Parameters<CacheRuntime['signals']['flush']>[0],
+  errors: unknown[] | undefined,
+): unknown[] | undefined {
+  try {
+    flush(changes)
+  }
+  catch (error) {
+    return appendSyncError(errors, error)
+  }
+  return errors
 }
 
-/** Build the cache key for a wrapped item proxy. */
-export function getItemWrapKey(collection: ResolvedCollection<any, any, any>, key: string | number, layer: { id: string } | undefined) {
-  return [layer?.id, collection.name, String(key)].filter(part => part != null && part !== '').join(':')
+/** Run item-cell synchronization with Core-provided final values. */
+function runBridgeSinkWithValues(
+  flush: CacheRuntime['itemCells']['flush'],
+  changes: Parameters<CacheRuntime['itemCells']['flush']>[0],
+  values: Parameters<CacheRuntime['itemCells']['flush']>[1],
+  errors: unknown[] | undefined,
+): unknown[] | undefined {
+  try {
+    flush(changes, values)
+  }
+  catch (error) {
+    return appendSyncError(errors, error)
+  }
+  return errors
+}
+
+/** Evict deleted or public-key-changed identities after active cells update. */
+function cleanupChangedWrappers(
+  ctx: CacheRuntime,
+  deletions: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[4],
+  keyForms: Parameters<Parameters<typeof createCacheStateSink>[0]['flush']>[2],
+  errors: unknown[] | undefined,
+): unknown[] | undefined {
+  try {
+    for (const deletion of deletions)
+      ctx.wrappedItems.deleteBase(deletion.collection, deletion.key)
+    for (const change of keyForms)
+      ctx.wrappedItems.deleteBase(change.collection, change.previousKey)
+  }
+  catch (error) {
+    return appendSyncError(errors, error)
+  }
+  return errors
+}
+
+/** Apply bridge write invalidation before calling user hooks. */
+function handleAfterWrite(ctx: CacheRuntime, payload: EngineWriteCommitPayload): void {
+  if (payload.operation === 'delete')
+    ctx.wrappedItems.deleteBase(payload.collection.name, payload.key!)
+  else if (payload.keyFormChanged && payload.previousKey !== undefined)
+    ctx.wrappedItems.deleteBase(payload.collection.name, payload.previousKey)
+  const store = ctx.getStore()
+  store.$hooks.callHookSync('afterCacheWrite', {
+    store,
+    meta: {},
+    collection: payload.collection,
+    key: payload.key,
+    result: payload.result,
+    marker: payload.marker,
+    operation: payload.operation,
+  })
+}
+
+/** Forward a CRDT conflict after engine state commits. */
+function handleConflict(
+  getStore: CacheRuntime['getStore'],
+  payload: EngineConflictPayload,
+): void {
+  const store = getStore()
+  store.$hooks.callHookSync('cacheConflict', {
+    store,
+    meta: {},
+    collection: payload.collection,
+    key: payload.key,
+    conflicts: payload.conflicts,
+  })
+}
+
+/** Update layer mirrors before calling layer-add hooks. */
+function handleLayerAdd(ctx: CacheRuntime, layer: CacheLayer): void {
+  ctx.visibleListCache.delete(layer.collectionName)
+  const layers = ensureLayersForCollection(ctx, layer.collectionName)
+  layers.value = [...layers.value.filter(candidate => candidate.id !== layer.id), layer]
+  const store = ctx.getStore()
+  store.$hooks.callHookSync('cacheLayerAdd', { store, layer })
+}
+
+/** Remove exact layer wrappers and mirror state before user hooks. */
+function handleLayerRemove(ctx: CacheRuntime, layer: CacheLayer): void {
+  ctx.visibleListCache.delete(layer.collectionName)
+  const layers = ctx.layers[layer.collectionName]
+  if (layers) {
+    layers.value = layers.value.filter(candidate => candidate.id !== layer.id)
+  }
+  ctx.wrappedItems.deleteLayer(layer.collectionName, layer.id)
+  const store = ctx.getStore()
+  store.$hooks.callHookSync('cacheLayerRemove', { store, layer })
+}
+
+/** Apply bridge-owned reset state before forwarding reset hooks. */
+function handleReset(ctx: CacheRuntime, payload: EngineResetPayload): void {
+  if (payload.collection) {
+    const collectionName = payload.collection.name
+    ctx.visibleListCache.delete(collectionName)
+    ctx.indexResultCache.reset(collectionName)
+    ctx.wrappedItems.deleteCollection(collectionName)
+    clearQueryStateForCollection(ctx, collectionName)
+  }
+  else {
+    ctx.visibleListCache.clear()
+    ctx.indexResultCache.reset()
+    ctx.wrappedItems.clear()
+    clearAllQueryState(ctx)
+  }
+  refreshLayerMirrors(ctx)
+  ctx.signals.reset()
+  ctx.versions.reset()
+  if (payload.source === 'clearCollection') {
+    return
+  }
+  const store = ctx.getStore()
+  store.$hooks.callHookSync('afterCacheReset', { store, meta: {} })
+}
+
+/** Remove stale devtools layer mirror entries without exposing engine maps. */
+function refreshLayerMirrors(ctx: CacheRuntime): void {
+  for (const [collectionName, layers] of Object.entries(ctx.layers)) {
+    layers.value = layers.value.filter((layer) => {
+      const active = ctx.engine.getLayer(layer.id)
+      return active?.collectionName === collectionName
+    })
+  }
 }
 
 /** Resolve an item primary key or throw a cache-friendly error. */
-export function getItemKey(collection: ResolvedCollection<any, any, any>, item: ResolvedCollectionItem<any, any, any>): string | number {
+export function getItemKey(
+  collection: ResolvedCollection<any, any, any>,
+  item: ResolvedCollectionItem<any, any, any>,
+): string | number {
   const key = collection.getKey(item)
   if (!isKeyDefined(key)) {
     throw new Error(`Item does not have a key for collection ${collection.name}: ${item}`)
@@ -86,55 +288,16 @@ export function getItemKey(collection: ResolvedCollection<any, any, any>, item: 
   return key
 }
 
-/** Track a wrapped item key so layer removal can evict its proxy. */
-export function addWrappedItemKeyToLayer(ctx: CacheRuntime, layer: { id: string } | undefined, wrapKey: string) {
-  if (!layer) {
-    return
-  }
-  let keys = ctx.wrappedItemKeysPerLayer.get(layer.id)
-  if (!keys) {
-    keys = new Set()
-    ctx.wrappedItemKeysPerLayer.set(layer.id, keys)
-  }
-  keys.add(wrapKey)
+/** Read one resolved raw engine value through public engine API. */
+export function readRawCacheItem(
+  ctx: CacheRuntime,
+  collection: ResolvedCollection<any, any, any>,
+  key: string | number,
+): any | undefined {
+  return ctx.engine.readItemRaw({ collection, key })
 }
 
-/** Ensure a collection state ref exists. */
-export function ensureCollectionRef(ctx: CacheRuntime, collectionName: string) {
-  if (!ctx.state.collections[collectionName]) {
-    ctx.state.collections[collectionName] = ref({})
-  }
-  return ctx.state.collections[collectionName]
-}
-
-/** Remove causality metadata for an evicted or deleted cache row. */
-export function removeFieldTimestampsForItem(ctx: CacheRuntime, collectionName: string, key: string | number): void {
-  const timestamps = ctx.state.fieldTimestamps.get(collectionName)
-  if (!timestamps) {
-    return
-  }
-  timestamps.delete(key)
-  if (timestamps.size === 0) {
-    ctx.state.fieldTimestamps.delete(collectionName)
-  }
-}
-
-/** Mark a query marker as fetched. */
-export function mark(ctx: CacheRuntime, marker: string) {
-  ctx.state.markers[marker] = true
-}
-
-/** Get or create a collection index map. */
-export function getCollectionIndex(ctx: CacheRuntime, collectionName: string, indexKey: string) {
-  let collectionIndex = ctx.state.collectionIndexes.get(collectionName)
-  if (!collectionIndex) {
-    collectionIndex = new Map()
-    ctx.state.collectionIndexes.set(collectionName, collectionIndex)
-  }
-  let index = collectionIndex.get(indexKey)
-  if (!index) {
-    index = new Map()
-    collectionIndex.set(indexKey, index)
-  }
-  return index
+/** Ensure devtools layer mirror for a collection exists. */
+export function ensureLayersForCollection(ctx: CacheRuntime, collectionName: string) {
+  return ctx.layers[collectionName] ??= shallowRef<CacheLayer[]>([])
 }

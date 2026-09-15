@@ -1,6 +1,7 @@
 import type { MonospaceQueryOptions } from './query'
 import { createMonospaceError, MonospaceValidationError } from './errors'
 import { serializeMonospaceQuery } from './query'
+import { trimTrailingSlash } from './url'
 
 /**
  * Fetch function accepted by the Monospace REST client.
@@ -215,13 +216,6 @@ function createItemUrl(
   const url = `${baseUrl}/items/${encodeURIComponent(collection)}${itemPath}`
   const search = serializeMonospaceQuery(query).toString()
   return search ? `${url}?${search}` : url
-}
-
-/**
- * Removes one trailing slash from a URL.
- */
-function trimTrailingSlash(value: string): string {
-  return value.endsWith('/') ? value.slice(0, -1) : value
 }
 
 /**

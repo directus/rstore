@@ -3,6 +3,7 @@ import { createDeferred } from '#test-utils/deferred'
 import { createVueStack } from '#test-utils/store/vueStack'
 import { describe, expect, it, onTestFinished } from 'vitest'
 import { createFormObject } from '../src'
+import { relationCollection } from './utils/form'
 import { createRelationStack } from './utils/relationStore'
 
 /** Build a user form against the shared real relation cache. */
@@ -18,6 +19,27 @@ async function createUserForm() {
 }
 
 describe('form relation operations', () => {
+  it('initializes no-store relation defaults while preserving relation operations', () => {
+    const form = createFormObject({
+      collection: relationCollection(),
+      defaultValues: () => ({ id: 'user-1', profileId: null }),
+      submit: async () => undefined,
+      validateOnSubmit: false,
+    }) as any
+
+    expect(form.profile.$value).toBeNull()
+    expect(form.posts.$value).toEqual([])
+
+    form.profile.$connect({ id: 'profile-1' })
+    form.posts.$set([{ id: 'post-1' }])
+
+    expect(form.profileId).toBe('profile-1')
+    expect(form.$opLog.getOptimized()).toEqual([
+      expect.objectContaining({ field: 'profile', type: 'connect', newValue: { id: 'profile-1' } }),
+      expect.objectContaining({ field: 'posts', type: 'set', newValue: [{ id: 'post-1' }] }),
+    ])
+  })
+
   it('round-trips to-one connect and disconnect through undo and redo', async () => {
     const { form, stack } = await createUserForm()
     stack.write('profiles', { id: 'profile-1', bio: 'Hello' })
