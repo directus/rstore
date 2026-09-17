@@ -16,8 +16,11 @@ export interface PluginOptions {
 export const injectionKey = Symbol('rstore') as InjectionKey<RstoreVueGlobal>
 
 type VueHookCallback<TCallback> = TCallback extends (payload: infer TPayload) => infer TResult
-  ? (payload: Omit<TPayload, 'store'> & { store: VueStore }) => TResult
+  ? (payload: Omit<TPayload, 'store'> & { store: VuePluginStore }) => TResult
   : never
+
+/** Uses an application's augmented store when it provides Vue collection APIs. */
+type VuePluginStore = GlobalStoreType extends VueStore ? GlobalStoreType : VueStore
 
 export interface VuePluginSetupApi extends Omit<PluginSetupApi, 'hook'> {
   /** Registers a hook that receives the Vue store proxy. */

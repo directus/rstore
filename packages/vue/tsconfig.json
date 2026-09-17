@@ -23,5 +23,8 @@
     "src",
     "test",
     "benchmark"
+  ],
+  "exclude": [
+    "test/plugin-global-store.test-d.ts"
   ]
 }

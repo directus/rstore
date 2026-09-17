@@ -36,7 +36,7 @@
     "build": "unbuild",
     "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",
     "prepack": "node ../../scripts/sync-dep-skills.mjs .",
-    "test:types": "tsc --noEmit"
+    "test:types": "tsc --noEmit && pnpm run build && tsc --noEmit -p test/tsconfig.plugin-global-store.json"
   },
   "peerDependencies": {
     "vue": "^3.5.21"
