@@ -97,10 +97,13 @@ export function removeLayer(ctx: CacheRuntime, layerId: string) {
   }
 
   const layer = collectionLayers[index]!
-  invalidateCollectionStateCache(ctx, layer.collectionName)
   clearLayerWrappedItems(ctx, layer.id)
   collectionLayersRef.value = collectionLayers.filter(l => l.id !== layerId)
   delete ctx.layerIdToCollectionName[layerId]
+  // Invalidating notifies reactive readers synchronously. Doing it before the
+  // layer leaves the list lets such a reader memoize the overlay again with the
+  // removed layer still applied, and nothing invalidates it a second time.
+  invalidateCollectionStateCache(ctx, layer.collectionName)
   updateIndexesAfterLayerRemoval(ctx, layer)
 
   const store = ctx.getStore()

@@ -39,6 +39,43 @@ describe('cache', () => {
       }
     })
 
+    it('drops a removed layer when a sync reader runs during the removal', async () => {
+      const store = await createStore({
+        schema: [{ name: 'TestCollection' }],
+        plugins: [],
+      })
+      const cache = store.$cache
+      const collection = store.$collections[0]!
+      cache.writeItem({ collection, key: 1, item: { id: 1, name: 'item1' } })
+
+      cache.addLayer({
+        id: 'layer1',
+        collectionName: 'TestCollection',
+        state: {
+          2: { id: 2, name: 'item2' },
+        },
+        deletedItems: new Set(),
+      })
+
+      expect(store.TestCollection.peekMany()).toHaveLength(2)
+
+      // Re-reads the collection from inside the invalidation itself, which is
+      // what lets a stale overlay be memoized again before the layer is gone.
+      const stop = watchSyncEffect(() => {
+        store.TestCollection.peekMany()
+      })
+
+      try {
+        cache.removeLayer('layer1')
+
+        const items = store.TestCollection.peekMany()
+        expect(items.map((item: any) => item.id)).toEqual([1])
+      }
+      finally {
+        stop()
+      }
+    })
+
     it('should add a new item from a layer', async () => {
       const store = await createStore({
         schema: [{ name: 'TestCollection' }],
