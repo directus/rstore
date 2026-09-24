@@ -58,6 +58,14 @@ export type VueQueryRefreshOptions<TOptions> = Partial<TOptions> & {
    * nothing is reset for a page that is not loaded again.
    */
   pages?: number[]
+  /**
+   * Once every reloaded page fetched successfully, delete from the cache every item of the query
+   * collection and of the collections reached through `include` that the refreshed result does not
+   * hold. Rows of the pages left out by `pages` are kept. Works without garbage collection, and
+   * ignores other queries: an item they still display is deleted too. Nothing is deleted when no
+   * page is reloaded, when a reloaded page fails or is superseded, or for a `no-cache` query.
+   */
+  prune?: boolean
 }
 
 export interface VueQueryReturn<

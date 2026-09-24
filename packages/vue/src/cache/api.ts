@@ -117,6 +117,7 @@ export function createCacheApi<
       layers: ctx.layers,
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
       rebuildIndexes: () => rebuildIndexes(ctx, collectionName => getStateForCollection(ctx, collectionName)),
+      prune: params => enqueueOperation(ctx, { type: 'prune', params }),
     },
   } satisfies Cache & VueCachePrivate as any
 }

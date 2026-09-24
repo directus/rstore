@@ -13,6 +13,17 @@ export type QueuedOperation
     | { type: 'removeLayer', layerId: Parameters<Cache['removeLayer']>[0] }
     | { type: 'setState', state: CustomCacheState }
     | { type: 'clear' }
+    | { type: 'prune', params: CachePruneParams }
+
+/** Deletion of every item of some collections except the ones a refreshed query still holds. */
+export interface CachePruneParams {
+  /** Names of the collections to prune. */
+  collections: string[]
+  /** Keys to keep per collection name, as strings. Called once, when the operation runs. */
+  getKeptKeys: () => Map<string, Set<string>>
+  /** Whether the refresh that requested the prune is still current when the operation runs. */
+  canApply: () => boolean
+}
 
 /** Public hook payload retained until its complete batch becomes visible. */
 type AfterCacheWritePayload = Parameters<CacheHookDefinitions<StoreSchema, CollectionDefaults>['afterCacheWrite']>[0]
@@ -117,5 +128,7 @@ export interface VueCachePrivate {
     ensureLayersForCollection: (collectionName: string) => Ref<CacheLayer[]>
     /** Rebuild relation indexes after the store schema changes at runtime. */
     rebuildIndexes: () => void
+    /** Queue a prune, so it runs after the writes already queued by the same refresh. */
+    prune: (params: CachePruneParams) => void
   }
 }

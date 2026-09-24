@@ -8,6 +8,7 @@ import { useQueryTracking } from '../tracking'
 import { loadPage } from './load'
 import { watchQueryOptions } from './options'
 import { createPage, getPageId, getPageOptions, hasUncachedPage } from './page'
+import { addPrunedLoad, applyPrune, createPruneRun, recordKeptPage } from './prune'
 import { createFetchState, getFetchStateError, isFetchStateLoading, toQueryFetchState } from './state'
 
 /**
@@ -69,7 +70,8 @@ export function createQuery<
   let promise = loadMainPage() as unknown as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
   Object.assign(promise, returnObject)
 
-  function loadMainPage(forceFetch = false, pageIndexes?: number[], resetPages = !forceFetch) {
+  function loadMainPage(forceFetch = false, pageIndexes?: number[], resetPages = !forceFetch, prune = false) {
+    const pruneRun = prune ? createPruneRun() : undefined
     // A normal forced refresh keeps and reloads every page. A reset discards
     // them because the options now identify a different query; leaving a page
     // reset but unloaded would falsely claim it had never been fetched.
@@ -101,10 +103,14 @@ export function createQuery<
     const promises: Array<Promise<unknown>> = []
     if (shouldLoad(index)) {
       ctx.mainPage.requestId = crypto.randomUUID()
+      addPrunedLoad(pruneRun, ctx.mainPage)
       // Kept as the main page promise even when it is not reloaded: `setPageResult` awaits it so the
       // main page result always lands first, and the previous one has already settled.
-      ctx.mainPagePromise = loadPage(ctx, ctx.mainPage, forceFetch)
+      ctx.mainPagePromise = loadPage(ctx, ctx.mainPage, forceFetch, pruneRun)
       promises.push(ctx.mainPagePromise)
+    }
+    else {
+      recordKeptPage(ctx, pruneRun, ctx.mainPage)
     }
     // Started after `mainPagePromise` is assigned, for the same reason.
     for (const page of otherPages) {
@@ -114,13 +120,18 @@ export function createQuery<
       }
       ctx.pages.value[page.index] = page
       if (!shouldLoad(page.index)) {
+        recordKeptPage(ctx, pruneRun, page)
         continue
       }
       // Supersedes any fetch still in flight for the page, like the main page above.
       page.requestId = crypto.randomUUID()
-      promises.push(loadPage(ctx, page, forceFetch))
+      addPrunedLoad(pruneRun, page)
+      promises.push(loadPage(ctx, page, forceFetch, pruneRun))
     }
-    return Promise.all(promises).then(() => returnObject)
+    return Promise.all(promises).then(() => {
+      applyPrune(ctx, pruneRun)
+      return returnObject
+    })
   }
 
   function getPage(optionsExtension: Partial<TOptions>) {
@@ -153,8 +164,8 @@ export function createQuery<
   }
 
   function refresh(options?: VueQueryRefreshOptions<TOptions>) {
-    // `pages` selects what to reload; the rest is the main page's find options.
-    const { pages, ...optionsExtension } = options ?? {}
+    // `pages` and `prune` shape the refresh; the rest is the main page's find options.
+    const { pages, prune, ...optionsExtension } = options ?? {}
     ctx.mainPage.options = optionsExtension
     const mainPageIndex = getPageOptions(ctx, ctx.mainPage).pageIndex ?? 0
     const includesMainPage = pages == null || pages.includes(mainPageIndex)
@@ -162,7 +173,7 @@ export function createQuery<
     if (changedOptions) {
       ctx.updateQueryTrackingMode()
     }
-    promise = loadMainPage(true, pages, changedOptions) as unknown as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
+    promise = loadMainPage(true, pages, changedOptions, prune) as unknown as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
     Object.assign(promise, returnObject)
     return promise
   }

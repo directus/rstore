@@ -71,7 +71,7 @@ export function addToQueryTracking(
 }
 
 /** Resolve the nested include shape accepted for a relation target. */
-function resolveNestedInclude(
+export function resolveNestedInclude(
   relations: Record<string, unknown>,
   include: unknown,
 ): FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> | undefined {
@@ -88,4 +88,30 @@ function resolveNestedInclude(
   return Object.keys(candidate).some(key => key in relations)
     ? candidate as FindOptionsInclude<Collection, CollectionDefaults, StoreSchema>
     : undefined
+}
+
+/**
+ * Populate tracking from visible items when hooks did not provide every key.
+ * Items already released by `dirtyQueryId` are not adopted again.
+ */
+export function populateTracking<TResult>(
+  store: VueStore,
+  tracking: HookMetaQueryTracking,
+  result: TResult | undefined,
+  include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> | undefined,
+  dirtyQueryId?: string,
+): void {
+  if (result == null || (!trackingIsEmpty(tracking) && !include)) {
+    return
+  }
+  for (const item of Array.isArray(result) ? result : [result]) {
+    if (item && typeof item === 'object') {
+      addToQueryTracking(store, tracking, item as WrappedItemBase<Collection, CollectionDefaults, StoreSchema>, include, new Map(), dirtyQueryId)
+    }
+  }
+}
+
+/** Whether a tracking payload holds no item identities. */
+function trackingIsEmpty(tracking: HookMetaQueryTracking): boolean {
+  return Object.values(tracking.items).every(keys => keys.size === 0)
 }

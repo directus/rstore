@@ -39,7 +39,7 @@ The `query` and `liveQuery` composables return an object with the following prop
 
 - `foreground` / `background`: the state of each kind of fetch, to tell a first load apart from a silent refresh <Badge text="New in v0.9" />.
 
-- `refresh`: a function that can be called to refresh the data. It reloads every page held in `pages`, not just the main one <Badge text="Changed in v0.9" type="warning" />, and the returned promise settles once they all have. Pass `pages` to reload a subset: `refresh({ pages: [0] })` reloads the page at index `0` only, and `refresh({ pages: [] })` reloads none.
+- `refresh`: a function that can be called to refresh the data. It reloads every page held in `pages`, not just the main one <Badge text="Changed in v0.9" type="warning" />, and the returned promise settles once they all have. Pass `pages` to reload a subset: `refresh({ pages: [0] })` reloads the page at index `0` only, and `refresh({ pages: [] })` reloads none. Pass `prune: true` to also delete from the cache the items the refreshed result no longer holds, see [Pruning the cache on refresh](#pruning-the-cache-on-refresh).
 
 - `pages`: a ref containing the query pages.
 
@@ -232,6 +232,27 @@ const { data: projects } = store.Project.query(q => q.many(
     : { enabled: false }
 ))
 ```
+
+### Pruning the cache on refresh <Badge text="New in v0.9" />
+
+A refresh writes the rows the server returns, but rows it no longer returns (deleted remotely, moved out of the filter, removed from a relation) stay in the cache. Pass `prune: true` to make sure no dangling item is left:
+
+```ts
+const { refresh } = store.Todo.query(q => q.many({
+  include: { author: true },
+}))
+
+await refresh({ prune: true })
+```
+
+Once every reloaded page fetched successfully, each item of the query collection, and of every collection reached through `include` (at any depth), that the refreshed result does not hold is deleted from the cache.
+
+- It works whether the experimental garbage collection is enabled or not.
+- Other queries are not taken into account: an item another query displays is deleted too if this result does not hold it.
+- Rows of the pages left out by `pages` are kept, since they are still part of the query result.
+- A related item still linked in the cache to an item of the result is kept.
+- Nothing is deleted if no page is reloaded (`pages: []`), if a reloaded page fails or is superseded by a newer load, or for a `no-cache` query, whose result is not in the cache.
+- Items with a pending optimistic mutation are kept.
 
 ### Pagination <Badge text="New in v0.8.2" />
 

@@ -2,7 +2,7 @@ import type { Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryT
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { VueStore } from './store'
 import { computed, nextTick, ref, toValue, watch } from 'vue'
-import { addToQueryTracking, createTrackingObject } from './trackingRelations'
+import { addToQueryTracking, createTrackingObject, populateTracking } from './trackingRelations'
 
 /** Options needed to reconcile one query's page ownership. */
 export interface QueryTrackingOwnershipOptions<TResult> {
@@ -178,27 +178,6 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
   return controller
 }
 
-/**
- * Populate tracking from visible items when hooks did not provide every key.
- * Items already released by `dirtyQueryId` are not adopted again.
- */
-function populateTracking<TResult>(
-  store: VueStore,
-  tracking: HookMetaQueryTracking,
-  result: TResult | undefined,
-  include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> | undefined,
-  dirtyQueryId?: string,
-): void {
-  if (result == null || (!trackingIsEmpty(tracking) && !include)) {
-    return
-  }
-  for (const item of Array.isArray(result) ? result : [result]) {
-    if (item && typeof item === 'object') {
-      addToQueryTracking(store, tracking, item as WrappedItemBase<Collection, CollectionDefaults, StoreSchema>, include, new Map(), dirtyQueryId)
-    }
-  }
-}
-
 /** Iterate cached items represented by a tracking object. */
 function forEachTrackedItem(
   store: VueStore,
@@ -221,11 +200,6 @@ function forEachTrackedKey(tracking: HookMetaQueryTracking, callback: (collectio
       callback(collectionName, key)
     }
   }
-}
-
-/** Whether a tracking payload holds no item identities. */
-function trackingIsEmpty(tracking: HookMetaQueryTracking): boolean {
-  return Object.values(tracking.items).every(keys => keys.size === 0)
 }
 
 /** Whether a page result supplies no item identity to a skipped payload. */

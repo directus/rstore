@@ -2,6 +2,7 @@ import type { CacheRuntime, CacheWriteBatch, QueuedOperation } from './types'
 import { triggerRef } from 'vue'
 import { ensureCollectionRef, evictCollectionStateCache, mark } from './context'
 import { addLayerNow, removeLayer } from './layers'
+import { pruneNow } from './prune'
 import { clearNow, deleteItemNow, setStateNow, writeItemNow } from './writes'
 
 /** Completed queue entry whose observer errors must not replay the write. */
@@ -85,6 +86,9 @@ function processQueuedOperation(ctx: CacheRuntime, operation: QueuedOperation) {
       return true
     case 'clear':
       clearNow(ctx)
+      return true
+    case 'prune':
+      pruneNow(ctx, operation.params)
       return true
   }
 }

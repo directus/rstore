@@ -1,16 +1,25 @@
 import type { CustomHookMeta, FindOptions } from '@rstore/shared'
+import type { PruneRun } from './prune'
 import type { VueQueryPage } from './types'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { nextTick } from 'vue'
+import { createTrackingObject } from '../trackingRelations'
 import { isCurrentPageRequest, setPageResult } from './page'
+import { recordPrunedFetch } from './prune'
 
 /**
  * Load a query page from cache or fetcher.
+ *
+ * @param ctx Query context owning the page.
+ * @param page Page to load.
+ * @param forceFetch Whether the cache must be bypassed.
+ * @param pruneRun Set by `refresh({ prune: true })` to collect what the fetch returned.
  */
 export async function loadPage(
   ctx: any,
   page: VueQueryPage<any, any, any, any, any>,
   forceFetch: boolean,
+  pruneRun?: PruneRun,
 ) {
   page._foreground.markIncomplete()
   if (ctx.isDisabled()) {
@@ -31,7 +40,7 @@ export async function loadPage(
     const finalOptions = await resolvePageOptions(ctx, page, forceFetch, savedPageRequestId)
     // Even a cache hit must not acquire ownership after the consumer stops.
     if (finalOptions && isCurrentPageRequest(ctx, page, savedPageRequestId)) {
-      await fetchPage(ctx, page, savedPageRequestId, finalOptions, newQueryTracking)
+      await fetchPage(ctx, page, savedPageRequestId, finalOptions, newQueryTracking, pruneRun)
     }
   }
   catch (e: any) {
@@ -78,6 +87,7 @@ async function fetchPage(
   savedPageRequestId: string,
   finalOptions: FindOptions<any, any, any>,
   newQueryTracking: any,
+  pruneRun: PruneRun | undefined,
 ) {
   // A no-cache page displays rows the cache does not hold, so it can neither
   // own them nor be represented by them.
@@ -94,10 +104,13 @@ async function fetchPage(
     return
   }
 
+  // Pruning needs the written identities even without ownership. That payload
+  // stays out of the ownership paths below, which only see `newQueryTracking`.
+  const hookTracking = tracksPage ? newQueryTracking : pruneRun && !uncachedPage ? createTrackingObject() : undefined
   const fetchMeta: CustomHookMeta = {
     ...ctx.meta.value,
     $canPublishQuery: () => isCurrentPageRequest(ctx, page, savedPageRequestId),
-    $queryTracking: tracksPage ? newQueryTracking : undefined,
+    $queryTracking: hookTracking,
   }
   const pageResult = await ctx.fetchMethod(finalOptions, fetchMeta)
   const { valid } = await setPageResult(ctx, page, savedPageRequestId, pageResult, finalOptions.fetchPolicy)
@@ -106,6 +119,10 @@ async function fetchPage(
     return
   }
   updateQueryMeta(ctx, page, fetchMeta)
+  // A no-cache result says nothing about the cache: left unrecorded, it cancels the prune.
+  if (pruneRun && !uncachedPage) {
+    recordPrunedFetch(pruneRun, hookTracking, pageResult, finalOptions.include, tracksPage)
+  }
   if (tracksPage) {
     ctx.queryTracking.handleQueryTracking(page.id, newQueryTracking, getTrackingResult(page, pageResult), finalOptions.include, true)
     releaseDiscardedPageOwnership(ctx)
