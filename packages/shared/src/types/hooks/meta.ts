@@ -3,6 +3,8 @@
  */
 export interface HookMetaQueryTracking {
   items: Record<string, Set<string | number>>
+  /** Included relation branches written by this fetch, even when their result is empty. */
+  includedRelations?: Record<string, Map<string | number, Set<string>>>
   skipped?: boolean
 }
 

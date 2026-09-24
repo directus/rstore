@@ -132,7 +132,9 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
         // metadata. Synchronous adoption protects even immediate public GC.
         const stop = watch(() => {
           const current = createTrackingObject()
-          populateTracking(store, current, visible, include)
+          // A released nested row can remain in the shared cache until its
+          // deferred sweep. Do not let a sibling deletion re-adopt it.
+          populateTracking(store, current, visible, include, trackingQueryId)
           return current
         }, (current) => {
           const previous = pageTrackings.get(pageId)
@@ -176,19 +178,23 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
   return controller
 }
 
-/** Populate tracking from visible items when hooks did not provide every key. */
+/**
+ * Populate tracking from visible items when hooks did not provide every key.
+ * Items already released by `dirtyQueryId` are not adopted again.
+ */
 function populateTracking<TResult>(
   store: VueStore,
   tracking: HookMetaQueryTracking,
   result: TResult | undefined,
   include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> | undefined,
+  dirtyQueryId?: string,
 ): void {
   if (result == null || (!trackingIsEmpty(tracking) && !include)) {
     return
   }
   for (const item of Array.isArray(result) ? result : [result]) {
     if (item && typeof item === 'object') {
-      addToQueryTracking(store, tracking, item as WrappedItemBase<Collection, CollectionDefaults, StoreSchema>, include)
+      addToQueryTracking(store, tracking, item as WrappedItemBase<Collection, CollectionDefaults, StoreSchema>, include, new Map(), dirtyQueryId)
     }
   }
 }

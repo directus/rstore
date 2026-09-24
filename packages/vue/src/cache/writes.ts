@@ -223,7 +223,20 @@ function writeMutableItem(ctx: CacheRuntime, params: Parameters<Cache['writeItem
 
 function writeRelationField(ctx: CacheRuntime, params: Parameters<Cache['writeItem']>[0] & { batch?: CacheWriteBatch }, field: string, rawItem: any) {
   const relation = params.collection.relations[field]
-  if (!rawItem || !relation) {
+  if (!relation) {
+    return
+  }
+  // An included empty relation is authoritative too: cached children absent
+  // from this response must not be retained while query ownership reconciles.
+  const tracking = params.meta?.$queryTracking
+  if (tracking) {
+    const relations = tracking.includedRelations ??= {}
+    const items = relations[params.collection.name] ??= new Map()
+    const fields = items.get(params.key) ?? new Set<string>()
+    fields.add(field)
+    items.set(params.key, fields)
+  }
+  if (!rawItem) {
     return
   }
   if (relation.many && !Array.isArray(rawItem)) {

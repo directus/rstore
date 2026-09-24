@@ -14,6 +14,7 @@ export function createTrackingObject(): HookMetaQueryTracking {
  *
  * `visited` guards repeated item/selection pairs. An item reached again through
  * a different include must still contribute that selection's descendants.
+ * When `dirtyQueryId` is set, items already released by that query are skipped.
  */
 export function addToQueryTracking(
   store: VueStore,
@@ -21,8 +22,9 @@ export function addToQueryTracking(
   item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>,
   include?: RelationInclude,
   visited: Map<string, Set<RelationInclude | undefined>> = new Map(),
+  dirtyQueryId?: string,
 ): void {
-  if (!item.$collection) {
+  if (!item.$collection || (dirtyQueryId && item.$meta.dirtyQueries.has(dirtyQueryId))) {
     return
   }
   const collection = store.$collections.find(collection => collection.name === item.$collection)
@@ -44,9 +46,13 @@ export function addToQueryTracking(
     if (!relationInclude || relationInclude === false) {
       continue
     }
+    // A relation embedded in this fetch is authoritative: only rows it wrote
+    // belong to it. Still descend into them, since their own nested relation
+    // fields may be omitted and must then fall back to the cache.
+    const embedded = tracking.includedRelations?.[collection.name]?.get(key)?.has(relationName)
     const value = item[relationName as keyof typeof item] as unknown as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | Array<WrappedItemBase<Collection, CollectionDefaults, StoreSchema>>
     for (const relatedItem of Array.isArray(value) ? value : [value]) {
-      if (!relatedItem) {
+      if (!relatedItem || (embedded && !tracking.items[relatedItem.$collection]?.has(relatedItem.$getKey()))) {
         continue
       }
       const relatedCollection = relatedItem.$collection
@@ -58,6 +64,7 @@ export function addToQueryTracking(
         relatedItem,
         relatedCollection ? resolveNestedInclude(relatedCollection.relations, relationInclude) : undefined,
         visited,
+        dirtyQueryId,
       )
     }
   }
