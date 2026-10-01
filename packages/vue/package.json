@@ -32,6 +32,7 @@
     "skills"
   ],
   "scripts": {
+    "benchmark:register-collections": "vite-node benchmark/register-collections.ts",
     "benchmark:write-items": "vite-node benchmark/write-items-publication.ts",
     "build": "unbuild",
     "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",

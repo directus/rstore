@@ -211,22 +211,36 @@ export async function createStore<
   }) as Promise<VueStore<TSchema, TCollectionDefaults>>
 }
 
-export function addCollection(store: VueStore, collection: Collection) {
+/** Register a batch of collections, resolving relations and rebuilding cached indexes once. */
+export function addCollections(store: VueStore, collections: readonly Collection[]) {
+  if (!collections.length)
+    return
+
   const privateStore = store as unknown as PrivateVueStore
+  const names = new Set<string>()
+  const resolvedCollections = collections.map((collection) => {
+    if (privateStore.$_collectionNames.has(collection.name) || names.has(collection.name)) {
+      throw new Error(`Collection ${collection.name} already exists`)
+    }
+    names.add(collection.name)
+    return resolveCollection(collection, store.$collectionDefaults)
+  })
 
-  if (privateStore.$_collectionNames.has(collection.name)) {
-    throw new Error(`Collection ${collection.name} already exists`)
+  // Prepare the whole batch before publishing it, so an invalid definition
+  // cannot leave earlier collections registered after the call fails.
+  normalizeCollectionRelations(resolvedCollections)
+  for (const collection of resolvedCollections) {
+    store.$collections.push(collection)
+    privateStore.$_collectionNames.add(collection.name)
   }
-
-  const resolvedCollection = resolveCollection(collection, store.$collectionDefaults)
-  store.$collections.push(resolvedCollection)
-  privateStore.$_collectionNames.add(collection.name)
-
-  normalizeCollectionRelations([resolvedCollection])
   resolveCollectionOppositeRelations(store.$collections)
   // New relations add indexes to existing collections. Rebuild from cached
-  // rows so relations work even when their target was cached before this call.
+  // rows once the full schema is known, including targets cached before this call.
   ;(store.$cache as Cache & VueCachePrivate)._private.rebuildIndexes()
+}
+
+export function addCollection(store: VueStore, collection: Collection) {
+  addCollections(store, [collection])
 }
 
 export function removeCollection(store: VueStore, collectionName: string) {
