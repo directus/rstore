@@ -416,3 +416,23 @@ const createTodo = store.todos.createForm()
 ```
 
 Learn more about [Form Objects](../data/form.md).
+
+## Adding collections at runtime
+
+Use `addCollections` when loading several collection definitions into an existing store:
+
+```ts
+import { addCollections } from '@rstore/vue'
+
+addCollections(store, [
+  { name: 'notes' },
+  {
+    name: 'tags',
+    relations: { note: { to: { notes: { on: { id: 'noteId' } } } } },
+  },
+])
+```
+
+The batch resolves relations and rebuilds cached indexes once, including indexes for rows already in the store. Relations can target collections defined later in the same batch. Prefer this over calling `addCollection` in a loop when registering a schema.
+
+Duplicate names (within the batch or already in the store) and reserved names starting with `$` reject the batch before any collections are added. An empty batch does nothing. `addCollection(store, collection)` remains available for a single collection and uses the same registration path.

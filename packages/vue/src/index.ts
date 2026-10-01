@@ -67,6 +67,7 @@ export type {
 
 export {
   addCollection,
+  addCollections,
   createStore,
   removeCollection,
   setActiveStore,
