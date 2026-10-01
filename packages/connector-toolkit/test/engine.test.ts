@@ -214,3 +214,30 @@ describe('createFilterEngine applyQuery', () => {
     expect(mono.applyQuery(items, undefined)).toEqual({ supported: true, items })
   })
 })
+
+describe('createFilterEngine normalizeFieldValue', () => {
+  /**
+   * Dialect comparing the `n` field of `Big` collections as BigInt.
+   */
+  const big = createFilterEngine({
+    name: 'Big',
+    normalizeFieldValue: (value, field, context) => context.collection?.name === 'Big' && field === 'n' && typeof value === 'string'
+      ? BigInt(value)
+      : value,
+    normalizeSort: sort => normalizeSort(sort),
+  })
+  const context = { collection: { name: 'Big' } }
+
+  it('normalizes item and filter values before comparing them', () => {
+    expect(big.evaluateFilter({ n: '10' }, { n: { _gt: '9' } }, context)).toEqual({ supported: true, matches: true })
+    expect(big.evaluateFilter({ n: '10' }, { n: { _in: ['10'] } }, context)).toEqual({ supported: true, matches: true })
+    expect(big.evaluateFilter({ n: '10' }, { n: { _between: ['9', '11'] } }, context)).toEqual({ supported: true, matches: true })
+    // Without a matching context, values keep their default text comparison.
+    expect(big.evaluateFilter({ n: '10' }, { n: { _gt: '9' } })).toEqual({ supported: true, matches: false })
+  })
+
+  it('normalizes sorted values', () => {
+    const result = big.applyQuery([{ n: '9' }, { n: '100' }, { n: '10' }], { sort: 'n' }, context)
+    expect(result.supported && result.items.map(item => item.n)).toEqual(['9', '10', '100'])
+  })
+})

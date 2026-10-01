@@ -157,14 +157,28 @@ describe('monospace relation generation', () => {
     const orderItems = collections.find(collection => collection.name === 'OrderItems')
 
     // Forward relations use the constraint referenced columns.
-    expect(todos?.meta.monospace.relations?.author).toEqual({ connectKeys: ['email'] })
-    expect(orderItems?.meta.monospace.relations?.order).toEqual({ connectKeys: ['shop_id', 'code'] })
+    expect(todos?.meta.monospace.relations?.author).toEqual({ connectKeys: ['email'], forward: true })
+    expect(orderItems?.meta.monospace.relations?.order).toEqual({ connectKeys: ['shop_id', 'code'], forward: true })
     // Forward relations without an OpenAPI connect input schema still get
     // connect keys from the constraint.
-    expect(profiles?.meta.monospace.relations?.avatar).toEqual({ connectKeys: ['id'] })
-    // Backward relations keep the OpenAPI connect keys input columns.
+    expect(profiles?.meta.monospace.relations?.avatar).toEqual({ connectKeys: ['id'], forward: true })
+    // Backward relations keep the OpenAPI connect keys input columns. The
+    // direction is only needed by to-one writes, so to-many meta omits it.
     expect(profiles?.meta.monospace.relations?.todos).toEqual({ connectKeys: ['id'] })
     expect(orders?.meta.monospace.relations?.items).toEqual({ connectKeys: ['uuid'] })
+  })
+
+  it('marks backward to-one relations in collection meta', () => {
+    const document = createOpenApiFixture()
+    // Expose `Profiles.todos` as a to-one field: a one-to-one relation whose
+    // FK columns are owned by the Todos side.
+    document.components.schemas.ProfilesCollectionOutput.properties.todos = {
+      $ref: '#/components/schemas/TodosCollectionOutput',
+    }
+
+    const profiles = buildFixtureCollections({ document }).find(collection => collection.name === 'Profiles')
+
+    expect(profiles?.meta.monospace.relations?.todos).toEqual({ connectKeys: ['id'], forward: false })
   })
 
   it('prefers constraint columns over disagreeing OpenAPI connect key inputs', () => {
@@ -180,7 +194,7 @@ describe('monospace relation generation', () => {
 
     const todos = buildFixtureCollections({ document }).find(collection => collection.name === 'Todos')
 
-    expect(todos?.meta.monospace.relations?.author).toEqual({ connectKeys: ['email'] })
+    expect(todos?.meta.monospace.relations?.author).toEqual({ connectKeys: ['email'], forward: true })
   })
 
   it('types relation item fields with generated interface names', () => {

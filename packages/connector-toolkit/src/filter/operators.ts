@@ -110,6 +110,9 @@ export function comparableValue(value: any): any {
 
 /**
  * Runs a string comparison with optional case folding.
+ *
+ * BigInt values (produced by connector field normalizers) compare through
+ * their decimal text; other non-string values never match.
  */
 function compareText(
   itemValue: any,
@@ -117,10 +120,12 @@ function compareText(
   ignoreCase: boolean,
   compare: (left: string, right: string) => boolean,
 ): boolean {
-  if (typeof itemValue !== 'string' || typeof value !== 'string') {
+  const left = typeof itemValue === 'bigint' ? String(itemValue) : itemValue
+  const right = typeof value === 'bigint' ? String(value) : value
+  if (typeof left !== 'string' || typeof right !== 'string') {
     return false
   }
   return ignoreCase
-    ? compare(itemValue.toLowerCase(), value.toLowerCase())
-    : compare(itemValue, value)
+    ? compare(left.toLowerCase(), right.toLowerCase())
+    : compare(left, right)
 }

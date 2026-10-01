@@ -121,6 +121,58 @@ export class MonospaceNotFoundError extends MonospaceRestError {
 }
 
 /**
+ * One license limit violation reported by Monospace.
+ */
+export interface MonospaceLicenseViolation {
+  /**
+   * Licensed entitlement, for example `seats` or `custom_roles`.
+   */
+  entitlement: string
+
+  /**
+   * Usage the operation would produce (`true` for on/off entitlements).
+   */
+  usage?: number | boolean
+
+  /**
+   * Hard limit of numeric entitlements.
+   */
+  hard_limit?: number
+
+  /**
+   * Whether on/off entitlements are allowed (`false` when violated).
+   */
+  allowed?: boolean
+
+  /**
+   * Unknown extra violation properties.
+   */
+  [key: string]: unknown
+}
+
+/**
+ * Error returned when an operation would exceed a license limit (codes
+ * `6001`–`6008`) or when the instance license is locked (no code).
+ */
+export class MonospaceLicenseError extends MonospaceRestError {
+  /**
+   * License limit violations from `meta.violations`, empty when Monospace
+   * sends none (locked license, audit logs code `6008`).
+   */
+  violations: MonospaceLicenseViolation[]
+
+  /**
+   * Creates a Monospace license error.
+   */
+  constructor(message = 'License limit exceeded', details?: MonospaceErrorDetails) {
+    super(message, 402, details)
+    this.name = 'MonospaceLicenseError'
+    const violations = details?.meta?.violations
+    this.violations = Array.isArray(violations) ? violations as MonospaceLicenseViolation[] : []
+  }
+}
+
+/**
  * Maps an HTTP response body to a typed Monospace error.
  */
 export function createMonospaceError(
@@ -139,9 +191,9 @@ export function createMonospaceError(
   } = {},
 ): MonospaceRestError {
   const payload = isErrorPayload(body) ? body : undefined
-  const message = payload?.message ?? `Monospace request failed with status ${status}`
+  const message = payload ? describeErrorChain(payload) : `Monospace request failed with status ${status}`
   const details: MonospaceErrorDetails = {
-    code: payload?.code,
+    code: payload ? findDeepestCode(payload) : undefined,
     meta: payload?.meta,
     source: payload?.source,
   }
@@ -152,6 +204,8 @@ export function createMonospaceError(
       return new MonospaceValidationError(message, details, status)
     case 401:
       return new MonospaceAuthError(message, details)
+    case 402:
+      return new MonospaceLicenseError(message, details)
     case 403:
       return new MonospacePermissionError(message, details)
     case 404:
@@ -162,9 +216,11 @@ export function createMonospaceError(
 }
 
 /**
- * Returns whether a response body contains a Monospace error payload.
+ * Monospace `EngineError` payload: top-level messages are often generic
+ * ("Failed to execute query") and the specific cause lives in the
+ * recursive `source` chain.
  */
-function isErrorPayload(value: unknown): value is {
+interface MonospaceErrorPayload {
   /**
    * Human-readable error message.
    */
@@ -184,7 +240,45 @@ function isErrorPayload(value: unknown): value is {
    * Nested error that caused this error.
    */
   source?: unknown
-} {
+}
+
+/**
+ * Returns the error chain from the outer payload down to the root cause,
+ * following `source` while it is a valid error payload.
+ */
+function getErrorChain(payload: MonospaceErrorPayload): MonospaceErrorPayload[] {
+  const chain = [payload]
+  let current: unknown = payload.source
+  // Bounded walk guards against pathological (cyclic) source objects.
+  while (isErrorPayload(current) && chain.length < 32) {
+    chain.push(current)
+    current = current.source
+  }
+  return chain
+}
+
+/**
+ * Builds the error message as `outer: root cause` so the specific cause
+ * behind a generic top-level message is visible.
+ */
+function describeErrorChain(payload: MonospaceErrorPayload): string {
+  const root = getErrorChain(payload).at(-1)!
+  return root === payload || root.message === payload.message
+    ? payload.message
+    : `${payload.message}: ${root.message}`
+}
+
+/**
+ * Returns the code of the deepest error in the chain that has one.
+ */
+function findDeepestCode(payload: MonospaceErrorPayload): string | undefined {
+  return getErrorChain(payload).reverse().find(item => item.code != null)?.code
+}
+
+/**
+ * Returns whether a value is a Monospace error payload.
+ */
+function isErrorPayload(value: unknown): value is MonospaceErrorPayload {
   return typeof value === 'object'
     && value !== null
     && 'message' in value

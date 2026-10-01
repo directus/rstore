@@ -1,6 +1,6 @@
 import type { Plugin, PluginSetupApi } from '@rstore/shared'
 // @ts-expect-error virtual module
-import { apiKey, project, scopeId, url } from '#build/$rstore-monospace-config.js'
+import { apiKey, cacheControl, scopeId, url, workspace } from '#build/$rstore-monospace-config.js'
 import { useNuxtApp } from '#imports'
 import { createMonospaceRestClient, createMonospaceRstorePlugin } from '@rstore/monospace'
 
@@ -12,8 +12,9 @@ const nuxtMonospacePlugin: Plugin = {
   setup(api: PluginSetupApi) {
     const monospace = createMonospaceRestClient({
       apiKey,
-      project,
+      cacheControl,
       url,
+      workspace,
     })
     const monospacePlugin = createMonospaceRstorePlugin({
       client: monospace,

@@ -1,58 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import {
-  applyMonospaceIncludeFields,
-  createMonospaceIncludeFields,
   fetchMissingMonospaceRelations,
   normalizeMonospaceRelationItems,
 } from '../src'
 import { createProfilesCollection, createRelationStore, createTodosCollection } from './utils/plugin'
-
-describe('createMonospaceIncludeFields', () => {
-  it('maps include options to nested wildcard field selections', () => {
-    expect(createMonospaceIncludeFields({ author: true })).toEqual(['author.*'])
-    expect(createMonospaceIncludeFields({ author: true, todos: false })).toEqual(['author.*'])
-    expect(createMonospaceIncludeFields(undefined)).toEqual([])
-  })
-
-  it('supports nested includes recursively', () => {
-    expect(createMonospaceIncludeFields({
-      author: {
-        include: {
-          todos: true,
-        },
-      },
-    })).toEqual(['author.*', 'author.todos.*'])
-  })
-})
-
-describe('applyMonospaceIncludeFields', () => {
-  it('adds a base wildcard when no fields are selected', () => {
-    const query = applyMonospaceIncludeFields({} as { fields?: string[] }, { author: true }, createTodosCollection())
-    expect(query.fields).toEqual(['*', 'author.*'])
-  })
-
-  it('appends the relation FK columns to explicit field selections', () => {
-    // `author_id` backs the cache join of the included relation, so it is
-    // added to the explicit selection (a `*` base already includes it).
-    const query = applyMonospaceIncludeFields({ fields: ['id', 'title'] }, { author: true }, createTodosCollection())
-    expect(query.fields).toEqual(['id', 'title', 'author_id', 'author.*'])
-  })
-
-  it('appends backward relation source columns to explicit field selections', () => {
-    const query = applyMonospaceIncludeFields({ fields: ['name'] }, { todos: true }, createProfilesCollection())
-    expect(query.fields).toEqual(['name', 'id', 'todos.*'])
-  })
-
-  it('does not duplicate backing columns already selected', () => {
-    const query = applyMonospaceIncludeFields({ fields: ['id', 'author_id'] }, { author: true }, createTodosCollection())
-    expect(query.fields).toEqual(['id', 'author_id', 'author.*'])
-  })
-
-  it('keeps queries untouched without includes', () => {
-    const query = applyMonospaceIncludeFields({ fields: ['id'] }, undefined, createTodosCollection())
-    expect(query.fields).toEqual(['id'])
-  })
-})
 
 describe('normalizeMonospaceRelationItems', () => {
   it('keeps embedded to-one objects and FK columns untouched', () => {

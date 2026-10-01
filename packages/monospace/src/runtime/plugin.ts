@@ -1,32 +1,35 @@
 import type { Plugin } from '@rstore/shared'
-import type { MonospaceRestClient } from './client'
+import type { CreateMonospaceRestClientOptions, MonospaceRestClient } from './client'
+import type { MonospaceWorkspaceOptions } from './workspace'
 import { definePlugin } from '@rstore/core'
 import { applyMonospaceQuery } from '../filter'
 import { createMonospaceRestClient } from './client'
-import { DEFAULT_MONOSPACE_SCOPE_ID, getMonospaceCollectionName, getMonospacePrimaryKeys } from './collection'
-import { applyMonospaceIncludeFields, createMonospaceQuery, stripPrimaryKeys } from './query'
+import { DEFAULT_MONOSPACE_SCOPE_ID, getMonospaceCollectionName } from './collection'
+import { resolveMonospaceItemKey } from './itemKey'
+import { registerMonospaceWriteHooks } from './pluginWrites'
+import { createMonospaceQuery, createMonospaceReadQuery } from './query'
 import { fetchMissingMonospaceRelations, normalizeMonospaceRelationItems, toArray } from './relations'
-import { buildMonospaceRelationWrites } from './relationWrites'
-import { applyMonospaceRelationCachePatches } from './relationWritesCache'
+import { resolveMonospaceWorkspace } from './workspace'
 
 /**
  * Options used to create the rstore Monospace runtime plugin.
  */
-export interface CreateMonospaceRstorePluginOptions {
+export interface CreateMonospaceRstorePluginOptions extends MonospaceWorkspaceOptions {
   /**
    * Monospace instance URL used when `client` is not provided.
    */
   url?: string
 
   /**
-   * Monospace project identifier used when `client` is not provided.
-   */
-  project?: string
-
-  /**
    * Runtime API key used when `client` is not provided.
    */
   apiKey?: string
+
+  /**
+   * `Cache-Control` request header used when `client` is not provided.
+   * `'no-cache'` bypasses the Monospace server-side read cache.
+   */
+  cacheControl?: CreateMonospaceRestClientOptions['cacheControl']
 
   /**
    * Existing Monospace REST client to reuse.
@@ -56,16 +59,19 @@ export function createMonospaceRstorePlugin(options: CreateMonospaceRstorePlugin
     setup({ hook }) {
       hook('fetchFirst', async (payload) => {
         const collectionName = getMonospaceCollectionName(payload.collection)
-        const include = (payload.findOptions as any)?.include
+        const context = { collection: payload.collection as any, store: payload.store as any }
 
         let result: any
         if (payload.key != null) {
-          result = await monospace.readOne(collectionName, payload.key, applyMonospaceIncludeFields(createMonospaceQuery(payload.findOptions as any), include, payload.collection as any))
+          // Composite keys and collections without item routes resolve to
+          // key column values, read through a filtered collection request.
+          const key = resolveMonospaceItemKey({ collection: context.collection, key: payload.key, store: context.store })
+          result = await monospace.readOne(collectionName, key, createMonospaceReadQuery(payload.findOptions as any, context))
         }
         else {
-          const results = await monospace.readMany(collectionName, applyMonospaceIncludeFields(createMonospaceQuery(payload.findOptions as any, {
+          const results = await monospace.readMany(collectionName, createMonospaceReadQuery(payload.findOptions as any, context, {
             limit: 1,
-          }), include, payload.collection as any))
+          }))
           result = results?.[0]
         }
 
@@ -75,8 +81,10 @@ export function createMonospaceRstorePlugin(options: CreateMonospaceRstorePlugin
 
       hook('fetchMany', async (payload) => {
         const collectionName = getMonospaceCollectionName(payload.collection)
-        const include = (payload.findOptions as any)?.include
-        const result = await monospace.readMany(collectionName, applyMonospaceIncludeFields(createMonospaceQuery(payload.findOptions as any), include, payload.collection as any))
+        const result = await monospace.readMany(collectionName, createMonospaceReadQuery(payload.findOptions as any, {
+          collection: payload.collection as any,
+          store: payload.store as any,
+        }))
         normalizeMonospaceRelationItems(payload.store as any, payload.collection as any, result ?? [])
         payload.setResult(result)
       })
@@ -109,81 +117,7 @@ export function createMonospaceRstorePlugin(options: CreateMonospaceRstorePlugin
         payload.setResult(evaluation.supported ? evaluation.items : [])
       })
 
-      hook('createItem', async (payload) => {
-        const collectionName = getMonospaceCollectionName(payload.collection)
-        // Translate form relation operations: FK column writes for to-one
-        // relations, Monospace `_connect` operations for to-many relations.
-        const writes = buildMonospaceRelationWrites({
-          collection: payload.collection as any,
-          formOperations: payload.formOperations,
-          item: payload.item as Record<string, any>,
-          mode: 'create',
-          store: payload.store as any,
-        })
-        const result = await monospace.createOne(collectionName, writes.item, {})
-        applyMonospaceRelationCachePatches(payload.store as any, result, writes.patches)
-        payload.setResult(result)
-      })
-
-      hook('createMany', async (payload) => {
-        const collectionName = getMonospaceCollectionName(payload.collection)
-        payload.setResult(await monospace.createMany(collectionName, payload.items as Array<Record<string, any>>, {}))
-      })
-
-      hook('updateItem', async (payload) => {
-        const collectionName = getMonospaceCollectionName(payload.collection)
-        // Translate form relation operations and strip the generated primary
-        // keys, which are carried by the endpoint URL.
-        const writes = buildMonospaceRelationWrites({
-          collection: payload.collection as any,
-          formOperations: payload.formOperations,
-          item: payload.item as Record<string, any>,
-          key: payload.key,
-          mode: 'update',
-          store: payload.store as any,
-        })
-        const item = stripPrimaryKeys(writes.item, getMonospacePrimaryKeys(payload.collection))
-        const result = await monospace.updateOne(collectionName, payload.key, item, {})
-        applyMonospaceRelationCachePatches(payload.store as any, result, writes.patches)
-        payload.setResult(result)
-      })
-
-      hook('updateMany', async (payload) => {
-        const collectionName = getMonospaceCollectionName(payload.collection)
-        const primaryKeys = getMonospacePrimaryKeys(payload.collection)
-        payload.setResult(await Promise.all(payload.items.map(({ key, item }) => {
-          return monospace.updateOne(collectionName, key, stripPrimaryKeys(item as Record<string, any>, primaryKeys), {})
-        })))
-      })
-
-      hook('deleteItem', async (payload) => {
-        await monospace.deleteOne(getMonospaceCollectionName(payload.collection), payload.key, {})
-      })
-
-      hook('deleteMany', async (payload) => {
-        if (!payload.keys.length) {
-          payload.abort()
-          return
-        }
-
-        const collectionName = getMonospaceCollectionName(payload.collection)
-        const primaryKeys = getMonospacePrimaryKeys(payload.collection)
-        if (primaryKeys.length === 1) {
-          await monospace.deleteMany(collectionName, {
-            filter: {
-              [primaryKeys[0]!]: {
-                _in: payload.keys,
-              },
-            },
-          })
-        }
-        else {
-          await Promise.all(payload.keys.map((key) => {
-            return monospace.deleteOne(collectionName, key, {})
-          }))
-        }
-        payload.abort()
-      })
+      registerMonospaceWriteHooks(hook, monospace)
     },
   })
 }
@@ -195,12 +129,14 @@ function resolveMonospaceClient(options: CreateMonospaceRstorePluginOptions): Mo
   if (options.client) {
     return options.client
   }
-  if (!options.url || !options.project) {
-    throw new Error('Monospace URL and project are required to create the rstore Monospace plugin when no client is provided')
+  const workspace = resolveMonospaceWorkspace(options)
+  if (!options.url || !workspace) {
+    throw new Error('Monospace URL and workspace are required to create the rstore Monospace plugin when no client is provided')
   }
   return createMonospaceRestClient({
     apiKey: options.apiKey,
-    project: options.project,
+    cacheControl: options.cacheControl,
     url: options.url,
+    workspace,
   })
 }

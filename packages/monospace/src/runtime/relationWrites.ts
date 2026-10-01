@@ -4,14 +4,16 @@ import type { MonospaceRelationCachePatch } from './relationWritesCache'
 import type { MonospaceConnectEntry } from './relationWriteUtils'
 import { getMonospacePrimaryKeys, getMonospaceRelationConnectKeys } from './collection'
 import { toArray } from './relations'
+import { isBackwardToOneRelation, translateCreateFkColumns, translateToOneField } from './relationWritesToOne'
 import { buildConnectEntry, isMonospaceOperationPayload, pickItemColumns, relatedItemsMatch } from './relationWriteUtils'
 
 /**
  * Mutation mode of a Monospace relational write.
  *
- * Create bodies carry a single operation object per relation field while
- * update bodies carry an array of operation objects, matching the payloads
- * accepted by the Monospace relational data API.
+ * Create bodies carry a single operation object per to-one relation field
+ * while update bodies (and to-many fields in both modes) carry an array of
+ * operation objects, matching the payloads accepted by the Monospace
+ * relational data API.
  */
 export type MonospaceMutationMode = 'create' | 'update'
 
@@ -55,8 +57,9 @@ export interface MonospaceRelationWriteOptions {
  */
 export interface MonospaceRelationWrites {
   /**
-   * Mutation body with relation writes applied: FK column values for to-one
-   * relations and Monospace operation payloads for to-many relations.
+   * Mutation body with relation writes applied: FK column values (update) or
+   * `_connect` operations (create) for to-one relations and Monospace
+   * operation payloads for to-many relations.
    */
   item: Record<string, any>
 
@@ -70,20 +73,22 @@ export interface MonospaceRelationWrites {
  * Translates rstore form relation operations (`connect`, `disconnect`,
  * many-relation `set`) into Monospace mutation body writes.
  *
- * To-one operations write the real FK columns of the relation (resolving
- * missing referenced column values from the cache); no `_connect` /
- * `_disconnect` operation is emitted since the FK column write alone is the
- * canonical, unambiguous form. To-many operations are translated into
- * Monospace `_connect`/`_disconnect` operations, as no source columns exist
- * for them. Fields carrying user-assigned relation payloads (already present
- * on the body or op-shaped values) pass through untouched. To-many
- * disconnect operations are dropped in create mode, where Monospace only
- * accepts `_create` and `_connect`.
+ * To-one operations are translated by {@link translateToOneField}: FK
+ * column writes in update mode, `_connect` operations in create mode, where
+ * Monospace rejects FK columns. In create mode, FK columns supplied on the
+ * body without form operations are translated into `_connect` operations as
+ * well. To-many operations are translated into Monospace
+ * `_connect`/`_disconnect` operations, as no source columns exist for them.
+ * Fields carrying user-assigned relation payloads (already present on the
+ * body or op-shaped values) pass through untouched. To-many disconnect
+ * operations are dropped in create mode, where Monospace only accepts
+ * `_create` and `_connect`.
  */
 export function buildMonospaceRelationWrites(options: MonospaceRelationWriteOptions): MonospaceRelationWrites {
   const item = { ...options.item }
   const patches: MonospaceRelationCachePatch[] = []
-  if (!options.formOperations?.length) {
+  const formOperations = options.formOperations ?? []
+  if (!formOperations.length && options.mode === 'update') {
     return { item, patches }
   }
 
@@ -94,16 +99,19 @@ export function buildMonospaceRelationWrites(options: MonospaceRelationWriteOpti
     if (!relation || relation.to.length !== 1) {
       continue
     }
-    const ops = options.formOperations.filter(op => String(op.field) === relationKey)
-    if (!ops.length) {
-      continue
-    }
+    const ops = formOperations.filter(op => String(op.field) === relationKey)
     // User-assigned relation payloads pass through untouched.
     if (item[relationKey] !== undefined || ops.some(op => isMonospaceOperationPayload(op.newValue))) {
       continue
     }
 
     const target = relation.to[0]!
+    if (!ops.length) {
+      if (options.mode === 'create' && !relation.many && !isBackwardToOneRelation(options.collection, relationKey, target)) {
+        translateCreateFkColumns(item, options.item, relationKey, target)
+      }
+      continue
+    }
     if (relation.many) {
       translateToManyField({ ...options, item, ops, patches, relationKey, target })
     }
@@ -119,47 +127,30 @@ export function buildMonospaceRelationWrites(options: MonospaceRelationWriteOpti
  * Context shared by the per-field translation helpers.
  */
 export interface MonospaceFieldTranslationContext extends MonospaceRelationWriteOptions {
+  /**
+   * Mutation body being translated (mutated in place).
+   */
   item: Record<string, any>
+
+  /**
+   * Form operations recorded on the translated relation field.
+   */
   ops: FormOperation[]
+
+  /**
+   * Cache patches collected for the whole mutation.
+   */
   patches: MonospaceRelationCachePatch[]
+
+  /**
+   * Translated relation field name.
+   */
   relationKey: string
+
+  /**
+   * Single target of the translated relation.
+   */
   target: MonospaceRelationTargetLike
-}
-
-/**
- * Translates the operations of one to-one relation field into FK column
- * writes on the mutation body.
- *
- * The relation `on` mapping pairs the referenced target columns with the FK
- * columns on the mutated item, so a connect assigns
- * `item[fkColumn] = related[referencedColumn]` and a disconnect assigns
- * `null`. Referenced column values missing from the connect payload are
- * resolved from the cached target item; when they cannot be resolved the
- * mutation fails rather than sending an incomplete FK.
- */
-function translateToOneField(ctx: MonospaceFieldTranslationContext): void {
-  const { item, ops, relationKey, store, target } = ctx
-  const targetCollection = store?.$collections?.find(other => other.name === target.collection)
-  const pairs = Object.entries(target.on)
-
-  for (const op of ops) {
-    if (op.type === 'connect') {
-      // All referenced columns are required to write a complete FK value.
-      const entry = buildConnectEntry(ctx, targetCollection, op.newValue, Object.keys(target.on), Object.keys(target.on), 'all')
-      for (const [targetField, sourceField] of pairs) {
-        if (sourceField !== relationKey) {
-          item[sourceField] = entry.item[targetField]
-        }
-      }
-    }
-    else if (op.type === 'disconnect') {
-      for (const [, sourceField] of pairs) {
-        if (sourceField !== relationKey) {
-          item[sourceField] = null
-        }
-      }
-    }
-  }
 }
 
 /**
@@ -229,7 +220,8 @@ function translateToManyField(ctx: MonospaceFieldTranslationContext): void {
     wireOps.push({ _connect: { keys: added.map(entry => entry.key) } })
   }
   if (wireOps.length) {
-    item[relationKey] = mode === 'create' ? wireOps[0] : wireOps
+    // To-many relation operations are arrays in both create and update mode.
+    item[relationKey] = wireOps
   }
 
   for (const key of removedKeys) {

@@ -10,6 +10,7 @@ import { supported, unsupported } from './types'
  */
 export function createFilterEngine(dialect: FilterEngineDialect): FilterEngine {
   const readItemValue = dialect.readItemValue ?? ((item: Record<string, any>, key: string) => item[key])
+  const normalizeFieldValue = dialect.normalizeFieldValue
 
   /**
    * Evaluates a connector filter against a single local cache item.
@@ -70,7 +71,11 @@ export function createFilterEngine(dialect: FilterEngineDialect): FilterEngine {
     return {
       supported: true,
       items: paginateItems(
-        sortItems(result, sort.fields, { readValue: dialect.readItemValue }),
+        sortItems(result, sort.fields, {
+          readValue: normalizeFieldValue
+            ? (item, field) => normalizeFieldValue(readItemValue(item, field), field, context)
+            : dialect.readItemValue,
+        }),
         query,
         dialect.paginate,
       ),
@@ -146,7 +151,16 @@ export function createFilterEngine(dialect: FilterEngineDialect): FilterEngine {
       value = resolved.value
     }
 
-    return evaluateOperator(readItemValue(item, key), operator, value, { extra: dialect.extraOperators })
+    let itemValue = readItemValue(item, key)
+    if (normalizeFieldValue) {
+      itemValue = normalizeFieldValue(itemValue, key, context)
+      // List (`_in`) and range (`_between`) operands are normalized entry by entry.
+      value = Array.isArray(value)
+        ? value.map(entry => normalizeFieldValue(entry, key, context))
+        : normalizeFieldValue(value, key, context)
+    }
+
+    return evaluateOperator(itemValue, operator, value, { extra: dialect.extraOperators })
   }
 
   /**

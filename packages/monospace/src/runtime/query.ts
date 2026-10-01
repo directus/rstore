@@ -1,5 +1,8 @@
-import type { MonospaceRelationCollectionLike } from './relations'
-import { createConnectorQuery } from '@rstore/connector-toolkit'
+import type { MonospaceInclude, MonospaceIncludeContext } from './include'
+import type { MonospaceSortInput } from './sort'
+import { createConnectorQuery, isRecord } from '@rstore/connector-toolkit'
+import { collectIncludeBackingFields, createMonospaceInclude, withBackingFields } from './include'
+import { normalizeMonospaceSort } from './sort'
 
 export { stripPrimaryKeys } from '@rstore/connector-toolkit'
 
@@ -8,7 +11,8 @@ export { stripPrimaryKeys } from '@rstore/connector-toolkit'
  */
 export interface MonospaceQueryOptions {
   /**
-   * Field selection sent to Monospace.
+   * Primitive fields selected on the items, `*` for all of them. Aliases use
+   * the `responseName:sourceField` form. Reads default to `['*']`.
    */
   fields?: string[]
 
@@ -18,9 +22,11 @@ export interface MonospaceQueryOptions {
   filter?: Record<string, any>
 
   /**
-   * Monospace sort specifier.
+   * Sort specifiers. The Monospace object form is
+   * `[{ field: { direction: 'desc' } }]`; field names (`'-field'` for
+   * descending) and `{ field: 'desc' }` are normalized to it.
    */
-  sort?: Array<string | Record<string, any>>
+  sort?: MonospaceSortInput | MonospaceSortInput[]
 
   /**
    * Maximum number of items to return.
@@ -53,19 +59,26 @@ export interface MonospaceFindOptions extends MonospaceQueryOptions {
   pageSize?: number
 
   /**
-   * Adapter-specific params forwarded to Monospace.
+   * Adapter-specific params forwarded to Monospace. A raw Monospace
+   * `include` object passed here is merged into the include generated from
+   * the rstore `include` option.
    */
-  params?: MonospaceQueryOptions
+  params?: MonospaceQueryOptions & {
+    /**
+     * Raw Monospace include options keyed by relation name.
+     */
+    include?: MonospaceInclude
+  }
 }
 
+// rstore consumes its own top-level `include` option, so `include` is not a
+// known key: a raw Monospace include is only read from `params`.
 const MONOSPACE_QUERY_KEYS = [
   'fields',
   'filter',
   'sort',
   'limit',
   'offset',
-  'deep',
-  'alias',
 ] as const
 
 /**
@@ -83,105 +96,68 @@ export function createMonospaceQuery(
 }
 
 /**
- * Builds Monospace nested field selections for an rstore `include` option.
+ * Creates the Monospace REST query of a read request.
  *
- * Each included relation maps to a `relation.*` wildcard selection and
- * nested includes recurse with dot notation (`relation.nested.*`), matching
- * the Monospace relational data API.
+ * Monospace 1.0 rejects reads without a field selection, so `fields`
+ * defaults to `['*']`. The rstore `include` option maps to a Monospace
+ * `include` object (see {@link createMonospaceInclude}), and explicit
+ * `fields` get the parent-side FK columns backing the included relations so
+ * the rstore cache can resolve the relation joins.
  */
-export function createMonospaceIncludeFields(include: Record<string, any> | undefined): string[] {
-  const fields: string[] = []
-  appendIncludeFields(fields, include, '')
-  return fields
-}
-
-/**
- * Adds include-driven nested field selections to a Monospace query.
- *
- * A `*` base selection is added when the query selects no explicit fields so
- * embedded relations do not narrow the returned item columns. When the query
- * selects explicit fields, the FK columns backing each included relation on
- * the parent side are appended so the rstore cache can resolve the relation
- * joins (`*` selections already include all primitive columns). The nested
- * relation selections use wildcards, so the target-side join columns are
- * always included.
- */
-export function applyMonospaceIncludeFields<TQuery extends MonospaceQueryOptions>(
-  query: TQuery,
-  include: Record<string, any> | undefined,
-  collection?: MonospaceRelationCollectionLike,
-): TQuery {
-  const selections = createMonospaceIncludeFields(include)
-  if (!selections.length) {
-    return query
+export function createMonospaceReadQuery(
+  findOptions: MonospaceFindOptions | undefined,
+  context: MonospaceIncludeContext = {},
+  overrides: MonospaceQueryOptions = {},
+): MonospaceQueryOptions {
+  const query = createMonospaceQuery(findOptions, overrides)
+  const include = createMonospaceInclude(findOptions?.include, context, query.include)
+  query.fields = withBackingFields(query.fields, collectIncludeBackingFields(include, context.collection))
+  if (include) {
+    query.include = include
   }
-
-  const baseFields = typeof query.fields === 'string' ? (query.fields as string).split(',') : query.fields
-  const base = baseFields?.length ? baseFields : ['*']
-  const backingFields = base.includes('*') ? [] : collectIncludeBackingFields(include, collection)
-  query.fields = [...new Set([...base, ...backingFields, ...selections])]
+  else {
+    delete query.include
+  }
   return query
 }
 
 /**
- * Collects the source-side FK columns backing the included relations.
- */
-function collectIncludeBackingFields(
-  include: Record<string, any> | undefined,
-  collection: MonospaceRelationCollectionLike | undefined,
-): string[] {
-  const fields: string[] = []
-  for (const key in include) {
-    if (!include[key]) {
-      continue
-    }
-    const relation = collection?.normalizedRelations?.[key]
-    for (const target of relation?.to ?? []) {
-      fields.push(...Object.values(target.on))
-    }
-  }
-  return fields
-}
-
-/**
  * Serializes Monospace query options into URL search parameters.
+ *
+ * Sort specifiers are normalized to the Monospace object form, field
+ * selections are comma-joined at every include level, and other nested
+ * values use bracket notation.
  */
 export function serializeMonospaceQuery(query?: MonospaceQueryOptions): URLSearchParams {
   const params = new URLSearchParams()
-  if (!query) {
-    return params
+  if (query) {
+    appendSelection(params, '', query)
   }
-
-  for (const [key, value] of Object.entries(query)) {
-    if (value === undefined) {
-      continue
-    }
-    if (key === 'fields' && Array.isArray(value)) {
-      params.set(key, value.join(','))
-      continue
-    }
-    appendQueryValue(params, key, value)
-  }
-
   return params
 }
 
 /**
- * Appends include field selections for one nesting level.
+ * Appends the options of one selection level (top-level query or include
+ * entry) under a bracket prefix.
  */
-function appendIncludeFields(
-  fields: string[],
-  include: Record<string, any> | undefined,
-  prefix: string,
-): void {
-  for (const key in include) {
-    const value = include[key]
-    if (!value) {
-      continue
+function appendSelection(params: URLSearchParams, prefix: string, options: Record<string, any>): void {
+  for (const [key, value] of Object.entries(options)) {
+    const name = prefix ? `${prefix}[${key}]` : key
+    if (key === 'fields' && Array.isArray(value)) {
+      params.set(name, value.join(','))
     }
-    fields.push(`${prefix}${key}.*`)
-    if (value && typeof value === 'object' && value.include && typeof value.include === 'object') {
-      appendIncludeFields(fields, value.include, `${prefix}${key}.`)
+    else if (key === 'sort') {
+      appendQueryValue(params, name, normalizeMonospaceSort(value))
+    }
+    else if (key === 'include' && isRecord(value)) {
+      for (const [relation, relationOptions] of Object.entries(value)) {
+        if (isRecord(relationOptions)) {
+          appendSelection(params, `${name}[${relation}]`, relationOptions)
+        }
+      }
+    }
+    else {
+      appendQueryValue(params, name, value)
     }
   }
 }

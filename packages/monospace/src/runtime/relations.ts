@@ -1,3 +1,4 @@
+import type { MonospaceGeneratedRelationMeta } from './collection'
 import { createBatchedRelationFilter, isRecord, toArray } from '@rstore/connector-toolkit'
 import { getMonospacePrimaryKeys } from './collection'
 
@@ -65,12 +66,7 @@ export interface MonospaceRelationCollectionLike {
       /**
        * Generated relation metadata keyed by relation field.
        */
-      relations?: Record<string, {
-        /**
-         * Connect key columns accepted by `_connect` operations.
-         */
-        connectKeys?: string[]
-      }>
+      relations?: Record<string, MonospaceGeneratedRelationMeta>
     }
   }
 

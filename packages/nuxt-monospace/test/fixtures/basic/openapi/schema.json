@@ -1,15 +1,72 @@
 {
   "openapi": "3.1.0",
-  "paths": {},
+  "paths": {
+    "/api/blog/items/Todos": {
+      "get": {
+        "responses": {}
+      },
+      "post": {
+        "responses": {}
+      },
+      "patch": {
+        "responses": {}
+      },
+      "delete": {
+        "responses": {}
+      }
+    },
+    "/api/blog/items/Todos/{key}": {
+      "get": {
+        "responses": {}
+      },
+      "patch": {
+        "responses": {}
+      },
+      "delete": {
+        "responses": {}
+      }
+    },
+    "/api/blog/items/Profiles": {
+      "get": {
+        "responses": {}
+      },
+      "post": {
+        "responses": {}
+      },
+      "patch": {
+        "responses": {}
+      },
+      "delete": {
+        "responses": {}
+      }
+    },
+    "/api/blog/items/Profiles/{key}": {
+      "get": {
+        "responses": {}
+      },
+      "patch": {
+        "responses": {}
+      },
+      "delete": {
+        "responses": {}
+      }
+    }
+  },
   "x-monospace-mappings": {
     "Todos": {
       "many": {
         "$ref": "#/paths/~1api~1blog~1items~1Todos"
+      },
+      "one": {
+        "$ref": "#/paths/~1api~1blog~1items~1Todos~1{key}"
       }
     },
     "Profiles": {
       "many": {
         "$ref": "#/paths/~1api~1blog~1items~1Profiles"
+      },
+      "one": {
+        "$ref": "#/paths/~1api~1blog~1items~1Profiles~1{key}"
       }
     }
   },

@@ -29,7 +29,7 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
     return collection
   }
 
-  it('writes the FK column from the referenced email column on create', async () => {
+  it('connects through the referenced email column on create', async () => {
     const hooks = setupPlugin(client)
     const collection = createEmailJoinedTodosCollection()
     client.createOne.mockResolvedValueOnce({ id: 5, title: 'A', author_id: 'jane@acme.dev' })
@@ -41,11 +41,11 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
       formOperations: [createFormOp('author', 'connect', { id: 'p1', email: 'jane@acme.dev' })],
     })
 
-    // The FK column stores the referenced (email) value.
+    // The connect key is the referenced (email) column.
     expect(client.createOne).toHaveBeenCalledWith('Todos', {
       title: 'A',
-      author_id: 'jane@acme.dev',
-    }, {})
+      author: { _connect: { key: { email: 'jane@acme.dev' } } },
+    }, { fields: ['*'] })
     expect(result).toEqual({ id: 5, title: 'A', author_id: 'jane@acme.dev' })
   })
 
@@ -64,7 +64,7 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
 
     expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, {
       author_id: 'jane@acme.dev',
-    }, {})
+    }, { fields: ['*'] })
   })
 
   it('resolves missing referenced columns from the cache', async () => {
@@ -89,8 +89,8 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
 
     expect(client.createOne).toHaveBeenCalledWith('Todos', {
       title: 'A',
-      author_id: 'jane@acme.dev',
-    }, {})
+      author: { _connect: { key: { email: 'jane@acme.dev' } } },
+    }, { fields: ['*'] })
   })
 
   it('throws when the referenced columns cannot be resolved', async () => {
@@ -122,7 +122,7 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
 
     expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
       todos: [{ _connect: { keys: [{ uuid: 'u3' }] } }],
-    }, {})
+    }, { fields: ['*'] })
     // Cache reconciliation still keys the FK column patch by PK.
     expect(store.$cache.writeItem).toHaveBeenCalledWith({
       collection: expect.objectContaining({ name: 'Todos' }),
@@ -147,7 +147,7 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
     })
     expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
       todos: [{ _connect: { keys: [{ uuid: 'u9' }] } }],
-    }, {})
+    }, { fields: ['*'] })
     expect(store.$cache.writeItem).not.toHaveBeenCalled()
   })
 })

@@ -136,7 +136,7 @@ export function createOrdersCollection(): any {
         collection: 'Orders',
       },
     },
-    getKey: (item: any) => item.shop_id != null && item.code != null ? `${item.shop_id}:${item.code}` : undefined,
+    getKey: (item: any) => item.shop_id != null && item.code != null ? `${item.shop_id}::${item.code}` : undefined,
     normalizedRelations: {
       items: {
         many: true,

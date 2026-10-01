@@ -3,15 +3,19 @@ import {
   normalizeSort as toolkitNormalizeSort,
   paginateItems as toolkitPaginateItems,
 } from '@rstore/connector-toolkit'
+import { normalizeMonospaceSort } from '../runtime/sort'
 
 export type { NormalizedSort, NormalizedSortField } from '@rstore/connector-toolkit'
 export { comparableValue, evaluateOperator, sortItems } from '@rstore/connector-toolkit'
 
 /**
  * Normalizes Monospace sort specifiers into ordered sort fields.
+ *
+ * Input is first normalized to the object form sent to Monospace, so
+ * `-field` strings sort descending in the cache as they do on the server.
  */
 export function normalizeSort(sort: unknown): NormalizedSort {
-  return toolkitNormalizeSort(sort, { dialectName: 'Monospace' })
+  return toolkitNormalizeSort(normalizeMonospaceSort(sort as any), { dialectName: 'Monospace' })
 }
 
 /**

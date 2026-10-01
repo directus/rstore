@@ -1,6 +1,20 @@
+import type { MonospaceItemKey } from './clientUtils'
 import type { MonospaceQueryOptions } from './query'
-import { createMonospaceError, MonospaceValidationError } from './errors'
-import { serializeMonospaceQuery } from './query'
+import type { MonospaceWorkspaceOptions } from './workspace'
+import {
+  assertBulkMutationFilter,
+  createItemUrl,
+  firstItem,
+  isMonospaceKeyObject,
+  readResponseBody,
+  trimTrailingSlash,
+  unwrapEnvelope,
+  withMonospaceKeyFilter,
+} from './clientUtils'
+import { createMonospaceError } from './errors'
+import { resolveMonospaceWorkspace } from './workspace'
+
+export type { MonospaceItemKey } from './clientUtils'
 
 /**
  * Fetch function accepted by the Monospace REST client.
@@ -10,16 +24,11 @@ export type MonospaceFetch = (input: string, init?: RequestInit) => Promise<Resp
 /**
  * Options used to create a Monospace REST client.
  */
-export interface CreateMonospaceRestClientOptions {
+export interface CreateMonospaceRestClientOptions extends MonospaceWorkspaceOptions {
   /**
    * Base URL of the Monospace instance.
    */
   url: string
-
-  /**
-   * Monospace project identifier.
-   */
-  project: string
 
   /**
    * Optional runtime API key.
@@ -30,6 +39,12 @@ export interface CreateMonospaceRestClientOptions {
    * Fetch implementation used by the client.
    */
   fetch?: MonospaceFetch
+
+  /**
+   * `Cache-Control` request header sent with every request. `'no-cache'`
+   * bypasses the Monospace server-side read cache. Not sent by default.
+   */
+  cacheControl?: 'no-cache' | 'no-store'
 }
 
 /**
@@ -47,9 +62,10 @@ export interface MonospaceBulkMutationQueryOptions extends MonospaceQueryOptions
  */
 export interface MonospaceRestClient {
   /**
-   * Reads one item by key.
+   * Reads one item by key. Object keys read through a filtered collection
+   * request and resolve to `null` when no item matches.
    */
-  readOne: (collection: string, key: string | number, query?: MonospaceQueryOptions) => Promise<any>
+  readOne: (collection: string, key: MonospaceItemKey, query?: MonospaceQueryOptions) => Promise<any>
 
   /**
    * Reads many items.
@@ -67,9 +83,10 @@ export interface MonospaceRestClient {
   createMany: (collection: string, items: Array<Record<string, any>>, query?: MonospaceQueryOptions) => Promise<any[]>
 
   /**
-   * Updates one item by key.
+   * Updates one item by key. Object keys update through a filtered
+   * collection request.
    */
-  updateOne: (collection: string, key: string | number, item: Record<string, any>, query?: MonospaceQueryOptions) => Promise<any>
+  updateOne: (collection: string, key: MonospaceItemKey, item: Record<string, any>, query?: MonospaceQueryOptions) => Promise<any>
 
   /**
    * Updates many filtered items with a shared request body.
@@ -77,9 +94,10 @@ export interface MonospaceRestClient {
   updateMany: (collection: string, item: Record<string, any>, query: MonospaceBulkMutationQueryOptions) => Promise<any[]>
 
   /**
-   * Deletes one item by key.
+   * Deletes one item by key. Object keys delete through a filtered
+   * collection request.
    */
-  deleteOne: (collection: string, key: string | number, query?: MonospaceQueryOptions) => Promise<void>
+  deleteOne: (collection: string, key: MonospaceItemKey, query?: MonospaceQueryOptions) => Promise<void>
 
   /**
    * Deletes many items with query filters.
@@ -92,7 +110,11 @@ export interface MonospaceRestClient {
  */
 export function createMonospaceRestClient(options: CreateMonospaceRestClientOptions): MonospaceRestClient {
   const fetchFn = options.fetch ?? globalThis.fetch.bind(globalThis)
-  const baseUrl = `${trimTrailingSlash(options.url)}/api/${encodeURIComponent(options.project)}`
+  const workspace = resolveMonospaceWorkspace(options)
+  if (!workspace) {
+    throw new Error('Monospace workspace is required to create the Monospace REST client')
+  }
+  const baseUrl = `${trimTrailingSlash(options.url)}/api/${encodeURIComponent(workspace)}`
 
   /**
    * Sends one REST request and unwraps the `{ data }` envelope when present.
@@ -138,8 +160,11 @@ export function createMonospaceRestClient(options: CreateMonospaceRestClientOpti
     return unwrapEnvelope(body) as T
   }
 
-  return {
+  const client: MonospaceRestClient = {
     async readOne(collection, key, query) {
+      if (isMonospaceKeyObject(key)) {
+        return firstItem(await request('GET', collection, { query: withMonospaceKeyFilter({ ...query, limit: 1 }, key) }))
+      }
       return await request('GET', collection, { key, query })
     },
 
@@ -157,6 +182,9 @@ export function createMonospaceRestClient(options: CreateMonospaceRestClientOpti
     },
 
     async updateOne(collection, key, item, query) {
+      if (isMonospaceKeyObject(key)) {
+        return firstItem(await client.updateMany(collection, item, withMonospaceKeyFilter(query, key)))
+      }
       return await request('PATCH', collection, { body: item, key, query })
     },
 
@@ -166,6 +194,10 @@ export function createMonospaceRestClient(options: CreateMonospaceRestClientOpti
     },
 
     async deleteOne(collection, key, query) {
+      if (isMonospaceKeyObject(key)) {
+        await client.deleteMany(collection, withMonospaceKeyFilter(query, key))
+        return
+      }
       await request('DELETE', collection, { key, query })
     },
 
@@ -174,6 +206,7 @@ export function createMonospaceRestClient(options: CreateMonospaceRestClientOpti
       await request('DELETE', collection, { query })
     },
   }
+  return client
 
   /**
    * Creates request headers for a Monospace REST call.
@@ -188,67 +221,9 @@ export function createMonospaceRestClient(options: CreateMonospaceRestClientOpti
     if (body !== undefined) {
       headers['Content-Type'] = 'application/json'
     }
+    if (options.cacheControl) {
+      headers['Cache-Control'] = options.cacheControl
+    }
     return headers
   }
-}
-
-/**
- * Asserts that a bulk mutation cannot serialize to an unfiltered REST request.
- */
-function assertBulkMutationFilter(query: MonospaceQueryOptions | undefined): void {
-  const filterQuery = serializeMonospaceQuery({ filter: query?.filter }).toString()
-  if (!filterQuery) {
-    throw new MonospaceValidationError('Monospace bulk mutations require a non-empty filter')
-  }
-}
-
-/**
- * Creates a Monospace item endpoint URL.
- */
-function createItemUrl(
-  baseUrl: string,
-  collection: string,
-  key: string | number | undefined,
-  query: MonospaceQueryOptions | undefined,
-): string {
-  const itemPath = key == null ? '' : `/${encodeURIComponent(String(key))}`
-  const url = `${baseUrl}/items/${encodeURIComponent(collection)}${itemPath}`
-  const search = serializeMonospaceQuery(query).toString()
-  return search ? `${url}?${search}` : url
-}
-
-/**
- * Removes one trailing slash from a URL.
- */
-function trimTrailingSlash(value: string): string {
-  return value.endsWith('/') ? value.slice(0, -1) : value
-}
-
-/**
- * Reads a REST response body as JSON when possible.
- */
-async function readResponseBody(response: Response): Promise<unknown> {
-  if (response.status === 204) {
-    return undefined
-  }
-  const text = await response.text()
-  if (!text) {
-    return undefined
-  }
-  try {
-    return JSON.parse(text)
-  }
-  catch {
-    return text
-  }
-}
-
-/**
- * Unwraps a Monospace `{ data }` envelope when one is returned.
- */
-function unwrapEnvelope(value: unknown): unknown {
-  if (typeof value === 'object' && value !== null && 'data' in value) {
-    return (value as { data: unknown }).data
-  }
-  return value
 }

@@ -4,8 +4,8 @@ import type { MonospaceSchemaMetadata } from '../../src/schema'
  * Creates the Monospace schema metadata fixture matching the OpenAPI fixture
  * from `./openapi`.
  *
- * The raw item arrays mirror what `GET /api/{project}/items/{name}` returns
- * for the Monospace system schema meta collections:
+ * The raw item arrays mirror the Monospace system schema meta collections, as
+ * flattened by `loadRemoteSchemaMetadata` (grouped by collection):
  *
  * - `Todos.id` is a plain single-column primary key.
  * - `Orders` has a composite primary key (`shop_id`, `code`), in that order.
@@ -55,6 +55,17 @@ export function createSchemaMetadataFixture(): MonospaceSchemaMetadata {
         constraintId: 'ct_author',
         oppositeRelationFieldId: 'rf_profiles_todos',
       },
+      // Backward side of Profiles.avatar, not exposed in the OpenAPI output.
+      {
+        id: 'rf_todos_avatar_of',
+        apiName: 'avatarOf',
+        collectionId: 'c_todos',
+        oppositeCollectionId: 'c_profiles',
+        isList: true,
+        isNullable: false,
+        constraintId: null,
+        oppositeRelationFieldId: 'rf_profiles_avatar',
+      },
       {
         id: 'rf_profiles_todos',
         apiName: 'todos',
@@ -74,17 +85,6 @@ export function createSchemaMetadataFixture(): MonospaceSchemaMetadata {
         isNullable: false,
         constraintId: 'ct_avatar',
         oppositeRelationFieldId: 'rf_todos_avatar_of',
-      },
-      // Backward side of Profiles.avatar, not exposed in the OpenAPI output.
-      {
-        id: 'rf_todos_avatar_of',
-        apiName: 'avatarOf',
-        collectionId: 'c_todos',
-        oppositeCollectionId: 'c_profiles',
-        isList: true,
-        isNullable: false,
-        constraintId: null,
-        oppositeRelationFieldId: 'rf_profiles_avatar',
       },
       {
         id: 'rf_orders_items',

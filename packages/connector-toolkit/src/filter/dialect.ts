@@ -59,6 +59,16 @@ export interface FilterEngineDialect {
   readItemValue?: (item: Record<string, any>, key: string) => any
 
   /**
+   * Normalizes a field value before it is compared or sorted, letting
+   * connectors compare typed fields (for example 64-bit integers serialized
+   * as decimal strings) by value. Applied to item values, filter values
+   * (each entry of list/range operands), and sorted values.
+   *
+   * Defaults to the identity.
+   */
+  normalizeFieldValue?: (value: any, field: string, context: FilterContext) => any
+
+  /**
    * Resolves dynamic filter values (for example `$NOW`) before comparison.
    */
   resolveFilterValue?: (value: any, context: FilterContext) => ResolvedFilterValue

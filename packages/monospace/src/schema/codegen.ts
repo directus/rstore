@@ -1,4 +1,5 @@
 import type { CodegenCollection, RenderedItemField, VirtualModuleNames } from '@rstore/connector-toolkit'
+import type { CreateMonospaceRestClientOptions, MonospaceWorkspaceOptions } from '../runtime'
 import type { MonospaceCollectionDefinition } from './introspection'
 import {
   generateCollectionsTemplate as toolkitGenerateCollectionsTemplate,
@@ -8,25 +9,27 @@ import {
   generateViteIndexTemplate as toolkitGenerateViteIndexTemplate,
   generateViteSchemaTemplate as toolkitGenerateViteSchemaTemplate,
 } from '@rstore/connector-toolkit'
+import { resolveMonospaceWorkspace } from '../runtime/workspace'
 
 /**
  * Options used by generated Monospace runtime config modules.
  */
-export interface GenerateMonospaceRuntimeConfigOptions {
+export interface GenerateMonospaceRuntimeConfigOptions extends MonospaceWorkspaceOptions {
   /**
    * Monospace instance URL to expose in generated runtime code.
    */
   url: string
 
   /**
-   * Monospace project identifier to expose in generated runtime code.
-   */
-  project: string
-
-  /**
    * Optional runtime API key to expose in generated runtime code.
    */
   apiKey?: string
+
+  /**
+   * Optional `Cache-Control` request header sent by the generated REST
+   * client.
+   */
+  cacheControl?: CreateMonospaceRestClientOptions['cacheControl']
 
   /**
    * rstore plugin scope id for generated Monospace collections.
@@ -109,8 +112,9 @@ export function generateTypedCollectionsTemplate(
  */
 export function generateConfigTemplate(options: GenerateMonospaceRuntimeConfigOptions): string {
   return `export const url = ${JSON.stringify(options.url)}
-export const project = ${JSON.stringify(options.project)}
+export const workspace = ${JSON.stringify(resolveMonospaceWorkspace(options))}
 export const apiKey = ${JSON.stringify(options.apiKey)}
+export const cacheControl = ${JSON.stringify(options.cacheControl)}
 export const scopeId = ${JSON.stringify(options.scopeId)}
 `
 }
@@ -130,8 +134,9 @@ export function generateMonospacePluginTemplate(options: GenerateMonospaceRuntim
 
 export const monospace = createMonospaceRestClient({
   url: ${JSON.stringify(options.url)},
-  project: ${JSON.stringify(options.project)},
+  workspace: ${JSON.stringify(resolveMonospaceWorkspace(options))},
   apiKey: ${JSON.stringify(options.apiKey)},
+  cacheControl: ${JSON.stringify(options.cacheControl)},
 })
 
 export const monospacePlugin = createMonospaceRstorePlugin({

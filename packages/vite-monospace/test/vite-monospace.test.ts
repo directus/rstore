@@ -74,7 +74,7 @@ describe('rstoreMonospace', () => {
     const { rstoreMonospace } = await import('../src')
     const plugin = rstoreMonospace({})
 
-    await expect(runBuildStart(plugin)).rejects.toThrow('@rstore/vite-monospace requires url and project options to load the remote Monospace schema, or both input and metadataInput for local generation')
+    await expect(runBuildStart(plugin)).rejects.toThrow('@rstore/vite-monospace requires url and workspace options to load the remote Monospace schema, or both input and metadataInput for local generation')
   })
 
   it('rejects local OpenAPI input without a metadata snapshot or remote options', async () => {
@@ -106,7 +106,7 @@ describe('rstoreMonospace', () => {
     expect(fixtures.loadMonospaceCollections).toHaveBeenCalledWith(expect.objectContaining({
       input: join(root, 'openapi.json'),
       metadataInput: join(root, 'schema-metadata.json'),
-      project: undefined,
+      workspace: undefined,
       scopeId: 'test-scope',
       url: undefined,
     }))
@@ -116,8 +116,9 @@ describe('rstoreMonospace', () => {
     const { rstoreMonospace } = await import('../src')
     const root = await createTempRoot()
     const plugin = rstoreMonospace({
-      project: 'blog',
+      workspace: 'blog',
       runtimeApiKey: 'public-runtime-token',
+      cacheControl: 'no-cache',
       schemaApiKey: 'secret-schema-token',
       scopeId: 'test-scope',
       url: 'https://example.monospace.io',
@@ -134,7 +135,9 @@ describe('rstoreMonospace', () => {
     expect(indexCode).toContain('virtual:rstore-monospace/schema')
     expect(schemaCode).toContain('export const schema')
     expect(pluginCode).toContain('createMonospaceRestClient')
+    expect(pluginCode).toContain('workspace: "blog"')
     expect(pluginCode).toContain('public-runtime-token')
+    expect(pluginCode).toContain('cacheControl: "no-cache"')
     expect(indexCode).not.toContain('secret-schema-token')
     expect(schemaCode).not.toContain('secret-schema-token')
     expect(pluginCode).not.toContain('secret-schema-token')
@@ -142,6 +145,21 @@ describe('rstoreMonospace', () => {
     expect(declarations).toContain('export interface Todos')
     expect(declarations).toContain('readonly relations: {"author":{"to":{"Profiles":{"on":{"id":"author$id"}}}}}')
     expect(schemaCode).toContain('"author":{"to":{"Profiles":{"on":{"id":"author$id"}}}}')
+  })
+
+  it('accepts the deprecated project option as the workspace', async () => {
+    const { rstoreMonospace } = await import('../src')
+    const plugin = rstoreMonospace({
+      project: 'legacy',
+      scopeId: 'test-scope',
+      url: 'https://example.monospace.io',
+    })
+
+    runConfigResolved(plugin, await createTempRoot())
+    await runBuildStart(plugin)
+
+    expect(fixtures.loadMonospaceCollections).toHaveBeenCalledWith(expect.objectContaining({ workspace: 'legacy' }))
+    expect(await runLoad(plugin, 'virtual:rstore-monospace/plugin')).toContain('workspace: "legacy"')
   })
 
   it('watches the local schema inputs and reloads collections when they change', async () => {
@@ -226,7 +244,7 @@ describe('rstoreMonospace', () => {
       logLevel: 'silent',
       plugins: [
         rstoreMonospace({
-          project: 'blog',
+          workspace: 'blog',
           schemaApiKey: 'secret-schema-token',
           scopeId: 'test-scope',
           url: 'https://example.monospace.io',

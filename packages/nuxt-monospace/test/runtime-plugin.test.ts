@@ -31,7 +31,8 @@ const fixtures = vi.hoisted(() => {
 
 vi.mock('#build/$rstore-monospace-config.js', () => ({
   apiKey: 'runtime-token',
-  project: 'blog',
+  cacheControl: 'no-cache',
+  workspace: 'blog',
   scopeId: 'test-scope',
   url: 'https://example.monospace.io',
 }))
@@ -68,7 +69,8 @@ describe('runtime plugin', () => {
     expect(fixtures.createMonospaceRestClient).toHaveBeenCalledTimes(2)
     expect(fixtures.createMonospaceRestClient).toHaveBeenCalledWith({
       apiKey: 'runtime-token',
-      project: 'blog',
+      cacheControl: 'no-cache',
+      workspace: 'blog',
       url: 'https://example.monospace.io',
     })
     expect(fixtures.createMonospaceRstorePlugin).toHaveBeenCalledTimes(2)

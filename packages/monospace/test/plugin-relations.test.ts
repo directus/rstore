@@ -10,7 +10,7 @@ beforeEach(() => {
 })
 
 describe('createMonospaceRstorePlugin relations', () => {
-  it('embeds included relations through nested field selections', async () => {
+  it('embeds included relations through Monospace include selections', async () => {
     const hooks = setupPlugin(client)
     client.readMany.mockResolvedValueOnce([{ id: 1, title: 'A', author_id: 'p1', author: { id: 'p1', name: 'Jane' } }])
 
@@ -23,7 +23,8 @@ describe('createMonospaceRstorePlugin relations', () => {
     })
 
     expect(client.readMany).toHaveBeenCalledWith('Todos', {
-      fields: ['*', 'author.*'],
+      fields: ['*'],
+      include: { author: { fields: ['*'] } },
     })
     // The API returns the real FK column; nothing is injected or rewritten.
     expect(result[0]).toEqual({
@@ -49,9 +50,10 @@ describe('createMonospaceRstorePlugin relations', () => {
     })
 
     // `author_id` backs the cache join, so it is added to the explicit
-    // selection alongside the embedded relation wildcard.
+    // selection while the relation is selected through `include`.
     expect(client.readOne).toHaveBeenCalledWith('Todos', 1, {
-      fields: ['id', 'title', 'author_id', 'author.*'],
+      fields: ['id', 'title', 'author_id'],
+      include: { author: { fields: ['*'] } },
     })
   })
 
@@ -72,6 +74,10 @@ describe('createMonospaceRstorePlugin relations', () => {
       store: createRelationStore(),
     })
 
+    expect(client.readMany).toHaveBeenCalledWith('Profiles', {
+      fields: ['*'],
+      include: { todos: { fields: ['*'], limit: -1 } },
+    })
     expect(result[0].todos).toEqual([{ id: 1, title: 'A', author_id: 'p1' }])
   })
 

@@ -1,8 +1,8 @@
-import type { MonospaceQueryOptions, MonospaceRestClient } from '@rstore/monospace'
+import type { MonospaceGeneratedRelationMeta, MonospaceQueryOptions, MonospaceRestClient } from '@rstore/monospace'
 
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/vue'
+import type { Collection, CollectionDefaults, CustomCollectionMeta, StoreSchema } from '@rstore/vue'
 
 /**
  * Monospace query options exposed through rstore find options.
@@ -10,43 +10,17 @@ import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/vue'
 export interface RstoreMonospaceQueryOptions extends MonospaceQueryOptions {}
 
 /**
- * Monospace metadata stored on generated rstore collections.
+ * Monospace metadata stored on generated rstore collections. The
+ * `CustomCollectionMeta` augmentation itself comes from `@rstore/monospace`.
  */
-export interface RstoreMonospaceCollectionMeta {
-  /**
-   * Original Monospace collection name.
-   */
-  collection?: string
-
-  /**
-   * Generated relation metadata keyed by relation field.
-   */
-  relations?: Record<string, RstoreMonospaceRelationMeta>
-}
+export type RstoreMonospaceCollectionMeta = NonNullable<CustomCollectionMeta['monospace']>
 
 /**
  * Generated Monospace metadata for one relation field.
  */
-export interface RstoreMonospaceRelationMeta {
-  /**
-   * Connect key columns accepted by Monospace `_connect` operations.
-   */
-  connectKeys?: string[]
-}
+export type RstoreMonospaceRelationMeta = MonospaceGeneratedRelationMeta
 
 declare module '@rstore/vue' {
-  export interface CustomCollectionMeta {
-    /**
-     * Primary keys generated from Monospace OpenAPI metadata.
-     */
-    primaryKeys?: string[]
-
-    /**
-     * Monospace-specific metadata for generated collections.
-     */
-    monospace?: RstoreMonospaceCollectionMeta
-  }
-
   export interface FindOptions<
     TCollection extends Collection,
     TCollectionDefaults extends CollectionDefaults,

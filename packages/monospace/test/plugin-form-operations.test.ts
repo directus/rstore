@@ -21,13 +21,13 @@ beforeEach(() => {
 
 describe('createMonospaceRstorePlugin form relation operations', () => {
   describe('to-one relations', () => {
-    it('writes the FK column for connect on create', async () => {
+    it('translates connect on create into a single _connect object', async () => {
       const hooks = setupPlugin(client)
       client.createOne.mockResolvedValueOnce({ id: 5, title: 'A', author_id: 'p1' })
 
-      // The form projection already wrote `author_id` on the body; the
-      // adapter keeps it and emits no `_connect` operation, since the FK
-      // column write alone is the canonical form.
+      // The form projection already wrote `author_id` on the body, but
+      // Monospace create inputs reject FK columns: the relation field
+      // carries the `_connect` operation instead.
       const result: any = await runHook(hooks.createItem, {
         collection: createTodosCollection(),
         store: createRelationStore(),
@@ -37,26 +37,9 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
 
       expect(client.createOne).toHaveBeenCalledWith('Todos', {
         title: 'A',
-        author_id: 'p1',
-      }, {})
+        author: { _connect: { key: { id: 'p1' } } },
+      }, { fields: ['*'] })
       expect(result).toEqual({ id: 5, title: 'A', author_id: 'p1' })
-    })
-
-    it('resolves the FK column from the connect payload when missing from the body', async () => {
-      const hooks = setupPlugin(client)
-      client.createOne.mockResolvedValueOnce({ id: 5, title: 'A', author_id: 'p1' })
-
-      await runHook(hooks.createItem, {
-        collection: createTodosCollection(),
-        store: createRelationStore(),
-        item: { title: 'A' },
-        formOperations: [createFormOp('author', 'connect', { id: 'p1', name: 'Jane' })],
-      })
-
-      expect(client.createOne).toHaveBeenCalledWith('Todos', {
-        title: 'A',
-        author_id: 'p1',
-      }, {})
     })
 
     it('writes the FK column for connect on update', async () => {
@@ -73,7 +56,7 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
 
       expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, {
         author_id: 'p1',
-      }, {})
+      }, { fields: ['*'] })
       expect(result).toEqual({ id: 1, title: 'A', author_id: 'p1' })
     })
 
@@ -91,11 +74,11 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
 
       expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, {
         author_id: null,
-      }, {})
+      }, { fields: ['*'] })
       expect(result).toEqual({ id: 1, title: 'A', author_id: null })
     })
 
-    it('sends a null FK column for disconnect on create', async () => {
+    it('omits the relation for disconnect on create', async () => {
       const hooks = setupPlugin(client)
       client.createOne.mockResolvedValueOnce({ id: 5, title: 'A', author_id: null })
 
@@ -106,8 +89,7 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
         formOperations: [createFormOp('author', 'disconnect', undefined, undefined)],
       })
 
-      // The null FK column is a valid create body field meaning "no author".
-      expect(client.createOne).toHaveBeenCalledWith('Todos', { title: 'A', author_id: null }, {})
+      expect(client.createOne).toHaveBeenCalledWith('Todos', { title: 'A' }, { fields: ['*'] })
     })
 
     it('writes composite FK columns for connect', async () => {
@@ -128,7 +110,7 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
       expect(client.updateOne).toHaveBeenCalledWith('OrderItems', 9, {
         order_shop_id: 1,
         order_code: 'A',
-      }, {})
+      }, { fields: ['*'] })
       expect(result).toEqual({ id: 9, order_shop_id: 1, order_code: 'A' })
     })
 
@@ -161,7 +143,7 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
 
       expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
         todos: [{ _connect: { keys: [{ id: 3 }] } }],
-      }, {})
+      }, { fields: ['*'] })
       // The connected todo's real FK column is patched in the cache so the
       // relation accessor resolves without a refetch.
       expect(store.$cache.writeItem).toHaveBeenCalledWith({
@@ -186,7 +168,7 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
 
       expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
         todos: [{ _disconnect: { filter: { id: 2 } } }],
-      }, {})
+      }, { fields: ['*'] })
       expect(store.$cache.writeItem).toHaveBeenCalledWith({
         collection: expect.objectContaining({ name: 'Todos' }),
         key: 2,
@@ -211,7 +193,7 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
 
       expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
         todos: [{ _disconnect: { filter: { _or: [{ id: 1 }, { id: 2 }] } } }],
-      }, {})
+      }, { fields: ['*'] })
     })
 
     it('translates disconnect-all into an empty _disconnect and clears cached FK columns', async () => {
@@ -237,7 +219,7 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
 
       expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
         todos: [{ _disconnect: {} }],
-      }, {})
+      }, { fields: ['*'] })
       expect(store.$cache.writeItem).toHaveBeenCalledWith({
         collection: expect.objectContaining({ name: 'Todos' }),
         key: 1,
@@ -276,7 +258,7 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
           { _disconnect: { filter: { id: 1 } } },
           { _connect: { keys: [{ id: 3 }] } },
         ],
-      }, {})
+      }, { fields: ['*'] })
       expect(store.$cache.writeItem).toHaveBeenCalledWith({
         collection: expect.objectContaining({ name: 'Todos' }),
         key: 1,
@@ -291,7 +273,7 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
       expect(store.$cache.writeItem).not.toHaveBeenCalledWith(expect.objectContaining({ key: 2 }))
     })
 
-    it('connects all $set items with a single-op shape on create', async () => {
+    it('connects all $set items with an operation array on create', async () => {
       const hooks = setupPlugin(client)
       client.createOne.mockResolvedValueOnce({ id: 'p2', name: 'John' })
 
@@ -304,8 +286,8 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
 
       expect(client.createOne).toHaveBeenCalledWith('Profiles', {
         name: 'John',
-        todos: { _connect: { keys: [{ id: 1 }, { id: 2 }] } },
-      }, {})
+        todos: [{ _connect: { keys: [{ id: 1 }, { id: 2 }] } }],
+      }, { fields: ['*'] })
     })
 
     it('uses composite parent keys for FK column patches', async () => {
@@ -318,14 +300,14 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
       await runHook(hooks.updateItem, {
         collection: createOrdersCollection(),
         store,
-        key: '1:A',
+        key: '1::A',
         item: {},
         formOperations: [createFormOp('items', 'connect', { id: 5 })],
       })
 
-      expect(client.updateOne).toHaveBeenCalledWith('Orders', '1:A', {
+      expect(client.updateOne).toHaveBeenCalledWith('Orders', { shop_id: '1', code: 'A' }, {
         items: [{ _connect: { keys: [{ id: 5 }] } }],
-      }, {})
+      }, { fields: ['*'] })
       expect(store.$cache.writeItem).toHaveBeenCalledWith({
         collection: expect.objectContaining({ name: 'OrderItems' }),
         key: 5,
@@ -348,7 +330,7 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
         formOperations: [createFormOp('author', 'set', payload, undefined)],
       })
 
-      expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, { author: payload }, {})
+      expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, { author: payload }, { fields: ['*'] })
     })
 
     it('passes op-shaped payloads through untouched on create', async () => {
@@ -363,25 +345,11 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
         formOperations: [createFormOp('todos', 'set', payload, undefined)],
       })
 
-      expect(client.createOne).toHaveBeenCalledWith('Profiles', { name: 'John', todos: payload }, {})
+      expect(client.createOne).toHaveBeenCalledWith('Profiles', { name: 'John', todos: payload }, { fields: ['*'] })
     })
   })
 
   describe('fK columns in mutation bodies', () => {
-    it('keeps FK columns in createItem bodies without form operations', async () => {
-      const hooks = setupPlugin(client)
-      client.createOne.mockResolvedValueOnce({ id: 5 })
-
-      // FK columns are real, writable API fields: nothing is stripped.
-      await runHook(hooks.createItem, {
-        collection: createTodosCollection(),
-        store: createRelationStore(),
-        item: { title: 'A', author_id: 'p1' },
-      })
-
-      expect(client.createOne).toHaveBeenCalledWith('Todos', { title: 'A', author_id: 'p1' }, {})
-    })
-
     it('keeps FK columns and strips only primary keys from updateItem bodies', async () => {
       const hooks = setupPlugin(client)
       client.updateOne.mockResolvedValueOnce({ id: 1 })
@@ -393,26 +361,7 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
         item: { id: 1, title: 'A', author_id: 'p1' },
       })
 
-      expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, { title: 'A', author_id: 'p1' }, {})
-    })
-
-    it('keeps FK columns in createMany bodies', async () => {
-      const hooks = setupPlugin(client)
-      client.createMany.mockResolvedValueOnce([{ id: 1 }, { id: 2 }])
-
-      await runHook(hooks.createMany, {
-        collection: createTodosCollection(),
-        store: createRelationStore(),
-        items: [
-          { title: 'A', author_id: 'p1' },
-          { title: 'B', author_id: null },
-        ],
-      })
-
-      expect(client.createMany).toHaveBeenCalledWith('Todos', [
-        { title: 'A', author_id: 'p1' },
-        { title: 'B', author_id: null },
-      ], {})
+      expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, { title: 'A', author_id: 'p1' }, { fields: ['*'] })
     })
 
     it('keeps FK columns and strips only primary keys from updateMany bodies', async () => {
@@ -428,8 +377,8 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
         ],
       })
 
-      expect(client.updateOne).toHaveBeenNthCalledWith(1, 'Todos', 1, { title: 'A', author_id: 'p1' }, {})
-      expect(client.updateOne).toHaveBeenNthCalledWith(2, 'Todos', 2, { title: 'B', author_id: 'p2' }, {})
+      expect(client.updateOne).toHaveBeenNthCalledWith(1, 'Todos', 1, { title: 'A', author_id: 'p1' }, { fields: ['*'] })
+      expect(client.updateOne).toHaveBeenNthCalledWith(2, 'Todos', 2, { title: 'B', author_id: 'p2' }, { fields: ['*'] })
     })
   })
 })

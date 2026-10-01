@@ -3,9 +3,11 @@ import type { MonospaceGeneratedCollectionMeta } from '../runtime'
 import type { MonospaceResolvedCollectionMetadata } from './metadata'
 import type { MonospaceSchemaMetadata } from './metadataTypes'
 import type { MonospaceRelationField } from './relations'
-import type { MonospaceGeneratedField, MonospaceOpenApiDocument, MonospacePrimaryKeyConfig, OpenApiSchema, OpenApiSchemaObject } from './types'
-import { collectionTypeName, createGetKeyExpression } from '@rstore/connector-toolkit'
+import type { MonospaceGeneratedField, MonospaceOpenApiDocument, MonospacePrimaryKeyConfig, OpenApiSchemaObject } from './types'
+import { createGetKeyExpression } from '@rstore/connector-toolkit'
+import { createGeneratedFields, isInt64Schema, monospaceCollectionTypeName } from './fieldTypes'
 import { resolveMonospaceSchemaMetadata } from './metadata'
+import { detectMonospaceCollectionCapabilities, MONOSPACE_COLLECTION_OPERATION_COUNT } from './operations'
 import { applyMonospaceRelations, detectMonospaceRelationFields, mergeMonospaceRelationFieldMetadata } from './relations'
 
 /**
@@ -99,33 +101,6 @@ export function buildMonospaceCollections(
 }
 
 /**
- * Creates a valid TypeScript interface name from a Monospace collection name.
- */
-export function monospaceCollectionTypeName(collectionName: string): string {
-  return collectionTypeName(collectionName, 'Monospace')
-}
-
-/**
- * Converts a Monospace OpenAPI schema to a generated TypeScript type.
- */
-export function schemaToTsType(schema: OpenApiSchema | undefined): string {
-  if (!schema) {
-    return 'any'
-  }
-  if (isReference(schema)) {
-    return 'any'
-  }
-  const union = schema.anyOf ?? schema.oneOf
-  if (union?.length) {
-    return union.map(item => schemaToTsType(item)).join(' | ')
-  }
-  if (Array.isArray(schema.type)) {
-    return schema.type.map(type => schemaTypeToTs(type, schema)).join(' | ')
-  }
-  return schemaTypeToTs(schema.type, schema)
-}
-
-/**
  * Returns the resolved metadata of an exposed collection.
  */
 function getCollectionMetadata(
@@ -148,15 +123,28 @@ function createCollectionDefinition(
   collectionMetadata: MonospaceResolvedCollectionMetadata,
   relationFields: Record<string, MonospaceRelationField>,
 ): MonospaceCollectionDefinition {
+  const schemas = options.document.components?.schemas
   const schema = getCollectionOutputSchema(options.document, collectionName)
   const primaryKeys = resolvePrimaryKeys(collectionName, collectionMetadata, options.primaryKeys)
-  const itemFields = createGeneratedFields(schema, relationFields)
+  const itemFields = createGeneratedFields(schema, relationFields, schemas)
   const relationsMeta = createRelationsMeta(relationFields)
+  const { itemRoutes, operations } = detectMonospaceCollectionCapabilities(options.document, collectionName)
+  const int64Fields = Object.entries(schema.properties ?? {})
+    .filter(([name, property]) => !relationFields[name] && isInt64Schema(property, schemas))
+    .map(([name]) => name)
+  // Optional meta entries are omitted when empty or default (item routes
+  // available, every operation served) so the generated meta stays compact.
+  const restrictedOperations = operations && operations.length < MONOSPACE_COLLECTION_OPERATION_COUNT
+    ? operations
+    : undefined
   const meta: MonospaceGeneratedCollectionMeta = {
     primaryKeys,
     monospace: {
       collection: collectionName,
       ...relationsMeta ? { relations: relationsMeta } : {},
+      ...itemRoutes ? {} : { itemRoutes: false },
+      ...restrictedOperations ? { operations: restrictedOperations } : {},
+      ...int64Fields.length ? { int64Fields } : {},
     },
   }
 
@@ -177,15 +165,19 @@ function createCollectionDefinition(
 /**
  * Creates the generated relation metadata carried by the collection meta.
  *
- * Only relations with resolved connect key columns are included, so the
- * generated meta stays compact.
+ * Entries carry the resolved connect key columns and, for to-one relations,
+ * the relation direction used by the write path. Relations with neither are
+ * omitted, so the generated meta stays compact.
  */
 function createRelationsMeta(
   relationFields: Record<string, MonospaceRelationField>,
 ): NonNullable<MonospaceGeneratedCollectionMeta['monospace']['relations']> | undefined {
   const entries = Object.entries(relationFields)
-    .filter(([, field]) => field.connectKeys?.length)
-    .map(([name, field]) => [name, { connectKeys: field.connectKeys }] as const)
+    .map(([name, field]) => [name, {
+      ...field.connectKeys?.length ? { connectKeys: field.connectKeys } : {},
+      ...field.kind === 'one' && field.forward != null ? { forward: field.forward } : {},
+    }] as const)
+    .filter(([, meta]) => Object.keys(meta).length)
   return entries.length ? Object.fromEntries(entries) : undefined
 }
 
@@ -224,75 +216,4 @@ function resolvePrimaryKeys(
     return collectionMetadata.primaryKeys
   }
   throw new Error(`Collection "${collectionName}" has no primary index in the Monospace schema metadata; set the primaryKeys option to override its keys`)
-}
-
-/**
- * Creates generated item fields from an object schema.
- *
- * Relation fields are typed with the generated target interfaces and are
- * always optional because Monospace only returns them when they are
- * explicitly selected. To-many fields are typed as plain arrays because the
- * runtime adapter unwraps the REST `{ data }` envelopes.
- */
-function createGeneratedFields(
-  schema: OpenApiSchemaObject,
-  relationFields: Record<string, MonospaceRelationField>,
-): MonospaceGeneratedField[] {
-  const required = new Set(schema.required ?? [])
-  return Object.entries(schema.properties ?? {}).map(([name, property]) => {
-    const relation = relationFields[name]
-    if (relation) {
-      return {
-        name,
-        optional: true,
-        type: relationFieldTsType(relation),
-      }
-    }
-    return {
-      name,
-      optional: !required.has(name),
-      type: schemaToTsType(property),
-    }
-  })
-}
-
-/**
- * Converts a detected relation field to a generated TypeScript type.
- */
-function relationFieldTsType(relation: MonospaceRelationField): string {
-  const typeName = monospaceCollectionTypeName(relation.collection)
-  if (relation.kind === 'many') {
-    return `${typeName}[]`
-  }
-  return relation.nullable ? `${typeName} | null` : typeName
-}
-
-/**
- * Returns whether a schema is an OpenAPI reference.
- */
-function isReference(schema: OpenApiSchema): schema is { $ref: string } {
-  return '$ref' in schema
-}
-
-/**
- * Converts a JSON schema primitive type to TypeScript.
- */
-function schemaTypeToTs(type: string | undefined, schema: OpenApiSchemaObject): string {
-  switch (type) {
-    case 'string':
-      return 'string'
-    case 'integer':
-    case 'number':
-      return 'number'
-    case 'boolean':
-      return 'boolean'
-    case 'null':
-      return 'null'
-    case 'array':
-      return `${schemaToTsType(schema.items)}[]`
-    case 'object':
-      return 'Record<string, any>'
-    default:
-      return 'any'
-  }
 }

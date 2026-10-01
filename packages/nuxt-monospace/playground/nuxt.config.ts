@@ -7,7 +7,7 @@ export default defineNuxtConfig({
   rstoreMonospace: {
     input: './openapi/schema.json',
     metadataInput: './openapi/schema-metadata.json',
-    project: 'blog',
+    workspace: 'blog',
     url: 'https://example.monospace.io',
   },
 })

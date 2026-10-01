@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   buildMonospaceCollections,
+  generateConfigTemplate,
   generateItemsTemplate,
   generateTypedCollectionsTemplate,
   generateViteDeclarations,
@@ -97,6 +98,45 @@ describe('buildMonospaceCollections', () => {
   })
 })
 
+describe('generated collection capabilities', () => {
+  const collections = buildMonospaceCollections({
+    document: createOpenApiFixture(),
+    metadata: createSchemaMetadataFixture(),
+    scopeId: 'test-scope',
+  })
+  const byName = new Map(collections.map(collection => [collection.name, collection]))
+
+  it('flags collections without single-item routes', () => {
+    // Composite primary key: no `one` mapping nor `/{key}` path.
+    expect(byName.get('Orders')?.meta.monospace.itemRoutes).toBe(false)
+    expect(byName.get('Todos')?.meta.monospace).not.toHaveProperty('itemRoutes')
+  })
+
+  it('reads the served operations from the mapped OpenAPI path methods', () => {
+    // Read-only extension connector collections only serve reads.
+    expect(byName.get('OrderItems')?.meta.monospace.operations).toEqual(['readMany', 'readOne'])
+    expect(byName.get('Orders')?.meta.monospace.operations).toEqual(['readMany', 'create', 'updateMany', 'deleteMany'])
+    // Fully featured collections keep a compact meta.
+    expect(byName.get('Todos')?.meta.monospace).not.toHaveProperty('operations')
+  })
+
+  it('types 64-bit integers as decimal strings and records them in the meta', () => {
+    const items = generateItemsTemplate(collections)
+
+    expect(items).toContain('views?: string')
+    expect(items).toContain('total?: string | null')
+    expect(byName.get('Todos')?.meta.monospace.int64Fields).toEqual(['views'])
+    expect(byName.get('Orders')?.meta.monospace.int64Fields).toEqual(['total'])
+    expect(byName.get('Profiles')?.meta.monospace).not.toHaveProperty('int64Fields')
+  })
+
+  it('types required to-one relations nullable when the OpenAPI document does', () => {
+    // `OrderItems.order` is required in the metadata, but Monospace types
+    // relations into another data source as nullable.
+    expect(generateItemsTemplate(collections)).toContain('order?: Orders | null')
+  })
+})
+
 describe('template generation', () => {
   it('generates runtime schema JavaScript and TypeScript declarations', () => {
     const collections = buildMonospaceCollections({
@@ -131,9 +171,9 @@ describe('template generation', () => {
 
     // Meta is JSON.stringify-ed into the runtime and typed collection
     // templates, so connect keys flow through automatically.
-    expect(schema).toContain('"author":{"connectKeys":["email"]}')
+    expect(schema).toContain('"author":{"connectKeys":["email"],"forward":true}')
     expect(schema).toContain('"todos":{"connectKeys":["id"]}')
-    expect(typed).toContain('"author":{"connectKeys":["email"]}')
+    expect(typed).toContain('"author":{"connectKeys":["email"],"forward":true}')
     // Declarations do not embed meta values; the meta type comes from the
     // CustomCollectionMeta augmentation and the declarations stay valid.
     expect(declarations).toContain('export const collection0: Collection<Todos>')
@@ -156,5 +196,20 @@ describe('template generation', () => {
     expect(typed).toContain('"todos":{"many":true,"to":{"Todos":{"on":{"author_id":"email"}}}}')
     expect(declarations).toContain('readonly relations: {"author":{"to":{"Profiles":{"on":{"email":"author_id"}}}}')
     expect(declarations).toContain('readonly relations: {"avatar"')
+  })
+})
+
+describe('generateConfigTemplate', () => {
+  it('exports the runtime client options', () => {
+    const template = generateConfigTemplate({
+      apiKey: 'runtime-token',
+      cacheControl: 'no-cache',
+      scopeId: 'test-scope',
+      url: 'https://example.monospace.io',
+      workspace: 'blog',
+    })
+
+    expect(template).toContain('export const apiKey = "runtime-token"')
+    expect(template).toContain('export const cacheControl = "no-cache"')
   })
 })

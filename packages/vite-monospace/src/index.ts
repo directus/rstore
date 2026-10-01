@@ -1,9 +1,10 @@
+import type { CreateMonospaceRestClientOptions, MonospaceWorkspaceOptions } from '@rstore/monospace'
 import type { MonospaceCollectionDefinition, MonospacePrimaryKeyConfig } from '@rstore/monospace/schema'
 import type { Plugin, ResolvedConfig } from 'vite'
 import { isAbsolute, resolve } from 'node:path'
 import process from 'node:process'
 import { createRstoreVirtualModulePlugin } from '@rstore/connector-toolkit/vite'
-import { DEFAULT_MONOSPACE_SCOPE_ID } from '@rstore/monospace'
+import { DEFAULT_MONOSPACE_SCOPE_ID, resolveMonospaceWorkspace } from '@rstore/monospace'
 import {
   generateMonospacePluginTemplate,
   generateViteDeclarations,
@@ -19,16 +20,11 @@ const VIRTUAL_PLUGIN_ID = 'virtual:rstore-monospace/plugin'
 /**
  * Options accepted by the rstore Monospace Vite plugin.
  */
-export interface RstoreMonospaceViteOptions {
+export interface RstoreMonospaceViteOptions extends MonospaceWorkspaceOptions {
   /**
    * Monospace API URL.
    */
   url?: string
-
-  /**
-   * Monospace project identifier.
-   */
-  project?: string
 
   /**
    * Build-time API key for schema loading (OpenAPI document and schema
@@ -43,9 +39,9 @@ export interface RstoreMonospaceViteOptions {
   input?: string
 
   /**
-   * Local schema metadata snapshot JSON file path: the raw items of the
-   * Monospace system schema meta collections keyed by meta collection name.
-   * Required alongside `input` for fully local generation.
+   * Local schema metadata snapshot JSON file path, as returned by
+   * `loadRemoteSchemaMetadata` from `@rstore/monospace/schema`. Required
+   * alongside `input` for fully local generation.
    */
   metadataInput?: string
 
@@ -53,6 +49,13 @@ export interface RstoreMonospaceViteOptions {
    * Runtime API key emitted into generated client code.
    */
   runtimeApiKey?: string
+
+  /**
+   * `Cache-Control` request header sent by the generated runtime client.
+   * `'no-cache'` bypasses the Monospace server-side read cache. Not sent by
+   * default.
+   */
+  cacheControl?: CreateMonospaceRestClientOptions['cacheControl']
 
   /**
    * rstore plugin scope id for generated Monospace collections.
@@ -92,7 +95,8 @@ export function rstoreMonospace(options: RstoreMonospaceViteOptions): Plugin {
       assertRuntimeOptions(options)
       return generateMonospacePluginTemplate({
         apiKey: options.runtimeApiKey,
-        project: options.project!,
+        cacheControl: options.cacheControl,
+        workspace: resolveMonospaceWorkspace(options),
         scopeId,
         url: options.url!,
       })
@@ -119,7 +123,7 @@ async function loadCollections(
     input,
     metadataInput,
     primaryKeys: options.primaryKeys,
-    project: options.project,
+    workspace: resolveMonospaceWorkspace(options),
     schemaApiKey: options.schemaApiKey,
     scopeId: options.scopeId ?? DEFAULT_MONOSPACE_SCOPE_ID,
     url: options.url,
@@ -131,7 +135,7 @@ async function loadCollections(
  *
  * Fully local generation needs both `input` (OpenAPI document) and
  * `metadataInput` (schema metadata snapshot); any missing local file falls
- * back to remote loading, which requires `url` and `project`.
+ * back to remote loading, which requires `url` and `workspace`.
  */
 function assertSchemaSourceOptions(
   options: RstoreMonospaceViteOptions,
@@ -144,7 +148,7 @@ function assertSchemaSourceOptions(
 
   const missing = [
     options.url ? null : 'url',
-    options.project ? null : 'project',
+    resolveMonospaceWorkspace(options) ? null : 'workspace',
   ].filter(Boolean)
 
   if (missing.length) {
@@ -159,7 +163,7 @@ function assertSchemaSourceOptions(
 function assertRuntimeOptions(options: RstoreMonospaceViteOptions): void {
   const missing = [
     options.url ? null : 'url',
-    options.project ? null : 'project',
+    resolveMonospaceWorkspace(options) ? null : 'workspace',
   ].filter(Boolean)
 
   if (missing.length) {

@@ -140,6 +140,10 @@ describe('applyMonospaceQuery', () => {
 
     const byPriorityDesc = applyMonospaceQuery(items, { sort: [{ priority: 'desc' }] })
     expect(byPriorityDesc.supported && byPriorityDesc.items.map(item => item.id)).toEqual([4, 3, 1, 2])
+
+    // `-field` strings are sent as descending object specifiers.
+    const byTitleDesc = applyMonospaceQuery(items, { sort: '-title' })
+    expect(byTitleDesc.supported && byTitleDesc.items.map(item => item.id)).toEqual([4, 1, 3, 2])
   })
 
   it('sorts null values last in ascending order', () => {
@@ -155,10 +159,64 @@ describe('applyMonospaceQuery', () => {
     })
   })
 
+  it('evaluates queries whose includes do not narrow embedded relations', () => {
+    expect(applyMonospaceQuery(items, {
+      fields: ['*'],
+      include: { comments: { fields: ['*'], limit: -1, sort: [{ id: { direction: 'desc' } }] } },
+      limit: 1,
+    })).toMatchObject({ supported: true, items: [items[0]] })
+  })
+
   it('reports queries that require a fetch as unsupported', () => {
-    expect(applyMonospaceQuery(items, { deep: { comments: { _limit: 2 } } })).toMatchObject({ supported: false })
-    expect(applyMonospaceQuery(items, { alias: { name: 'title' } })).toMatchObject({ supported: false })
+    expect(applyMonospaceQuery(items, { fields: ['id', 'name:title'] })).toMatchObject({ supported: false })
+    expect(applyMonospaceQuery(items, { fields: 'id,name:title' })).toMatchObject({ supported: false })
+    expect(applyMonospaceQuery(items, { include: { comments: { fields: ['body'], limit: 2 } } })).toMatchObject({ supported: false })
+    expect(applyMonospaceQuery(items, { include: { comments: { offset: 2 } } })).toMatchObject({ supported: false })
+    expect(applyMonospaceQuery(items, { include: { comments: { filter: { approved: { _eq: true } } } } })).toMatchObject({ supported: false })
+    expect(applyMonospaceQuery(items, { include: { comments: { include: { author: { fields: ['label:name'] } } } } })).toMatchObject({ supported: false })
     expect(applyMonospaceQuery(items, { sort: [{ priority: { direction: 'asc', nulls: 'first' } }] })).toMatchObject({ supported: false })
     expect(applyMonospaceQuery(items, { filter: { author: { name: { _eq: 'Jane' } } } })).toMatchObject({ supported: false })
+  })
+})
+
+describe('int64 fields', () => {
+  // Monospace returns int64/uint64 values as decimal strings.
+  const context = {
+    collection: { name: 'Todos', meta: { monospace: { int64Fields: ['views'] } } },
+  }
+
+  it('compares int64 decimal strings numerically', () => {
+    const item = { views: '10', title: '10' }
+
+    expect(evaluateMonospaceFilter(item, { views: { _gt: '9' } }, context)).toEqual({ supported: true, matches: true })
+    expect(evaluateMonospaceFilter(item, { views: { _gte: 9 } }, context)).toEqual({ supported: true, matches: true })
+    expect(evaluateMonospaceFilter(item, { views: { _lt: '9' } }, context)).toEqual({ supported: true, matches: false })
+    expect(evaluateMonospaceFilter(item, { views: { _lte: '10' } }, context)).toEqual({ supported: true, matches: true })
+    expect(evaluateMonospaceFilter(item, { views: { _between: ['9', 11] } }, context)).toEqual({ supported: true, matches: true })
+    expect(evaluateMonospaceFilter(item, { views: { _nbetween: ['9', '11'] } }, context)).toEqual({ supported: true, matches: false })
+    // Values beyond `Number.MAX_SAFE_INTEGER` keep their precision.
+    expect(evaluateMonospaceFilter({ views: '9007199254740993' }, { views: { _lt: '10000000000000000000' } }, context)).toEqual({ supported: true, matches: true })
+    // Non-int64 string fields keep text comparison.
+    expect(evaluateMonospaceFilter(item, { title: { _gt: '9' } }, context)).toEqual({ supported: true, matches: false })
+  })
+
+  it('matches int64 equality across numbers and strings', () => {
+    expect(evaluateMonospaceFilter({ views: '42' }, { views: 42 }, context)).toEqual({ supported: true, matches: true })
+    expect(evaluateMonospaceFilter({ views: 42 }, { views: { _eq: '42' } }, context)).toEqual({ supported: true, matches: true })
+    expect(evaluateMonospaceFilter({ views: '9007199254740993' }, { views: { _in: ['1', '9007199254740993'] } }, context)).toEqual({ supported: true, matches: true })
+    expect(evaluateMonospaceFilter({ views: '9007199254740993' }, { views: { _neq: '9007199254740992' } }, context)).toEqual({ supported: true, matches: true })
+    expect(evaluateMonospaceFilter({ views: null }, { views: { _null: true } }, context)).toEqual({ supported: true, matches: true })
+  })
+
+  it('sorts int64 fields numerically', () => {
+    const items = [
+      { id: 1, views: '9' },
+      { id: 2, views: '100' },
+      { id: 3, views: null },
+      { id: 4, views: '10' },
+    ]
+
+    const result = applyMonospaceQuery(items, { sort: 'views' }, context)
+    expect(result.supported && result.items.map(item => item.id)).toEqual([1, 4, 2, 3])
   })
 })

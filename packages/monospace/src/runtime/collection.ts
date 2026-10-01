@@ -8,6 +8,18 @@ import type { Collection } from '@rstore/shared'
 export const DEFAULT_MONOSPACE_SCOPE_ID = 'rstore-monospace'
 
 /**
+ * Monospace item API operation a collection can serve.
+ */
+export type MonospaceCollectionOperation
+  = | 'readMany'
+    | 'readOne'
+    | 'create'
+    | 'updateMany'
+    | 'updateOne'
+    | 'deleteMany'
+    | 'deleteOne'
+
+/**
  * Generated Monospace metadata for one relation field.
  */
 export interface MonospaceGeneratedRelationMeta {
@@ -16,6 +28,15 @@ export interface MonospaceGeneratedRelationMeta {
    * relation, extracted from the OpenAPI connect key input schemas.
    */
   connectKeys?: string[]
+
+  /**
+   * Direction of a to-one relation: `true` when the FK columns are owned by
+   * this collection (forward side), `false` when they are owned by the
+   * target collection (backward side). Generated from the schema metadata
+   * for to-one relations only; when omitted, the write path infers the
+   * direction from the relation `on` mapping.
+   */
+  forward?: boolean
 }
 
 /**
@@ -40,6 +61,27 @@ export interface MonospaceGeneratedCollectionMeta {
      * Generated relation metadata keyed by relation field.
      */
     relations?: Record<string, MonospaceGeneratedRelationMeta>
+
+    /**
+     * Whether the collection exposes `/{key}` item routes. `false` when the
+     * collection has no single-field primary key route (extension-connector
+     * collections): item reads and writes then use filtered collection
+     * requests.
+     */
+    itemRoutes?: boolean
+
+    /**
+     * Item API operations the collection serves, read from the OpenAPI
+     * path methods. Extension connector collections only serve their
+     * declared operations. Omitted when every operation is served.
+     */
+    operations?: MonospaceCollectionOperation[]
+
+    /**
+     * Fields holding 64-bit integers (`int64` / `uint64`), which Monospace
+     * returns as decimal strings.
+     */
+    int64Fields?: string[]
   }
 }
 
@@ -74,6 +116,27 @@ export interface MonospaceCollectionLike {
        * Generated relation metadata keyed by relation field.
        */
       relations?: Record<string, MonospaceGeneratedRelationMeta>
+
+      /**
+       * Whether the collection exposes `/{key}` item routes. `false` when the
+       * collection has no single-field primary key route (extension-connector
+       * collections): item reads and writes then use filtered collection
+       * requests.
+       */
+      itemRoutes?: boolean
+
+      /**
+       * Item API operations the collection serves, read from the OpenAPI
+       * path methods. Extension connector collections only serve their
+       * declared operations. Omitted when every operation is served.
+       */
+      operations?: MonospaceCollectionOperation[]
+
+      /**
+       * Fields holding 64-bit integers (`int64` / `uint64`), which Monospace
+       * returns as decimal strings.
+       */
+      int64Fields?: string[]
     }
   }
 }
@@ -98,6 +161,27 @@ declare module '@rstore/shared' {
        * Generated relation metadata keyed by relation field.
        */
       relations?: Record<string, MonospaceGeneratedRelationMeta>
+
+      /**
+       * Whether the collection exposes `/{key}` item routes. `false` when the
+       * collection has no single-field primary key route (extension-connector
+       * collections): item reads and writes then use filtered collection
+       * requests.
+       */
+      itemRoutes?: boolean
+
+      /**
+       * Item API operations the collection serves, read from the OpenAPI
+       * path methods. Extension connector collections only serve their
+       * declared operations. Omitted when every operation is served.
+       */
+      operations?: MonospaceCollectionOperation[]
+
+      /**
+       * Fields holding 64-bit integers (`int64` / `uint64`), which Monospace
+       * returns as decimal strings.
+       */
+      int64Fields?: string[]
     }
   }
 }
@@ -114,6 +198,17 @@ export function getMonospacePrimaryKeys(collection: MonospaceCollectionLike): st
  */
 export function getMonospaceCollectionName(collection: MonospaceCollectionLike): string {
   return collection.meta?.monospace?.collection ?? collection.name
+}
+
+/**
+ * Returns the generated direction of a to-one relation (`true` for forward,
+ * `false` for backward), or `undefined` when the meta does not declare it.
+ */
+export function getMonospaceRelationForward(
+  collection: MonospaceCollectionLike,
+  relationKey: string,
+): boolean | undefined {
+  return collection.meta?.monospace?.relations?.[relationKey]?.forward
 }
 
 /**

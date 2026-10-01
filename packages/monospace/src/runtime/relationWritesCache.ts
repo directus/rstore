@@ -31,8 +31,8 @@ export interface MonospaceToManyCachePatch {
  * Cache reconciliation patch produced by a translated relational write.
  *
  * Only to-many writes need patches: to-one writes set the real FK columns on
- * the mutation body and the mutation response carries them back, so the
- * cached item is already consistent.
+ * the mutated item (directly or through `_connect`) and the mutation
+ * response carries them back, so the cached item is already consistent.
  */
 export type MonospaceRelationCachePatch = MonospaceToManyCachePatch
 

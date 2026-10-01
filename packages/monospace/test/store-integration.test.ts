@@ -58,7 +58,7 @@ describe('monospace relations end-to-end', () => {
     const todos = await store.Todos.findMany({ include: { author: true } })
 
     expect(readManyMock).toHaveBeenCalledTimes(1)
-    expect(readManyMock).toHaveBeenCalledWith('Todos', { fields: ['*', 'author.*'] })
+    expect(readManyMock).toHaveBeenCalledWith('Todos', { fields: ['*'], include: { author: { fields: ['*'] } } })
     expect(todos).toHaveLength(1)
     // The accessor joins `Todos.author_id` to the cached Profiles item.
     expect(todos[0].author?.name).toBe('Jane')
@@ -78,7 +78,7 @@ describe('monospace relations end-to-end', () => {
 
     const todos = await store.Todos.findMany({ fields: ['id', 'title'], include: { author: true } })
 
-    expect(readManyMock).toHaveBeenCalledWith('Todos', { fields: ['id', 'title', 'author_id', 'author.*'] })
+    expect(readManyMock).toHaveBeenCalledWith('Todos', { fields: ['id', 'title', 'author_id'], include: { author: { fields: ['*'] } } })
     expect(todos[0].author?.name).toBe('Jane')
   })
 
@@ -97,7 +97,7 @@ describe('monospace relations end-to-end', () => {
 
     const profiles = await store.Profiles.findMany({ include: { todos: true } })
 
-    expect(readManyMock).toHaveBeenCalledWith('Profiles', { fields: ['*', 'todos.*'] })
+    expect(readManyMock).toHaveBeenCalledWith('Profiles', { fields: ['*'], include: { todos: { fields: ['*'], limit: -1 } } })
     expect(profiles).toHaveLength(1)
     expect(profiles[0].todos.map((todo: any) => todo.title).sort()).toEqual(['A', 'B'])
   })
@@ -145,13 +145,14 @@ describe('monospace relations end-to-end', () => {
     const todos = await store.Todos.findMany({ include: { author: true } })
     expect(readManyMock).toHaveBeenCalledTimes(2)
     expect(readManyMock).toHaveBeenLastCalledWith('Todos', {
-      fields: ['*', 'author.*'],
+      fields: ['*'],
       filter: { id: { _in: [1] } },
+      include: { author: { fields: ['*'] } },
     })
     expect(todos[0].author?.name).toBe('Jane')
   })
 
-  it('serializes create-form $connect into a real FK column write', async () => {
+  it('serializes create-form $connect into a to-one _connect operation', async () => {
     const { storePromise, client } = createTestStore(async (collection) => {
       if (collection === 'Profiles') {
         return [{ id: 'p1', name: 'Jane' }]
@@ -168,12 +169,12 @@ describe('monospace relations end-to-end', () => {
 
     await form.$submit()
 
-    // $connect writes the real `author_id` FK column onto the form and the
-    // create body carries it as a plain field — no `_connect` operation.
+    // $connect writes the real `author_id` FK column onto the form, but
+    // Monospace create inputs only accept the relation `_connect` operation.
     expect(client.createOne).toHaveBeenCalledWith('Todos', {
       title: 'A',
-      author_id: 'p1',
-    }, {})
+      author: { _connect: { key: { id: 'p1' } } },
+    }, { fields: ['*'] })
 
     // The created item resolves its relation accessor from the cache.
     const todosCollection = store.$collections.find((c: any) => c.name === 'Todos')
@@ -199,7 +200,7 @@ describe('monospace relations end-to-end', () => {
 
     expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, {
       author_id: null,
-    }, {})
+    }, { fields: ['*'] })
 
     // The updated FK column clears the accessor without a refetch.
     const todosCollection = store.$collections.find((c: any) => c.name === 'Todos')
@@ -230,7 +231,7 @@ describe('monospace relations end-to-end', () => {
     // Update mode sends to-many relation operations as an array.
     expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
       todos: [{ _connect: { keys: [{ id: 2 }] } }],
-    }, {})
+    }, { fields: ['*'] })
 
     // The connected todo's real FK column is patched in the cache so the
     // relation accessor resolves without a refetch.
@@ -274,7 +275,7 @@ describe('monospace relations end-to-end', () => {
         { _disconnect: { filter: { id: 1 } } },
         { _connect: { keys: [{ id: 3 }] } },
       ],
-    }, {})
+    }, { fields: ['*'] })
 
     const profilesCollection = store.$collections.find((c: any) => c.name === 'Profiles')
     const profile: any = store.$cache.readItem({ collection: profilesCollection, key: 'p1' })

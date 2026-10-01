@@ -52,6 +52,8 @@ describe('evaluateOperator', () => {
     expectMatch('Hello', '_ends_with', 'lo', true)
     expectMatch('Hello', '_nends_with', 'lo', false)
     expectMatch(42, '_contains', '4', false)
+    // BigInt values compare through their decimal text.
+    expectMatch(1234n, '_contains', 23n, true)
   })
 
   it('evaluates range operators', () => {

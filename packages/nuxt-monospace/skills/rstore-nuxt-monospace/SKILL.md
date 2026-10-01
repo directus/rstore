@@ -18,7 +18,7 @@ export default defineNuxtConfig({
   ],
   rstoreMonospace: {
     url: 'https://your-monospace-instance.com',
-    project: 'your-project',
+    workspace: 'your-workspace',
     schemaApiKey: process.env.MONOSPACE_API_KEY,
     scopeId: 'rstore-monospace',
   },
@@ -48,11 +48,12 @@ const todos = await monospace.readMany('Todos', { limit: 10 })
 | Option | Purpose |
 | --- | --- |
 | `url` | Monospace API URL |
-| `project` | Monospace project identifier |
+| `workspace` | Monospace workspace identifier (`project` is a deprecated alias) |
 | `schemaApiKey` | Build-time key for remote schema loading (needs `openApiSchema:read` + `dataModel:read`) |
 | `input` | Local OpenAPI JSON path, resolved from Nuxt root |
 | `metadataInput` | Local schema metadata snapshot JSON path, resolved from Nuxt root |
 | `runtimeApiKey` | Runtime API key emitted into generated config |
+| `cacheControl` | `Cache-Control` header (`'no-cache'` or `'no-store'`) sent by the generated runtime client |
 | `scopeId` | rstore plugin scope id, defaulting to `rstore-monospace` |
 | `primaryKeys` | Explicit primary key overrides by collection name |
 
@@ -61,7 +62,7 @@ const todos = await monospace.readMany('Todos', { limit: 10 })
 - `$rstore-monospace-collections.js` contains runtime collection definitions.
 - `$rstore-monospace-items.d.ts` contains generated item interfaces.
 - `$rstore-monospace-collections.d.ts` contains typed collection declarations.
-- `$rstore-monospace-config.js` contains runtime URL, project, optional API key, and scope id.
+- `$rstore-monospace-config.js` contains runtime URL, workspace, optional API key, and scope id.
 
 ## Module Behavior
 
@@ -69,7 +70,7 @@ const todos = await monospace.readMany('Todos', { limit: 10 })
 - It adds generated collections through `addCollectionImport`.
 - It adds the runtime plugin through `addPluginImport`.
 - It registers runtime type references and auto-imports `useMonospace()`.
-- Missing `url` or `project` skips collection generation with a warning.
+- Missing `url` or `workspace` skips collection generation with a warning.
 
 ## Guardrails
 

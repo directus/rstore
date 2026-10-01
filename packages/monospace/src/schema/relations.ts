@@ -31,6 +31,12 @@ export interface MonospaceRelationField {
   connectKeys?: string[]
 
   /**
+   * Whether the relation field owns the FK columns (forward side), resolved
+   * from the schema metadata.
+   */
+  forward?: boolean
+
+  /**
    * rstore `on` mapping from target column names to source column names,
    * resolved from the FK constraint column pairs in the schema metadata.
    */
@@ -93,7 +99,8 @@ export function detectMonospaceRelationFields(
 /**
  * Merges resolved schema metadata into OpenAPI-detected relation fields.
  *
- * The metadata provides the real FK column `on` mapping of each relation.
+ * The metadata provides the real FK column `on` mapping and the direction
+ * (`forward`) of each relation.
  * Forward relation connect keys always come from the constraint referenced
  * columns: they are the authoritative source, so when the OpenAPI connect
  * input schema disagrees the constraint columns win. Backward relations keep
@@ -123,6 +130,7 @@ export function mergeMonospaceRelationFieldMetadata(
     merged[name] = {
       ...field,
       ...connectKeys?.length ? { connectKeys } : {},
+      forward: relationMetadata.forward,
       on: relationMetadata.on,
     }
   }

@@ -13,7 +13,7 @@ export interface MonospaceCollectionMetadataItem {
   apiName: string
 
   /**
-   * Unknown extra columns returned by the items API.
+   * Unknown extra columns.
    */
   [key: string]: unknown
 }
@@ -38,7 +38,7 @@ export interface MonospacePrimitiveFieldMetadataItem {
   collectionId: string
 
   /**
-   * Unknown extra columns returned by the items API.
+   * Unknown extra columns.
    */
   [key: string]: unknown
 }
@@ -88,7 +88,7 @@ export interface MonospaceRelationFieldMetadataItem {
   oppositeRelationFieldId?: string | null
 
   /**
-   * Unknown extra columns returned by the items API.
+   * Unknown extra columns.
    */
   [key: string]: unknown
 }
@@ -118,7 +118,7 @@ export interface MonospaceConstraintFieldMetadataItem {
   order?: number
 
   /**
-   * Unknown extra columns returned by the items API.
+   * Unknown extra columns.
    */
   [key: string]: unknown
 }
@@ -143,7 +143,7 @@ export interface MonospaceIndexMetadataItem {
   collectionId: string
 
   /**
-   * Unknown extra columns returned by the items API.
+   * Unknown extra columns.
    */
   [key: string]: unknown
 }
@@ -168,19 +168,20 @@ export interface MonospaceIndexFieldMetadataItem {
   order?: number
 
   /**
-   * Unknown extra columns returned by the items API.
+   * Unknown extra columns.
    */
   [key: string]: unknown
 }
 
 /**
  * Monospace schema metadata snapshot: the raw items of the system schema
- * meta collections, keyed by meta collection API name — exactly the shape
- * returned by `GET /api/{project}/items/{name}` for each collection.
+ * meta collections, keyed by meta collection API name. Produced by
+ * `loadRemoteSchemaMetadata`, which flattens the schema structure endpoint
+ * response (`GET /api/{workspace}/schema/structure/sources`).
  */
 export interface MonospaceSchemaMetadata {
   /**
-   * Project collections.
+   * Workspace collections, including system collections.
    */
   MonospaceCollection: MonospaceCollectionMetadataItem[]
 

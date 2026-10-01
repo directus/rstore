@@ -19,7 +19,7 @@ export default defineConfig({
   plugins: [
     rstoreMonospace({
       url: 'https://your-monospace-instance.com',
-      project: 'your-project',
+      workspace: 'your-workspace',
       schemaApiKey: process.env.MONOSPACE_API_KEY,
       scopeId: 'rstore-monospace',
     }),
@@ -46,11 +46,12 @@ app.use(RstorePlugin, { store })
 | Option | Purpose |
 | --- | --- |
 | `url` | Monospace API URL used for remote schema loading and runtime client code |
-| `project` | Monospace project identifier |
+| `workspace` | Monospace workspace identifier (`project` is a deprecated alias) |
 | `schemaApiKey` | Build-time key for remote schema loading (needs `openApiSchema:read` + `dataModel:read`) |
 | `input` | Local OpenAPI JSON path, resolved from the Vite root |
 | `metadataInput` | Local schema metadata snapshot JSON path, resolved from the Vite root |
 | `runtimeApiKey` | Runtime API key emitted into generated client code |
+| `cacheControl` | `Cache-Control` header (`'no-cache'` or `'no-store'`) sent by the generated runtime client |
 | `scopeId` | rstore plugin scope id, defaulting to `rstore-monospace` |
 | `primaryKeys` | Explicit primary key overrides by collection name |
 | `dts` | Declaration output path, `true`/omitted for `rstore-monospace.d.ts`, or `false` to disable |
@@ -63,7 +64,7 @@ app.use(RstorePlugin, { store })
 
 ## Local Schema Mode
 
-Use `input` plus `metadataInput` when the schema is checked into the project or generated separately. The metadata snapshot holds the raw items of the Monospace system schema meta collections keyed by collection name:
+Use `input` plus `metadataInput` when the schema is checked into the project or generated separately. The metadata snapshot holds the Monospace schema meta collection items keyed by collection name; write it from `loadRemoteSchemaMetadata` (`@rstore/monospace/schema`):
 
 ```ts
 rstoreMonospace({
@@ -72,7 +73,7 @@ rstoreMonospace({
 })
 ```
 
-With only one local file, the other schema source is loaded remotely and `url`/`project` are required.
+With only one local file, the other schema source is loaded remotely and `url`/`workspace` are required.
 
 ## Guardrails
 

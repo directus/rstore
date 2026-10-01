@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMockClient, createTodosCollection, runHook, setupPlugin } from './utils/plugin'
+import { createMockClient, createOrdersCollection, createRelationStore, createTodosCollection, runHook, setupPlugin } from './utils/plugin'
 
 const client = createMockClient()
 
@@ -31,10 +31,36 @@ describe('createMonospaceRstorePlugin', () => {
       key: 1,
     })
 
+    expect(client.readOne).toHaveBeenCalledWith('Todos', 1, { fields: ['*'] })
     expect(fetched).toEqual({ id: 1, title: 'Fetched' })
     expect(created).toEqual({ id: 2, title: 'Created' })
     expect(updated).toEqual({ id: 1, title: 'Updated' })
-    expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, { title: 'Updated' }, {})
+    expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, { title: 'Updated' }, { fields: ['*'] })
+  })
+
+  it('reads composite-key items by their key column values', async () => {
+    const hooks = setupPlugin(client)
+    client.readOne.mockResolvedValueOnce({ shop_id: 1, code: 'A' })
+
+    // Composite keys have no `/{key}` route: the client sends a key filter.
+    await runHook(hooks.fetchFirst, {
+      collection: createOrdersCollection(),
+      store: createRelationStore({ collections: [createOrdersCollection()] }),
+      key: '1::A',
+    })
+
+    expect(client.readOne).toHaveBeenCalledWith('Orders', { shop_id: '1', code: 'A' }, { fields: ['*'] })
+  })
+
+  it('reads items of collections without item routes by key filter', async () => {
+    const hooks = setupPlugin(client)
+    const collection = createTodosCollection()
+    collection.meta.monospace.itemRoutes = false
+    client.readOne.mockResolvedValueOnce({ id: 1 })
+
+    await runHook(hooks.fetchFirst, { collection, key: 1 })
+
+    expect(client.readOne).toHaveBeenCalledWith('Todos', { id: 1 }, { fields: ['*'] })
   })
 
   it('deletes many items with a primary-key filter', async () => {
@@ -53,6 +79,23 @@ describe('createMonospaceRstorePlugin', () => {
         },
       },
     })
+  })
+
+  it('selects every field on list reads without explicit fields', async () => {
+    const hooks = setupPlugin(client)
+    client.readMany.mockResolvedValueOnce([{ id: 1 }])
+
+    const first = await runHook(hooks.fetchFirst, {
+      collection: createTodosCollection(),
+      findOptions: { filter: { id: { _eq: 1 } } },
+    })
+
+    expect(client.readMany).toHaveBeenCalledWith('Todos', {
+      fields: ['*'],
+      filter: { id: { _eq: 1 } },
+      limit: 1,
+    })
+    expect(first).toEqual({ id: 1 })
   })
 
   it('filters cached items with cacheFilterMany', () => {

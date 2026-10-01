@@ -1,7 +1,8 @@
+import type { CreateMonospaceRestClientOptions, MonospaceWorkspaceOptions } from '@rstore/monospace'
 import type { MonospacePrimaryKeyConfig } from '@rstore/monospace/schema'
 import { resolve } from 'node:path'
 import { addImportsDir, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, useLogger } from '@nuxt/kit'
-import { DEFAULT_MONOSPACE_SCOPE_ID } from '@rstore/monospace'
+import { DEFAULT_MONOSPACE_SCOPE_ID, resolveMonospaceWorkspace } from '@rstore/monospace'
 import {
   generateCollectionsTemplate,
   generateConfigTemplate,
@@ -13,16 +14,11 @@ import {
 /**
  * Options accepted by the rstore Monospace Nuxt module.
  */
-export interface ModuleOptions {
+export interface ModuleOptions extends MonospaceWorkspaceOptions {
   /**
    * Monospace API URL.
    */
   url?: string
-
-  /**
-   * Monospace project identifier.
-   */
-  project?: string
 
   /**
    * Build-time API key for schema loading (OpenAPI document and schema
@@ -37,9 +33,9 @@ export interface ModuleOptions {
   input?: string
 
   /**
-   * Local schema metadata snapshot JSON file path: the raw items of the
-   * Monospace system schema meta collections keyed by meta collection name.
-   * Required alongside `input` for fully local generation.
+   * Local schema metadata snapshot JSON file path, as returned by
+   * `loadRemoteSchemaMetadata` from `@rstore/monospace/schema`. Required
+   * alongside `input` for fully local generation.
    */
   metadataInput?: string
 
@@ -47,6 +43,13 @@ export interface ModuleOptions {
    * Runtime API key emitted into generated client code.
    */
   runtimeApiKey?: string
+
+  /**
+   * `Cache-Control` request header sent by the generated runtime client.
+   * `'no-cache'` bypasses the Monospace server-side read cache. Not sent by
+   * default.
+   */
+  cacheControl?: CreateMonospaceRestClientOptions['cacheControl']
 
   /**
    * rstore plugin scope id for generated Monospace collections.
@@ -112,8 +115,9 @@ export default defineNuxtModule<ModuleOptions>({
       references.push({ path: resolveModulePath('./runtime/types.ts') })
     })
 
-    if (!options.url || !options.project) {
-      log.warn('Monospace URL and project are required; skipping Monospace collection generation')
+    const workspace = resolveMonospaceWorkspace(options)
+    if (!options.url || !workspace) {
+      log.warn('Monospace URL and workspace are required; skipping Monospace collection generation')
       return
     }
 
@@ -122,7 +126,7 @@ export default defineNuxtModule<ModuleOptions>({
       input: options.input ? resolve(nuxt.options.rootDir, options.input) : undefined,
       metadataInput: options.metadataInput ? resolve(nuxt.options.rootDir, options.metadataInput) : undefined,
       primaryKeys: options.primaryKeys,
-      project: options.project,
+      workspace,
       schemaApiKey: options.schemaApiKey,
       scopeId,
       url: options.url,
@@ -149,9 +153,10 @@ export default defineNuxtModule<ModuleOptions>({
       filename: '$rstore-monospace-config.js',
       getContents: () => generateConfigTemplate({
         apiKey: options.runtimeApiKey,
-        project: options.project!,
+        cacheControl: options.cacheControl,
         scopeId,
         url: options.url!,
+        workspace,
       }),
     })
 

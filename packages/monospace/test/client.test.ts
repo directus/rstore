@@ -7,6 +7,7 @@ import {
   MonospaceRestError,
   MonospaceValidationError,
 } from '../src'
+import { jsonResponse } from './utils/http'
 
 const fetchMock = vi.fn()
 
@@ -15,11 +16,11 @@ beforeEach(() => {
 })
 
 describe('createMonospaceRestClient', () => {
-  it('builds project-scoped item requests with auth headers and unwraps envelopes', async () => {
+  it('builds workspace-scoped item requests with auth headers and unwraps envelopes', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: [{ id: 1, title: 'Todo' }] }))
     const client = createMonospaceRestClient({
       url: 'https://example.monospace.io/',
-      project: 'blog',
+      workspace: 'blog',
       apiKey: 'runtime-token',
       fetch: fetchMock,
     })
@@ -50,7 +51,7 @@ describe('createMonospaceRestClient', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: [{ id: 7, title: 'Created' }] }))
     const client = createMonospaceRestClient({
       url: 'https://example.monospace.io',
-      project: 'blog',
+      workspace: 'blog',
       fetch: fetchMock,
     })
 
@@ -71,7 +72,7 @@ describe('createMonospaceRestClient', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ data: [{ id: 1, completed: true }] }))
     const client = createMonospaceRestClient({
       url: 'https://example.monospace.io',
-      project: 'blog',
+      workspace: 'blog',
       fetch: fetchMock,
     })
 
@@ -94,10 +95,75 @@ describe('createMonospaceRestClient', () => {
     })
   })
 
+  it('reads composite-key items through a filtered collection request', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: [{ shop_id: 1, code: 'A' }] }))
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: [] }))
+    const client = createMonospaceRestClient({
+      url: 'https://example.monospace.io',
+      workspace: 'blog',
+      fetch: fetchMock,
+    })
+
+    await expect(client.readOne('Orders', { shop_id: 1, code: 'A' }, { fields: ['*'] })).resolves.toEqual({ shop_id: 1, code: 'A' })
+    await expect(client.readOne('Orders', { shop_id: 1, code: 'B' })).resolves.toBeNull()
+
+    const url = decodeURIComponent(String(fetchMock.mock.calls[0]![0]))
+    expect(url).toMatch(/\/api\/blog\/items\/Orders\?/)
+    expect(url).toContain('filter[shop_id][_eq]=1')
+    expect(url).toContain('filter[code][_eq]=A')
+    expect(url).toContain('limit=1')
+    expect(url).toContain('fields=*')
+  })
+
+  it('updates and deletes composite-key items through filtered collection requests', async () => {
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: [{ shop_id: 1, code: 'A', total: 2 }] }))
+    fetchMock.mockResolvedValueOnce(jsonResponse({ data: [] }))
+    const client = createMonospaceRestClient({
+      url: 'https://example.monospace.io',
+      workspace: 'blog',
+      fetch: fetchMock,
+    })
+
+    await expect(client.updateOne('Orders', { shop_id: 1, code: 'A' }, { total: 2 }, { fields: ['*'] })).resolves.toEqual({
+      shop_id: 1,
+      code: 'A',
+      total: 2,
+    })
+    await client.deleteOne('Orders', { shop_id: 1, code: 'A' })
+
+    const [updateUrl, updateInit] = fetchMock.mock.calls[0]!
+    expect(decodeURIComponent(String(updateUrl))).toMatch(/\/items\/Orders\?.*filter\[shop_id\]\[_eq\]=1.*filter\[code\]\[_eq\]=A/)
+    expect(updateInit).toMatchObject({ body: JSON.stringify({ total: 2 }), method: 'PATCH' })
+    const [deleteUrl, deleteInit] = fetchMock.mock.calls[1]!
+    expect(decodeURIComponent(String(deleteUrl))).toMatch(/\/items\/Orders\?filter\[shop_id\]\[_eq\]=1&filter\[code\]\[_eq\]=A$/)
+    expect(deleteInit).toMatchObject({ method: 'DELETE' })
+  })
+
+  it('sends the Cache-Control header only when configured', async () => {
+    fetchMock.mockImplementation(async () => jsonResponse({ data: [] }))
+    const defaultClient = createMonospaceRestClient({
+      url: 'https://example.monospace.io',
+      workspace: 'blog',
+      fetch: fetchMock,
+    })
+    const noCacheClient = createMonospaceRestClient({
+      url: 'https://example.monospace.io',
+      workspace: 'blog',
+      cacheControl: 'no-cache',
+      fetch: fetchMock,
+    })
+
+    await defaultClient.readMany('Todos')
+    await noCacheClient.readMany('Todos')
+
+    expect(fetchMock.mock.calls[0]![1].headers).not.toHaveProperty('Cache-Control')
+    expect(fetchMock.mock.calls[1]![1].headers).toMatchObject({ 'Cache-Control': 'no-cache' })
+  })
+
   it('rejects bulk mutations whose filter serializes to an empty query', async () => {
     const client = createMonospaceRestClient({
       url: 'https://example.monospace.io',
-      project: 'blog',
+      workspace: 'blog',
       fetch: fetchMock,
     })
 
@@ -121,13 +187,13 @@ describe('createMonospaceRestClient', () => {
     }, 422))
     const client = createMonospaceRestClient({
       url: 'https://example.monospace.io',
-      project: 'blog',
+      workspace: 'blog',
       fetch: fetchMock,
     })
 
     const error = await client.readOne('Todos', 1).then(() => null, e => e)
     expect(error).toBeInstanceOf(MonospaceValidationError)
-    expect(error.message).toBe('Failed to execute query')
+    expect(error.message).toBe('Failed to execute query: Query parsing failed')
     expect(error.status).toBe(422)
     expect(error.code).toBe('4009')
     expect(error.source).toEqual({ message: 'Query parsing failed' })
@@ -144,22 +210,10 @@ describe('createMonospaceRestClient', () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({ message: 'Nope' }, status))
     const client = createMonospaceRestClient({
       url: 'https://example.monospace.io',
-      project: 'blog',
+      workspace: 'blog',
       fetch: fetchMock,
     })
 
     await expect(client.readOne('Todos', 1)).rejects.toBeInstanceOf(errorClass)
   })
 })
-
-/**
- * Creates a minimal fetch `Response` for REST client tests.
- */
-function jsonResponse(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    headers: {
-      'content-type': 'application/json',
-    },
-    status,
-  })
-}
