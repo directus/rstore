@@ -207,7 +207,16 @@ function resultIsEmpty<TResult>(result: TResult | undefined): boolean {
   return result == null || (Array.isArray(result) && result.length === 0)
 }
 
-/** Compare keys by cache identity, where string and numeric forms are equal. */
+/** Check string-equivalent cache identity with at most two Set lookups. */
 function trackingHasKey(tracking: HookMetaQueryTracking, collectionName: string, key: string | number): boolean {
-  return Array.from(tracking.items[collectionName] ?? []).some(candidate => String(candidate) === String(key))
+  const keys = tracking.items[collectionName]
+  if (!keys)
+    return false
+  if (keys.has(key))
+    return true
+  if (typeof key === 'number')
+    return keys.has(String(key))
+  const numericKey = Number(key)
+  // Round-trip before matching: '01', '1.0', and '-0' differ from numeric keys.
+  return String(numericKey) === key && keys.has(numericKey)
 }

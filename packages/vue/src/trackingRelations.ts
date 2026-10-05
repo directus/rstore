@@ -104,9 +104,12 @@ export function populateTracking<TResult>(
   if (result == null || (!trackingIsEmpty(tracking) && !include)) {
     return
   }
+  // Related graphs can converge from multiple visible roots. Keep one visit
+  // set for this population pass while preserving isolated public traversals.
+  const visited = new Map<string, Set<RelationInclude | undefined>>()
   for (const item of Array.isArray(result) ? result : [result]) {
     if (item && typeof item === 'object') {
-      addToQueryTracking(store, tracking, item as WrappedItemBase<Collection, CollectionDefaults, StoreSchema>, include, new Map(), dirtyQueryId)
+      addToQueryTracking(store, tracking, item as WrappedItemBase<Collection, CollectionDefaults, StoreSchema>, include, visited, dirtyQueryId)
     }
   }
 }

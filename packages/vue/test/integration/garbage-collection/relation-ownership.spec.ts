@@ -184,6 +184,55 @@ describe('relation ownership', () => {
     expect(cached(stack, 'posts', 'p1')).toBeDefined()
   })
 
+  it('deduplicates a shared nested relation within each population pass', async () => {
+    let postRelationReads = 0
+    const schema = structuredClone(blogSchema)
+    for (const collection of schema) {
+      if (!('name' in collection) || collection.name !== 'authors')
+        continue
+      const reference = collection.relations!.posts!.to.posts!
+      for (const target of Array.isArray(reference) ? reference : [reference]) {
+        target.filter = () => {
+          postRelationReads++
+          return true
+        }
+      }
+    }
+    const stack = await createGarbageCollectionStack({ schema, remote: false })
+    stack.cache.writeItem({ collection: stack.collection('authors'), key: 'a1', item: { id: 'a1', name: 'Ada' } })
+    for (const id of ['p1', 'p2', 'p3']) {
+      stack.cache.writeItem({ collection: stack.collection('posts'), key: id, item: { id, authorId: 'a1' } })
+    }
+
+    const scope = stack.scope(() => stack.store.posts.query((q: any) => q.many({
+      fetchPolicy: 'cache-only',
+      filter: (post: any) => post.id !== 'p3',
+      include: { author: { posts: true } },
+      experimentalGarbageCollection: true,
+    })))
+    const query = await scope.result
+    await drainGarbageCollection()
+
+    // Each population pass reads the shared author's three selected posts once.
+    // Repeating that graph for both roots doubles these reads from six to twelve.
+    expect(postRelationReads).toBeLessThanOrEqual(6)
+    stack.cache.garbageCollect()
+    expect(query.data.value.map((post: any) => post.id)).toEqual(['p1', 'p2'])
+    expect(query.data.value.map((post: any) => post.author.posts.map((nested: any) => nested.id))).toEqual([
+      ['p1', 'p2', 'p3'],
+      ['p1', 'p2', 'p3'],
+    ])
+    expect(cached(stack, 'authors', 'a1')).toBeDefined()
+    for (const id of ['p1', 'p2', 'p3'])
+      expect(cached(stack, 'posts', id)).toBeDefined()
+
+    scope.stop()
+    await drainGarbageCollection()
+    expect(cached(stack, 'authors', 'a1')).toBeUndefined()
+    for (const id of ['p1', 'p2', 'p3'])
+      expect(cached(stack, 'posts', id)).toBeUndefined()
+  })
+
   it('keeps a shared relation target until both owning parent pages release it', async () => {
     const stack = await createGarbageCollectionStack({
       schema: blogSchema,
