@@ -32,7 +32,8 @@ export function setupPlugin<
 
       return store.$hooks.hook(name, (payload: HookPayload) => {
         // Plugin scoping to specific collections with the same scopeId
-        if (!options?.ignoreScope && plugin.scopeId && 'collection' in payload && payload.collection.scopeId && payload.collection.scopeId !== plugin.scopeId) {
+        // (`formFieldMerge` has no collection for forms without a store).
+        if (!options?.ignoreScope && plugin.scopeId && 'collection' in payload && payload.collection?.scopeId && payload.collection.scopeId !== plugin.scopeId) {
           return
         }
         return callback(payload as any)

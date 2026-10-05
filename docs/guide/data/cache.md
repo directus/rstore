@@ -16,6 +16,8 @@ const state = store.$cache.getState()
 store.$cache.setState(state)
 ```
 
+The state includes the [item metadata](#item-metadata) namespaces registered with `serialize` (the default), such as the field stamps of the multiplayer plugin.
+
 ## Clear cache
 
 Clearing the cache is useful when you want to remove all items from the cache. This can be used for example to reset the store to its initial state after the user logs out.
@@ -88,6 +90,55 @@ You can also use the `store.<collectionName>.clearItem` method:
 ```ts
 store.User.clearItem('abc')
 ```
+
+## Write metadata <Badge text="New in v0.9" />
+
+Writes, deletes and mutations accept `metadata`: opaque data that the cache forwards to the [`cacheBeforeWriteItem` and `cacheBeforeDeleteItem`](../plugin/hooks.md#cachebeforewriteitem) hooks without reading it. Plugins give it a meaning, for example the field timestamps of the [multiplayer plugin](./collaboration.md#stamped-writes):
+
+```ts
+store.$cache.writeItem({ collection, key, item, metadata: { fieldTimestamps } })
+store.$cache.writeItems({ collection, items: [{ key, value, metadata: { fieldTimestamps } }] })
+store.$cache.deleteItem({ collection, key, metadata: { deletedAt } })
+await store.todos.update(item, { metadata: { fieldTimestamps } })
+```
+
+Plugins declare their keys by augmenting `CustomCacheWriteMetadata`:
+
+```ts
+declare module '@rstore/shared' {
+  interface CustomCacheWriteMetadata {
+    etag?: string
+  }
+}
+```
+
+In development, the cache warns once per key when a write carries a metadata key that no hook handled (handlers mark keys with `consume()`). It usually means a plugin is missing.
+
+## Item metadata <Badge text="New in v0.9" />
+
+`store.$cache.itemMetadata` stores per-item plugin data beside the cached rows, partitioned by namespace. Reads and writes are synchronous, so cache hooks can use them.
+
+```ts
+const metadata = store.$cache.itemMetadata
+
+// Once, usually in the plugin `init` hook
+metadata.register('my-plugin:etag', { lifecycle: 'item' })
+
+metadata.write('my-plugin:etag', 'todos', '1', 'W/"42"')
+metadata.read('my-plugin:etag', 'todos', '1') // 'W/"42"'
+metadata.delete('my-plugin:etag', 'todos', '1')
+Array.from(metadata.entries('my-plugin:etag')) // [{ collection, key, value }]
+metadata.size('my-plugin:etag')
+metadata.namespaces() // [{ name, lifecycle, serialize, persist }]
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `lifecycle` | | `'item'`: removed with the row (delete, garbage collection, `clear`, `clearCollection`). `'detached'`: survives the row (for example a tombstone), removed by `clear`, `clearCollection` or `delete` |
+| `serialize` | `true` | Include the namespace in `getState()` and restore it in `setState()`. Numeric keys are restored as numbers |
+| `persist` | `false` | Let storage plugins persist it, such as the [offline plugin](./offline.md#persisted-item-metadata). Values must be structured-cloneable |
+
+Registering a namespace again with the same options is a no-op; with other options it throws. Writing to an unregistered namespace throws. Keys follow row identity: `1` and `'1'` address the same entry.
 
 ## Apply mutations <Badge text="New in v0.9" />
 

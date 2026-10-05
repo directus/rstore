@@ -1,4 +1,4 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomCacheWriteMetadata, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { finalizeMutation } from './finalizeMutation'
 import { createOptimisticLayerLifecycle, prepareMutationItems } from './optimistic'
 
@@ -12,6 +12,11 @@ export interface CreateManyOptions<
   items: Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>
   skipCache?: boolean
   optimistic?: boolean | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
+  /**
+   * Opaque data forwarded to the cache hooks of the committed write/delete
+   * (`cacheBeforeWriteItem` / `cacheBeforeDeleteItem`).
+   */
+  metadata?: CustomCacheWriteMetadata
 }
 
 export async function createMany<
@@ -23,6 +28,7 @@ export async function createMany<
   collection,
   items: inputItems,
   skipCache,
+  metadata,
   optimistic = true,
 }: CreateManyOptions<TCollection, TCollectionDefaults, TSchema>): Promise<Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>> {
   const meta: CustomHookMeta = {}
@@ -89,6 +95,7 @@ export async function createMany<
       store: store as unknown as GlobalStoreType,
       meta,
       collection,
+      metadata,
       items: transportItems,
       getResult: () => result,
       setResult: (newResult, options) => {
@@ -112,6 +119,7 @@ export async function createMany<
           store: store as unknown as GlobalStoreType,
           meta,
           collection,
+          metadata,
           item: transportItem,
           getResult: () => singleResult,
           setResult: (newResult, options) => {
@@ -141,6 +149,7 @@ export async function createMany<
       items: transportItems,
       results: result,
       skipCache,
+      metadata,
     }, {
       emitItemHooks: !aborted,
       onBeforeApplyCache: optimisticLayer.remove,

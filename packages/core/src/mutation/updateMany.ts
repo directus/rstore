@@ -1,4 +1,4 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomCacheWriteMetadata, CustomHookMeta, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { isKeyDefined } from '../key'
 import { peekMany } from '../query'
@@ -15,6 +15,11 @@ export interface UpdateManyOptions<
   items: Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>
   skipCache?: boolean
   optimistic?: boolean | Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>
+  /**
+   * Opaque data forwarded to the cache hooks of the committed write/delete
+   * (`cacheBeforeWriteItem` / `cacheBeforeDeleteItem`).
+   */
+  metadata?: CustomCacheWriteMetadata
 }
 
 export async function updateMany<
@@ -26,6 +31,7 @@ export async function updateMany<
   collection,
   items,
   skipCache,
+  metadata,
   optimistic = true,
 }: UpdateManyOptions<TCollection, TCollectionDefaults, TSchema>): Promise<Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>> {
   const meta: CustomHookMeta = {}
@@ -125,6 +131,7 @@ export async function updateMany<
       store: store as unknown as GlobalStoreType,
       meta,
       collection,
+      metadata,
       items: itemsWithKey,
       getResult: () => result,
       setResult: (newResult, options) => {
@@ -146,6 +153,7 @@ export async function updateMany<
           store: store as unknown as GlobalStoreType,
           meta,
           collection,
+          metadata,
           key,
           item,
           getResult: () => singleResult ?? undefined,
@@ -180,6 +188,7 @@ export async function updateMany<
       items: itemsWithKey,
       results: result,
       skipCache,
+      metadata,
     }, {
       emitItemHooks: !aborted,
       onBeforeApplyCache: optimisticLayer.remove,

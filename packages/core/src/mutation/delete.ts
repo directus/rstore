@@ -1,4 +1,4 @@
-import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomCacheWriteMetadata, CustomHookMeta, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
 import { finalizeMutation } from './finalizeMutation'
 import { assertMutationAllowed, createOptimisticLayerLifecycle } from './optimistic'
@@ -13,6 +13,11 @@ export interface DeleteOptions<
   key: string | number
   skipCache?: boolean
   optimistic?: boolean
+  /**
+   * Opaque data forwarded to the cache hooks of the committed write/delete
+   * (`cacheBeforeWriteItem` / `cacheBeforeDeleteItem`).
+   */
+  metadata?: CustomCacheWriteMetadata
 
   /**
    * Whether this mutation should participate in batching.
@@ -36,6 +41,7 @@ export async function deleteItem<
   collection,
   key,
   skipCache,
+  metadata,
   optimistic = true,
   batch,
 }: DeleteOptions<TCollection, TCollectionDefaults, TSchema>): Promise<void> {
@@ -78,6 +84,7 @@ export async function deleteItem<
         store: store as unknown as GlobalStoreType,
         meta,
         collection,
+        metadata,
         key,
         abort,
       }, abort)
@@ -89,6 +96,7 @@ export async function deleteItem<
       mutation: 'delete',
       key,
       skipCache,
+      metadata,
     }, {
       onBeforeApplyCache: optimisticLayer.remove,
     })

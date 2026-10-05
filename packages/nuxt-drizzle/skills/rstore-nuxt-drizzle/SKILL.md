@@ -1,6 +1,6 @@
 ---
 name: rstore-nuxt-drizzle
-description: "Use when exposing Drizzle-backed data in Nuxt, OR before writing a custom `server/api` route, Nitro `defineEventHandler`, H3 handler, or REST/CRUD endpoint that reads or writes a Drizzle table — prefer the module's generated endpoints, `allowTables`, `hooksForTable`, and `publishRstoreDrizzleRealtimeUpdate` over hand-rolled routes; also covers generating collections/API routes from schema, adding a new Drizzle table to the rstore API, fixing `Collection \"<name>\" is not allowed` errors, fetch/filter/paginate, create/update/delete, realtime, offline, and table-level access control; pair with `rstore-nuxt` for Nuxt integration and `rstore-vue` for collection/query/form behavior."
+description: "Use when exposing Drizzle-backed data in Nuxt, OR before writing a custom `server/api` route, Nitro `defineEventHandler`, H3 handler, or REST/CRUD endpoint that reads or writes a Drizzle table — prefer the module's generated endpoints, `allowTables`, `hooksForTable`, and `publishRstoreDrizzleRealtimeUpdate` over hand-rolled routes; also covers generating collections/API routes from schema, adding a new Drizzle table to the rstore API, fixing `Collection \"<name>\" is not allowed` errors, fetch/filter/paginate, create/update/delete, realtime, concurrent edits (field-level last-writer-wins via `ws.lww`), offline, and table-level access control; pair with `rstore-nuxt` for Nuxt integration and `rstore-vue` for collection/query/form behavior (`rstore-multiplayer` for LWW/presence details)."
 ---
 
 # Rstore Nuxt Drizzle
@@ -18,7 +18,9 @@ Use this skill with the `@rstore/nuxt` skill for Nuxt module/runtime behavior an
 | Realtime subscriptions | [https://rstore.akryum.dev/guide/data/live](https://rstore.akryum.dev/guide/data/live) |
 | Offline behavior | [https://rstore.akryum.dev/guide/data/offline](https://rstore.akryum.dev/guide/data/offline) |
 | Plugin hooks and extension points | [https://rstore.akryum.dev/guide/plugin/hooks](https://rstore.akryum.dev/guide/plugin/hooks) |
-| Related package skills | `rstore-nuxt` skill (`@rstore/nuxt`), `rstore-vue` skill (`@rstore/vue`) |
+| Collab op log store (experimental) | [https://rstore.akryum.dev/plugins/nuxt-drizzle#collab-op-log-store](https://rstore.akryum.dev/plugins/nuxt-drizzle#collab-op-log-store) |
+| Concurrent edits (LWW) | [https://rstore.akryum.dev/plugins/nuxt-drizzle#concurrent-edits](https://rstore.akryum.dev/plugins/nuxt-drizzle#concurrent-edits), [https://rstore.akryum.dev/guide/data/collaboration](https://rstore.akryum.dev/guide/data/collaboration) |
+| Related package skills | `rstore-nuxt` skill (`@rstore/nuxt`), `rstore-vue` skill (`@rstore/vue`), `rstore-multiplayer` skill (`@rstore/multiplayer`) |
 | Skill-local API references | [./references/index.md](./references/index.md) |
 
 ## Core concepts
@@ -33,6 +35,7 @@ Use this skill with the `@rstore/nuxt` skill for Nuxt module/runtime behavior an
 | `ws` | Enables websocket realtime handler and client plugin |
 | `offline` | Enables offline sync plugins and sync config template values |
 | `rstoreDrizzleHooks` / `hooksForTable` / `allowTables` | Server extension and access-control APIs |
+| `createDrizzleOpLogStore` (`@rstore/nuxt-drizzle/collab`, experimental) | Collab documents (rich-text OT) stored in Drizzle tables |
 
 ## Quick start
 
@@ -95,9 +98,13 @@ Before adding a `server/api/*.ts` handler, a `defineEventHandler`, or any custom
 - `ws: true` (or object form) enables websocket handler registration and client subscription plugin wiring.
 - Realtime subscriptions are keyed by collection, key, and `where`; exact filter shape impacts topic reuse.
 - On websocket reconnect, the runtime re-sends active subscriptions and triggers `realtimeReconnectEventHook`, which makes `liveQuery` refresh.
+- Concurrent edits: every published frame is HLC-stamped (`fieldTimestamps` on `created`/`updated`, `deletedAt` on `deleted`) and written with cache `metadata`. With `ws` enabled the module installs `createMultiplayerPlugin({ lww: true, formTextMerge: false })`, so a delayed frame never overwrites a newer field or resurrects a deleted row. `ws.lww: false` opts out (stamped frames then overwrite rows, no tombstones).
+- Set `RSTORE_DRIZZLE_NODE_ID` per server instance for a stable clock node id; otherwise a random one is picked per process.
+- A custom realtime server should send `fieldTimestamps` / `deletedAt` in `SubscriptionUpdateMessage` frames; frames without stamps are plain writes.
 - `offline` enables offline plugin generation and sync config wiring.
 - Offline sync expects stable keys and usable `updatedAt` comparison values.
 - `offline.serializeDateValue` exists for non-default date comparison serialization.
+- With `ws` + `offline`, the multiplayer field stamps and tombstones are persisted item metadata: they survive reloads, so a stale frame after reload still loses against a newer stamp. Queued mutations replay with their write `metadata`.
 - A create whose primary key already exists returns `409`, so a replayed create is dropped from the offline queue instead of being retried forever. The check runs only after the insert fails and covers primary keys only, not other unique indexes.
 - Failed operations inside a `_batch` request carry their HTTP status back to the client, so `createError` in a hook behaves the same batched and unbatched.
 
@@ -120,6 +127,7 @@ Before adding a `server/api/*.ts` handler, a `defineEventHandler`, or any custom
 7. `allowTables` flips the default from "all tables exposed" to "deny by default". After the first call, every new Drizzle table you add to the schema must also be added to `allowTables` — otherwise endpoints throw `Collection "<name>" is not allowed.` at runtime.
 8. Do not add a pre-insert existence check in an `index.post.before` hook to guard against duplicate creates — the module already answers a duplicate primary key with `409`, and the extra `SELECT` costs a round-trip on every create while still racing concurrent inserts.
 9. Do not hand-write `server/api/<table>/*` CRUD routes for tables already exposed by the generated `apiPath`. Duplicate code paths drift, bypass `allowTables` / `hooksForTable`, and miss realtime publishing — extend behavior through hooks or use `publishRstoreDrizzleRealtimeUpdate` from a justified custom route.
+10. Do not register `createMultiplayerPlugin()` yourself while `ws.lww` is `true` (the default); set `ws.lww: false` first, for example to enable form text merge.
 
 ## References
 
@@ -131,6 +139,7 @@ Before adding a `server/api/*.ts` handler, a `defineEventHandler`, or any custom
 | rstoreDrizzle.apiPath | Generated REST base path | [api-api-path](./references/api-api-path.md) |
 | rstoreDrizzle.ws | Enable websocket realtime integration | [api-ws](./references/api-ws.md) |
 | rstoreDrizzle.ws.apiPath | Override websocket endpoint path | [api-ws-api-path](./references/api-ws-api-path.md) |
+| rstoreDrizzle.ws.lww | Toggle the built-in multiplayer LWW plugin | [api-ws-lww](./references/api-ws-lww.md) |
 | rstoreDrizzle.offline | Enable offline sync integration | [api-offline](./references/api-offline.md) |
 | rstoreDrizzle.offline.serializeDateValue | Customize offline sync date serialization | [api-offline-serialize-date-value](./references/api-offline-serialize-date-value.md) |
 | findOptions.include | Primary relation include option | [api-find-options-include](./references/api-find-options-include.md) |
@@ -147,8 +156,10 @@ Before adding a `server/api/*.ts` handler, a `defineEventHandler`, or any custom
 | hooksForTable | Table-scoped hook registration helper | [api-hooks-for-table](./references/api-hooks-for-table.md) |
 | allowTables | Collection allow-list access control | [api-allow-tables](./references/api-allow-tables.md) |
 | publishRstoreDrizzleRealtimeUpdate | Publish manual realtime updates for direct Drizzle writes | [api-publish-rstore-drizzle-realtime-update](./references/api-publish-rstore-drizzle-realtime-update.md) |
+| createDrizzleOpLogStore | Collab document op log store over Drizzle tables (experimental) | [api-create-drizzle-op-log-store](./references/api-create-drizzle-op-log-store.md) |
 | Base @rstore/nuxt skill | Nuxt module/runtime integration semantics | `rstore-nuxt` skill |
 | Base @rstore/vue skill | Underlying collection/query/form semantics | `rstore-vue` skill |
+| @rstore/multiplayer skill | LWW merge, tombstones, conflicts, presence | `rstore-multiplayer` skill |
 
 ## Further reading
 
@@ -158,3 +169,4 @@ Before adding a `server/api/*.ts` handler, a `defineEventHandler`, or any custom
 - Offline docs: [https://rstore.akryum.dev/guide/data/offline](https://rstore.akryum.dev/guide/data/offline)
 - @rstore/nuxt skill: `rstore-nuxt`
 - @rstore/vue skill: `rstore-vue`
+- @rstore/multiplayer skill: `rstore-multiplayer`

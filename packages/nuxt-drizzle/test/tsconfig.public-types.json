@@ -1,0 +1,22 @@
+{
+  "compilerOptions": {
+    "baseUrl": ".",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "@rstore/shared": [
+        "../../shared/dist/index.d.ts"
+      ],
+      "@rstore/vue": [
+        "../../vue/dist/index.d.ts"
+      ]
+    },
+    "allowImportingTsExtensions": true,
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true
+  },
+  "files": [
+    "query-types.public.test-d.ts"
+  ]
+}

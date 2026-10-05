@@ -14,11 +14,20 @@
   "dependencies": {
     "@nuxt/kit": "catalog:",
     "@rstore/devtools": "workspace:^",
+    "@rstore/multiplayer": "workspace:^",
     "@rstore/nuxt": "workspace:^",
     "@rstore/nuxt-multiplayer": "workspace:^",
+    "@rstore/nuxt-multiplayer-server": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
     "@vueuse/core": "catalog:",
+    "prosemirror-commands": "^1.7.1",
+    "prosemirror-keymap": "^1.2.3",
+    "prosemirror-model": "^1.25.12",
+    "prosemirror-schema-basic": "^1.2.5",
+    "prosemirror-state": "^1.4.4",
+    "prosemirror-transform": "^1.12.2",
+    "prosemirror-view": "^1.42.6",
     "shiki": "catalog:"
   },
   "devDependencies": {

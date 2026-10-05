@@ -1,6 +1,7 @@
-import type { FieldTimestampValue } from '@rstore/shared'
+import type { FieldTimestampValue } from '@rstore/multiplayer/clock'
 import type { SubscriptionUpdateMessage } from './realtime'
-import { compareHLC, parseHLC } from '@rstore/core'
+import { parseHLC } from '@rstore/multiplayer/clock'
+import { maxStamp } from '@rstore/multiplayer/lww'
 
 /**
  * Extract the latest HLC timestamp carried on an update payload. Returns
@@ -10,17 +11,7 @@ export function maxPayloadStamp(payload: SubscriptionUpdateMessage): FieldTimest
   if (payload.type === 'deleted') {
     return payload.deletedAt
   }
-  const ts = payload.fieldTimestamps
-  if (!ts) {
-    return undefined
-  }
-  let best: FieldTimestampValue | undefined
-  for (const v of Object.values(ts)) {
-    if (best === undefined || compareHLC(v, best) > 0) {
-      best = v
-    }
-  }
-  return best
+  return payload.fieldTimestamps ? maxStamp(payload.fieldTimestamps) ?? undefined : undefined
 }
 
 /** HLC string/number → wall-clock Date (physical component). */

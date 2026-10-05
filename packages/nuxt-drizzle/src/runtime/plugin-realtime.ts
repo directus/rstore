@@ -1,13 +1,14 @@
-import type { FieldTimestampValue } from '@rstore/shared'
+import type { FieldTimestampValue } from '@rstore/multiplayer/clock'
 import type { InitAckMessage, InitErrorMessage, SubscriptionMessage, SubscriptionRejectedMessage, SubscriptionUpdateMessage } from './utils/realtime'
 // @ts-expect-error virtual module
 import { scopeId as drizzleScopeId, wsAutoReconnect, wsClientEndpoint, wsHeartbeatInterval } from '#build/$rstore-drizzle-config.js'
-import { compareHLC } from '@rstore/core'
+import { compareHLC } from '@rstore/multiplayer/clock'
 import { definePlugin, realtimeReconnectEventHook } from '@rstore/vue'
 import { useWebSocket } from '@vueuse/core'
 import { watch } from 'vue'
 import { getRstoreDrizzleClientId } from './utils/client-id'
 import { getSubscriptionId, RSTORE_DRIZZLE_PROTOCOL_VERSION } from './utils/realtime'
+import { applyRealtimeUpdate } from './utils/realtime-apply'
 import { createRealtimeReadyGate } from './utils/realtime-ready'
 import { maxPayloadStamp, stampToDate } from './utils/realtime-stamps'
 
@@ -113,45 +114,14 @@ export default definePlugin({
       hook('init', ({ store }) => {
         storeRef = store
 
+        /** Write the frame, then track the newest stamp of its collection. */
         function applyUpdate(u: SubscriptionUpdateMessage) {
-          const collection = store.$collections.find(c => c.name === u.collection)
-          if (!collection) {
-            throw new Error(`Collection ${u.collection} not found`)
-          }
-
+          applyRealtimeUpdate(store, u)
           const stamp = maxPayloadStamp(u)
           if (stamp !== undefined) {
-            const prev = lastStampPerCollection.get(collection.name)
+            const prev = lastStampPerCollection.get(u.collection)
             if (prev === undefined || compareHLC(stamp, prev) > 0) {
-              lastStampPerCollection.set(collection.name, stamp)
-            }
-          }
-
-          switch (u.type) {
-            case 'created':
-            case 'updated': {
-              const key = collection.getKey(u.record)
-              if (key == null) {
-                throw new Error(`Key not found for collection ${collection.name}`)
-              }
-              store.$cache.writeItem({
-                collection,
-                key,
-                item: u.record,
-                fieldTimestamps: u.fieldTimestamps,
-              })
-              break
-            }
-            case 'deleted': {
-              const key = u.key
-              if (key == null) {
-                throw new Error(`Key not found for collection ${collection.name}`)
-              }
-              store.$cache.deleteItem({
-                collection,
-                key,
-                deletedAt: u.deletedAt,
-              })
+              lastStampPerCollection.set(u.collection, stamp)
             }
           }
         }

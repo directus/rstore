@@ -33,6 +33,9 @@ const sourceAliases = [
   { find: /^@rstore\/connector-toolkit\/vite$/, replacement: sourceEntry('connector-toolkit', 'src/vite/index.ts') },
 ]
 
+/** Exact `@rstore/multiplayer` entries, for projects that do not alias every package. */
+const multiplayerSourceAliases = sourceAliases.filter(({ find }) => find.source.startsWith('^@rstore\\/multiplayer'))
+
 /**
  * The shared test helpers, reachable as `#test-utils/…` from any package.
  *
@@ -111,8 +114,12 @@ export default defineConfig({
       },
       {
         resolve: {
-          // Protocol consumers must validate against the current Shared source.
-          alias: [{ find: /^@rstore\/shared$/, replacement: sourceEntry('shared') }],
+          // Protocol consumers must validate against the current Shared and
+          // Multiplayer sources.
+          alias: [
+            { find: /^@rstore\/shared$/, replacement: sourceEntry('shared') },
+            ...multiplayerSourceAliases,
+          ],
         },
         test: {
           name: 'nuxt',

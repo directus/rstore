@@ -29,7 +29,7 @@ describe('public schema builders', () => {
 
   it('rejects a separately declared relation whose owner is absent from the schema', async () => {
     const { posts, relations } = schema()
-    await expect(createVueStack({ schema: [posts, relations], remote: false, tombstoneGc: false }))
+    await expect(createVueStack({ schema: [posts, relations], remote: false }))
       .rejects
       .toThrow('Collection "users" not found in store')
   })

@@ -1,11 +1,13 @@
 import { createVueStack } from '#test-utils/store/vueStack'
+import { createMultiplayerPlugin } from '@rstore/multiplayer'
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 
-/** A real editor and subscribed reader sharing persisted document state. */
+/** A real editor and subscribed reader sharing persisted document state; text merges come from the multiplayer plugin. */
 async function setup() {
   const stack = await createVueStack({
     schema: [{ name: 'documents' }],
+    plugins: [createMultiplayerPlugin({ tombstoneGc: false })],
     data: { documents: [{ id: '1', body: 'Hello world', count: 0, status: 'draft' }] },
   })
   const query = await stack.run(() => stack.store.documents.liveQuery((q: any) => q.first('1')))

@@ -1,6 +1,7 @@
 import type { StoreSchema } from '@rstore/shared'
 import { hydrate } from '#test-utils/store/ssr'
 import { createVueStack } from '#test-utils/store/vueStack'
+import { createMultiplayerPlugin, getFieldTimestamps } from '@rstore/multiplayer'
 import { describe, expect, it, vi } from 'vitest'
 import { isProxy, nextTick, toRaw } from 'vue'
 import { defineModule, realtimeReconnectEventHook } from '../../src'
@@ -219,20 +220,20 @@ describe('ssr hydration round trip', () => {
 
 describe('causality across hydration', () => {
   it.each([0, 1, '1', '01', 'p1'])('preserves causal ordering after hydration for key %j', async (key) => {
-    const server = await createSide(true)
+    const server = await createVueStack({ schema, data: rows(), isServer: true, plugins: [createMultiplayerPlugin({ tombstoneGc: false })] })
     const collection = server.store.$collections.find((c: any) => c.name === 'posts')!
     await server.store.posts.findMany()
-    // A CRDT collection: the server holds a value stamped at 200 and the
-    // tombstone of an item deleted at 300.
+    // With createMultiplayerPlugin(), the server holds a value stamped at 200
+    // and the tombstone of an item deleted at 300.
     server.store.$cache.writeItem({
       collection,
       key,
       item: { id: key, title: 'Server title', author_id: 'a1' },
-      fieldTimestamps: { title: 200 },
+      metadata: { fieldTimestamps: { title: 200 } },
     })
-    server.store.$cache.deleteItem({ collection, key: 'p3', deletedAt: 300 })
+    server.store.$cache.deleteItem({ collection, key: 'p3', metadata: { deletedAt: 300 } })
 
-    const client = await createSide(false)
+    const client = await createVueStack({ schema, data: rows(), isServer: false, plugins: [createMultiplayerPlugin({ tombstoneGc: false })] })
     hydrate(client.store.$cache, server.store.$cache.getState())
     const clientCollection = client.store.$collections.find((c: any) => c.name === 'posts')!
 
@@ -243,18 +244,18 @@ describe('causality across hydration', () => {
       collection: clientCollection,
       key,
       item: { id: key, title: 'Stale title' },
-      fieldTimestamps: { title: 100 },
+      metadata: { fieldTimestamps: { title: 100 } },
     })
     client.store.$cache.writeItem({
       collection: clientCollection,
       key: 'p3',
       item: { id: 'p3', title: 'Resurrected', author_id: 'a2' },
-      fieldTimestamps: { title: 100 },
+      metadata: { fieldTimestamps: { title: 100 } },
     })
     await nextTick()
 
     expect(client.store.posts.peekFirst(key).title).toBe('Server title')
-    expect(client.store.$cache.readFieldTimestamps({ collectionName: 'posts', key })).toMatchObject({ title: 200 })
+    expect(getFieldTimestamps(client.store, 'posts', key)).toMatchObject({ title: 200 })
     expect(client.store.posts.peekFirst('p3')).toBeFalsy()
   })
 

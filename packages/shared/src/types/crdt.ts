@@ -1,6 +1,10 @@
+// Import these types from `@rstore/multiplayer/clock`, `/lww` and `/text`. They are defined
+// here for one minor (0.9) so that @rstore/shared needs no dependency on
+// @rstore/multiplayer, which re-exports them; the definitions move there in 0.10.
+
 /**
  * A single field timestamp value. Either a legacy wall-clock number or a
- * serialized Hybrid Logical Clock string (see `@rstore/core`'s `hlc.ts`).
+ * serialized Hybrid Logical Clock string (see `@rstore/multiplayer/clock`).
  *
  * HLC strings sort lexicographically in causal order, so both forms can be
  * compared with the same helper (`compareHLC`).

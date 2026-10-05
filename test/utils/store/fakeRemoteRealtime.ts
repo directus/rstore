@@ -3,12 +3,13 @@ import type { FieldTimestamps, FieldTimestampValue } from '@rstore/shared'
 /**
  * Realtime frame delivery for {@link import('./fakeRemote').createFakeRemote}.
  *
- * Frames land through `store.$cache.writeItem({ ..., fieldTimestamps })` and
- * `store.$cache.deleteItem({ ..., deletedAt })` — the exact contract real
- * connectors use (`packages/nuxt-drizzle/src/runtime/plugin-realtime.ts:137`).
+ * Frames land through `store.$cache.writeItem({ ..., metadata: { fieldTimestamps } })`
+ * and `store.$cache.deleteItem({ ..., metadata: { deletedAt } })` — the contract
+ * real connectors use (`packages/nuxt-drizzle/src/runtime/plugin-realtime.ts`).
  * Writing through `store.$collection(c).writeItem(item)` instead, as this
- * harness used to, bypasses CRDT field merge and tombstones, so no test above
- * the connector could fail when that path broke.
+ * harness used to, bypasses the cache hooks that `createMultiplayerPlugin()`
+ * uses for field merge and tombstones, so no test above the connector could
+ * fail when that path broke.
  */
 
 /** A realtime frame pushed into open subscriptions by `FakeRemote.emit`. */
@@ -51,7 +52,7 @@ export function deliverFrame(store: any, frame: FakeRemoteFrame): void {
     store.$cache.deleteItem({
       collection,
       key: frame.key,
-      deletedAt: frame.deletedAt,
+      metadata: frame.deletedAt != null ? { deletedAt: frame.deletedAt } : undefined,
     })
     return
   }
@@ -64,6 +65,6 @@ export function deliverFrame(store: any, frame: FakeRemoteFrame): void {
     collection,
     key,
     item: frame.item,
-    fieldTimestamps: frame.fieldTimestamps,
+    metadata: frame.fieldTimestamps ? { fieldTimestamps: frame.fieldTimestamps } : undefined,
   })
 }

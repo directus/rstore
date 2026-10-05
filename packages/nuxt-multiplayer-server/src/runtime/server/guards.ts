@@ -1,8 +1,8 @@
-/** Compatibility runtime facade for the canonical Shared multiplayer guards. */
+/** Compatibility runtime facade for the canonical multiplayer protocol guards. */
 export {
   isMultiplayerId,
   isMultiplayerMessage,
   isMultiplayerTextCursor,
   isMultiplayerUser,
   parseMultiplayerMessage,
-} from '@rstore/shared'
+} from '@rstore/multiplayer/protocol'

@@ -18,6 +18,7 @@ await store.todos.delete('1')
 
 - Runs delete mutation hooks.
 - Removes item from cache when applicable.
+- Accepts `options.metadata` (write metadata), exposed read-only to the `deleteItem` hook as `payload.metadata`.
 
 ## Requirements
 

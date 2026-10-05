@@ -287,6 +287,12 @@ const { data: todos } = await store.todos.liveQuery(q => q.many())
 </script>
 ```
 
+### Concurrent edits <Badge text="New in v0.9" />
+
+Every published frame is stamped with a Hybrid Logical Clock (`fieldTimestamps` on `created`/`updated`, `deletedAt` on `deleted`). With `ws` enabled, the module installs [`createMultiplayerPlugin({ lww: true, formTextMerge: false })`](../guide/data/collaboration.md) from `@rstore/multiplayer`, which merges those stamps field by field and keeps tombstones, so a delayed frame never overwrites a newer value or resurrects a deleted row. Set [`ws.lww: false`](#ws-lww) to opt out, for example to register the multiplayer plugin yourself with form text merge enabled.
+
+Each server instance owns its clock; set `RSTORE_DRIZZLE_NODE_ID` to give it a stable node id (otherwise a random one is picked per process).
+
 When the websocket reconnects, the runtime plugin re-sends active subscriptions and then triggers `realtimeReconnectEventHook` from `@rstore/vue`. Existing `liveQuery` instances listen to that hook and call `refresh()`, which helps recover updates missed while the client was disconnected.
 
 ::: tip External realtime server
@@ -450,6 +456,73 @@ export default defineNuxtConfig({
 All the usual `before` / `after` hooks (`item.get.before`, `index.post.before`, etc.) still fire per-op inside a batch, so permission checks and query transforms keep working unchanged.
 
 A failing op carries its HTTP status back to the client, so an error thrown with `createError` in a hook behaves identically batched and unbatched.
+
+## Collab op log store <Badge text="Experimental" type="warning" />
+
+`createDrizzleOpLogStore` from `@rstore/nuxt-drizzle/collab` stores [collab documents](../guide/data/collaborative-documents.md) in your database: the block rows in an ordinary table (an rstore collection, so documents stay queryable), plus an op log and one row per document. Use it as the `store` of `defineRstoreCollab()` ([Nuxt Multiplayer Server](./nuxt-multiplayer-server.md#collab-documents)) or of `createCollabServer`.
+
+```ts
+// server/database/schema.ts (SQLite; use jsonb, boolean and bigint columns on Postgres)
+export const docNodes = sqliteTable('doc_nodes', {
+  id: text('id').notNull(),
+  docId: text('doc_id').notNull(),
+  parentId: text('parent_id'),
+  orderKey: text('order_key').notNull(),
+  type: text('type').notNull(),
+  attrs: text('attrs', { mode: 'json' }).notNull(),
+  content: text('content', { mode: 'json' }),
+  deleted: integer('deleted', { mode: 'boolean' }).notNull(),
+  version: integer('version').notNull(),
+}, table => [primaryKey({ columns: [table.docId, table.id] })])
+
+export const collabOps = sqliteTable('collab_ops', {
+  docId: text('doc_id').notNull(),
+  version: integer('version').notNull(),
+  clientId: text('client_id').notNull(),
+  seq: integer('seq').notNull(),
+  userId: text('user_id'),
+  ops: text('ops', { mode: 'json' }).notNull(),
+  time: integer('time').notNull(),
+}, table => [
+  primaryKey({ columns: [table.docId, table.version] }),
+  uniqueIndex('collab_ops_submission').on(table.docId, table.clientId, table.seq),
+])
+
+export const collabDocs = sqliteTable('collab_docs', {
+  docId: text('doc_id').primaryKey(),
+  head: integer('head').notNull(),
+  floor: integer('floor').notNull(),
+})
+```
+
+```ts
+// server/plugins/collab.ts
+import { createDrizzleOpLogStore } from '@rstore/nuxt-drizzle/collab'
+import { collabDocs, collabOps, docNodes } from '../database/schema'
+
+export default defineNitroPlugin(() => {
+  defineRstoreCollab({
+    store: createDrizzleOpLogStore({
+      db: useDrizzle(),
+      tables: { nodes: docNodes, ops: collabOps, docs: collabDocs },
+      // Rows written by the sequencer reach non-collab subscribers (document lists, search).
+      onAppend: (_docId, _entry, nodes) => {
+        for (const record of nodes) {
+          publishRstoreDrizzleRealtimeUpdate({ collection: 'docNodes', type: 'updated', record })
+        }
+      },
+    }),
+  })
+})
+```
+
+- Default columns use these property names; SQL names are free. `attrs`, `content` and `ops` map to objects; `deleted` maps to a boolean. Node ids may repeat across documents, so enforce unique `(docId, id)` as shown. Pass `mapping` when existing tables use aliases or require extra row values.
+- `append` runs in one transaction (op log row, document head, block rows). `transaction` can own tenant/RLS setup; `appendGuard` rechecks current access and `persistAppend` writes a durable outbox in that same transaction. Both receive `{ tx, docId, entry, nodes, appendContext? }`; `appendContext` comes from collab authorization and is never persisted. A guard returns `forbidden` or `unavailable` to reject without ack or broadcast.
+- The unique `(docId, version)` catches a second writer, which then rebases and retries. SQLite lock errors (`SQLITE_BUSY`) are retried; use WAL mode (`PRAGMA journal_mode = WAL`). Drivers without async transactions (better-sqlite3, D1) are not supported.
+- `retention` (`{ minOps, maxAgeMs }`) and `compact` work like the [memory store](../guide/data/collaborative-documents.md#op-log-stores). Compaction raises the floor only, erases old op content, and retains submission identity; it never deletes block rows.
+- `onAppend` runs after commit. Use `onAppendError` for publication failures: neither callback can make a committed append retry.
+- A new document needs no row in `collab_docs`: its head is 0. Create its first blocks with `version: 0`.
+- Register the multiplayer plugin with `ot: { collections: ['docNodes'] }` on the client, so realtime frames of the block rows are ordered by version (`ws.lww` already installs the plugin: set it to `false` and install your own with both options).
 
 ## Hooks
 
@@ -642,7 +715,7 @@ export default defineNuxtConfig({
 | `apiPath`           | `string`                                                    | `'/api/rstore'`                       | Base path of the generated REST + batch API routes.                         |
 | `drizzleConfigPath` | `string`                                                    | `'drizzle.config.ts'`                 | Path to the Drizzle Kit config file, relative to the project root.          |
 | `drizzleImport`     | `{ name: string, from: string }`                            | `{ name: 'useDrizzle', from: '~~/server/utils/drizzle' }` | Import used on the server to get the Drizzle instance.          |
-| `ws`                | `boolean \| { apiPath?: string, clientEndpoint?: string, heartbeatInterval?: number, autoReconnect?: boolean \| { retries?: number, delay?: number } }`  | `false`                               | Enables WebSocket-based realtime updates. See [Realtime Updates](#realtime-updates). |
+| `ws`                | `boolean \| { apiPath?: string, clientEndpoint?: string, heartbeatInterval?: number, autoReconnect?: boolean \| { retries?: number, delay?: number }, lww?: boolean }`  | `false`                               | Enables WebSocket-based realtime updates. See [Realtime Updates](#realtime-updates). |
 | `offline`           | `boolean \| OfflinePluginOptions`                           | `false`                               | Enables the offline plugin. See [Offline Mode](#offline-mode).              |
 
 ### apiPath
@@ -787,6 +860,21 @@ export default defineNuxtConfig({
         retries: 10,
         delay: 2000,
       },
+    },
+  },
+})
+```
+
+#### ws.lww <Badge text="New in v0.9" />
+
+Install the multiplayer LWW plugin (`createMultiplayerPlugin({ lww: true, formTextMerge: false })` from `@rstore/multiplayer`). Default `true`. With `false`, stamped frames overwrite cached rows and deletes leave no tombstone; register your own multiplayer plugin instead if you need it with other options. Do not register it in addition to the default one.
+
+```ts
+export default defineNuxtConfig({
+  modules: ['@rstore/nuxt-drizzle'],
+  rstoreDrizzle: {
+    ws: {
+      lww: false,
     },
   },
 })
@@ -970,6 +1058,10 @@ interface SubscriptionUpdateMessage {
    * `init.clientId` matches.
    */
   originClientId?: string
+  /** Per-field HLC stamps of a `created` / `updated` row. */
+  fieldTimestamps?: Record<string, string | number>
+  /** HLC stamp of a `deleted` row. */
+  deletedAt?: string | number
 }
 ```
 
@@ -1002,9 +1094,11 @@ On receipt, the client reacts as follows:
 
 | `type`    | Action on the normalized cache                                                    |
 | --------- | --------------------------------------------------------------------------------- |
-| `created` | `store.$cache.writeItem({ collection, key: collection.getKey(record), item: record })` |
+| `created` | `store.$cache.writeItem({ collection, key: collection.getKey(record), item: record, metadata: { fieldTimestamps } })` |
 | `updated` | same as `created` (upsert by key)                                                 |
-| `deleted` | `store.$cache.deleteItem({ collection, key })`                                    |
+| `deleted` | `store.$cache.deleteItem({ collection, key, metadata: { deletedAt } })`           |
+
+The stamps are merged by the multiplayer plugin (see [Concurrent edits](#concurrent-edits)); frames without stamps are plain writes.
 
 Because the `created` / `updated` branches both derive the key from `record` via the collection's `getKey` function, a custom server only needs to send a complete `record` for those types. For `deleted`, include both `record` and `key` — the key is the authoritative identifier and `record` is kept for consistency and for future hook payloads.
 

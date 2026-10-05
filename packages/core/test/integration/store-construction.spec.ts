@@ -23,7 +23,7 @@ describe('createStoreCore', () => {
 
   /** Supply a real cache with matching schema; storage workflows use the normal stack. */
   async function createSubject() {
-    const donor = await createVueStack({ schema: options.schema, remote: false, tombstoneGc: false, syncImmediately: false })
+    const donor = await createVueStack({ schema: options.schema, remote: false, syncImmediately: false })
     cache = donor.cache
     return createStoreCore({ ...options, cache })
   }

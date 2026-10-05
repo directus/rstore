@@ -26,9 +26,9 @@ export const blogSchema: StoreSchema = [
   },
 ]
 
-/** Create a real Vue cache stack with tombstone timers disabled for item-GC tests. */
+/** Create a real Vue cache stack for item-GC tests. */
 export function createGarbageCollectionStack(options: VueStackOptions): Promise<VueStack> {
-  return createVueStack({ tombstoneGc: false, ...options })
+  return createVueStack(options)
 }
 
 /** Read a cached item through the public cache API. */

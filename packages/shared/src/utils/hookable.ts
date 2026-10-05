@@ -100,6 +100,15 @@ export class Hookable<
   }
 
   /**
+   * Whether at least one callback is registered for `name`.
+   *
+   * Lets hot paths skip building a payload nobody would receive.
+   */
+  hasHook(name: HookNameT): boolean {
+    return !!this._hooks[name]?.length
+  }
+
+  /**
    * Create a handle that stops one dispatch.
    *
    * By default it applies to the next `callHook`, preserving the original API.

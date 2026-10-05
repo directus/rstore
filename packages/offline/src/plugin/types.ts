@@ -1,4 +1,4 @@
-import type { ResolvedCollection } from '@rstore/shared'
+import type { CustomCacheWriteMetadata, ResolvedCollection } from '@rstore/shared'
 import type { useIndexedDb } from '../indexeddb'
 
 export interface CreateOfflinePluginOptions {
@@ -52,6 +52,8 @@ export interface QueuedMutation {
   key?: string | number
   /** Item payload for create/update replay. */
   item?: any
+  /** Write metadata of the mutation, replayed with it. */
+  metadata?: CustomCacheWriteMetadata
   /** Queue insertion time. */
   time: Date
 }
@@ -68,6 +70,8 @@ export interface QueuedManyMutation {
   keys?: Array<string | number>
   /** Item payloads for create/update replay. */
   items?: Array<any>
+  /** Write metadata of the mutation, replayed with it. */
+  metadata?: CustomCacheWriteMetadata
   /** Queue insertion time. */
   time: Date
 }
@@ -89,6 +93,10 @@ export interface OfflinePluginRuntime {
    * instead of replaying the queued operations twice.
    */
   pendingSync?: Promise<void>
+  /** Tail of the chained item metadata writes to IndexedDB. */
+  itemMetadataWrites?: Promise<void>
+  /** Whether the persisted item metadata was restored into the cache. */
+  itemMetadataRestored?: boolean
 }
 
 export type OfflineQueuedOperation = QueuedMutation | QueuedManyMutation

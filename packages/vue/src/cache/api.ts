@@ -1,9 +1,10 @@
 import type { Cache, CollectionDefaults, CustomCacheState, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CacheRuntime, VueCachePrivate } from './types'
-import { gcTombstones } from '@rstore/core'
 import { ref, toRaw, toValue } from 'vue'
 import { getCollectionIndex, invalidateCollectionStateCache } from './context'
+import { createDeprecatedCacheMethods, mapDeleteItemAliases, mapWriteItemAliases } from './deprecatedAliases'
 import { rebuildIndexes } from './indexes'
+import { clearItemMetadataForCollection, createItemMetadataApi, serializeItemMetadata } from './itemMetadata'
 import { ensureLayersForCollection, getStateForCollection } from './layers'
 import { applyMutationToCache } from './mutations'
 import { clearQueryStateForCollection } from './queryState'
@@ -16,7 +17,7 @@ export function createCacheApi<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
 >(ctx: CacheRuntime<TSchema, TCollectionDefaults>): Cache & VueCachePrivate {
-  return {
+  const cache: Cache & VueCachePrivate = {
     wrapItem({ collection, item, noCache }) {
       return getWrappedItem(ctx, collection, item, noCache)!
     },
@@ -27,7 +28,7 @@ export function createCacheApi<
       return readItems(ctx, params)
     },
     writeItem(params) {
-      enqueueOperation(ctx, { type: 'writeItem', params })
+      enqueueOperation(ctx, { type: 'writeItem', params: mapWriteItemAliases(ctx, params) })
     },
     writeItems(params) {
       enqueueWriteItems(ctx, params)
@@ -39,19 +40,9 @@ export function createCacheApi<
       return applyMutationToCache(ctx, params)
     },
     deleteItem(params) {
-      enqueueOperation(ctx, { type: 'deleteItem', params })
+      enqueueOperation(ctx, { type: 'deleteItem', params: mapDeleteItemAliases(ctx, params) })
     },
-    readFieldTimestamps({ collectionName, key }) {
-      return ctx.state.fieldTimestamps.get(collectionName)?.get(key)
-    },
-    writeFieldTimestamps({ collectionName, key, timestamps }) {
-      let collectionTs = ctx.state.fieldTimestamps.get(collectionName)
-      if (!collectionTs) {
-        collectionTs = new Map()
-        ctx.state.fieldTimestamps.set(collectionName, collectionTs)
-      }
-      collectionTs.set(key, { ...timestamps })
-    },
+    ...createDeprecatedCacheMethods(ctx, () => cache),
     getModuleState(name, key, initState) {
       const cacheKey = `${name}:${key}`
       if (!ctx.state.modules[cacheKey]) {
@@ -90,14 +81,6 @@ export function createCacheApi<
     removeLayer(layerId) {
       enqueueOperation(ctx, { type: 'removeLayer', layerId })
     },
-    tombstones: {
-      get: (c, k) => ctx.state.tombstones.get(c, k),
-      entries: () => ctx.state.tombstones.entries(),
-      size: () => ctx.state.tombstones.size(),
-    },
-    gcTombstones(olderThan) {
-      return gcTombstones(ctx.state.tombstones, olderThan)
-    },
     pause() {
       ctx.state.paused = true
     },
@@ -105,9 +88,14 @@ export function createCacheApi<
       ctx.state.paused = false
       flushQueuedOperations(ctx)
     },
+    itemMetadata: createItemMetadataApi(ctx),
     dispose() {
-      ctx.stopTombstoneGc?.()
-      ctx.stopTombstoneGc = undefined
+      if (ctx.disposed) {
+        return
+      }
+      ctx.disposed = true
+      const store = ctx.getStore()
+      store.$hooks.callHookSync('dispose', { store })
     },
     _private: {
       state: ctx.state,
@@ -120,6 +108,7 @@ export function createCacheApi<
       prune: params => enqueueOperation(ctx, { type: 'prune', params }),
     },
   } satisfies Cache & VueCachePrivate as any
+  return cache
 }
 
 function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit, indexKey, indexValue }: Parameters<Cache['readItems']>[0]) {
@@ -160,21 +149,7 @@ function getState(ctx: CacheRuntime): CustomCacheState {
     markers: toValue(ctx.state.markers),
     modules: {},
     queryMeta: ctx.state.queryMeta,
-    fieldTimestamps: {},
-    // Serialized as a list: `TombstoneStore` is a Map behind an interface, and
-    // the payload has to survive JSON/devalue.
-    tombstones: Array.from(ctx.state.tombstones.entries(), ([, tombstone]) => ({
-      collection: tombstone.collection,
-      key: tombstone.key,
-      deletedAt: tombstone.deletedAt,
-    })),
-  }
-
-  for (const [collectionName, keys] of ctx.state.fieldTimestamps) {
-    const target: Record<string | number, any> = result.fieldTimestamps![collectionName] = {}
-    for (const [key, timestamps] of keys) {
-      target[key] = { ...timestamps }
-    }
+    itemMetadata: serializeItemMetadata(ctx),
   }
 
   for (const collectionName in ctx.state.collections) {
@@ -201,18 +176,13 @@ function getState(ctx: CacheRuntime): CustomCacheState {
 function clearCollection(ctx: CacheRuntime, collection: Parameters<Cache['clearCollection']>[0]['collection']) {
   clearQueryStateForCollection(ctx, collection.name)
   invalidateCollectionStateCache(ctx, collection.name)
-  ctx.state.fieldTimestamps.delete(collection.name)
-  const tombIds = Array.from(ctx.state.tombstones.entries(), ([, t]) => t)
-    .filter(t => t.collection === collection.name)
-  for (const t of tombIds) {
-    ctx.state.tombstones.clear(t.collection, t.key)
-  }
+  clearItemMetadataForCollection(ctx, collection.name)
   const itemsForType = ctx.state.collections[collection.name]
   if (!itemsForType) {
     return
   }
   for (const key in itemsForType.value) {
-    enqueueOperation(ctx, { type: 'deleteItem', params: { collection, key } })
+    enqueueOperation(ctx, { type: 'deleteItem', params: { collection, key }, bypassHooks: true })
   }
 }
 

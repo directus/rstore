@@ -116,9 +116,10 @@ describe('useRstoreMultiplayerField', () => {
     api.onBlur()
     vi.runAllTimers()
 
-    // Channel-level: each hook independently signaled, so clearFocus
-    // was called exactly once for the title hook's blur.
+    // The title hook signals its own blur; the channel ignores it because
+    // its focused field is now 'body'.
     expect(channel.clearFocus).toHaveBeenCalledTimes(1)
+    expect(channel.clearFocus).toHaveBeenCalledWith('title')
   })
 
   it('does not call setFocusedField on a blur without a prior focus', () => {

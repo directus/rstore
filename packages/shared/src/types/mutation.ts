@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
+import type { CustomCacheWriteMetadata } from './cacheMetadata'
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StoreSchema } from './collection'
-import type { FieldTimestamps, FieldTimestampValue } from './crdt'
+import type { DeprecatedCacheDeleteAliases, DeprecatedCacheWriteAliases } from './deprecatedAliases'
 import type { FormObjectBase } from './form'
 import type { FormOperation } from './formOperation'
 import type { GlobalStoreType } from './global'
@@ -48,7 +49,7 @@ export interface ApplyMutationOptions<
   TCollection extends Collection = Collection,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
   TSchema extends StoreSchema = StoreSchema,
-> {
+> extends DeprecatedCacheWriteAliases, DeprecatedCacheDeleteAliases {
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
   mutation: CollectionMutationType
   key?: string | number
@@ -58,8 +59,8 @@ export interface ApplyMutationOptions<
   result?: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
   results?: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
   meta?: CustomHookMeta
-  fieldTimestamps?: FieldTimestamps
-  deletedAt?: FieldTimestampValue
+  /** Opaque data forwarded to every cache write/delete this mutation produces. */
+  metadata?: CustomCacheWriteMetadata
 }
 
 export interface FinalizeMutationOptions<

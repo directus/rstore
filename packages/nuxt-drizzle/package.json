@@ -20,17 +20,21 @@
   },
   "exports": {
     ".": {
-      "types": "./dist/types.d.ts",
+      "types": "./dist/module.d.ts",
       "import": "./dist/module.mjs",
       "require": "./dist/module.cjs"
     },
     "./realtime": {
       "types": "./dist/runtime/realtime-protocol.d.ts",
       "import": "./dist/runtime/realtime-protocol.js"
+    },
+    "./collab": {
+      "types": "./dist/runtime/collab-oplog.d.ts",
+      "import": "./dist/runtime/collab-oplog.js"
     }
   },
   "main": "./dist/module.cjs",
-  "types": "./dist/types.d.ts",
+  "types": "./dist/module.d.ts",
   "files": [
     "dist",
     "skills"
@@ -43,14 +47,16 @@
     "dev:build": "nuxi build playground",
     "test": "RSTORE_TEST_PACKAGE=nuxt-drizzle pnpm -w exec vitest run --config vitest.config.ts",
     "test:watch": "RSTORE_TEST_PACKAGE=nuxt-drizzle pnpm -w exec vitest watch --config vitest.config.ts",
-    "test:types": "vue-tsc --noEmit",
-    "prepack": "node ../../scripts/sync-dep-skills.mjs ."
+    "test:types": "vue-tsc --noEmit && pnpm run test:types:public",
+    "prepack": "node ../../scripts/sync-dep-skills.mjs .",
+    "test:types:public": "tsc --noEmit -p test/tsconfig.public-types.json"
   },
   "peerDependencies": {
     "drizzle-orm": "*"
   },
   "dependencies": {
     "@nuxt/kit": "^4.0.0",
+    "@rstore/multiplayer": "workspace:^",
     "@rstore/nuxt": "workspace:^",
     "@rstore/offline": "workspace:^",
     "@rstore/shared": "workspace:^",
@@ -62,6 +68,8 @@
     "superjson": "^2.2.3"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "0.5.8",
+    "@libsql/client": "catalog:",
     "@nuxt/devtools": "^2.3.0",
     "@nuxt/module-builder": "^0.8.4",
     "@nuxt/schema": "catalog:",

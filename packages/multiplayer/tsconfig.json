@@ -1,0 +1,34 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
+    "moduleResolution": "Node",
+    // Tests import the public subpaths; map them to sources so type checks
+    // need no prior build.
+    "paths": {
+      "@rstore/multiplayer": [
+        "./src/index.ts"
+      ],
+      "@rstore/multiplayer/*": [
+        "./src/*/index.ts"
+      ]
+    },
+    "strict": true,
+    "noImplicitOverride": true,
+    "noImplicitThis": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true
+  },
+  "include": [
+    "src",
+    "test",
+    "e2e"
+  ],
+  // Store-backed suites import `@rstore/vue` and `#test-utils`; they are
+  // type-checked by the root `tsconfig.integration.json`.
+  "exclude": [
+    "test/integration"
+  ]
+}

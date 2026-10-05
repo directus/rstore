@@ -10,7 +10,6 @@ function setup(title = 'One') {
   return createVueStack({
     schema: [{ name: 'todos' }],
     data: { todos: [{ id: '1', title }, { id: '2', title: 'Two' }] },
-    tombstoneGc: false,
   })
 }
 

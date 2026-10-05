@@ -1,61 +1,26 @@
-import { addServerHandler, addServerImports, addTemplate, createResolver, defineNuxtModule } from '@nuxt/kit'
+import type { RstoreMultiplayerServerModuleOptions } from './options'
+import { addServerHandler, addServerImports, addServerTemplate, createResolver, defineNuxtModule } from '@nuxt/kit'
+import { DEFAULT_SERVER_MODULE_OPTIONS, renderServerConfigTemplate, resolveServerModuleOptions } from './options'
 
+export type { RstoreMultiplayerServerModuleOptions } from './options'
+export type { RstoreCollabOptions, RstoreCollabPeer } from './runtime/server/collab'
 export * from './runtime/server/guards'
 export * from './runtime/server/hooks'
-export * from './runtime/server/identity'
-export * from './runtime/server/origin'
-export * from './runtime/server/rooms'
 export * from './runtime/server/types'
-
-export interface RstoreMultiplayerServerModuleOptions {
-  /**
-   * WebSocket endpoint the handler is mounted on.
-   *
-   * @default '/api/rstore-multiplayer/ws'
-   */
-  endpoint?: string
-  /**
-   * Maximum number of peers allowed in a single room. Excess joins are
-   * silently rejected.
-   *
-   * @default 100
-   */
-  maxRoomSize?: number
-  /**
-   * Maximum payload size in bytes. Frames larger than this are dropped
-   * (but the connection stays open).
-   *
-   * @default 16384
-   */
-  maxMessageBytes?: number
-  /**
-   * Per-peer rate limit configuration. Pass `false` or `null` to disable.
-   *
-   * @default { capacity: 60, refillPerSecond: 30 }
-   */
-  rateLimit?: { capacity: number, refillPerSecond: number } | false | null
-  /**
-   * Origins accepted at WebSocket upgrade time. By default only
-   * same-origin upgrades are allowed (the `Origin` header host must match
-   * the request `Host`) — this blocks cross-site WebSocket hijacking.
-   * Provide an array of extra allowed origins (e.g.
-   * `['https://app.example.com']`) or `false` to disable the check.
-   *
-   * @default undefined (same-origin only)
-   */
-  allowedOrigins?: string[] | false
-}
-
-// `allowedOrigins` intentionally has no default entry — `undefined` means
-// "same-origin only", which is the safe default enforced at runtime.
-const DEFAULT_OPTIONS: Required<Omit<RstoreMultiplayerServerModuleOptions, 'rateLimit' | 'allowedOrigins'>> & {
-  rateLimit: { capacity: number, refillPerSecond: number } | null
-} = {
-  endpoint: '/api/rstore-multiplayer/ws',
-  maxRoomSize: 100,
-  maxMessageBytes: 16 * 1024,
-  rateLimit: { capacity: 60, refillPerSecond: 30 },
-}
+// Compatibility exports: the room server lives in `@rstore/multiplayer/server`.
+export {
+  isOriginAllowed,
+  PeerIdentityStore,
+  PeerRateLimiter,
+  Room,
+  RoomRegistry,
+} from '@rstore/multiplayer/server'
+export type {
+  MultiplayerAllowedOrigins,
+  PeerIdentity,
+  RoomPeer,
+  TokenBucketOptions,
+} from '@rstore/multiplayer/server'
 
 export default defineNuxtModule<RstoreMultiplayerServerModuleOptions>({
   meta: {
@@ -65,32 +30,19 @@ export default defineNuxtModule<RstoreMultiplayerServerModuleOptions>({
       nuxt: '^3.19.2 || >=4.1.2',
     },
   },
-  defaults: DEFAULT_OPTIONS as unknown as RstoreMultiplayerServerModuleOptions,
+  defaults: DEFAULT_SERVER_MODULE_OPTIONS as RstoreMultiplayerServerModuleOptions,
   setup(options, nuxt) {
     const { resolve } = createResolver(import.meta.url)
-
-    const resolved = {
-      endpoint: options.endpoint ?? DEFAULT_OPTIONS.endpoint,
-      maxRoomSize: options.maxRoomSize ?? DEFAULT_OPTIONS.maxRoomSize,
-      maxMessageBytes: options.maxMessageBytes ?? DEFAULT_OPTIONS.maxMessageBytes,
-      rateLimit:
-        options.rateLimit === false || options.rateLimit === null
-          ? null
-          : (options.rateLimit ?? DEFAULT_OPTIONS.rateLimit),
-      allowedOrigins: options.allowedOrigins,
-    }
+    const resolved = resolveServerModuleOptions(options)
 
     const nitro = ((nuxt.options as unknown as Record<string, any>).nitro ??= {}) as Record<string, any>
     nitro.experimental ??= {}
     nitro.experimental.websocket = true
 
-    addTemplate({
+    // A Nitro virtual module: server code may not import `#build` app templates.
+    addServerTemplate({
       filename: '$rstore-multiplayer-server-config.js',
-      getContents: () => `export const maxRoomSize = ${JSON.stringify(resolved.maxRoomSize)}
-export const maxMessageBytes = ${JSON.stringify(resolved.maxMessageBytes)}
-export const rateLimit = ${JSON.stringify(resolved.rateLimit)}
-export const allowedOrigins = ${JSON.stringify(resolved.allowedOrigins)}
-`,
+      getContents: () => renderServerConfigTemplate(resolved),
     })
 
     addServerHandler({
@@ -103,6 +55,13 @@ export const allowedOrigins = ${JSON.stringify(resolved.allowedOrigins)}
         name: 'rstoreMultiplayerServerHooks',
         from: resolve('./runtime/server/hooks'),
       },
+      ...(resolved.collab
+        ? ['defineRstoreCollab', 'useRstoreCollabServer'].map(name => ({ name, from: resolve('./runtime/server/collab') }))
+        : []),
     ])
+
+    // The collab client (`useRstoreCollabDocument`) connects here by default.
+    const publicConfig = nuxt.options.runtimeConfig.public as Record<string, unknown>
+    publicConfig.rstoreMultiplayerEndpoint ??= resolved.endpoint
   },
 })

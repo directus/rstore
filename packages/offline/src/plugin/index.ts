@@ -1,6 +1,7 @@
 import type { CreateOfflinePluginOptions } from './types'
 import { definePlugin } from '@rstore/core'
 import { useIndexedDb } from '../indexeddb'
+import { installItemMetadataPersistence } from './itemMetadata'
 import { createOfflineRuntime } from './metadata'
 import { installMutationHooks } from './mutations'
 import { installReconnectHook } from './reconnect'
@@ -26,6 +27,7 @@ export function createOfflinePlugin(options: CreateOfflinePluginOptions = {}) {
 
       installVersionCleanupHook(runtime, hook)
       installMutationHooks(runtime, hook)
+      installItemMetadataPersistence(runtime, hook)
       // Single ordered `sync` hook: queue replay first, then remote pull.
       installOfflineSyncHook(runtime, hook)
       if (options.reconnect !== false) {

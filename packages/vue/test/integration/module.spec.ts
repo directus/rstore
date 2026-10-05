@@ -47,6 +47,25 @@ describe('store resolution', () => {
     expect(second.state.count).toBe(5)
   })
 
+  it('builds a fresh module after `$modulesCache` is replaced', async () => {
+    const store = await setup()
+    let builds = 0
+    const factory = defineModule('counter', () => {
+      builds++
+      return { build: builds }
+    })
+
+    const first = withInjectionContext(store, () => factory()).result
+    // Test harnesses reset modules between scenarios this way; the store used
+    // to keep returning its original map, silently ignoring the assignment.
+    store.$modulesCache = new WeakMap()
+    const second = withInjectionContext(store, () => factory()).result
+
+    expect(second).not.toBe(first)
+    expect(second.build).toBe(2)
+    expect(withInjectionContext(store, () => factory()).result).toBe(second)
+  })
+
   it('deduplicates before asynchronous module resolution finishes', async () => {
     const store = await setup()
     let builds = 0

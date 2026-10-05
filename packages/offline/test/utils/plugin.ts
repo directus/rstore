@@ -137,6 +137,9 @@ export function createFakeStore(collections: any[] = []): any {
       resume: vi.fn(),
       writeItem: vi.fn(),
       deleteItem: vi.fn(),
+      itemMetadata: {
+        namespaces: () => [],
+      },
     },
     $hooks: {
       callHook: vi.fn(async () => {}),

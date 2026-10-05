@@ -21,6 +21,8 @@ rstoreDrizzle: {
 - Creates a build-time offline plugin template with provided options.
 - Adds generated offline plugin and `plugin-offline` runtime bridge.
 - Sync hook compares local keys and fetches updates by `updatedAt`.
+- The offline plugin persists item metadata namespaces registered with `persist: true` (multiplayer field stamps and tombstones from `ws`) and restores them on first sync, before queued mutations replay.
+- Queued mutations keep their write `metadata` and replay with it.
 
 ## Requirements
 

@@ -1,6 +1,6 @@
 import type { Nuxt } from '@nuxt/schema'
 import type { ModuleOptions, RealtimeResolvedOptions } from './types'
-import { addServerHandler, addServerImports, addServerPlugin } from '@nuxt/kit'
+import { addServerHandler, addServerImports, addServerPlugin, addTemplate } from '@nuxt/kit'
 
 /** Resolve realtime options and register websocket integration when enabled. */
 export function setupRealtime({
@@ -31,10 +31,29 @@ export function setupRealtime({
     })
     addServerPlugin(resolve('./runtime/server/plugins/publish-hooks'))
     addPluginImport(nuxt, resolve('./runtime/plugin-realtime'))
+    if (wsOptions.lww !== false) {
+      registerMultiplayerPlugin(nuxt, addPluginImport)
+    }
     registerRealtimeServerImports(resolve)
   }
 
   return resolved
+}
+
+/**
+ * Install the multiplayer LWW plugin, so stamped realtime frames merge field by
+ * field and deletes leave tombstones (form text merge stays opt-in).
+ */
+function registerMultiplayerPlugin(nuxt: Nuxt, addPluginImport: (nuxt: Nuxt, path: string) => void) {
+  const pluginFile = 'rstore-drizzle-multiplayer-plugin.ts'
+  addTemplate({
+    filename: pluginFile,
+    write: true,
+    getContents: () => `import { createMultiplayerPlugin } from '@rstore/multiplayer'
+export default createMultiplayerPlugin({ lww: true, formTextMerge: false })
+`,
+  })
+  addPluginImport(nuxt, `#build/${pluginFile}`)
 }
 
 function registerRealtimeServerImports(resolve: (path: string) => string) {

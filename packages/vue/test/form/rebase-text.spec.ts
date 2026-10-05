@@ -1,7 +1,11 @@
-import { createFormObject } from '@rstore/vue'
+import { textFieldMerger } from '@rstore/multiplayer'
+import { createFormObject as createVueFormObject } from '@rstore/vue'
 import { describe, expect, it } from 'vitest'
 
-describe('form CRDT rebase and conflicts', () => {
+/** A standalone form merging text with the merger `createMultiplayerPlugin()` registers. */
+const createFormObject: typeof createVueFormObject = options => createVueFormObject({ fieldMerge: textFieldMerger, ...options })
+
+describe('form text rebase with the multiplayer text merger', () => {
   it('should merge non-overlapping concurrent text edits on the same field', () => {
     const form = createFormObject({
       defaultValues: () => ({ body: 'Hello world' }),

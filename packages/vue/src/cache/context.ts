@@ -1,7 +1,9 @@
 import type { CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
 import type { CacheRuntime, CreateCacheOptions } from './types'
-import { createTombstoneStore, isKeyDefined, scheduleTombstoneGc } from '@rstore/core'
+import { isKeyDefined } from '@rstore/core'
+import { createWarnOnce } from '@rstore/shared'
 import { ref } from 'vue'
+import { createItemMetadataState } from './itemMetadata'
 
 /** Create the mutable runtime shared by all cache modules. */
 export function createCacheRuntime<
@@ -10,8 +12,6 @@ export function createCacheRuntime<
 >({
   getStore,
   cacheStaggering: rawCacheStaggering = 0,
-  tombstoneGc = {},
-  isServer = (import.meta as unknown as { server?: boolean }).server === true,
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): CacheRuntime<TSchema, TCollectionDefaults> {
   const cacheStaggering = Math.max(0, Math.floor(rawCacheStaggering))
   const runtime: CacheRuntime<TSchema, TCollectionDefaults> = {
@@ -26,9 +26,10 @@ export function createCacheRuntime<
       pageRefs: new Map(),
       paused: false,
       queue: [],
-      fieldTimestamps: new Map(),
-      tombstones: createTombstoneStore(),
+      itemMetadata: createItemMetadataState(),
     },
+    disposed: false,
+    warnOnce: createWarnOnce(),
     layers: {},
     layerIdToCollectionName: {},
     wrappedItems: new Map(),
@@ -38,14 +39,6 @@ export function createCacheRuntime<
     collectionStateCacheReactivityMarker: new Map(),
     isFlushingQueue: false,
     staggeringBudget: cacheStaggering,
-  }
-
-  const canScheduleTombstoneGc = !isServer && typeof setInterval !== 'undefined'
-  if (tombstoneGc !== false && canScheduleTombstoneGc) {
-    runtime.stopTombstoneGc = scheduleTombstoneGc(runtime.state.tombstones, {
-      intervalMs: tombstoneGc.intervalMs ?? 60_000,
-      ttlMs: tombstoneGc.ttlMs ?? 24 * 60 * 60 * 1000,
-    })
   }
 
   return runtime
@@ -105,18 +98,6 @@ export function ensureCollectionRef(ctx: CacheRuntime, collectionName: string) {
     ctx.state.collections[collectionName] = ref({})
   }
   return ctx.state.collections[collectionName]
-}
-
-/** Remove causality metadata for an evicted or deleted cache row. */
-export function removeFieldTimestampsForItem(ctx: CacheRuntime, collectionName: string, key: string | number): void {
-  const timestamps = ctx.state.fieldTimestamps.get(collectionName)
-  if (!timestamps) {
-    return
-  }
-  timestamps.delete(key)
-  if (timestamps.size === 0) {
-    ctx.state.fieldTimestamps.delete(collectionName)
-  }
 }
 
 /** Mark a query marker as fetched. */

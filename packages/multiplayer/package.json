@@ -1,0 +1,188 @@
+{
+  "name": "@rstore/multiplayer",
+  "type": "module",
+  "version": "0.8.4",
+  "description": "Framework-agnostic multiplayer building blocks for rstore: clocks, LWW, text merge, rich-text OT and wire protocol",
+  "license": "MIT",
+  "repository": {
+    "url": "https://github.com/Akryum/rstore.git",
+    "type": "git",
+    "directory": "packages/multiplayer"
+  },
+  "sideEffects": false,
+  "publishConfig": {
+    "access": "public"
+  },
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.mts",
+        "default": "./dist/index.mjs"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    },
+    "./clock": {
+      "import": {
+        "types": "./dist/clock/index.d.mts",
+        "default": "./dist/clock/index.mjs"
+      },
+      "require": {
+        "types": "./dist/clock/index.d.cts",
+        "default": "./dist/clock/index.cjs"
+      }
+    },
+    "./lww": {
+      "import": {
+        "types": "./dist/lww/index.d.mts",
+        "default": "./dist/lww/index.mjs"
+      },
+      "require": {
+        "types": "./dist/lww/index.d.cts",
+        "default": "./dist/lww/index.cjs"
+      }
+    },
+    "./text": {
+      "import": {
+        "types": "./dist/text/index.d.mts",
+        "default": "./dist/text/index.mjs"
+      },
+      "require": {
+        "types": "./dist/text/index.d.cts",
+        "default": "./dist/text/index.cjs"
+      }
+    },
+    "./presence": {
+      "import": {
+        "types": "./dist/presence/index.d.mts",
+        "default": "./dist/presence/index.mjs"
+      },
+      "require": {
+        "types": "./dist/presence/index.d.cts",
+        "default": "./dist/presence/index.cjs"
+      }
+    },
+    "./protocol": {
+      "import": {
+        "types": "./dist/protocol/index.d.mts",
+        "default": "./dist/protocol/index.mjs"
+      },
+      "require": {
+        "types": "./dist/protocol/index.d.cts",
+        "default": "./dist/protocol/index.cjs"
+      }
+    },
+    "./ot": {
+      "import": {
+        "types": "./dist/ot/index.d.mts",
+        "default": "./dist/ot/index.mjs"
+      },
+      "require": {
+        "types": "./dist/ot/index.d.cts",
+        "default": "./dist/ot/index.cjs"
+      }
+    },
+    "./server": {
+      "import": {
+        "types": "./dist/server/index.d.mts",
+        "default": "./dist/server/index.mjs"
+      },
+      "require": {
+        "types": "./dist/server/index.d.cts",
+        "default": "./dist/server/index.cjs"
+      }
+    },
+    "./prosemirror": {
+      "import": {
+        "types": "./dist/prosemirror/index.d.mts",
+        "default": "./dist/prosemirror/index.mjs"
+      },
+      "require": {
+        "types": "./dist/prosemirror/index.d.cts",
+        "default": "./dist/prosemirror/index.cjs"
+      }
+    }
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.mjs",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "clock": [
+        "./dist/clock/index.d.ts"
+      ],
+      "lww": [
+        "./dist/lww/index.d.ts"
+      ],
+      "text": [
+        "./dist/text/index.d.ts"
+      ],
+      "presence": [
+        "./dist/presence/index.d.ts"
+      ],
+      "protocol": [
+        "./dist/protocol/index.d.ts"
+      ],
+      "ot": [
+        "./dist/ot/index.d.ts"
+      ],
+      "server": [
+        "./dist/server/index.d.ts"
+      ],
+      "prosemirror": [
+        "./dist/prosemirror/index.d.ts"
+      ]
+    }
+  },
+  "files": [
+    "dist",
+    "skills"
+  ],
+  "scripts": {
+    "build": "unbuild",
+    "dev": "unbuild --stub",
+    "test": "RSTORE_TEST_PACKAGE=multiplayer pnpm -w exec vitest run --config vitest.config.ts",
+    "test:e2e": "playwright test -c e2e/playwright.config.ts",
+    "test:types": "tsc --noEmit",
+    "prepack": "node ../../scripts/sync-dep-skills.mjs ."
+  },
+  "peerDependencies": {
+    "prosemirror-model": "^1.25.0",
+    "prosemirror-state": "^1.4.0",
+    "prosemirror-transform": "^1.12.0",
+    "prosemirror-view": "^1.42.0"
+  },
+  "peerDependenciesMeta": {
+    "prosemirror-model": {
+      "optional": true
+    },
+    "prosemirror-state": {
+      "optional": true
+    },
+    "prosemirror-transform": {
+      "optional": true
+    },
+    "prosemirror-view": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@rstore/shared": "workspace:^"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "fast-check": "^4.10.2",
+    "prosemirror-model": "^1.25.12",
+    "prosemirror-schema-basic": "^1.2.5",
+    "prosemirror-schema-list": "^1.5.1",
+    "prosemirror-state": "^1.4.4",
+    "prosemirror-transform": "^1.12.2",
+    "prosemirror-view": "^1.42.6",
+    "typescript": "catalog:",
+    "unbuild": "catalog:",
+    "vitest": "catalog:",
+    "yjs": "^13.6.33"
+  }
+}

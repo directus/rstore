@@ -1,4 +1,4 @@
-import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomCacheWriteMetadata, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { pickNonSpecialProps, set } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
 import { isKeyDefined } from '../key'
@@ -17,6 +17,11 @@ export interface UpdateOptions<
   key?: string | number | null
   skipCache?: boolean
   optimistic?: boolean | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
+  /**
+   * Opaque data forwarded to the cache hooks of the committed write/delete
+   * (`cacheBeforeWriteItem` / `cacheBeforeDeleteItem`).
+   */
+  metadata?: CustomCacheWriteMetadata
   /**
    * Form operations (op log) from a form submission.
    * Passed through to plugin hooks so they can handle relational edits.
@@ -46,6 +51,7 @@ export async function updateItem<
   item: inputItem,
   key,
   skipCache,
+  metadata,
   optimistic = true,
   formOperations,
   batch,
@@ -132,6 +138,7 @@ export async function updateItem<
         store: store as unknown as GlobalStoreType,
         meta,
         collection,
+        metadata,
         key,
         item: transportItem,
         getResult: () => result ?? undefined,
@@ -154,6 +161,7 @@ export async function updateItem<
       item: transportItem,
       result: result ?? undefined,
       skipCache,
+      metadata,
       formOperations: formOperations as FormOperation[],
     }, {
       requireResultError: 'Item update failed: result is nullish',

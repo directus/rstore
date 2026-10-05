@@ -1,4 +1,4 @@
-/** Compatibility type facade for the canonical Shared multiplayer protocol. */
+/** Compatibility type facade for the canonical multiplayer protocol. */
 export type {
   MultiplayerLeaveMessage,
   MultiplayerMessage,
@@ -6,4 +6,4 @@ export type {
   MultiplayerTextCursor,
   MultiplayerUpdateMessage,
   MultiplayerUser,
-} from '@rstore/shared'
+} from '@rstore/multiplayer/protocol'

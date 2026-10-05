@@ -1,6 +1,7 @@
 import type { MaybeRefOrGetter } from 'vue'
 import type { RstoreMultiplayerChannel } from './useRstoreMultiplayerChannel'
 import { toValue } from 'vue'
+import { readTextCursor } from '../utils/selection'
 import { useRstoreMultiplayerField } from './useRstoreMultiplayerField'
 
 export interface UseRstoreMultiplayerTextFieldOptions<TField extends string> {
@@ -28,14 +29,7 @@ export function useRstoreMultiplayerTextField<TField extends string>(
       return
     }
 
-    const start = target.selectionStart ?? 0
-    const end = target.selectionEnd ?? start
-
-    options.channel.setTextCursor(toValue(options.field), {
-      start,
-      end,
-      direction: normalizeSelectionDirection(target.selectionDirection),
-    })
+    options.channel.setTextCursor(toValue(options.field), readTextCursor(target))
   }
 
   return {
@@ -43,12 +37,4 @@ export function useRstoreMultiplayerTextField<TField extends string>(
     onBlur: field.onBlur,
     onCursorEvent,
   }
-}
-
-function normalizeSelectionDirection(direction: string | null): 'forward' | 'backward' | 'none' {
-  if (direction === 'forward' || direction === 'backward') {
-    return direction
-  }
-
-  return 'none'
 }

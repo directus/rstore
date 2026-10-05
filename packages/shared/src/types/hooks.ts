@@ -2,6 +2,7 @@ import type { CollectionDefaults, StoreSchema } from './collection'
 import type { BatchHookDefinitions } from './hooks/batch'
 import type { CacheHookDefinitions } from './hooks/cache'
 import type { FetchHookDefinitions } from './hooks/fetch'
+import type { FormHookDefinitions } from './hooks/form'
 import type { LifecycleHookDefinitions } from './hooks/lifecycle'
 import type { MutationHookDefinitions } from './hooks/mutation'
 import type { RealtimeHookDefinitions } from './hooks/realtime'
@@ -10,6 +11,7 @@ import type { SyncHookDefinitions } from './hooks/sync'
 export * from './hooks/batch'
 export * from './hooks/cache'
 export * from './hooks/fetch'
+export * from './hooks/form'
 export * from './hooks/lifecycle'
 export * from './hooks/meta'
 export * from './hooks/mutation'
@@ -25,6 +27,7 @@ export interface HookDefinitions<
 > extends
   LifecycleHookDefinitions<TSchema, TCollectionDefaults>,
   FetchHookDefinitions<TSchema, TCollectionDefaults>,
+  FormHookDefinitions<TSchema, TCollectionDefaults>,
   MutationHookDefinitions<TSchema, TCollectionDefaults>,
   CacheHookDefinitions<TSchema, TCollectionDefaults>,
   RealtimeHookDefinitions<TSchema, TCollectionDefaults>,

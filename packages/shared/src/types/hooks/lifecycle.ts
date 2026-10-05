@@ -18,6 +18,16 @@ export interface LifecycleHookDefinitions<
     },
   ) => Awaitable<void>
 
+  /**
+   * Called once when the store's cache is disposed (`$cache.dispose()`).
+   * Plugins stop their timers and channels here.
+   */
+  dispose: (
+    payload: {
+      store: GlobalStoreType
+    },
+  ) => void
+
   moduleResolved: (
     payload: {
       store: GlobalStoreType

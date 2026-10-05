@@ -19,6 +19,7 @@ await store.todos.update({ id: '1', title: 'Updated' })
 - Resolves target key from payload/options.
 - Runs update hooks and writes result into cache.
 - Accepts `options.formOperations` for advanced plugin-driven relation workflows.
+- Accepts `options.metadata` (write metadata), exposed read-only to mutation hooks as `payload.metadata`.
 
 ## Requirements
 

@@ -7,6 +7,12 @@
     // Resolved relative to this file: under `moduleResolution: "Node"`, `paths`
     // is consulted before any `imports`-field handling, so no `baseUrl` is needed.
     "paths": {
+      "@rstore/multiplayer": [
+        "../multiplayer/src/index.ts"
+      ],
+      "@rstore/multiplayer/*": [
+        "../multiplayer/src/*/index.ts"
+      ],
       "#test-utils/*": [
         "../../test/utils/*"
       ]

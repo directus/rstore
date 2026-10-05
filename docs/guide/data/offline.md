@@ -163,7 +163,18 @@ For a robust offline experience, each collection should have:
 
 While offline, mutations are queued and replayed when the connection is restored. The plugin handles queue execution automatically.
 
-Conflicts are application-specific. If multiple clients can edit the same records, implement conflict strategy on the backend (for example last-write-wins, merge rules, or version checks) and return canonical records so rstore can converge correctly.
+Queued mutations keep their [write metadata](./cache.md#write-metadata) (for example `metadata: { fieldTimestamps }`) and are replayed with it.
+
+When several clients can edit the same records, pick a convergence strategy:
+
+- **Field-level last-writer-wins** on the client with the [multiplayer plugin](./collaboration.md): realtime frames and mutations carry per-field timestamps, and the newest value of each field wins. Its stamps and tombstones survive reloads (see below).
+- **Backend rules** (merge rules, version checks): return canonical records so rstore converges.
+
+## Persisted item metadata <Badge text="New in v0.9" />
+
+The offline plugin also persists the [item metadata](./cache.md#item-metadata) namespaces registered with `persist: true`, such as the field stamps and tombstones of the multiplayer plugin. They are mirrored to IndexedDB after every cache write and delete, and restored at the start of the first sync of the store, before queued mutations are replayed and persisted rows are loaded. A stale realtime frame received after a reload still loses against a newer stamp written before it.
+
+Entries already present in the cache (for example from SSR hydration) are not overwritten, and a `version` change clears them with the persisted rows.
 
 ### Replay failures
 
