@@ -1,10 +1,12 @@
 // @ts-check
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import pico from 'picocolors'
 
-const msgPath = path.resolve('.git/COMMIT_EDITMSG')
+// Git resolves both ordinary checkouts and linked worktrees.
+const msgPath = path.resolve(execFileSync('git', ['rev-parse', '--git-path', 'COMMIT_EDITMSG'], { encoding: 'utf8' }).trim())
 const msg = readFileSync(msgPath, 'utf-8').trim()
 
 const commitRE
