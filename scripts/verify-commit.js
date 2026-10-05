@@ -1,10 +1,12 @@
 // @ts-check
+import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import process from 'node:process'
 import pico from 'picocolors'
 
-const msgPath = path.resolve('.git/COMMIT_EDITMSG')
+// Linked worktrees store commit messages in their separate Git directory.
+const msgPath = path.resolve(execFileSync('git', ['rev-parse', '--git-path', 'COMMIT_EDITMSG'], { encoding: 'utf-8' }).trim())
 const msg = readFileSync(msgPath, 'utf-8').trim()
 
 const commitRE
