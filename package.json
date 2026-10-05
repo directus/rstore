@@ -12,7 +12,7 @@
   },
   "scripts": {
     "build": "pnpm run -r --filter \"@rstore/*\" build",
-    "dev:prepare": "pnpm run -r --filter \"@rstore/*\" dev:prepare",
+    "dev:prepare": "pnpm --filter @rstore/multiplayer... build && pnpm run -r --filter \"@rstore/*\" dev:prepare",
     "dev": "pnpm run -r --filter \"@rstore/*\" --filter \"!@rstore/devtools\" dev",
     "lint": "eslint --cache .",
     "test": "vitest run",

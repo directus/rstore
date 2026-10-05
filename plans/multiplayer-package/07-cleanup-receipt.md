@@ -44,3 +44,11 @@
   those device interactions.
 - Publish only through the pull-request nightly workflow. Do not use the
   official release script for this preview package set.
+
+## Cold installation repair — 2026-10-05
+
+Initial PR head `8755ff0dda44c3afa891e5f91d8abda06b0d3b63` failed CI/nightly during postinstall: Nuxt preparation imported `@rstore/multiplayer/protocol` before its compiled entry existed. Local prepared checkout checks did not expose this cold boundary.
+
+`dev:prepare` now builds `@rstore/multiplayer` and its workspace dependencies before recursive Nuxt preparation. Disposable checkout, frozen dependency install with lifecycle scripts disabled, then the real repaired `dev:prepare` all passed. Missing offline fast-check tarball required ordinary frozen install; package versions stayed unchanged.
+
+Logs: `/tmp/rstore-prototype-cold-install-online.log`, `/tmp/rstore-prototype-cold-prepare.log`. PR: https://github.com/directus/rstore/pull/69. CI and preview publication must be checked on the follow-up commit, not the failed initial head.
