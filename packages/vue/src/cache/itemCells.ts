@@ -1,8 +1,9 @@
 import type { EngineChangeSet } from '@rstore/core'
-import type { Ref, ShallowRef } from 'vue'
+import type { Ref } from 'vue'
 import type { CacheChangeInterestRegistry } from './changeInterest'
 import type { ResolvedItemChanges } from './stateSink'
-import { shallowRef, triggerRef } from 'vue'
+import { triggerRef } from 'vue'
+import { CacheItemCell } from './itemCell'
 import { appendSyncError, throwSyncErrors } from './syncErrors'
 
 /** One wrapper-owned reactive source with detached lazy-read fallback. */
@@ -23,10 +24,18 @@ export interface ItemCellRegistry {
   create: (collection: string, key: string | number, initial: any, active?: boolean) => ItemCell
   /** Resolve changed engine items once and update every active wrapper cell. */
   flush: (changes: EngineChangeSet, values?: ResolvedItemChanges) => void
+  /** Stage live changed values until list and missing-item signals have published. */
+  stage: (changes: EngineChangeSet, values?: ResolvedItemChanges) => StagedItemCellUpdates | undefined
   /** Apply one Core-provided resolved value without aggregate containers. */
   flushItem: (collection: string, key: string, value: unknown) => void
   /** Detach every active cell. */
   dispose: () => void
+}
+
+/** Live cell updates staged as one coherent source snapshot. */
+export interface StagedItemCellUpdates {
+  /** Notify every reactive wrapper after bridge signals observe staged values. */
+  notify: () => void
 }
 
 /** Dependencies required by detached lazy reads and committed synchronization. */
@@ -45,13 +54,14 @@ export function createItemCellRegistry(options: CreateItemCellRegistryOptions): 
   return {
     create: registry.create.bind(registry),
     flush: registry.flush.bind(registry),
+    stage: registry.stage.bind(registry),
     flushItem: registry.flushItem.bind(registry),
     dispose: registry.dispose.bind(registry),
   }
 }
 
 /** Compact registry shared by every item cell. */
-class CacheItemCellRegistry implements ItemCellRegistry {
+export class CacheItemCellRegistry implements ItemCellRegistry {
   /** Active cells grouped by collection and canonical key. */
   private readonly collections = new Map<string, Map<string, Set<CacheItemCell>>>()
   /** Whether cache disposal severed runtime ownership. */
@@ -109,6 +119,61 @@ class CacheItemCellRegistry implements ItemCellRegistry {
       }
     }
     throwSyncErrors(errors, 'Item cell synchronization failed')
+  }
+
+  /** Stage current non-deleted values before any dependent watcher can rerun. */
+  stage(changes: EngineChangeSet, values?: ResolvedItemChanges): StagedItemCellUpdates | undefined {
+    if (this.disposed || !this.collections.size)
+      return undefined
+    const updates: Array<{ cells: Set<CacheItemCell>, next: unknown }> = []
+    let errors: unknown[] | undefined
+    for (const [collection, keys] of changes.items) {
+      const byKey = this.collections.get(collection)
+      if (!byKey)
+        continue
+      for (const key of keys) {
+        const cells = byKey.get(key)
+        if (!cells?.size)
+          continue
+        try {
+          const resolved = values?.get(collection)
+          const next = resolved?.has(key) ? resolved.get(key) : this.options.read(collection, key)
+          // Callers only stage operations whose change set has no deletions.
+          // Keep a defensive error here so a future caller cannot leave an
+          // active wrapper reading a vanished value without detaching it.
+          if (next === undefined)
+            throw new Error(`Cannot stage deleted item cell ${collection}:${key}`)
+          updates.push({ cells, next })
+        }
+        catch (error) {
+          errors = appendSyncError(errors, error)
+        }
+      }
+    }
+    throwSyncErrors(errors, 'Item cell staging failed')
+    const staged: CacheItemCell[] = []
+    for (const { cells, next } of updates) {
+      for (const cell of cells) {
+        if (cell.stage(next))
+          staged.push(cell)
+      }
+    }
+    if (!staged.length)
+      return undefined
+    return {
+      notify() {
+        let notifyErrors: unknown[] | undefined
+        for (const cell of staged) {
+          try {
+            cell.notify()
+          }
+          catch (error) {
+            notifyErrors = appendSyncError(notifyErrors, error)
+          }
+        }
+        throwSyncErrors(notifyErrors, 'Staged item cell notification failed')
+      },
+    }
   }
 
   /** Synchronize one exact key through scalar state-sink dispatch. */
@@ -180,104 +245,4 @@ class CacheItemCellRegistry implements ItemCellRegistry {
     }
     throwSyncErrors(errors, `Item cell synchronization failed for ${collection}:${key}`)
   }
-}
-
-/** Prototype-backed item source avoiding wrapper-specific reader closures. */
-class CacheItemCell implements ItemCell {
-  /** Vue dependency updated after engine commits. */
-  readonly ref: ShallowRef<any>
-  /** Last readable value retained after detachment or deletion. */
-  fallback: any
-  /** Shared state-specific reader selected outside hot field reads. */
-  private reader: ItemCellReader
-  /** Lazy, synchronized, or detached state. */
-  private currentState: ItemCellState
-
-  /** Create one compact source. */
-  constructor(
-    /** Owning registry, removed on complete disposal. */
-    public registry: CacheItemCellRegistry | undefined,
-    /** Owning collection. */
-    public readonly collection: string,
-    /** Canonical item key. */
-    public readonly id: string,
-    initial: any,
-    state: ItemCellState,
-  ) {
-    this.ref = shallowRef(initial)
-    this.fallback = initial
-    this.currentState = state
-    this.reader = state === 'active' ? () => this.ref.value : readerForInactiveState(state)
-  }
-
-  /** Return lazy, synchronized, or detached state. */
-  get state(): ItemCellState {
-    return this.currentState
-  }
-
-  /** Select shared reader during lifecycle transitions. */
-  set state(value: ItemCellState) {
-    this.currentState = value
-    this.reader = value === 'active' ? () => this.ref.value : readerForInactiveState(value)
-  }
-
-  /** Expose this prototype-backed source through Ref API. */
-  get source(): Ref<any> {
-    return this as unknown as Ref<any>
-  }
-
-  /** Read active value or lazily enter fallback/active ownership. */
-  get value(): any {
-    return this.reader(this)
-  }
-
-  /** Support Ref-shaped writes inside Vue utilities. */
-  set value(next: any) {
-    this.update(next)
-  }
-
-  /** Consume reactive dependency for an already requested wrapper. */
-  track(): void {
-    // eslint-disable-next-line ts/no-unused-expressions
-    this.value
-  }
-
-  /** Return whether committed engine changes synchronize this cell. */
-  isActive(): boolean {
-    return this.state === 'active'
-  }
-
-  /** Stop registry ownership while preserving lazy reads. */
-  detach(): void {
-    this.registry?.detach(this)
-  }
-
-  /** Store one current value and notify reactive consumers. */
-  update(next: any): void {
-    this.fallback = next
-    this.ref.value = next
-  }
-}
-
-/** Item-cell lifecycle state. */
-type ItemCellState = 'dormant' | 'active' | 'detached'
-
-/** Shared source reader signature. */
-type ItemCellReader = (cell: CacheItemCell) => any
-
-/** Activate a lazy wrapper or fall back to detached lookup. */
-function readDormant(cell: CacheItemCell): any {
-  if (cell.registry?.activate(cell))
-    return cell.ref.value
-  return cell.registry?.readFallback(cell) ?? cell.fallback
-}
-
-/** Read current engine value for an evicted wrapper when runtime remains live. */
-function readDetached(cell: CacheItemCell): any {
-  return cell.registry?.readFallback(cell) ?? cell.fallback
-}
-
-/** Return shared reader for one inactive lifecycle state. */
-function readerForInactiveState(state: Exclude<ItemCellState, 'active'>): ItemCellReader {
-  return state === 'dormant' ? readDormant : readDetached
 }

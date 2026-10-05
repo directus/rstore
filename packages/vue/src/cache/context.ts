@@ -11,7 +11,7 @@ import { createSignalRegistry } from './signals'
 import { createCacheStateSink } from './stateSink'
 import { synchronizeBridgeIndex } from './stateSinkIndex'
 import { synchronizeBridgeItem } from './stateSinkItem'
-import { appendSyncError, throwSyncErrors } from './syncErrors'
+import { appendSyncError, runSyncTask, throwSyncErrors } from './syncErrors'
 import { createCacheVersionRegistry } from './versions'
 import { createWrappedItemRegistry } from './wrappedRegistry'
 
@@ -115,11 +115,27 @@ function synchronizeBridge(
   for (const collection of resets) ctx.visibleListCache.delete(collection)
   for (const dependency of changes.indexes) ctx.indexResultCache.invalidate(dependency)
   for (const collection of resets) ctx.indexResultCache.reset(collection)
-  // Flush existing missing/list/index dependencies before item deletion can
-  // install a new missing-item dependency during its synchronous cell rerun.
+  // A list signal can synchronously rebuild a custom cache-filter result. For
+  // ordinary live writes, stage every cell before publication so one watcher
+  // never combines new list membership with old fields from another wrapper.
+  // Keep reset, deletion, and public-key replacement flows in their established
+  // order because each changes wrapper identity and missing-item tracking.
+  const canStageItemCells = deletions.length === 0 && resets.size === 0 && keyForms.length === 0
+  let stagedItemCells: ReturnType<CacheRuntime['itemCells']['stage']>
+  if (canStageItemCells && orderedChanges.items.size) {
+    try {
+      stagedItemCells = ctx.itemCells.stage(orderedChanges, values)
+    }
+    catch (error) {
+      // Preserve bridge error aggregation and fall back to normal cell flushing.
+      errors = appendSyncError(errors, error)
+    }
+  }
   errors = runBridgeSink(ctx.versions.flush, orderedChanges, errors)
   errors = runBridgeSink(ctx.signals.flush, orderedChanges, errors)
-  if (orderedChanges.items.size)
+  if (stagedItemCells)
+    errors = runSyncTask(stagedItemCells.notify, errors)
+  else if (orderedChanges.items.size)
     errors = runBridgeSinkWithValues(ctx.itemCells.flush, orderedChanges, values, errors)
   if (deletions.length || keyForms.length)
     errors = cleanupChangedWrappers(ctx, deletions, keyForms, errors)
