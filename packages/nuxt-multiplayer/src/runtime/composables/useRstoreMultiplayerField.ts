@@ -38,7 +38,8 @@ export function useRstoreMultiplayerField<TField extends string>(
       }
 
       activeField.value = null
-      options.channel.clearFocus()
+      // The channel ignores it when another field took the focus meanwhile.
+      options.channel.clearFocus(field)
     }, 0)
   }
 

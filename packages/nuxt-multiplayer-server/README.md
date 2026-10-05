@@ -1,72 +1,38 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="https://github.com/Akryum/rstore/blob/main/img/LogoTextHorizontalWhite.png?raw=true" width="400px" height="122px">
-    <source media="(prefers-color-scheme: light)" srcset="https://github.com/Akryum/rstore/blob/main/img/LogoTextHorizontalBlack.png?raw=true" width="400px" height="122px">
-    <img alt="rstore logo" src="https://github.com/Akryum/rstore/blob/main/img/LogoTextHorizontalBlack.png?raw=true" width="400px" height="122px">
-  </picture>
-</p>
+# @rstore/nuxt-multiplayer-server
 
----
+Nitro WebSocket endpoint relaying the `multiplayer:*` frames of [`@rstore/nuxt-multiplayer`](https://rstore.akryum.dev/plugins/nuxt-multiplayer) between the members of each room. Experimental.
 
-<p align="center">
-  <a href="https://rstore.akryum.dev">Documentation</a> |
-  <a href="https://nightly.akryum.dev/Akryum/rstore">Nightly releases</a> |
-  <a href="./CONTRIBUTING.md">Contributing guide</a>
-</p>
-
-<p align="center">
-  <a href="https://github.com/Akryum/rstore/actions/workflows/ci.yml">
-    <img src="https://github.com/Akryum/rstore/actions/workflows/ci.yml/badge.svg" alt="ci">
-  </a>
-</p>
-
-rstore is a local-first data store for Vue and Nuxt applications.
-
-It gives you a normalized reactive cache, a structured query and mutation API, and plugin-based integration with your own data sources.
-
-## Why rstore
-
-- Normalized reactive cache shared across your app
-- Queries and mutations co-located with components
-- Plugins for REST, GraphQL, local databases, and custom backends
-- Built for local-first, realtime, forms, and offline workflows
-- Strong TypeScript support
-- Nuxt module with DevTools integration
-
-![Devtools screenshot](./docs/guide/img/nuxt-devtools2.png)
-
-## Start here
-
-- Vue quickstart: <https://rstore.akryum.dev/guide/getting-started#vue>
-- Nuxt quickstart: <https://rstore.akryum.dev/guide/getting-started#nuxt>
-- Nuxt + Drizzle: <https://rstore.akryum.dev/guide/getting-started#nuxt-drizzle>
-- Core concepts: <https://rstore.akryum.dev/guide/learn-more>
-
-## Core workflow
-
-1. Define collections that describe your application data.
-2. Add collection hooks or plugins to connect those collections to your backend.
-3. Query and mutate data from components through the store.
-4. Layer on forms, subscriptions, offline support, and federation as needed.
-
-## Example
+```sh
+pnpm i @rstore/nuxt-multiplayer-server
+```
 
 ```ts
-const store = useStore()
-
-const { data: todos, loading } = await store.todos.query(q => q.many())
-
-await store.todos.create({
-  id: crypto.randomUUID(),
-  title: 'Ship the docs',
-  completed: false,
+export default defineNuxtConfig({
+  modules: ['@rstore/nuxt-multiplayer-server'],
+  rstoreMultiplayerServer: {
+    endpoint: '/api/rstore-multiplayer/ws',
+    maxRoomSize: 100,
+    rateLimit: { capacity: 60, refillPerSecond: 30 },
+  },
 })
 ```
 
-## Learn more
+```ts
+// server/plugins/multiplayer.ts
+export default defineNitroPlugin(() => {
+  rstoreMultiplayerServerHooks.hook('multiplayer.authorize', async ({ peer, roomId, reject, setUserId }) => {
+    // Verify the session of `peer.request`, then:
+    setUserId(userId)
+  })
+})
+```
 
-- Getting started: <https://rstore.akryum.dev/guide/getting-started>
-- Collections and schema: <https://rstore.akryum.dev/guide/schema/collection>
-- Querying data: <https://rstore.akryum.dev/guide/data/query>
-- Mutations and forms: <https://rstore.akryum.dev/guide/data/mutation>
-- Plugin system: <https://rstore.akryum.dev/guide/plugin/setup>
+It is a thin adapter over `createMultiplayerServer` from [`@rstore/multiplayer/server`](https://rstore.akryum.dev/guide/data/collaboration#server): same-origin upgrades only by default, authorization once per room, identity binding against impersonation, size and rate limits, leave frames on disconnect.
+
+With `collab: true`, the endpoint also sequences [collab documents](https://rstore.akryum.dev/guide/data/collaborative-documents) (experimental), configured with `defineRstoreCollab()` in a Nitro plugin.
+
+Documentation: [Nuxt Multiplayer Server](https://rstore.akryum.dev/plugins/nuxt-multiplayer-server).
+
+## License
+
+MIT

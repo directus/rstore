@@ -1,6 +1,5 @@
 import type { CacheLayer, Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
-import { pickNonSpecialProps } from '@rstore/shared'
-import { fieldValuesEqual } from '../utils/equality'
+import { fieldValuesEqual, pickNonSpecialProps } from '@rstore/shared'
 
 /** Known application values paired with the wire values exposed to hooks. */
 export interface MutationItemSnapshot {

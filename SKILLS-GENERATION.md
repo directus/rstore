@@ -9,6 +9,7 @@ This process currently covers:
 - `packages/vue/skills/rstore-vue`
 - `packages/nuxt/skills/rstore-nuxt`
 - `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle`
+- `packages/multiplayer/skills/rstore-multiplayer`
 
 ## Sources of truth
 
@@ -31,6 +32,7 @@ If implementation behavior appears to differ from docs, fix docs first, then reg
 - `docs/guide/data/cache.md`
 - `docs/guide/data/module.md`
 - `docs/guide/data/offline.md`
+- `docs/guide/data/collaboration.md` (cross-references only: multiplayer plugin, `formFieldMerge` text merger)
 - `docs/guide/plugin/setup.md`
 - `docs/guide/plugin/hooks.md`
 
@@ -50,6 +52,19 @@ If implementation behavior appears to differ from docs, fix docs first, then reg
 - `docs/guide/data/offline.md`
 - `docs/guide/schema/relations.md`
 - `docs/guide/plugin/hooks.md`
+- `docs/guide/data/collaboration.md` (multiplayer LWW plugin installed by `ws.lww`)
+- `docs/guide/data/collaborative-documents.md` (cross-references only: `createDrizzleOpLogStore`)
+
+### `@rstore/multiplayer`
+
+- `docs/guide/data/collaboration.md`
+- `docs/guide/data/collaborative-documents.md` (collab documents: `/ot`, `/server` sequencer, `/prosemirror`, experimental)
+- `docs/plugins/nuxt-multiplayer.md`
+- `docs/plugins/nuxt-multiplayer-server.md`
+- `docs/guide/data/cache.md` (write metadata, item metadata, SSR state)
+- `docs/guide/data/offline.md` (persisted item metadata, queued metadata)
+- `docs/guide/data/form.md` (rebasing and conflicts)
+- `docs/guide/migration/v0_9.md`
 
 ## Output files
 
@@ -67,6 +82,8 @@ Expected paths:
 - `packages/nuxt/skills/rstore-nuxt/references/*.md`
 - `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/SKILL.md`
 - `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/references/*.md`
+- `packages/multiplayer/skills/rstore-multiplayer/SKILL.md`
+- `packages/multiplayer/skills/rstore-multiplayer/references/*.md`
 
 ## Required SKILL.md structure
 
@@ -115,6 +132,7 @@ Each reference file should:
 - For wrapper skills, include explicit package-skill references:
   - `@rstore/nuxt` must reference the `rstore-vue` skill.
   - `@rstore/nuxt-drizzle` must reference both `rstore-nuxt` and `rstore-vue`.
+  - `@rstore/multiplayer` must reference `rstore-vue`.
 - Never use cross-package relative paths (`../`) inside `SKILL.md`; reference other skills by skill name.
 - Never reference local source/test files from `SKILL.md` or `references/*.md` files.
 - Do not generate or update `agents/openai.yaml` for this workflow.
@@ -132,10 +150,12 @@ The `description` field is the primary trigger signal used by AI agents. Write i
   - `rstore-nuxt`: Nuxt module/runtime integration concerns; explicitly reference the `rstore-vue` skill by name.
   - `rstore-nuxt-drizzle`: Drizzle-backed generation/API/realtime/offline concerns; explicitly reference both `rstore-nuxt` and `rstore-vue` by name.
   - `rstore-vue`: base store/query/form/plugin/module behavior.
+  - `rstore-multiplayer`: realtime collaboration (LWW, tombstones, conflicts, form text merge, presence, room server, Nuxt multiplayer packages); explicitly reference the `rstore-vue` skill by name.
 - Include **anti-pattern triggers**: phrases agents type when they are about to reimplement something rstore already provides. The skill should fire *before* the redundant code is written.
   - `rstore-nuxt-drizzle`: `server/api`, `Nitro defineEventHandler`, `H3 handler`, `custom REST/CRUD endpoint`, `write an endpoint for <table>`.
   - `rstore-nuxt`: `custom server route`, `Nitro handler`, `useFetch`/`$fetch` for collection data, `ad hoc fetch composable`.
   - `rstore-vue`: `custom fetch composable`, `ad hoc fetch ref`, `bespoke cache layer`.
+  - `rstore-multiplayer`: `custom merge logic for realtime updates`, `timestamp comparison in writeItem`, `hand-rolled presence websocket`, `home-made CRDT/OT layer`.
 
 ## Generation workflow
 
@@ -161,6 +181,7 @@ If docs are missing or contradictory, update docs first and use the updated docs
 sed -n '1,260p' packages/vue/skills/rstore-vue/SKILL.md
 sed -n '1,260p' packages/nuxt/skills/rstore-nuxt/SKILL.md
 sed -n '1,320p' packages/nuxt-drizzle/skills/rstore-nuxt-drizzle/SKILL.md
+sed -n '1,260p' packages/multiplayer/skills/rstore-multiplayer/SKILL.md
 ```
 
 Checklist:
@@ -174,6 +195,7 @@ Checklist:
 - [ ] `SKILL.md` contains a reference table (`Topic`, `Description`, `Reference`) covering all skill references.
 - [ ] `rstore-nuxt` references the `rstore-vue` skill by name (no cross-package relative paths).
 - [ ] `rstore-nuxt-drizzle` references both `rstore-nuxt` and `rstore-vue` by name (no cross-package relative paths).
+- [ ] `rstore-multiplayer` references `rstore-vue` by name (no cross-package relative paths).
 - [ ] No source/test file paths are referenced from skill files.
 
 ### 4. Record generation metadata
@@ -232,6 +254,17 @@ Then:
 - Added the **anti-pattern triggers** rule to the "Frontmatter description rules (trigger quality)" section above, so future regenerations preserve the behavior.
 - Reason: agents working in rstore-powered projects were discovering rstore skills only when they already intended to use rstore. When the intent was phrased as "write an endpoint" or "add a server route", none of the skill descriptions matched and the agent reinvented what `@rstore/nuxt-drizzle` already generates.
 
+### 2026-10-03 incremental update (v0.9 `@rstore/multiplayer`)
+
+- Generation date: 2026-10-03
+- Docs commit SHA: `c65c9f1e733ea1cd841dbe42ab02a0122d91c484` (`HEAD`); the docs used were uncommitted working-tree changes on top of it.
+- Version notes: rstore 0.9 moved collaboration features (HLC, LWW, tombstones, text merge, presence, protocol, room server) into `@rstore/multiplayer`.
+- Docs inputs: new `docs/guide/data/collaboration.md`, `docs/plugins/nuxt-multiplayer.md`, `docs/plugins/nuxt-multiplayer-server.md`, `docs/guide/migration/v0_9.md`; changed `docs/guide/data/cache.md`, `docs/guide/plugin/hooks.md`, `docs/guide/data/form.md`, `docs/guide/data/live.md`, `docs/guide/data/offline.md`, `docs/plugins/nuxt-drizzle.md`.
+- New skill `packages/multiplayer/skills/rstore-multiplayer/` (`SKILL.md`, `references/index.md`, 44 `references/api-*.md`).
+- `rstore-vue`: description, documentation map, core concepts, form notes, new "Cache extension (v0.9)" section, guardrails 7-8, references table; new references `api-write-metadata`, `api-custom-cache-write-metadata`, `api-item-metadata`, `api-cache-before-write-item`, `api-cache-before-delete-item`, `api-dispose-hook`, `api-form-field-merge`, `api-form-rebase`, `api-form-field-conflict`; updated `api-create-form-object`, `api-define-plugin`, `api-create`, `api-update`, `api-delete`, `references/index.md`.
+- `rstore-nuxt`: runtime note and `api-cache-hydration` (serialized `itemMetadata` in `$srstore`).
+- `rstore-nuxt-drizzle`: description, documentation map, realtime/offline notes (HLC-stamped frames, `ws.lww`, `RSTORE_DRIZZLE_NODE_ID`, persisted stamps), guardrail 10, references table; new `api-ws-lww`; updated `api-ws`, `api-offline`, `references/index.md`.
+
 ## Dependency skill sync (for skills-npm consumers)
 
 `skills-npm` scans the consumer project's top-level `node_modules` for
@@ -251,6 +284,7 @@ Canonical skill folders (one per package) are committed:
 - `packages/vue/skills/rstore-vue`
 - `packages/nuxt/skills/rstore-nuxt`
 - `packages/nuxt-drizzle/skills/rstore-nuxt-drizzle`
+- `packages/multiplayer/skills/rstore-multiplayer`
 
 Copied skill folders are gitignored via per-directory `.gitignore`
 files that allowlist only the canonical folder name.

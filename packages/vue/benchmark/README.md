@@ -6,6 +6,9 @@ From the repository root, after installing dependencies and building packages, r
 pnpm --filter @rstore/vue benchmark:write-items
 ```
 
+Set `RSTORE_BENCHMARK_BEFORE_WRITE_HOOK=1` to register one no-op `cacheBeforeWriteItem` handler on
+every benchmark store; it measures the interception cost paid by a plugin that does no work.
+
 The command exercises the real Vue cache runtime, the public collection `peekMany` query API, a
 Vue computed, and a synchronous watcher. It measures 100 and 1,000 deterministic flat items. Every
 warmup and measured sample creates an isolated store and cache. The two modes alternate execution

@@ -196,7 +196,7 @@ describe('cache reactivity of computed pages', () => {
 
 describe('garbage collection with mixed page policies', () => {
   it('does not let an uncached page own cached rows', async () => {
-    const stack = await createVueStack({ schema, data: { items: rows(3) }, tombstoneGc: false })
+    const stack = await createVueStack({ schema, data: { items: rows(3) } })
     const query = await paginate(stack, { experimentalGarbageCollection: true })
     await query.fetchMore({ pageIndex: 1, fetchPolicy: 'no-cache' })
     await query.fetchMore({ pageIndex: 2 })
@@ -220,7 +220,6 @@ describe('garbage collection with mixed page policies', () => {
     const stack = await createVueStack({
       schema,
       data: { items: rows(3) },
-      tombstoneGc: false,
       plugins: [uncachedSecondPage(() => secondPageIsUncached)],
     })
     const query = await paginate(stack, { experimentalGarbageCollection: true })

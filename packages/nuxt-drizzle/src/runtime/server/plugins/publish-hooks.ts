@@ -1,26 +1,15 @@
-import process from 'node:process'
-import { createHLCClock, setDefaultClock } from '@rstore/core'
 import { getHeader } from 'h3'
 import { defineNitroPlugin } from 'nitropack/runtime'
 import { closeAllRstoreDrizzlePeers } from '../api/realtime.ws'
 import { CLIENT_ID_HEADER } from '../realtime/utils/protocol'
 import { rstoreDrizzleHooks } from '../utils/hooks'
 import { publishRstoreDrizzleRealtimeUpdate } from '../utils/realtime'
-
-/**
- * Install a dedicated server HLC so every realtime publish gets a
- * deterministically-ordered timestamp. A stable `nodeId` (from
- * `RSTORE_DRIZZLE_NODE_ID`, falling back to a process-bound random) keeps
- * tiebreaks consistent across in-flight frames within the same process.
- */
-function installServerHLC() {
-  const nodeId = process.env.RSTORE_DRIZZLE_NODE_ID
-    ?? `rstore-drizzle:${Math.random().toString(16).slice(2, 10)}`
-  setDefaultClock(createHLCClock(nodeId))
-}
+import { installRstoreDrizzleRealtimeClock } from '../utils/realtime-clock'
 
 export default defineNitroPlugin((nitroApp) => {
-  installServerHLC()
+  // A clock of this instance, not the process default one (two Nitro
+  // instances in one process must not share it).
+  installRstoreDrizzleRealtimeClock()
 
   rstoreDrizzleHooks.hook('index.post.after', async ({ event, collection, result }) => {
     publishRstoreDrizzleRealtimeUpdate({

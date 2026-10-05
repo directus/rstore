@@ -1,14 +1,20 @@
-import type { TombstoneStore } from '@rstore/core'
-import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WarnOnce, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from '../item'
 import type { VueStore } from '../store'
+import type { WriteInterception } from './interception'
+import type { ItemMetadataState } from './itemMetadata'
 
 /** Cache operations delayed while the cache is paused or write staggering is active. */
 export type QueuedOperation
   = | { type: 'writeItem', params: Parameters<Cache['writeItem']>[0] }
     | { type: 'writeItems', params: Parameters<Cache['writeItems']>[0], index: number, batch: CacheWriteBatch }
-    | { type: 'deleteItem', params: Parameters<Cache['deleteItem']>[0] }
+    | {
+      type: 'deleteItem'
+      params: Parameters<Cache['deleteItem']>[0]
+      /** Cache-local removal (`clearCollection`): `cacheBeforeDeleteItem` cannot keep the row. */
+      bypassHooks?: boolean
+    }
     | { type: 'addLayer', layer: Parameters<Cache['addLayer']>[0] }
     | { type: 'removeLayer', layerId: Parameters<Cache['removeLayer']>[0] }
     | { type: 'setState', state: CustomCacheState }
@@ -54,10 +60,8 @@ export interface InternalCacheState {
   paused: boolean
   /** Pending cache operations. */
   queue: QueuedOperation[]
-  /** Per-field timestamps for CRDT field-level LWW merge. */
-  fieldTimestamps: Map<string, Map<string | number, FieldTimestamps>>
-  /** Deletion tombstones used to reject stale writes after deletes. */
-  tombstones: TombstoneStore
+  /** Namespaced per-item plugin data (`cache.itemMetadata`). */
+  itemMetadata: ItemMetadataState
 }
 
 export interface CreateCacheOptions<
@@ -68,15 +72,6 @@ export interface CreateCacheOptions<
   getStore: () => VueStore<TSchema, TCollectionDefaults>
   /** Maximum number of queued writes processed per 10ms. */
   cacheStaggering?: number
-  /** Auto-GC settings for the per-cache tombstone store. */
-  tombstoneGc?: false | {
-    /** Sweep interval in ms. Defaults to 60_000. */
-    intervalMs?: number
-    /** Drop tombstones older than this many ms. Defaults to 86_400_000. */
-    ttlMs?: number
-  }
-  /** Whether this cache belongs to a server-side store instance. */
-  isServer?: boolean
 }
 
 /** Mutable runtime shared by cache helper modules. */
@@ -90,8 +85,14 @@ export interface CacheRuntime<
   cacheStaggering: number
   /** Internal reactive cache state. */
   state: InternalCacheState
-  /** Stop the tombstone GC timer, when one is active. */
-  stopTombstoneGc?: () => void
+  /** Store hooks, cached on first use by the write interception path. */
+  hooks?: VueStore<TSchema, TCollectionDefaults>['$hooks']
+  /** Reusable `cacheBeforeWriteItem` payload, created on first use. */
+  writeInterception?: WriteInterception
+  /** Whether `dispose()` already ran its hook. */
+  disposed: boolean
+  /** Dev warning reported once per id for this cache. */
+  warnOnce: WarnOnce
   /** Optimistic/cache layers by collection name. */
   layers: Record<string, Ref<CacheLayer[]>>
   /** Collection lookup for layer ids. */

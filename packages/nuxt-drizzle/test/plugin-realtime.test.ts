@@ -1,4 +1,4 @@
-import { stringifyHLC } from '@rstore/core'
+import { stringifyHLC } from '@rstore/multiplayer/clock'
 import { describe, expect, it } from 'vitest'
 import { maxPayloadStamp, stampToDate } from '../src/runtime/utils/realtime-stamps'
 

@@ -24,6 +24,7 @@ const plugin = definePlugin({
 
 - Hooks into fetch/cache/mutation/subscription/sync lifecycles.
 - Can set collection defaults via `addCollectionDefaults`.
+- Cache extension hooks: `cacheBeforeWriteItem`, `cacheBeforeDeleteItem`; form merge hook: `formFieldMerge`; cleanup hook: `dispose`.
 
 ## Requirements
 

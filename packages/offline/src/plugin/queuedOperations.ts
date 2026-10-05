@@ -62,12 +62,14 @@ async function replayOperation(store: any, collection: any, op: OfflineQueuedOpe
       return createItem({
         store,
         collection,
+        metadata: op.metadata,
         item: op.item,
       })
     case 'update':
       return updateItem({
         store,
         collection,
+        metadata: op.metadata,
         item: op.item,
         key: op.key!,
       })
@@ -75,24 +77,28 @@ async function replayOperation(store: any, collection: any, op: OfflineQueuedOpe
       return deleteItem({
         store,
         collection,
+        metadata: op.metadata,
         key: op.key!,
       })
     case 'createMany':
       return createMany({
         store,
         collection,
+        metadata: op.metadata,
         items: op.items!,
       })
     case 'updateMany':
       return updateMany({
         store,
         collection,
+        metadata: op.metadata,
         items: op.items!,
       })
     case 'deleteMany':
       return deleteMany({
         store,
         collection,
+        metadata: op.metadata,
         keys: op.keys!,
       })
   }

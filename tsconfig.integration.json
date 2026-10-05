@@ -23,6 +23,12 @@
       "@rstore/vue": [
         "./packages/vue/src/index.ts"
       ],
+      "@rstore/multiplayer": [
+        "./packages/multiplayer/src/index.ts"
+      ],
+      "@rstore/multiplayer/*": [
+        "./packages/multiplayer/src/*/index.ts"
+      ],
       "@rstore/connector-toolkit": [
         "./packages/connector-toolkit/src/index.ts"
       ]
@@ -39,11 +45,5 @@
   "include": [
     "packages/*/test/integration/**/*.ts",
     "test/utils/**/*.ts"
-  ],
-  "exclude": [
-    // Nuxt-Drizzle owns its source-backed integration typecheck in
-    // `packages/nuxt-drizzle/tsconfig.integration.json`, where generated
-    // runtime modules have exact declarations and Bundler resolution.
-    "packages/nuxt-drizzle/test/integration/**"
   ]
 }

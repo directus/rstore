@@ -36,6 +36,7 @@
     "test:types": "tsc --noEmit"
   },
   "dependencies": {
+    "@rstore/multiplayer": "workspace:^",
     "@rstore/shared": "workspace:^"
   },
   "devDependencies": {

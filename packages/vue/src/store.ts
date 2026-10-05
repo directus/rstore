@@ -1,6 +1,7 @@
 import type { BatchingConfig, Cache, Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOptions, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueCollectionApi } from './api'
+import type { DeprecatedStoreOptions } from './cache/deprecatedAliases'
 import type { VueCachePrivate } from './cache/types'
 import { createStoreCore, normalizeCollectionRelations, resolveCollection, resolveCollectionOppositeRelations } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
@@ -8,13 +9,14 @@ import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
 import { reactive, toValue, watch } from 'vue'
 import { createCollectionApi } from './api'
 import { createCache } from './cache'
+import { applyDeprecatedStoreOptions } from './cache/deprecatedAliases'
 import { cacheWriteEventHook } from './events'
 import { wrapMutation } from './wrapMutation'
 
 export interface CreateStoreOptions<
   TSchema extends StoreSchema = StoreSchema,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
-> {
+> extends DeprecatedStoreOptions {
   /**
    * The schema of the store with collections and relations.
    */
@@ -59,17 +61,6 @@ export interface CreateStoreOptions<
    * Set to `true` for default options, or provide a `BatchOptions` object for fine-grained control.
    */
   batching?: BatchingConfig
-
-  /**
-   * Configuration for the per-cache tombstone garbage collector.
-   * Defaults to a 60s sweep with a 24h TTL — long enough for most
-   * intermittent connectivity gaps while still bounding the working
-   * set. Pass `false` to disable (e.g. on the server).
-   */
-  tombstoneGc?: false | {
-    intervalMs?: number
-    ttlMs?: number
-  }
 }
 
 export type VueStoreCollectionApiProxy<
@@ -99,7 +90,8 @@ export async function createStore<
 >(options: CreateStoreOptions<TSchema, TCollectionDefaults>): Promise<VueStore<TSchema, TCollectionDefaults>> {
   let storeProxy = undefined as unknown as VueStore<TSchema, TCollectionDefaults>
 
-  const modulesCache = new WeakMap<(...args: any[]) => ResolvedModule<any, any>, ResolvedModule<any, any>>()
+  // Replaceable through `store.$modulesCache = new WeakMap()` (see the proxy `set` trap).
+  let modulesCache = new WeakMap<(...args: any[]) => ResolvedModule<any, any>, ResolvedModule<any, any>>()
 
   return createStoreCore<TSchema, TCollectionDefaults>({
     schema: options.schema,
@@ -108,8 +100,6 @@ export async function createStore<
     cache: createCache({
       getStore: () => storeProxy,
       cacheStaggering: options.cacheStaggering,
-      tombstoneGc: options.tombstoneGc,
-      isServer: options.isServer,
     }),
     hooks: createHooks<TSchema, TCollectionDefaults>(),
     findDefaults: options.findDefaults,
@@ -136,6 +126,7 @@ export async function createStore<
       }
 
       privateStore.$_collectionNames = new Set(store.$collections.map(m => m.name))
+      applyDeprecatedStoreOptions(store, options)
 
       const cacheResetEvent = createEventHook()
 
@@ -203,6 +194,15 @@ export async function createStore<
           }
 
           return Reflect.get(store, key)
+        },
+        set: (target, key, value, receiver) => {
+          // The getter above serves `$modulesCache` from the closure, so an
+          // assignment must replace that map rather than shadow it unseen.
+          if (key === '$modulesCache') {
+            modulesCache = value
+            return true
+          }
+          return Reflect.set(target, key, value, receiver)
         },
       }) as VueStore<TSchema, TCollectionDefaults>
 

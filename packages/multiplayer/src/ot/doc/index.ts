@@ -1,0 +1,8 @@
+export { applyDocOps } from './apply.js'
+export type { ApplyDocOpsOptions } from './apply.js'
+export { composeDocOps } from './compose.js'
+export { invertDocOps } from './invert.js'
+export { cloneDocState, compareSiblings, createDocState, isNodeVisible, orderedChildren } from './state.js'
+export type { OrderedChildrenOptions } from './state.js'
+export { rebaseDocOps, transformDocOps } from './transform.js'
+export type { TransformedDocOps } from './transform.js'

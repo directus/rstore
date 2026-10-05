@@ -1,11 +1,12 @@
 import { createVueStack } from '#test-utils/store/vueStack'
+import { createMultiplayerPlugin, tombstoneEntries } from '@rstore/multiplayer'
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick } from 'vue'
 import { harnessSchema, harnessTodos } from './shared'
 
-/** Opens a live `todos` query for each fake-remote realtime test. */
+/** Opens a live `todos` query for each fake-remote realtime test; stamps are handled by the multiplayer plugin. */
 async function setup(options: Record<string, any> = {}) {
-  const stack = await createVueStack({ schema: harnessSchema, data: harnessTodos(), ...options })
+  const stack = await createVueStack({ schema: harnessSchema, data: harnessTodos(), plugins: [createMultiplayerPlugin({ tombstoneGc: false })], ...options })
   const list = await stack.run(() => stack.store.todos.liveQuery((q: any) => q.many()))
   await vi.waitFor(() => expect(stack.remote.subscriptions()).toHaveLength(1))
   return { ...stack, list }
@@ -30,7 +31,7 @@ describe('fake remote realtime frames', () => {
     const { store, remote, list } = await setup()
     remote.emit({ type: 'deleted', collection: 'todos', key: '2', deletedAt: 300 })
     await nextTick()
-    expect(store.$cache.tombstones.size()).toBe(1)
+    expect(Array.from(tombstoneEntries(store))).toHaveLength(1)
     remote.emit({ type: 'updated', collection: 'todos', item: { id: '2', title: 'Zombie' }, fieldTimestamps: { title: 100 } })
     await nextTick()
     expect(title(list, '2')).toBeUndefined()

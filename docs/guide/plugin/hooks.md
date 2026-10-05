@@ -168,6 +168,7 @@ hook('createItem', (payload) => {
     payload.getResult, // A function to get the result of the query
     payload.setResult, // A function to update the result of the query
     payload.formOperations, // Form op log (only present when mutation comes from a form)
+    payload.metadata, // Write metadata passed to the mutation, read-only (v0.9)
   )
 })
 ```
@@ -286,6 +287,7 @@ hook('updateItem', (payload) => {
     payload.getResult, // A function to get the result of the query
     payload.setResult, // A function to update the result of the query
     payload.formOperations, // Form op log (only present when mutation comes from a form)
+    payload.metadata, // Write metadata passed to the mutation, read-only (v0.9)
   )
 })
 ```
@@ -409,6 +411,7 @@ hook('deleteItem', (payload) => {
     payload.meta,
     payload.collection, // The current collection
     payload.key, // The key of the item to delete
+    payload.metadata, // Write metadata passed to the mutation, read-only (v0.9)
   )
 })
 ```
@@ -589,25 +592,64 @@ hook('afterCacheWrite', (payload) => {
 
 Use this hook for side effects such as analytics, logging, or external cache invalidation.
 
-### cacheConflict
+### cacheBeforeWriteItem <Badge text="New in v0.9" />
 
-This hook is called when cache-level CRDT merge detects field conflicts on an item.
+Called before a write reaches the committed cache state, for `writeItem`, every item of `writeItems`, mutation results and relation children. It runs inside the queued cache flush, so `pause()`/`resume()` keep their order, and sees the committed row without optimistic layers. Handlers must be synchronous.
 
 ```ts
-hook('cacheConflict', (payload) => {
-  console.log(
-    payload.collection.name,
-    payload.key,
-    payload.conflicts, // Array<{ field, localValue, remoteValue, ... }>
-  )
+hook('cacheBeforeWriteItem', ({ collection, key, existing, incoming, metadata, setValue, skip, consume }) => {
+  // Drop stale writes of a versioned row
+  if (metadata?.version != null && existing?.version > metadata.version) {
+    consume('version')
+    return skip()
+  }
+  // Or replace the stored row
+  setValue({ ...existing, ...incoming })
 })
 ```
 
-Typical uses:
+| Payload | Description |
+| --- | --- |
+| `existing` | Committed row before the write (frozen; do not mutate), or `undefined` |
+| `incoming` | Incoming scalar fields (relation fields are split off) |
+| `metadata` | [Write metadata](../data/cache.md#write-metadata) of the write |
+| `setValue(row)` | Replace the whole stored row; indexes follow it. The last call wins |
+| `skip()` | Drop the write: no state change, no relation child write, no `afterCacheWrite`. Wins over `setValue` |
+| `consume(...keys)` | Mark metadata keys as handled (silences the development warning) |
 
-- Log conflict telemetry.
-- Trigger custom conflict resolution workflows.
-- Surface collaboration warnings in your UI layer.
+### cacheBeforeDeleteItem <Badge text="New in v0.9" />
+
+Called before `deleteItem` and delete mutations remove a row (evictions, `clear` and `clearCollection` are not intercepted).
+
+```ts
+hook('cacheBeforeDeleteItem', ({ collection, key, existing, metadata, skip, consume }) => {
+  if (metadata?.keepRow) {
+    consume('keepRow')
+    skip()
+  }
+})
+```
+
+### cacheConflict
+
+Moved to the [collaboration guide](../data/collaboration.md#cacheconflict): the hook is declared by `@rstore/multiplayer` and called by its plugin.
+
+## Forms
+
+### formFieldMerge <Badge text="New in v0.9" />
+
+Called during form `$rebase()` for every field changed both locally and remotely, then for each local `set` operation of that field. The first handler that calls `setMerged` wins; without one, the field is a conflict.
+
+```ts
+hook('formFieldMerge', ({ collection, field, base, local, remote, setMerged }) => {
+  if (typeof base === 'number' && typeof local === 'number' && typeof remote === 'number') {
+    // Counters: apply both deltas
+    setMerged(local + remote - base)
+  }
+})
+```
+
+The [multiplayer plugin](../data/collaboration.md#form-text-merge) registers a text merger on this hook.
 
 ## Fetching relations
 
@@ -1144,6 +1186,16 @@ hook('init', (payload) => {
     payload.store, // The store instance
     payload.meta,
   )
+})
+```
+
+### dispose <Badge text="New in v0.9" />
+
+Called once when the store cache is disposed (`store.$cache.dispose()`). Stop timers and close channels started by the plugin here.
+
+```ts
+hook('dispose', () => {
+  clearInterval(timer)
 })
 ```
 

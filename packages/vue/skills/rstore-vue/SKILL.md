@@ -1,6 +1,6 @@
 ---
 name: rstore-vue
-description: "Use when handling app data in Vue with `@rstore/vue` — fetch items/lists, keep queries reactive or live, create/update/delete records with forms, manage cache consistency, and debug store/query/subscription behavior across collections; also use before writing a custom fetch composable, ad hoc fetch ref, or bespoke cache layer for collection data — prefer `find*`, `query`, `liveQuery`, `createForm`, and `definePlugin` hooks over hand-rolled fetching/caching."
+description: "Use when handling app data in Vue with `@rstore/vue` — fetch items/lists, keep queries reactive or live, create/update/delete records with forms, manage cache consistency, and debug store/query/subscription behavior across collections; also use before writing a custom fetch composable, ad hoc fetch ref, or bespoke cache layer for collection data — prefer `find*`, `query`, `liveQuery`, `createForm`, and `definePlugin` hooks over hand-rolled fetching/caching; also use when extending cache writes with write metadata, item metadata or cache/form merge hooks (for realtime collaboration, LWW and presence use the `rstore-multiplayer` skill)."
 ---
 
 # Rstore Vue
@@ -17,6 +17,7 @@ Build typed, cache-first Vue data flows with `@rstore/vue`, including core engin
 | Query and live query | [https://rstore.akryum.dev/guide/data/query](https://rstore.akryum.dev/guide/data/query), [https://rstore.akryum.dev/guide/data/live](https://rstore.akryum.dev/guide/data/live) |
 | Mutations and forms | [https://rstore.akryum.dev/guide/data/mutation](https://rstore.akryum.dev/guide/data/mutation), [https://rstore.akryum.dev/guide/data/form](https://rstore.akryum.dev/guide/data/form) |
 | Cache and modules | [https://rstore.akryum.dev/guide/data/cache](https://rstore.akryum.dev/guide/data/cache), [https://rstore.akryum.dev/guide/data/module](https://rstore.akryum.dev/guide/data/module) |
+| Collaboration (multiplayer plugin) | [https://rstore.akryum.dev/guide/data/collaboration](https://rstore.akryum.dev/guide/data/collaboration), `rstore-multiplayer` skill |
 | Plugin setup and hooks | [https://rstore.akryum.dev/guide/plugin/setup](https://rstore.akryum.dev/guide/plugin/setup), [https://rstore.akryum.dev/guide/plugin/hooks](https://rstore.akryum.dev/guide/plugin/hooks) |
 | Skill-local API references | [./references/index.md](./references/index.md) |
 
@@ -35,6 +36,8 @@ Build typed, cache-first Vue data flows with `@rstore/vue`, including core engin
 | `useQueryTracking` | Tracks query membership and filters dirty cached items in reactive flows |
 | `createForm` / `updateForm` / `createFormObject` | Mutation and validation workflow with submit/reset/change tracking |
 | `definePlugin({ ... })` | Extends fetch/cache/mutation/subscribe/sync behavior via hooks |
+| Write metadata (`metadata`) | Opaque per-write data forwarded to `cacheBeforeWriteItem` / `cacheBeforeDeleteItem` and mutation hooks |
+| `store.$cache.itemMetadata` | Namespaced per-item plugin data beside cached rows (serialized/persisted per namespace) |
 | `defineModule(name, cb)` | Creates store-scoped reusable logic with per-store caching |
 | `@rstore/core` primitives | Backing implementation for collection/schema, find/peek/mutation/subscription behavior |
 | `@rstore/shared` types + hooks | Cross-package contracts for options, meta, payloads, and utilities |
@@ -83,6 +86,7 @@ Notes:
 - `createFormObject` supports `validateOnSubmit`, `transformData`, `resetOnSuccess`, `$changedProps`, and `$valid`.
 - Form objects expose `$opLog` for undo/redo and optimized form operations.
 - Use `$rebase`, `$conflicts`, and `$resolveConflict` for collaborative editing flows.
+- `$rebase` has no default merge policy: a field changed on both sides is a `FormFieldConflict { field, localValue, remoteValue }` unless a `formFieldMerge` handler (or `createFormObject({ fieldMerge })`) merges it. The multiplayer plugin registers a text merger (see the `rstore-multiplayer` skill).
 - `$save()` and `$onSaved()` are deprecated compatibility aliases. Prefer `$submit()` and `$onSuccess()`.
 
 ## Modules and plugins
@@ -94,6 +98,14 @@ Notes:
 - `addCollectionDefaults(...)` is the right place for shared field parsing/default behavior.
 - Keep plugin behavior keyed by store/scope instead of global mutable state.
 
+## Cache extension (v0.9)
+
+- Pass plugin data through `metadata` on `store.$cache.writeItem` / `writeItems` / `deleteItem` and mutations; the cache never reads it. Declare keys by augmenting `CustomCacheWriteMetadata` in `@rstore/shared`.
+- Handle metadata in `cacheBeforeWriteItem` (`setValue`, `skip`, `consume`) and `cacheBeforeDeleteItem` (`skip`, `consume`); handlers are synchronous.
+- Store per-row plugin state in `store.$cache.itemMetadata` namespaces (register once, usually in `init`); `serialize` (default `true`) puts them in `getState()` for SSR, `persist: true` lets the offline plugin persist them.
+- Stop plugin timers/channels in the `dispose` hook.
+- Realtime frames carrying `fieldTimestamps` / `deletedAt` must reach the cache as `metadata`; without the multiplayer plugin they simply overwrite the row (see the `rstore-multiplayer` skill).
+
 ## Guardrails
 
 1. Calling `useStore()` without installation/active store throws.
@@ -102,6 +114,8 @@ Notes:
 4. `experimentalGarbageCollection` affects query tracking behavior; use only with explicit coverage.
 5. Dynamic `store.$collection(name)` calls throw for unknown collection names.
 6. Avoid duplicating entity state outside store cache unless intentionally divergent.
+7. In development, an "unhandled metadata key" warning means no hook called `consume()` for that key, usually a missing plugin (for `fieldTimestamps`/`deletedAt`: the multiplayer plugin).
+8. Writing to an unregistered `itemMetadata` namespace throws; re-registering with different options throws.
 
 ## References
 
@@ -143,6 +157,15 @@ Notes:
 | deleteMany | Batch delete mutation | [api-delete-many](./references/api-delete-many.md) |
 | writeItem | Write/override item in cache | [api-write-item](./references/api-write-item.md) |
 | clearItem | Remove item from cache view | [api-clear-item](./references/api-clear-item.md) |
+| Write metadata | `metadata` option on cache writes/deletes and mutations | [api-write-metadata](./references/api-write-metadata.md) |
+| CustomCacheWriteMetadata | Type augmentation for write metadata keys | [api-custom-cache-write-metadata](./references/api-custom-cache-write-metadata.md) |
+| store.$cache.itemMetadata | Namespaced per-item plugin data | [api-item-metadata](./references/api-item-metadata.md) |
+| cacheBeforeWriteItem | Intercept/replace/skip cache writes | [api-cache-before-write-item](./references/api-cache-before-write-item.md) |
+| cacheBeforeDeleteItem | Intercept/skip cache deletes | [api-cache-before-delete-item](./references/api-cache-before-delete-item.md) |
+| dispose | Plugin cleanup on cache dispose | [api-dispose-hook](./references/api-dispose-hook.md) |
+| formFieldMerge | Merge policy for fields changed on both sides | [api-form-field-merge](./references/api-form-field-merge.md) |
+| form.$rebase | Apply remote data under local form edits | [api-form-rebase](./references/api-form-rebase.md) |
+| FormFieldConflict | `$conflicts` entry shape and resolution | [api-form-field-conflict](./references/api-form-field-conflict.md) |
 
 ## Further reading
 
@@ -151,3 +174,6 @@ Notes:
 - Mutation docs: [https://rstore.akryum.dev/guide/data/mutation](https://rstore.akryum.dev/guide/data/mutation)
 - Form docs: [https://rstore.akryum.dev/guide/data/form](https://rstore.akryum.dev/guide/data/form)
 - Plugin hook docs: [https://rstore.akryum.dev/guide/plugin/hooks](https://rstore.akryum.dev/guide/plugin/hooks)
+- Cache docs: [https://rstore.akryum.dev/guide/data/cache](https://rstore.akryum.dev/guide/data/cache)
+- Collaboration docs: [https://rstore.akryum.dev/guide/data/collaboration](https://rstore.akryum.dev/guide/data/collaboration)
+- @rstore/multiplayer skill: `rstore-multiplayer`

@@ -1,4 +1,4 @@
-import type { FieldConflict, FormObjectBase, FormOperation, StandardSchemaV1 } from '@rstore/shared'
+import type { FormFieldConflict, FormObjectBase, FormOperation, StandardSchemaV1 } from '@rstore/shared'
 import type { CreateFormObjectOptions, FormObjectAdditionalProps, FormObjectChanged, OpLogAPI, VueFormObject } from './types'
 import { emptySchema } from '@rstore/core'
 import { markRaw, reactive } from 'vue'
@@ -53,7 +53,7 @@ export function createFormObject<
     $rebase: (newBaseData: Partial<TData>, remoteChangedFields?: (keyof TData)[]) => {
       rebaseForm(ctx, newBaseData, remoteChangedFields)
     },
-    $conflicts: [] as FieldConflict[],
+    $conflicts: [] as FormFieldConflict[],
     $resolveConflict: (field: keyof TData, resolution: 'local' | 'remote') => {
       resolveConflict(ctx, field, resolution)
     },

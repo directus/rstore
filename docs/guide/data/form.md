@@ -592,7 +592,31 @@ form.$rebase(remoteItem)
 2. Replays local operations (`$opLog`) on top of that new base.
 3. Detects field-level conflicts where local and remote edits disagree.
 
-For string fields, rstore attempts an automatic text merge when possible. If a field still conflicts, it is exposed in `$conflicts`.
+### Merging fields changed on both sides <Badge text="Changed in v0.9" type="warning" />
+
+By default `$rebase()` has no merge policy: a field changed both locally and remotely is a conflict, exposed in `$conflicts`, even when the text edits do not overlap.
+
+Merge policies are plugins of the [`formFieldMerge`](../plugin/hooks.md#formfieldmerge) hook. The [multiplayer plugin](./collaboration.md#form-text-merge) registers a three-way text merger that restores automatic merging of non-overlapping string edits:
+
+```ts
+import { createMultiplayerPlugin } from '@rstore/multiplayer'
+
+const store = await createStore({
+  schema,
+  plugins: [remotePlugin, createMultiplayerPlugin()],
+})
+```
+
+A merger is called for the field, then for each local `set` operation of that field, so the op log is rewritten and undo/redo replay the merged values. Forms created with `createFormObject` take a merger directly:
+
+```ts
+import { textFieldMerger } from '@rstore/multiplayer'
+
+const form = createFormObject({
+  defaultValues: () => ({ title: '', body: '' }),
+  fieldMerge: textFieldMerger,
+})
+```
 
 ### Tracking remote-changed fields explicitly
 
@@ -618,6 +642,6 @@ for (const conflict of form.$conflicts) {
 }
 ```
 
-- `form.$conflicts` is the current list of unresolved field conflicts.
+- `form.$conflicts` is the current list of unresolved field conflicts: `{ field, localValue, remoteValue }` (`FormFieldConflict`).
 - `form.$resolveConflict(field, 'local')` keeps local edits.
 - `form.$resolveConflict(field, 'remote')` drops local operations for that field and accepts the rebased value.

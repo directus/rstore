@@ -5,7 +5,7 @@ import { promisify } from 'node:util'
 import { beforeAll, describe, expect, it } from 'vitest'
 
 const SYNC_DEP_SKILLS_SCRIPT = 'node ../../scripts/sync-dep-skills.mjs .'
-const SYNC_SKILLS_SCRIPT = 'node scripts/sync-dep-skills.mjs packages/vue packages/nuxt packages/nuxt-drizzle packages/directus packages/vite-directus packages/monospace packages/vite-monospace packages/nuxt-monospace'
+const SYNC_SKILLS_SCRIPT = 'node scripts/sync-dep-skills.mjs packages/vue packages/nuxt packages/nuxt-drizzle packages/directus packages/vite-directus packages/monospace packages/vite-monospace packages/nuxt-monospace packages/multiplayer'
 const execFile = promisify(execFileCallback)
 
 interface EmbeddedSkillPackage {
@@ -40,6 +40,7 @@ const embeddedSkillPackages: EmbeddedSkillPackage[] = [
   { packageDir: 'packages/monospace', skillName: 'rstore-monospace' },
   { dependencySkillNames: ['rstore-monospace', 'rstore-vue'], packageDir: 'packages/vite-monospace', skillName: 'rstore-vite-monospace' },
   { dependencySkillNames: ['rstore-monospace', 'rstore-nuxt', 'rstore-vue'], packageDir: 'packages/nuxt-monospace', skillName: 'rstore-nuxt-monospace' },
+  { packageDir: 'packages/multiplayer', skillName: 'rstore-multiplayer' },
 ]
 
 const sourceSkillPackages = new Map(embeddedSkillPackages.map(({ packageDir, skillName }) => [skillName, packageDir]))

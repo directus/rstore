@@ -13,6 +13,7 @@ export default defineNuxtConfig({
   modules: [
     '../nuxt/src/module',
     '../nuxt-multiplayer/src/module',
+    '../nuxt-multiplayer-server/src/module',
     '@nuxt/ui',
     '@vueuse/nuxt',
     'nuxt-auth-utils',
@@ -61,6 +62,11 @@ export default defineNuxtConfig({
 
   experimental: {
     asyncContext: true,
+  },
+
+  // Collab documents (`/doc/:id`) on the multiplayer endpoint.
+  rstoreMultiplayerServer: {
+    collab: true,
   },
 
   rstore: {

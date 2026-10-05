@@ -28,6 +28,15 @@ export interface ModuleOptions {
       retries?: number
       delay?: number
     }
+    /**
+     * Install `createMultiplayerPlugin({ lww: true, formTextMerge: false })`
+     * from `@rstore/multiplayer`, which merges the field stamps of realtime
+     * frames and keeps tombstones. Set `false` to register your own
+     * multiplayer plugin (e.g. with form text merge) or none: stamped frames
+     * then overwrite cached rows.
+     * @default true
+     */
+    lww?: boolean
   }
   /** Enable offline support. */
   offline?: boolean | (CreateOfflinePluginOptions & {

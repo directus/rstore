@@ -98,12 +98,12 @@ export interface VueCollectionApi<
   /** Create an item directly. */
   create: (
     item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
-    createOptions?: Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'formOperations' | 'batch'>,
+    createOptions?: Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'formOperations' | 'batch' | 'metadata'>,
   ) => Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   /** Create many items directly. */
   createMany: (
     items: Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>,
-    createOptions?: Pick<CreateManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
+    createOptions?: Pick<CreateManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'metadata'>,
   ) => Promise<Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>
   /** Create a form for a new item. */
   createForm: (
@@ -116,12 +116,12 @@ export interface VueCollectionApi<
   /** Update an item directly. */
   update: (
     item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
-    updateOptions?: Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'key' | 'optimistic' | 'formOperations' | 'batch'>,
+    updateOptions?: Pick<UpdateOptions<TCollection, TCollectionDefaults, TSchema>, 'key' | 'optimistic' | 'formOperations' | 'batch' | 'metadata'>,
   ) => Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   /** Update many items directly. */
   updateMany: (
     items: Array<Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>,
-    updateOptions?: Pick<UpdateManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
+    updateOptions?: Pick<UpdateManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'metadata'>,
   ) => Promise<Array<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>
   /** Create a form for updating an existing item. */
   updateForm: (
@@ -136,12 +136,12 @@ export interface VueCollectionApi<
   /** Delete one item. */
   delete: (
     keyOrItem: string | number | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
-    DeleteOptions?: Pick<DeleteOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'batch'>,
+    DeleteOptions?: Pick<DeleteOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'batch' | 'metadata'>,
   ) => Promise<void>
   /** Delete many items. */
   deleteMany: (
     keysOrItems: Array<string | number | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>>,
-    deleteOptions?: Pick<DeleteManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic'>,
+    deleteOptions?: Pick<DeleteManyOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'metadata'>,
   ) => Promise<void>
   /** Run custom collection-shaped mutation work through rstore. */
   mutate: <TResult>(

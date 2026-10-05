@@ -41,3 +41,12 @@
 | `deleteMany` | [./api-delete-many.md](./api-delete-many.md) |
 | `writeItem` | [./api-write-item.md](./api-write-item.md) |
 | `clearItem` | [./api-clear-item.md](./api-clear-item.md) |
+| `metadata` (write metadata) | [./api-write-metadata.md](./api-write-metadata.md) |
+| `CustomCacheWriteMetadata` | [./api-custom-cache-write-metadata.md](./api-custom-cache-write-metadata.md) |
+| `store.$cache.itemMetadata` | [./api-item-metadata.md](./api-item-metadata.md) |
+| `cacheBeforeWriteItem` hook | [./api-cache-before-write-item.md](./api-cache-before-write-item.md) |
+| `cacheBeforeDeleteItem` hook | [./api-cache-before-delete-item.md](./api-cache-before-delete-item.md) |
+| `dispose` hook | [./api-dispose-hook.md](./api-dispose-hook.md) |
+| `formFieldMerge` hook | [./api-form-field-merge.md](./api-form-field-merge.md) |
+| `form.$rebase` | [./api-form-rebase.md](./api-form-rebase.md) |
+| `FormFieldConflict` | [./api-form-field-conflict.md](./api-form-field-conflict.md) |

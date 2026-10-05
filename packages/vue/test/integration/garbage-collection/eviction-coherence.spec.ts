@@ -1,3 +1,4 @@
+import { createMultiplayerPlugin, getFieldTimestamps, setFieldTimestamps, tombstoneEntries } from '@rstore/multiplayer'
 import { describe, expect, it } from 'vitest'
 import { blogSchema, cached, createGarbageCollectionStack, drainGarbageCollection, todoSchema } from './utils'
 
@@ -6,6 +7,7 @@ describe('item eviction coherence', () => {
     const stack = await createGarbageCollectionStack({
       schema: todoSchema,
       data: { todos: [{ id: 0 }, { id: 1 }] },
+      plugins: [createMultiplayerPlugin({ tombstoneGc: false })],
     })
     const collected: any[] = []
     stack.store.$hooks.hook('itemGarbageCollect', (payload: any) => collected.push(payload))
@@ -16,19 +18,19 @@ describe('item eviction coherence', () => {
     await scope.result
     const collection = stack.collection('todos')
     const item = cached(stack, 'todos', 0)!
-    stack.cache.writeFieldTimestamps({ collectionName: 'todos', key: 0, timestamps: { title: 100 } })
-    stack.cache.writeFieldTimestamps({ collectionName: 'todos', key: 1, timestamps: { title: 200 } })
+    setFieldTimestamps(stack.store, 'todos', 0, { title: 100 })
+    setFieldTimestamps(stack.store, 'todos', 1, { title: 200 })
 
     scope.stop()
     stack.cache.garbageCollectItem({ collection, item })
 
     expect(cached(stack, 'todos', 0)).toBeUndefined()
-    expect(stack.cache.readFieldTimestamps({ collectionName: 'todos', key: 0 })).toBeUndefined()
-    expect(stack.cache.readFieldTimestamps({ collectionName: 'todos', key: 1 })).toEqual({ title: 200 })
+    expect(getFieldTimestamps(stack.store, 'todos', 0)).toBeUndefined()
+    expect(getFieldTimestamps(stack.store, 'todos', 1)).toEqual({ title: 200 })
     expect(collected).toHaveLength(1)
     expect(collected[0]).toMatchObject({ store: stack.store, collection, key: 0 })
     expect(collected[0]?.item).toBe(item)
-    expect(stack.cache.tombstones.size()).toBe(0)
+    expect(Array.from(tombstoneEntries(stack.store))).toEqual([])
 
     stack.cache.garbageCollectItem({ collection, item })
     expect(collected).toHaveLength(1)

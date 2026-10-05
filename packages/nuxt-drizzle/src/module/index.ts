@@ -33,7 +33,7 @@ export default defineNuxtModule<ModuleOptions>({
     const resolveRuntime = createRuntimeResolver(resolve)
 
     nuxt.hook('prepare:types', ({ references }) => {
-      references.push({ path: resolveRuntime('./runtime/types.ts') })
+      references.push({ path: resolveRuntime('./runtime/types') })
     })
 
     const drizzleConfigPath = options.drizzleConfigPath ?? 'drizzle.config.ts'

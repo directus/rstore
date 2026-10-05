@@ -30,6 +30,10 @@ const { unsubscribe } = store.ChatMessage.subscribe()
 unsubscribe()
 ```
 
+## Stamped realtime updates
+
+Realtime frames that carry per-field timestamps or delete times should reach the cache as [write metadata](./cache.md#write-metadata) (`metadata: { fieldTimestamps }`, `metadata: { deletedAt }`), merged by the [multiplayer plugin](./collaboration.md#stamped-writes). Without the plugin, a stamped frame simply overwrites the cached row.
+
 ## Metadata
 
 Plugins can set metadata information on the `meta` ref returned by `subscribe`:

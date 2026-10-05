@@ -101,7 +101,7 @@ async function persistMutation(runtime: OfflinePluginRuntime, { collection, muta
 }
 
 function installSingleMutationQueueHooks(runtime: OfflinePluginRuntime, hook: any) {
-  hook('createItem', async ({ collection, setResult, item }: any) => {
+  hook('createItem', async ({ collection, setResult, item, metadata }: any) => {
     if (!shouldQueueMutation(runtime, collection)) {
       return
     }
@@ -116,11 +116,12 @@ function installSingleMutationQueueHooks(runtime: OfflinePluginRuntime, hook: an
       collectionName: collection.name,
       item,
       key,
+      metadata,
     })
     setResult(item)
   })
 
-  hook('updateItem', async ({ collection, setResult, item, key }: any) => {
+  hook('updateItem', async ({ collection, setResult, item, key, metadata }: any) => {
     if (!shouldQueueMutation(runtime, collection)) {
       return
     }
@@ -129,11 +130,12 @@ function installSingleMutationQueueHooks(runtime: OfflinePluginRuntime, hook: an
       collectionName: collection.name,
       item,
       key,
+      metadata,
     })
     setResult(item)
   })
 
-  hook('deleteItem', async ({ collection, abort, key }: any) => {
+  hook('deleteItem', async ({ collection, abort, key, metadata }: any) => {
     if (!shouldQueueMutation(runtime, collection)) {
       return
     }
@@ -141,13 +143,14 @@ function installSingleMutationQueueHooks(runtime: OfflinePluginRuntime, hook: an
       type: 'delete',
       collectionName: collection.name,
       key,
+      metadata,
     })
     abort()
   })
 }
 
 function installManyMutationQueueHooks(runtime: OfflinePluginRuntime, hook: any) {
-  hook('createMany', async ({ collection, setResult, items }: any) => {
+  hook('createMany', async ({ collection, setResult, items, metadata }: any) => {
     if (!shouldQueueMutation(runtime, collection)) {
       return
     }
@@ -159,11 +162,12 @@ function installManyMutationQueueHooks(runtime: OfflinePluginRuntime, hook: any)
       type: 'createMany',
       collectionName: collection.name,
       ...queued,
+      metadata,
     })
     setResult(queued.items)
   })
 
-  hook('updateMany', async ({ collection, setResult, items }: any) => {
+  hook('updateMany', async ({ collection, setResult, items, metadata }: any) => {
     if (!shouldQueueMutation(runtime, collection)) {
       return
     }
@@ -175,11 +179,12 @@ function installManyMutationQueueHooks(runtime: OfflinePluginRuntime, hook: any)
       type: 'updateMany',
       collectionName: collection.name,
       ...queued,
+      metadata,
     })
     setResult(queued.items)
   })
 
-  hook('deleteMany', async ({ collection, abort, keys }: any) => {
+  hook('deleteMany', async ({ collection, abort, keys, metadata }: any) => {
     if (!shouldQueueMutation(runtime, collection) || keys.length === 0) {
       return
     }
@@ -187,6 +192,7 @@ function installManyMutationQueueHooks(runtime: OfflinePluginRuntime, hook: any)
       type: 'deleteMany',
       collectionName: collection.name,
       keys,
+      metadata,
     })
     abort()
   })
@@ -207,11 +213,14 @@ type QueuedMutationData = Omit<QueuedMutation, 'id' | 'time'> | Omit<QueuedManyM
  */
 async function queueMutation(runtime: OfflinePluginRuntime, data: QueuedMutationData): Promise<void> {
   const id = crypto.randomUUID()
+  // Leave `metadata` out when absent, so unstamped operations keep their shape.
+  const { metadata, ...rest } = data
   await getOfflineDb(runtime).writeItem(runtime.opsStoreName, id, {
     id,
-    ...data,
+    ...rest,
+    ...metadata ? { metadata } : {},
     time: new Date(),
-  } satisfies QueuedMutation | QueuedManyMutation)
+  } as QueuedMutation | QueuedManyMutation)
 }
 
 function collectKeyedItems(collection: any, items: any[], operation: 'createMany' | 'updateMany') {

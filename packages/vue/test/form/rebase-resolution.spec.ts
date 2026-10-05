@@ -89,6 +89,19 @@ describe('form CRDT rebase and conflicts', () => {
     expect(form.status).toBe('published')
   })
 
+  it('should report non-overlapping text edits as a conflict when no field merger is registered', () => {
+    const form = createFormObject({
+      defaultValues: () => ({ body: 'Hello world' }),
+      submit: async () => {},
+    })
+
+    form.body = 'Hello brave world'
+    form.$rebase({ body: 'Hello world!' })
+
+    expect(form.body).toBe('Hello brave world')
+    expect(form.$conflicts).toEqual([{ field: 'body', localValue: 'Hello brave world', remoteValue: 'Hello world!' }])
+  })
+
   it('should fall back to diffFields when remoteChangedFields is not provided', () => {
     const form = createFormObject({
       defaultValues: () => ({ title: 'Original', status: 'draft' }),

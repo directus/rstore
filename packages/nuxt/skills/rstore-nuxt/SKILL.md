@@ -68,7 +68,7 @@ rstore/
 
 - Auto-imports include `withItemType`, `defineCollection`, `defineRstorePlugin`, `defineRstoreModule`, `useStore`, `RStoreSchema`, plus related types.
 - The module generates and uses `#build` templates instead of requiring manual registry wiring.
-- The runtime plugin serializes cache state to `nuxtApp.payload.state.$srstore` on render and hydrates on client load.
+- The runtime plugin serializes cache state to `nuxtApp.payload.state.$srstore` on render and hydrates on client load, including serialized `itemMetadata` namespaces (for example multiplayer field stamps).
 - In development, a devtools plugin is appended automatically by runtime code.
 - `experimentalGarbageCollection` is passed from module options into `createStore`.
 

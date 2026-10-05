@@ -6,7 +6,7 @@ import { arch, cpus, platform, release } from 'node:os'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { computed, watchSyncEffect } from 'vue'
-import { assertLegacyPreconditions, createBenchmarkStore, createItems, legacyWriteItems } from './publicationStore'
+import { assertLegacyPreconditions, beforeWriteHookEnabled, createBenchmarkStore, createItems, legacyWriteItems } from './publicationStore'
 
 const benchmarkName = '@rstore/vue writeItems atomic publication'
 const itemCounts = [100, 1000]
@@ -247,6 +247,7 @@ async function main() {
       measuredIterations,
       isolatedStatePerSample: true,
       timingAssertions: false,
+      beforeWriteHook: beforeWriteHookEnabled(),
     },
     source: getSourceMetadata(),
     environment: {

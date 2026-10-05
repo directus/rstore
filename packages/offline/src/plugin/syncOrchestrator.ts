@@ -1,4 +1,5 @@
 import type { OfflinePluginRuntime } from './types'
+import { restoreItemMetadata } from './itemMetadata'
 import { replayQueuedOperations } from './queuedOperations'
 import { pullCollections } from './sync'
 
@@ -28,8 +29,10 @@ export function installOfflineSyncHook(runtime: OfflinePluginRuntime, hook: any)
   })
 }
 
-/** Run one full offline sync: queue replay, then remote pull. */
+/** Run one full offline sync: item metadata restore, queue replay, then remote pull. */
 async function runOfflineSync(runtime: OfflinePluginRuntime, payload: any): Promise<void> {
+  // Stamps and tombstones first: replayed and loaded rows merge against them.
+  await restoreItemMetadata(runtime, payload.store)
   await replayQueuedOperations(runtime, payload.store)
   await pullCollections(runtime, payload)
 }

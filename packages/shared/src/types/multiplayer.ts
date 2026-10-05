@@ -1,3 +1,7 @@
+// Import these types from `@rstore/multiplayer/protocol`. They are defined
+// here for one minor (0.9) so that @rstore/shared needs no dependency on
+// @rstore/multiplayer, which re-exports them; the definitions move there in 0.10.
+
 /** Cursor selection sent with a multiplayer presence frame. */
 export interface MultiplayerTextCursor {
   /** Inclusive selection start offset. */
@@ -60,6 +64,33 @@ export interface MultiplayerLeaveMessage {
   clientId: string
 }
 
+/** What a participant is typing into: a record, optionally one of its fields. */
+export interface MultiplayerTypingTarget {
+  /** Collection name of the record. */
+  collection: string
+  /** Key of the record. */
+  key: string | number
+  /** Field being typed into, if any. */
+  field?: string
+}
+
+/**
+ * Typing indicator. It never carries the typed content: the guard rejects
+ * any key outside this shape.
+ */
+export interface MultiplayerTypingMessage {
+  /** Discriminant for a typing frame. */
+  type: 'multiplayer:typing'
+  /** Room receiving the indicator. */
+  roomId: string
+  /** Participant that is typing. */
+  userId: string
+  /** Connection-scoped id: one per channel instance or browser tab. */
+  clientId: string
+  /** Where the participant types; `null` when they stopped. */
+  target: MultiplayerTypingTarget | null
+}
+
 /** Every frame accepted by the multiplayer wire protocol. */
 export type MultiplayerMessage<
   TUpdate = Record<string, any>,
@@ -68,3 +99,4 @@ export type MultiplayerMessage<
   = | MultiplayerUpdateMessage<TUpdate>
     | MultiplayerPresenceMessage<TField>
     | MultiplayerLeaveMessage
+    | MultiplayerTypingMessage

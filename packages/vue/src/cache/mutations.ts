@@ -2,6 +2,7 @@ import type { ApplyMutationOptions, ApplyMutationResult, Collection, CollectionD
 import type { CacheRuntime } from './types'
 import { isKeyDefined } from '@rstore/core'
 import { getMutationItemKey, unwrapMutationItem } from '@rstore/shared'
+import { resolveMutationMetadata } from './deprecatedAliases'
 import { enqueueOperation, enqueueWriteItems } from './queue'
 
 /** Apply a mutation-shaped cache update without emitting mutation hooks. */
@@ -20,6 +21,7 @@ function applyWriteMutation<TCollection extends Collection, TCollectionDefaults 
   params: ApplyMutationOptions<TCollection, TCollectionDefaults, TSchema>,
 ): ApplyMutationResult {
   const items = getWriteItems(params)
+  const metadata = resolveMutationMetadata(ctx, params)
   const many = params.results !== undefined || params.items !== undefined || items.length > 1
   const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
   const result: ApplyMutationResult = { written: [], deleted: [], skipped: 0 }
@@ -34,7 +36,8 @@ function applyWriteMutation<TCollection extends Collection, TCollectionDefaults 
       }
       throw new Error(`Item ${params.mutation} failed: key is not defined`)
     }
-    writes.push({ key, value: item })
+    // `afterCacheWrite` observers receive these entries: no `metadata` key unless set.
+    writes.push(metadata ? { key, value: item, metadata } : { key, value: item })
     result.written.push(key)
   }
 
@@ -46,7 +49,7 @@ function applyWriteMutation<TCollection extends Collection, TCollectionDefaults 
         key: writes[0].key,
         item: writes[0].value,
         meta: params.meta,
-        fieldTimestamps: params.fieldTimestamps,
+        metadata,
       },
     })
   }
@@ -66,6 +69,7 @@ function applyDeleteMutation(
   params: ApplyMutationOptions,
 ): ApplyMutationResult {
   const keys = getDeleteKeys(params)
+  const metadata = resolveMutationMetadata(ctx, params)
   const result: ApplyMutationResult = { written: [], deleted: [], skipped: 0 }
 
   for (const key of keys) {
@@ -74,7 +78,7 @@ function applyDeleteMutation(
       params: {
         collection: params.collection,
         key,
-        deletedAt: params.deletedAt,
+        metadata,
       },
     })
     result.deleted.push(key)

@@ -11,6 +11,7 @@
 | `rstoreDrizzle.apiPath` | [./api-api-path.md](./api-api-path.md) |
 | `rstoreDrizzle.ws` | [./api-ws.md](./api-ws.md) |
 | `rstoreDrizzle.ws.apiPath` | [./api-ws-api-path.md](./api-ws-api-path.md) |
+| `rstoreDrizzle.ws.lww` | [./api-ws-lww.md](./api-ws-lww.md) |
 | `rstoreDrizzle.offline` | [./api-offline.md](./api-offline.md) |
 | `rstoreDrizzle.offline.serializeDateValue` | [./api-offline-serialize-date-value.md](./api-offline-serialize-date-value.md) |
 | `findOptions.include` | [./api-find-options-include.md](./api-find-options-include.md) |
@@ -27,3 +28,4 @@
 | `hooksForTable` | [./api-hooks-for-table.md](./api-hooks-for-table.md) |
 | `allowTables` | [./api-allow-tables.md](./api-allow-tables.md) |
 | `publishRstoreDrizzleRealtimeUpdate` | [./api-publish-rstore-drizzle-realtime-update.md](./api-publish-rstore-drizzle-realtime-update.md) |
+| `createDrizzleOpLogStore` | [./api-create-drizzle-op-log-store.md](./api-create-drizzle-op-log-store.md) |

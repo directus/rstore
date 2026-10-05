@@ -21,8 +21,8 @@
     "test:dev": "vitest",
     "test:types": "pnpm run --parallel -r test:types && pnpm run test:types:integration",
     "test:types:integration": "tsc --noEmit -p tsconfig.integration.json",
-    "copy-readme": "echo ./packages/* | xargs -n 1 cp README.md",
-    "sync-skills": "node scripts/sync-dep-skills.mjs packages/vue packages/nuxt packages/nuxt-drizzle packages/directus packages/vite-directus packages/monospace packages/vite-monospace packages/nuxt-monospace",
+    "copy-readme": "node scripts/copy-readme.mjs",
+    "sync-skills": "node scripts/sync-dep-skills.mjs packages/vue packages/nuxt packages/nuxt-drizzle packages/directus packages/vite-directus packages/monospace packages/vite-monospace packages/nuxt-monospace packages/multiplayer",
     "release": "pnpm run copy-readme && pnpm run lint && pnpm run build && pnpm run test && pnpm run test:types && sheep release -b main --force",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
@@ -33,6 +33,7 @@
   "devDependencies": {
     "@akryum/sheep": "catalog:",
     "@antfu/eslint-config": "catalog:",
+    "@ast-grep/cli": "catalog:",
     "@iconify-json/lucide": "catalog:",
     "@iconify/vue": "catalog:",
     "@tailwindcss/vite": "catalog:",

@@ -1,0 +1,6 @@
+export { applyTextOp } from './apply.js'
+export { deltaLength, deltaToPlainText, normalizeDelta, normalizeTextOp } from './builder.js'
+export { composeTextOps, invertTextOp } from './compose.js'
+export { diffDelta, diffPlainText } from './diff.js'
+export { concatDelta, sliceDelta } from './slice.js'
+export { transformTextOp, transformTextPosition } from './transform.js'

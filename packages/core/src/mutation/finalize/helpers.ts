@@ -1,5 +1,6 @@
 import type { ApplyMutationOptions, ApplyMutationResult, Collection, CollectionDefaults, FinalizeMutationOptions, FinalizeMutationResult, GlobalStoreType, ResolvedCollectionItemBase, StoreCore, StoreSchema } from '@rstore/shared'
 import { getMutationItemKey, isMutationItemEntry, unwrapMutationItem } from '@rstore/shared'
+import { forwardDeprecatedMutationAliases } from '../../deprecated/mutationAliases'
 import { unwrapItem } from '../../item'
 import { isKeyDefined } from '../../key'
 import { validateCommittedCacheKeys } from './validation'
@@ -90,9 +91,9 @@ export function createSingleApplyOptions<
     collection: options.collection,
     mutation: options.mutation,
     meta,
-    fieldTimestamps: options.fieldTimestamps,
-    deletedAt: options.deletedAt,
+    metadata: options.metadata,
   }
+  forwardDeprecatedMutationAliases(options, applyOptions)
   if (isKeyDefined(options.key)) {
     applyOptions.key = options.key
   }
@@ -118,9 +119,9 @@ export function createManyApplyOptions<
     collection: options.collection,
     mutation: options.mutation,
     meta,
-    fieldTimestamps: options.fieldTimestamps,
-    deletedAt: options.deletedAt,
+    metadata: options.metadata,
   }
+  forwardDeprecatedMutationAliases(options, applyOptions)
   if (isKeyDefined(options.key)) {
     applyOptions.key = options.key
   }

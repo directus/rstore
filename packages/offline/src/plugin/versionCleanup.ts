@@ -1,5 +1,6 @@
 import type { OfflinePluginRuntime } from './types'
 import { removeLocalStorageItem } from '../localStorage'
+import { itemMetadataStoreName } from './constants'
 import { getMetadataKey, getOfflineDb, isCollectionIncluded } from './metadata'
 
 /**
@@ -23,6 +24,8 @@ export function installVersionCleanupHook(runtime: OfflinePluginRuntime, hook: a
       }
     }
 
+    // Persisted stamps and tombstones describe the wiped rows.
+    await getOfflineDb(runtime).clearDatabase(itemMetadataStoreName)
     await cleanupQueuedOperations(runtime)
   })
 }

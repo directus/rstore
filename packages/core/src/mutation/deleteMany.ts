@@ -1,4 +1,4 @@
-import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import type { CacheLayer, Collection, CollectionDefaults, CustomCacheWriteMetadata, CustomHookMeta, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import { finalizeMutation } from './finalizeMutation'
 import { assertMutationAllowed, createOptimisticLayerLifecycle } from './optimistic'
 
@@ -12,6 +12,11 @@ export interface DeleteManyOptions<
   keys: Array<string | number>
   skipCache?: boolean
   optimistic?: boolean
+  /**
+   * Opaque data forwarded to the cache hooks of the committed write/delete
+   * (`cacheBeforeWriteItem` / `cacheBeforeDeleteItem`).
+   */
+  metadata?: CustomCacheWriteMetadata
 }
 
 export async function deleteMany<
@@ -23,6 +28,7 @@ export async function deleteMany<
   collection,
   keys,
   skipCache,
+  metadata,
   optimistic = true,
 }: DeleteManyOptions<TCollection, TCollectionDefaults, TSchema>): Promise<void> {
   for (const key of keys) {
@@ -64,6 +70,7 @@ export async function deleteMany<
       store: store as unknown as GlobalStoreType,
       meta,
       collection,
+      metadata,
       keys,
       abort,
     }, _abort)
@@ -75,6 +82,7 @@ export async function deleteMany<
           store: store as unknown as GlobalStoreType,
           meta,
           collection,
+          metadata,
           key,
           abort,
         }, abort)
@@ -87,6 +95,7 @@ export async function deleteMany<
       mutation: 'delete',
       keys,
       skipCache,
+      metadata,
     }, {
       emitItemHooks: !aborted,
       onBeforeApplyCache: optimisticLayer.remove,

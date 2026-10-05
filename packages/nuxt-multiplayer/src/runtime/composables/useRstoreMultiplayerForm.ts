@@ -1,8 +1,9 @@
 import type { MultiplayerTextCursor } from '../types'
 import type { RstoreMultiplayerChannel } from './useRstoreMultiplayerChannel'
+import { rebaseMultiplayerTextCursor } from '@rstore/multiplayer/presence'
+import { sanitizeMultiplayerUpdate } from '@rstore/multiplayer/protocol'
 import { nextTick, onUnmounted, watch } from 'vue'
-import { rebaseMultiplayerTextCursor } from '../utils/multiplayerTextCursor'
-import { sanitizeMultiplayerUpdate } from '../utils/sanitizeUpdate'
+import { readTextCursor } from '../utils/selection'
 
 type FormChangeTuple = [newValue: unknown, oldValue: unknown]
 type FormChanges<TData extends Record<string, any>, TField extends keyof TData & string> = Partial<Record<TField, FormChangeTuple | undefined>>
@@ -215,23 +216,4 @@ function isFocusedTextField(
   return !!target
     && typeof document !== 'undefined'
     && document.activeElement === target
-}
-
-function readTextCursor(target: HTMLInputElement | HTMLTextAreaElement): MultiplayerTextCursor {
-  const start = target.selectionStart ?? 0
-  const end = target.selectionEnd ?? start
-
-  return {
-    start,
-    end,
-    direction: normalizeSelectionDirection(target.selectionDirection),
-  }
-}
-
-function normalizeSelectionDirection(direction: string | null): MultiplayerTextCursor['direction'] {
-  if (direction === 'forward' || direction === 'backward') {
-    return direction
-  }
-
-  return 'none'
 }

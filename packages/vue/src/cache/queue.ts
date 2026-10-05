@@ -1,9 +1,11 @@
 import type { CacheRuntime, CacheWriteBatch, QueuedOperation } from './types'
 import { triggerRef } from 'vue'
 import { ensureCollectionRef, evictCollectionStateCache, mark } from './context'
+import { runBeforeDelete } from './interception'
 import { addLayerNow, removeLayer } from './layers'
 import { pruneNow } from './prune'
-import { clearNow, deleteItemNow, setStateNow, writeItemNow } from './writes'
+import { clearNow, setStateNow } from './reset'
+import { deleteItemNow, writeItemNow } from './writes'
 
 /** Completed queue entry whose observer errors must not replay the write. */
 interface CompletedOperation {
@@ -120,11 +122,12 @@ function processQueuedWriteItems(ctx: CacheRuntime, operation: Extract<QueuedOpe
       if (!canProcessQueuedWrite(ctx)) {
         return false
       }
-      const { key, value: item } = operation.params.items[operation.index]!
+      const { key, value: item, metadata } = operation.params.items[operation.index]!
       writeItemNow(ctx, {
         collection: operation.params.collection,
         key,
         item,
+        metadata,
         meta: operation.params.meta,
         fromWriteItems: true,
         batch: operation.batch,
@@ -217,19 +220,10 @@ function throwSettlementErrors(errors: unknown[]) {
 }
 
 function processQueuedDelete(ctx: CacheRuntime, operation: Extract<QueuedOperation, { type: 'deleteItem' }>) {
-  const { collection, key, deletedAt } = operation.params
-  const collectionTs = ctx.state.fieldTimestamps.get(collection.name)
-  if (collectionTs) {
-    collectionTs.delete(key)
+  if (!operation.bypassHooks && runBeforeDelete(ctx, operation.params)) {
+    return
   }
-  if (deletedAt != null) {
-    ctx.state.tombstones.set({
-      collection: collection.name,
-      key,
-      deletedAt,
-    })
-  }
-  deleteItemNow(ctx, collection, key)
+  deleteItemNow(ctx, operation.params.collection, operation.params.key)
 }
 
 function scheduleStaggeringBudgetReset(ctx: CacheRuntime) {

@@ -1,29 +1,11 @@
+import type { CacheItemMetadata, CustomCacheWriteMetadata, SerializedCacheItemMetadata } from './cacheMetadata'
 import type { Collection, CollectionDefaults, CollectionRelation, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from './collection'
-import type { FieldTimestamps, FieldTimestampValue } from './crdt'
+import type { DeprecatedCacheDeleteAliases, DeprecatedCacheMethods, DeprecatedCacheWriteAliases } from './deprecatedAliases'
 import type { CustomHookMeta } from './hooks'
 import type { WrappedItem } from './item'
 import type { CacheLayer } from './layer'
 import type { Module, ResolvedModuleState } from './module'
 import type { ApplyMutationOptions, ApplyMutationResult } from './mutation'
-
-/**
- * A tombstone records the causal timestamp of a deletion so concurrent
- * writes arriving after the delete can be suppressed (or applied, if newer).
- */
-export interface CacheTombstone {
-  collection: string
-  key: string | number
-  deletedAt: FieldTimestampValue
-}
-
-/**
- * Read-only view of the cache's tombstone index.
- */
-export interface CacheTombstones {
-  get: (collection: string, key: string | number) => CacheTombstone | undefined
-  entries: () => IterableIterator<[string, CacheTombstone]>
-  size: () => number
-}
 
 /*
 
@@ -45,7 +27,13 @@ If there wasn't a marker, the cache would return a list with the single user tha
 
 */
 
-export interface CustomCacheState {}
+export interface CustomCacheState {
+  /**
+   * Item metadata of the namespaces registered with `serialize` (the default):
+   * namespace → collection → key → value.
+   */
+  itemMetadata?: SerializedCacheItemMetadata
+}
 
 export interface WriteItem<
   TCollection extends Collection = Collection,
@@ -54,12 +42,14 @@ export interface WriteItem<
 > {
   key: string | number
   value: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
+  /** Opaque per-write data for cache hooks (see `cacheBeforeWriteItem`). */
+  metadata?: CustomCacheWriteMetadata
 }
 
 export interface Cache<
   TSchema extends StoreSchema = StoreSchema,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
-> {
+> extends DeprecatedCacheMethods {
   readItem: <TCollection extends Collection = Collection>(params: {
     collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
     key: string | number
@@ -72,24 +62,16 @@ export interface Cache<
     marker?: string
     fromWriteItems?: boolean
     meta?: CustomHookMeta
-    /**
-     * Per-field timestamps for CRDT-like field-level LWW merge.
-     * When provided, the cache will merge at the field level using
-     * Last-Writer-Wins strategy instead of overwriting the entire object.
-     */
-    fieldTimestamps?: FieldTimestamps
-  }) => void
+    /** Opaque per-write data for cache hooks (see `cacheBeforeWriteItem`). */
+    metadata?: CustomCacheWriteMetadata
+  } & DeprecatedCacheWriteAliases) => void
 
   deleteItem: <TCollection extends Collection = Collection>(params: {
     collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
     key: string | number
-    /**
-     * Causal timestamp (HLC string or legacy number) of the delete.
-     * When provided, a tombstone is recorded so that concurrent writes
-     * older than this timestamp are dropped.
-     */
-    deletedAt?: FieldTimestampValue
-  }) => void
+    /** Opaque per-delete data for cache hooks (see `cacheBeforeDeleteItem`). */
+    metadata?: CustomCacheWriteMetadata
+  } & DeprecatedCacheDeleteAliases) => void
 
   readItems: <TCollection extends Collection = Collection>(params: {
     collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
@@ -145,22 +127,9 @@ export interface Cache<
   applyMutation: <TCollection extends Collection = Collection>(params: ApplyMutationOptions<TCollection, any, any>) => ApplyMutationResult
 
   /**
-   * Read the per-field timestamps for an item.
-   * Returns undefined if no timestamps are stored for the item.
+   * Namespaced per-item plugin data stored beside cache rows.
    */
-  readFieldTimestamps: (params: {
-    collectionName: string
-    key: string | number
-  }) => FieldTimestamps | undefined
-
-  /**
-   * Write per-field timestamps for an item.
-   */
-  writeFieldTimestamps: (params: {
-    collectionName: string
-    key: string | number
-    timestamps: FieldTimestamps
-  }) => void
+  itemMetadata: CacheItemMetadata
 
   getModuleState: <TModule extends Module> (name: TModule['name'], key: string, initState: TModule['state']) => ResolvedModuleState<TModule>
 
@@ -187,18 +156,6 @@ export interface Cache<
 
   garbageCollect: () => void
 
-  /**
-   * Read-only access to the tombstone index. Useful for devtools/debug
-   * and protocol publishers that want to replay deletions to new subscribers.
-   */
-  tombstones: CacheTombstones
-
-  /**
-   * Drop tombstones older than the given cutoff (HLC string or numeric).
-   * Pass a number `n` to drop tombstones whose `deletedAt.physical < n`.
-   */
-  gcTombstones: (olderThan: FieldTimestampValue) => Array<{ collection: string, key: string | number }>
-
   addLayer: (layer: CacheLayer) => void
 
   getLayer: (layerId: string) => CacheLayer | undefined
@@ -216,9 +173,9 @@ export interface Cache<
   resume: () => void
 
   /**
-   * Tear down any background timers (e.g. tombstone GC) owned by the
-   * cache. Safe to call multiple times. Mainly used by tests and by
-   * embedding apps that recreate the cache between tenants/sessions.
+   * Call the `dispose` hook, where plugins stop their timers and channels.
+   * Safe to call multiple times: the hook fires once. Mainly used by tests and
+   * by embedding apps that recreate the cache between tenants/sessions.
    */
   dispose: () => void
 }

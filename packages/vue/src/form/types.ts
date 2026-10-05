@@ -1,4 +1,4 @@
-import type { Awaitable, Cache, Collection, CollectionDefaults, CreateFormObject, FieldConflict, FormObjectBase, FormOperation, ResolvedCollection, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, UpdateFormObject } from '@rstore/shared'
+import type { Awaitable, Cache, Collection, CollectionDefaults, CreateFormObject, FormFieldConflict, FormFieldMergePayload, FormObjectBase, FormOperation, Hooks, ResolvedCollection, ResolvedCollectionItem, StandardSchemaV1, StoreSchema, UpdateFormObject } from '@rstore/shared'
 import type { EventHookOn } from '@vueuse/core'
 
 export type { FormOperation, FormOperationType } from '@rstore/shared'
@@ -58,11 +58,22 @@ export interface CreateFormObjectOptions<
   validateOnSubmit?: boolean
   /** Optional collection information to enable relation field methods. */
   collection?: ResolvedCollection<Collection, CollectionDefaults, StoreSchema>
-  /** Optional store reference to enable resolving relation fields from cache. */
+  /**
+   * Optional store reference to enable resolving relation fields from cache,
+   * and merging fields during `$rebase` with its `formFieldMerge` hook.
+   */
   store?: {
     $cache: Cache
     $collections: Array<ResolvedCollection>
+    $hooks?: Hooks<StoreSchema, CollectionDefaults>
   }
+  /**
+   * Merge a field changed both locally and remotely during `$rebase`, for
+   * forms without a store (store-backed forms use the `formFieldMerge` hook).
+   * Call `setMerged` to merge; otherwise the field is reported in `$conflicts`.
+   * `textFieldMerger` from `@rstore/multiplayer` merges concurrent text edits.
+   */
+  fieldMerge?: (payload: FormFieldMergePayload) => void
 }
 
 export type FormObjectChanged<TData> = {
@@ -106,11 +117,11 @@ export interface FormObjectAdditionalProps<
   /** Rebase local changes on top of new remote data. */
   $rebase: (newBaseData: Partial<TData>, remoteChangedFields?: (keyof TData)[]) => void
   /** Active field-level conflicts detected during the last `$rebase`. */
-  $conflicts: FieldConflict[]
+  $conflicts: FormFieldConflict[]
   /** Resolve a conflict by choosing local or remote value. */
   $resolveConflict: (field: keyof TData, resolution: 'local' | 'remote') => void
   /** Register a callback for conflicts detected during rebase. */
-  $onConflict: EventHookOn<FieldConflict[]>
+  $onConflict: EventHookOn<FormFieldConflict[]>
 }
 
 export type VueFormObject<

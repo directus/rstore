@@ -1,4 +1,4 @@
-import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomCacheWriteMetadata, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { set } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
 import { isKeyDefined } from '../key'
@@ -15,6 +15,11 @@ export interface CreateOptions<
   item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   skipCache?: boolean
   optimistic?: boolean | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
+  /**
+   * Opaque data forwarded to the cache hooks of the committed write/delete
+   * (`cacheBeforeWriteItem` / `cacheBeforeDeleteItem`).
+   */
+  metadata?: CustomCacheWriteMetadata
   /**
    * Form operations (op log) from a form submission.
    * Passed through to plugin hooks so they can handle relational edits.
@@ -43,6 +48,7 @@ export async function createItem<
   collection,
   item: inputItem,
   skipCache,
+  metadata,
   optimistic = true,
   formOperations,
   batch,
@@ -115,6 +121,7 @@ export async function createItem<
         store: store as unknown as GlobalStoreType,
         meta,
         collection,
+        metadata,
         item: transportItem,
         getResult: () => result,
         setResult: (newResult, options) => {
@@ -135,6 +142,7 @@ export async function createItem<
       item: transportItem,
       result,
       skipCache,
+      metadata,
       formOperations: formOperations as FormOperation[],
     }, {
       requireResultError: 'Item creation failed: result is nullish',

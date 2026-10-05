@@ -3,6 +3,8 @@
   "exclude": [
     "dist",
     "node_modules",
-    "playground"
+    "playground",
+    // Source-backed store suites: type-checked by the root `tsconfig.integration.json`.
+    "test/integration"
   ]
 }

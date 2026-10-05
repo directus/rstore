@@ -1,6 +1,7 @@
 import type { Cache } from '@rstore/shared'
 import type { CacheRuntime } from '../src/cache/types'
 import assert from 'node:assert/strict'
+import process from 'node:process'
 import { createStoreCore } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createCollectionApi } from '../src/api/createCollectionApi'
@@ -73,7 +74,6 @@ export async function createBenchmarkStore() {
   let storeProxy: any
   const runtime = createCacheRuntime({
     getStore: () => storeProxy,
-    tombstoneGc: false,
   })
   const cache = createCacheApi(runtime)
   const collectionApis = new Map<string, any>()
@@ -100,7 +100,17 @@ export async function createBenchmarkStore() {
     }),
   })
 
+  if (beforeWriteHookEnabled()) {
+    // Measures the interception cost a plugin pays without doing any work.
+    storeProxy.$hooks.hook('cacheBeforeWriteItem', () => {})
+  }
+
   return { cache, runtime, store: storeProxy }
+}
+
+/** Whether `RSTORE_BENCHMARK_BEFORE_WRITE_HOOK=1` asks for one no-op `cacheBeforeWriteItem` handler. */
+export function beforeWriteHookEnabled() {
+  return process.env.RSTORE_BENCHMARK_BEFORE_WRITE_HOOK === '1'
 }
 
 /** Generate independent deterministic expected data for one sample. */

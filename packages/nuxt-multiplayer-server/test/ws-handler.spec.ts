@@ -1,4 +1,5 @@
 import type { Peer } from 'crossws'
+import type { MultiplayerServerHandlerOptions } from '../src/runtime/server/ws-handler'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { rstoreMultiplayerServerHooks } from '../src/runtime/server/hooks'
 import { createMultiplayerWebSocketHandler } from '../src/runtime/server/ws-handler'
@@ -23,12 +24,12 @@ function makePeer(id: string): Peer & { received: any[] } {
   } as unknown as Peer & { received: any[] }
 }
 
-function makeHandler(options: { allowedOrigins?: string[] | false } = {}): WsHooks {
+function makeHandler(options: Partial<MultiplayerServerHandlerOptions> = {}): WsHooks {
   const handler = createMultiplayerWebSocketHandler({
     maxRoomSize: 10,
     maxMessageBytes: 64 * 1024,
     rateLimit: null,
-    allowedOrigins: options.allowedOrigins,
+    ...options,
   })
   return (handler as any).__websocket__ as WsHooks
 }
@@ -47,127 +48,61 @@ function presence(roomId: string, userId: string, clientId: string) {
   })
 }
 
-describe('ws-handler identity binding', () => {
-  const disposers: Array<() => void> = []
-
+describe('ws-handler wiring', () => {
   afterEach(() => {
-    for (const dispose of disposers.splice(0)) {
-      dispose()
-    }
     vi.restoreAllMocks()
   })
 
-  it('rewrites a spoofed leave to the sender\'s bound identity', async () => {
+  it('forwards text frames and closes to the room server', async () => {
     const hooks = makeHandler()
     const alice = makePeer('pA')
     const bob = makePeer('pB')
 
     await hooks.message(alice, presence('room', 'alice', 'cA'))
     await hooks.message(bob, presence('room', 'bob', 'cB'))
-    bob.received.length = 0
-
-    // Alice tries to erase Bob's presence by spoofing his identity.
-    await hooks.message(alice, frame({
-      type: 'multiplayer:leave',
-      roomId: 'room',
-      userId: 'bob',
-      clientId: 'cB',
-    }))
-
-    expect(bob.received).toHaveLength(1)
-    // The frame was stamped with Alice's bound identity, not Bob's.
-    expect(bob.received[0]).toMatchObject({
-      type: 'multiplayer:leave',
-      userId: 'alice',
-      clientId: 'cA',
-    })
-  })
-
-  it('rewrites spoofed presence user.id to the bound identity', async () => {
-    const hooks = makeHandler()
-    const alice = makePeer('pA')
-    const bob = makePeer('pB')
-
-    await hooks.message(alice, presence('room', 'alice', 'cA'))
-    await hooks.message(bob, presence('room', 'bob', 'cB'))
-    bob.received.length = 0
-
-    // Alice impersonates Bob in a presence frame.
-    await hooks.message(alice, presence('room', 'bob', 'cA'))
-
-    expect(bob.received).toHaveLength(1)
-    expect(bob.received[0].user.id).toBe('alice')
-  })
-
-  it('stamps updates with the bound clientId', async () => {
-    const hooks = makeHandler()
-    const alice = makePeer('pA')
-    const bob = makePeer('pB')
-
-    await hooks.message(alice, presence('room', 'alice', 'cA'))
-    await hooks.message(bob, presence('room', 'bob', 'cB'))
-    bob.received.length = 0
-
-    await hooks.message(alice, frame({
-      type: 'multiplayer:update',
-      roomId: 'room',
-      userId: 'alice',
-      clientId: 'cB', // spoofed connection id
-      data: { title: 'x' },
-    }))
-
-    expect(bob.received[0].clientId).toBe('cA')
-  })
-
-  it('binds the identity set by the authorize hook over client-supplied ids', async () => {
-    disposers.push(rstoreMultiplayerServerHooks.hook('multiplayer.authorize', (payload) => {
-      payload.setUserId('server-verified')
-    }))
-
-    const hooks = makeHandler()
-    const alice = makePeer('pA')
-    const bob = makePeer('pB')
-
-    await hooks.message(alice, presence('room', 'spoofed-id', 'cA'))
-    await hooks.message(bob, presence('room', 'bob', 'cB'))
-    bob.received.length = 0
-
-    await hooks.message(alice, frame({
-      type: 'multiplayer:update',
-      roomId: 'room',
-      userId: 'someone-else',
-      clientId: 'cA',
-      data: { title: 'x' },
-    }))
-
-    expect(bob.received[0].userId).toBe('server-verified')
-  })
-
-  it('broadcasts the bound identity on disconnect', async () => {
-    const hooks = makeHandler()
-    const alice = makePeer('pA')
-    const bob = makePeer('pB')
-
-    await hooks.message(alice, presence('room', 'alice', 'cA'))
-    // Alice later claims to be Bob — must not affect the bound identity.
-    await hooks.message(alice, frame({
-      type: 'multiplayer:update',
-      roomId: 'room',
-      userId: 'bob',
-      clientId: 'cB',
-      data: {},
-    }))
-    await hooks.message(bob, presence('room', 'bob', 'cB'))
-    bob.received.length = 0
-
     hooks.close(alice)
 
-    expect(bob.received).toHaveLength(1)
-    expect(bob.received[0]).toMatchObject({
-      type: 'multiplayer:leave',
-      userId: 'alice',
-      clientId: 'cA',
+    expect(alice.received.map(frame => frame.type)).toEqual(['multiplayer:presence'])
+    expect(bob.received).toEqual([{ type: 'multiplayer:leave', roomId: 'room', userId: 'alice', clientId: 'cA' }])
+  })
+
+  it.each([
+    ['maxRoomSize', { maxRoomSize: 1 }, presence('room', 'bob', 'cB')],
+    ['maxMessageBytes', { maxMessageBytes: 120 }, presence('room', 'bob'.repeat(20), 'cB')],
+    ['rateLimit', { rateLimit: { capacity: 1, refillPerSecond: 0 } }, presence('room', 'bob', 'cB')],
+  ] as const)('applies the %s option', async (_name, options, secondFrame) => {
+    const hooks = makeHandler(options)
+    const alice = makePeer('pA')
+    const bob = makePeer('pB')
+
+    await hooks.message(alice, presence('room', 'alice', 'cA'))
+    // Bob's frame is refused, or (rate limit) Alice's second one is dropped.
+    await hooks.message(bob, secondFrame)
+    await hooks.message(alice, presence('room', 'alice', 'cA'))
+
+    expect(bob.received).toEqual([])
+  })
+
+  it('calls the handlers registered on rstoreMultiplayerServerHooks with the crossws peer', async () => {
+    const peers: unknown[] = []
+    const dispose = rstoreMultiplayerServerHooks.hook('multiplayer.authorize', (payload) => {
+      peers.push(payload.peer)
+      payload.setUserId('server-verified')
     })
+    try {
+      const hooks = makeHandler()
+      const alice = makePeer('pA')
+      const bob = makePeer('pB')
+
+      await hooks.message(bob, presence('room', 'bob', 'cB'))
+      await hooks.message(alice, presence('room', 'spoofed-id', 'cA'))
+
+      expect(peers).toEqual([bob, alice])
+      expect(bob.received[0].user.id).toBe('server-verified')
+    }
+    finally {
+      dispose()
+    }
   })
 })
 

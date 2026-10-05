@@ -1,9 +1,10 @@
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/vue'
+import type { Collection, CollectionDefaults, StoreSchema } from '@rstore/shared'
 import type { RstoreDrizzleCondition } from './utils/types'
 
-declare module '@rstore/vue' {
+/** RStore query extension points are declared by Shared; Vue re-exports them. */
+declare module '@rstore/shared' {
   export interface CustomCollectionMeta {
     table?: string
     primaryKeys?: string[]

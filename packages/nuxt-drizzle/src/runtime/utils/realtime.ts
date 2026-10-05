@@ -1,4 +1,5 @@
-import type { FieldTimestamps, FieldTimestampValue } from '@rstore/shared'
+import type { FieldTimestampValue } from '@rstore/multiplayer/clock'
+import type { FieldTimestamps } from '@rstore/multiplayer/lww'
 import type { RstoreDrizzleCondition } from './types'
 
 /**

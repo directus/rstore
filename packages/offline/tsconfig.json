@@ -14,5 +14,10 @@
   "include": [
     "src",
     "test"
+  ],
+  // Store-backed suites import `@rstore/vue` and `#test-utils`; they are
+  // type-checked by the root `tsconfig.integration.json`.
+  "exclude": [
+    "test/integration"
   ]
 }

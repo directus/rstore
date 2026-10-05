@@ -6,6 +6,9 @@ export default antfu({
     '**/.nitro',
     'docs/guide/migration/**',
     '**/skills/**',
+    // Codemod inputs and expected outputs are compared verbatim.
+    'scripts/codemods/__fixtures__/**',
+    'scripts/codemods/*.yml',
   ],
   rules: {
     'vue/object-property-newline': ['error', {
@@ -55,6 +58,44 @@ export default antfu({
         message: 'Assert the public Store behavior produced by this private member.',
       },
     ],
+  },
+}, {
+  // `@rstore/multiplayer` is framework-agnostic and depends only on
+  // `@rstore/shared`: `@rstore/core` re-exports it during 0.9, so importing
+  // core back would create a cycle.
+  files: ['packages/multiplayer/src/**/*.ts'],
+  rules: {
+    'no-restricted-imports': ['error', {
+      patterns: [
+        {
+          group: [
+            '@rstore/*',
+            '!@rstore/shared',
+            'vue',
+            'vue/*',
+            '@vue/*',
+            'nuxt',
+            'nuxt/*',
+            '@nuxt/*',
+            '#app',
+            '#imports',
+          ],
+          message: '@rstore/multiplayer may only import @rstore/shared: no core, Vue or Nuxt.',
+        },
+      ],
+    }],
+  },
+}, {
+  files: ['packages/multiplayer/test/**/*.ts'],
+  rules: {
+    'no-restricted-imports': ['error', {
+      patterns: [
+        {
+          group: ['../src/*', '../../src/*', '../../../src/*', '**/packages/multiplayer/src/*'],
+          message: 'Import the public @rstore/multiplayer entries so tests exercise their boundary.',
+        },
+      ],
+    }],
   },
 }, {
   files: [

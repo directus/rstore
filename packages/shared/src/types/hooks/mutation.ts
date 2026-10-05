@@ -1,3 +1,4 @@
+import type { CustomCacheWriteMetadata } from '../cacheMetadata'
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from '../collection'
 import type { FormOperation } from '../formOperation'
 import type { GlobalStoreType } from '../global'
@@ -89,6 +90,8 @@ export interface MutationHookDefinitions<
       setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>, options?: AbortableOptions) => void
       /** Don't call remaining hooks in the queue. */
       abort: () => void
+      /** Write metadata of the mutation (`metadata` option), forwarded to its cache writes. Read-only. */
+      metadata?: CustomCacheWriteMetadata
       /** Form operations from a form submission. */
       formOperations?: FormOperation[]
     },
@@ -109,6 +112,8 @@ export interface MutationHookDefinitions<
       setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>, options?: AbortableOptions) => void
       /** Don't call remaining hooks in the queue. */
       abort: () => void
+      /** Write metadata of the mutation (`metadata` option), forwarded to its cache writes. Read-only. */
+      metadata?: CustomCacheWriteMetadata
     },
   ) => Awaitable<void>
 
@@ -128,6 +133,8 @@ export interface MutationHookDefinitions<
       setResult: (result: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>, options?: AbortableOptions) => void
       /** Don't call remaining hooks in the queue. */
       abort: () => void
+      /** Write metadata of the mutation (`metadata` option), forwarded to its cache writes. Read-only. */
+      metadata?: CustomCacheWriteMetadata
       /** Form operations from a form submission. */
       formOperations?: FormOperation[]
     },
@@ -148,6 +155,8 @@ export interface MutationHookDefinitions<
       setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>, options?: AbortableOptions) => void
       /** Don't call remaining hooks in the queue. */
       abort: () => void
+      /** Write metadata of the mutation (`metadata` option), forwarded to its cache writes. Read-only. */
+      metadata?: CustomCacheWriteMetadata
     },
   ) => Awaitable<void>
 
@@ -164,6 +173,8 @@ export interface MutationHookDefinitions<
       key: string | number
       /** Don't call remaining hooks in the queue. */
       abort: () => void
+      /** Write metadata of the mutation (`metadata` option), forwarded to its cache writes. Read-only. */
+      metadata?: CustomCacheWriteMetadata
     },
   ) => Awaitable<void>
 
@@ -180,6 +191,8 @@ export interface MutationHookDefinitions<
       keys: Array<string | number>
       /** Don't call remaining hooks in the queue. */
       abort: () => void
+      /** Write metadata of the mutation (`metadata` option), forwarded to its cache writes. Read-only. */
+      metadata?: CustomCacheWriteMetadata
     },
   ) => Awaitable<void>
 }

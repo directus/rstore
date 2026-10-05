@@ -1,9 +1,11 @@
-import type { FieldTimestamps, FieldTimestampValue } from '@rstore/shared'
+import type { FieldTimestampValue } from '@rstore/multiplayer/clock'
+import type { FieldTimestamps } from '@rstore/multiplayer/lww'
 import type { Table } from 'drizzle-orm'
 import type { RstoreDrizzleRealtimePayload } from './hooks'
-import { getDefaultClock, stringifyHLC } from '@rstore/core'
+import { stringifyHLC } from '@rstore/multiplayer/clock'
 import { getDrizzleCollectionNameFromTable, getDrizzleTableFromCollection } from './index'
 import { getPubSub } from './pubsub'
+import { useRstoreDrizzleRealtimeClock } from './realtime-clock'
 
 export type RstoreDrizzleRealtimeUpdateType = 'created' | 'updated' | 'deleted'
 
@@ -124,9 +126,10 @@ export function publishRstoreDrizzleRealtimeUpdate<TRecord = any>(
   const providedKey = options.key == null ? undefined : normalizeKey(options.key)
   payload.key = providedKey ?? inferRecordKey(collection, options.record as Record<string, any>)
 
-  // Stamp a fresh HLC on every publish so clients can CRDT-merge and
-  // tombstones order correctly. Callers can override via options.
-  const stamp = stringifyHLC(getDefaultClock().now())
+  // Stamp a fresh HLC of this server instance on every publish so clients can
+  // merge field by field and tombstones order correctly. Callers can override
+  // via options.
+  const stamp = stringifyHLC(useRstoreDrizzleRealtimeClock().now())
   if (options.type === 'deleted') {
     payload.deletedAt = (options as PublishRstoreDrizzleRealtimeChangedUpdateOptions<TRecord, 'deleted'>).deletedAt ?? stamp
   }
