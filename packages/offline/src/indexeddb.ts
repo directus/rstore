@@ -66,10 +66,21 @@ function runWriteTransaction(
   return new Promise<void>((resolve, reject) => {
     const transaction = db.transaction([storeName], 'readwrite')
     const objectStore = transaction.objectStore(storeName)
-    write(objectStore)
+    let enqueueError: unknown
+    let enqueueFailed = false
     transaction.oncomplete = () => resolve()
-    transaction.onerror = () => reject(transaction.error)
-    transaction.onabort = () => reject(transaction.error)
+    transaction.onerror = () => reject(enqueueFailed ? enqueueError : transaction.error)
+    transaction.onabort = () => reject(enqueueFailed ? enqueueError : transaction.error)
+    try {
+      write(objectStore)
+    }
+    catch (error) {
+      // Enqueue errors do not abort IndexedDB automatically. Abort earlier
+      // requests and reject after rollback, preserving the original cause.
+      enqueueError = error
+      enqueueFailed = true
+      transaction.abort()
+    }
   })
 }
 

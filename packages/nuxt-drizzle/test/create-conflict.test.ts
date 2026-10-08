@@ -1,4 +1,4 @@
-import { sqliteTable, text } from 'drizzle-orm/sqlite-core'
+import { SQLiteSyncDialect, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const todos = sqliteTable('todos', {
@@ -18,29 +18,39 @@ interface FakeDbOptions {
   existing?: any[]
   /** Error the existence probe rejects with, if any. */
   probeError?: unknown
+  /** Complete row returned by the database after inserting. */
+  inserted?: Record<string, unknown>
 }
 
 /**
  * Minimal stand-in for a drizzle database exposing only the two chains
  * `drizzleCreate` walks: `insert().values().returning()` and
- * `select().from().where().limit()`. Records every probe so tests can assert
- * the happy path performs none.
+ * `select().from().where().limit()`. Records inputs independently of its
+ * canned results, so empty writes or wrong-key probes cannot claim success.
  */
-function createFakeDb({ insertError, existing = [], probeError }: FakeDbOptions) {
+function createFakeDb({ insertError, existing = [], probeError, inserted = { id: 'a', text: 'a' } }: FakeDbOptions) {
   const probes: any[] = []
+  const writes: Array<{ table: unknown, body: unknown }> = []
   return {
     probes,
-    insert: () => ({
-      values: () => ({
-        returning: () => insertError ? Promise.reject(insertError) : Promise.resolve([{ id: 'a', text: 'a' }]),
-      }),
+    writes,
+    insert: (table: unknown) => ({
+      values: (body: unknown) => {
+        // Snapshot the payload at the DB boundary, before later caller changes.
+        writes.push({ table, body: structuredClone(body) })
+        return {
+          returning: () => insertError ? Promise.reject(insertError) : Promise.resolve([inserted]),
+        }
+      },
     }),
     select: () => ({
-      from: () => ({
+      from: (table: unknown) => ({
         where: (condition: any) => {
-          probes.push(condition)
           return {
-            limit: () => probeError ? Promise.reject(probeError) : Promise.resolve(existing),
+            limit: (limit: number) => {
+              probes.push({ table, condition, limit })
+              return probeError ? Promise.reject(probeError) : Promise.resolve(existing)
+            },
           }
         },
       }),
@@ -65,6 +75,7 @@ vi.mock('$rstore-drizzle-server-utils.js', () => ({
 
 const { drizzleCreate } = await import('../src/runtime/server/utils/operations/create')
 
+/** Executes the production create adapter with a client-authored body. */
 function create(collection: string, body: Record<string, any>) {
   return drizzleCreate({
     event: {} as any,
@@ -80,9 +91,18 @@ describe('drizzleCreate conflict handling', () => {
     db = createFakeDb({})
   })
 
-  it('throws 409 when the primary key is already taken', async () => {
+  it('probes the requested primary key before reporting a duplicate', async () => {
     db = createFakeDb({ insertError: new Error('UNIQUE constraint failed: todos.id'), existing: [{ id: 'a' }] })
-    await expect(create('todos', { id: 'a', text: 'a' })).rejects.toMatchObject({ statusCode: 409 })
+    const body = { id: 'a', text: 'Different title' }
+    await expect(create('todos', body)).rejects.toMatchObject({ statusCode: 409 })
+    expect(body).toEqual({ id: 'a', text: 'Different title' })
+    expect(db.writes).toEqual([{ table: todos, body: { id: 'a', text: 'Different title' } }])
+    expect(db.probes).toHaveLength(1)
+    expect(db.probes[0].table).toBe(todos)
+    expect(db.probes[0].limit).toBe(1)
+    const { sql, params } = new SQLiteSyncDialect().sqlToQuery(db.probes[0].condition)
+    expect(sql).toBe('"todos"."id" = ?')
+    expect(params).toEqual(['a'])
   })
 
   // A failure on some other constraint must stay a 500 so it is retried, and
@@ -108,9 +128,14 @@ describe('drizzleCreate conflict handling', () => {
 
   // The whole point of checking after the fact rather than before is that a
   // successful create costs no extra round-trip.
-  it('does not probe on a successful create', async () => {
-    const result = await create('todos', { id: 'a', text: 'a' })
-    expect(result).toEqual({ id: 'a', text: 'a' })
+  it('writes the client body and returns database fields without probing', async () => {
+    const body = { id: 'created-42', text: 'Client title' }
+    const inserted = { id: 'created-42', text: 'Client title', createdAt: new Date('2026-01-02T03:04:05Z') }
+    db = createFakeDb({ inserted })
+    const result = await create('todos', body)
+    expect(result).toEqual({ id: 'created-42', text: 'Client title', createdAt: new Date('2026-01-02T03:04:05Z') })
+    expect(body).toEqual({ id: 'created-42', text: 'Client title' })
+    expect(db.writes).toEqual([{ table: todos, body: { id: 'created-42', text: 'Client title' } }])
     expect(db.probes).toHaveLength(0)
   })
 })

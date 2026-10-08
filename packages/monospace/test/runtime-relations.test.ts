@@ -1,14 +1,17 @@
-import { describe, expect, it, vi } from 'vitest'
+import { describe, expect, it } from 'vitest'
 import {
   fetchMissingMonospaceRelations,
   normalizeMonospaceRelationItems,
 } from '../src'
-import { createProfilesCollection, createRelationStore, createTodosCollection } from './utils/plugin'
+import { createProfilesCollection, createTodosCollection } from './utils/plugin'
+import { createMonospaceTestStore } from './utils/store'
 
 describe('normalizeMonospaceRelationItems', () => {
+  const context = { $collections: [createTodosCollection(), createProfilesCollection()] }
+
   it('keeps embedded to-one objects and FK columns untouched', () => {
     const item: any = { id: 1, author_id: 'p1', author: { id: 'p1', name: 'Jane' } }
-    normalizeMonospaceRelationItems(createRelationStore(), createTodosCollection(), [item])
+    normalizeMonospaceRelationItems(context, createTodosCollection(), [item])
 
     expect(item).toEqual({ id: 1, author_id: 'p1', author: { id: 'p1', name: 'Jane' } })
   })
@@ -20,7 +23,7 @@ describe('normalizeMonospaceRelationItems', () => {
         data: [{ id: 1, title: 'A', author_id: 'p1' }, { id: 2, title: 'B', author_id: 'p1' }],
       },
     }
-    normalizeMonospaceRelationItems(createRelationStore(), createProfilesCollection(), [item])
+    normalizeMonospaceRelationItems(context, createProfilesCollection(), [item])
 
     expect(item.todos).toEqual([
       { id: 1, title: 'A', author_id: 'p1' },
@@ -38,7 +41,7 @@ describe('normalizeMonospaceRelationItems', () => {
         },
       },
     }
-    normalizeMonospaceRelationItems(createRelationStore(), createTodosCollection(), [item])
+    normalizeMonospaceRelationItems(context, createTodosCollection(), [item])
 
     expect(item.author.todos).toEqual([{ id: 2 }])
   })
@@ -47,7 +50,7 @@ describe('normalizeMonospaceRelationItems', () => {
     const todo: any = { id: 1 }
     const profile: any = { id: 'p1', todos: { data: [todo] } }
     todo.author = profile
-    normalizeMonospaceRelationItems(createRelationStore(), createTodosCollection(), [todo])
+    normalizeMonospaceRelationItems(context, createTodosCollection(), [todo])
 
     expect(Array.isArray(profile.todos)).toBe(true)
     expect(profile.todos[0]).toBe(todo)
@@ -55,146 +58,113 @@ describe('normalizeMonospaceRelationItems', () => {
   })
 })
 
-describe('fetchMissingMonospaceRelations', () => {
-  /**
-   * Creates a relation store whose Todos findMany calls are recorded.
-   */
-  function createFetchingStore(cacheItems: Record<string, any[]> = {}) {
-    const store = createRelationStore({ cacheItems })
-    const findMany = vi.fn(async () => [])
-    store.$collection = vi.fn(() => ({ findMany }))
-    return { findMany, store }
+describe('fetchMissingMonospaceRelations with real store/cache', () => {
+  /** Seeds real cache and records only external REST reads. */
+  async function createFetchingStore(cacheItems: Record<string, any[]> = {}) {
+    const { storePromise, readManyMock } = createMonospaceTestStore(async (collection, query) => {
+      if (collection === 'Todos') {
+        const items = [
+          { id: 1, author_id: 'p1', author: { id: 'p1', name: 'Jane' } },
+          { id: 3, author_id: 'p3', author: { id: 'p3', name: 'Jo' } },
+        ]
+        return items.filter(item => query.filter.id._in.includes(item.id))
+      }
+      return [{ id: 'p1', todos: { data: [{ id: 1, author_id: 'p1' }] } }]
+    })
+    const store: any = await storePromise
+    for (const [name, items] of Object.entries(cacheItems)) {
+      const collection = store.$collections.find((entry: any) => entry.name === name)
+      for (const item of items) {
+        store.$cache.writeItem({ collection, key: item.id, item })
+      }
+    }
+    const todos = store.$collections.find((entry: any) => entry.name === 'Todos')
+    const profiles = store.$collections.find((entry: any) => entry.name === 'Profiles')
+    return { store, readManyMock, todos, profiles }
   }
 
-  it('re-fetches items whose relation state is unknown', async () => {
-    const { findMany, store } = createFetchingStore()
-
-    // No embedded relation and no fetched FK column: the state is unknown.
-    await fetchMissingMonospaceRelations(store, createTodosCollection(), [
+  it('re-fetches every unknown parent while skipping an embedded null relation', async () => {
+    const { readManyMock, store, todos, profiles } = await createFetchingStore()
+    await fetchMissingMonospaceRelations(store, todos, [
       { id: 1 },
       { id: 2, author: null },
       { id: 3 },
     ], { author: true })
 
-    expect(store.$collection).toHaveBeenCalledWith('Todos')
-    expect(findMany).toHaveBeenCalledWith({
-      fetchPolicy: 'fetch-only',
-      filter: {
-        id: {
-          _in: [1, 3],
-        },
-      },
-      include: { author: true },
+    expect(readManyMock).toHaveBeenCalledExactlyOnceWith('Todos', {
+      fields: ['*'],
+      filter: { id: { _in: expect.arrayContaining([1, 3]) } },
+      include: { author: { fields: ['*'] } },
     })
+    expect([...readManyMock.mock.lastCall![1].filter.id._in].sort()).toEqual([1, 3])
+    expect(store.$cache.readItems({ collection: profiles }).map((item: any) => ({ id: item.id, name: item.name }))).toEqual([
+      { id: 'p1', name: 'Jane' },
+      { id: 'p3', name: 'Jo' },
+    ])
   })
 
   it('skips fetching when relations are already embedded', async () => {
-    const { store } = createFetchingStore()
-    store.$collection = vi.fn()
-
-    await fetchMissingMonospaceRelations(store, createTodosCollection(), [
+    const { store, readManyMock, todos } = await createFetchingStore()
+    await fetchMissingMonospaceRelations(store, todos, [
       { id: 1, author: { id: 'p1' } },
       { id: 2, author: null },
     ], { author: true })
-
-    expect(store.$collection).not.toHaveBeenCalled()
+    expect(readManyMock).not.toHaveBeenCalled()
   })
 
   it('skips fetching to-one relations with a null FK column', async () => {
-    const { store } = createFetchingStore()
-    store.$collection = vi.fn()
-
-    // A null FK means the relation is empty: nothing to fetch.
-    await fetchMissingMonospaceRelations(store, createTodosCollection(), [
-      { id: 1, author_id: null },
-    ], { author: true })
-
-    expect(store.$collection).not.toHaveBeenCalled()
+    const { store, readManyMock, todos } = await createFetchingStore()
+    await fetchMissingMonospaceRelations(store, todos, [{ id: 1, author_id: null }], { author: true })
+    expect(readManyMock).not.toHaveBeenCalled()
   })
 
-  it('skips fetching to-one relations resolvable from the cache through the FK column', async () => {
-    const { store } = createFetchingStore({
-      Profiles: [{ id: 'p1', name: 'Jane' }],
-    })
-
-    await fetchMissingMonospaceRelations(store, createTodosCollection(), [
-      { id: 1, author_id: 'p1' },
-    ], { author: true })
-
-    expect(store.$collection).not.toHaveBeenCalled()
+  it('skips fetching to-one relations resolvable through the real cache', async () => {
+    const { store, readManyMock, todos } = await createFetchingStore({ Profiles: [{ id: 'p1', name: 'Jane' }] })
+    await fetchMissingMonospaceRelations(store, todos, [{ id: 1, author_id: 'p1' }], { author: true })
+    expect(readManyMock).not.toHaveBeenCalled()
   })
 
-  it('re-fetches to-one relations whose FK target is not cached', async () => {
-    const { findMany, store } = createFetchingStore({
-      Profiles: [{ id: 'p2', name: 'John' }],
+  it('re-fetches missing FK targets without losing already cached targets', async () => {
+    const { readManyMock, store, todos, profiles } = await createFetchingStore({ Profiles: [{ id: 'p2', name: 'John' }] })
+    await fetchMissingMonospaceRelations(store, todos, [{ id: 1, author_id: 'p1' }], { author: true })
+    expect(readManyMock).toHaveBeenCalledExactlyOnceWith('Todos', {
+      fields: ['*'],
+      filter: { id: { _in: [1] } },
+      include: { author: { fields: ['*'] } },
     })
-
-    await fetchMissingMonospaceRelations(store, createTodosCollection(), [
-      { id: 1, author_id: 'p1' },
-    ], { author: true })
-
-    expect(findMany).toHaveBeenCalledWith({
-      fetchPolicy: 'fetch-only',
-      filter: {
-        id: {
-          _in: [1],
-        },
-      },
-      include: { author: true },
-    })
+    expect(store.$cache.readItem({ collection: profiles, key: 'p2' }).name).toBe('John')
+    expect(store.$cache.readItem({ collection: todos, key: 1 }).author.name).toBe('Jane')
   })
 
-  it('re-fetches to-many relations that are not embedded', async () => {
-    const { findMany, store } = createFetchingStore({
-      // Even with matching target items cached, an absent to-many field
-      // cannot be distinguished from a not-yet-loaded relation.
-      Todos: [{ id: 1, author_id: 'p1' }],
+  it('re-fetches absent to-many fields even when one matching child is cached', async () => {
+    const { readManyMock, store, profiles } = await createFetchingStore({ Todos: [{ id: 1, author_id: 'p1' }] })
+    await fetchMissingMonospaceRelations(store, profiles, [{ id: 'p1' }], { todos: true })
+    expect(readManyMock).toHaveBeenCalledExactlyOnceWith('Profiles', {
+      fields: ['*'],
+      filter: { id: { _in: ['p1'] } },
+      include: { todos: { fields: ['*'], limit: -1 } },
     })
-
-    await fetchMissingMonospaceRelations(store, createProfilesCollection(), [
-      { id: 'p1' },
-    ], { todos: true })
-
-    expect(findMany).toHaveBeenCalledWith({
-      fetchPolicy: 'fetch-only',
-      filter: {
-        id: {
-          _in: ['p1'],
-        },
-      },
-      include: { todos: true },
-    })
+    expect(store.$cache.readItem({ collection: profiles, key: 'p1' }).todos.map((item: any) => item.id)).toEqual([1])
   })
 
-  it('checks relation presence on the raw data of wrapped cache items', async () => {
-    const { findMany, store } = createFetchingStore()
-
-    // Wrapped items report relation keys as present through their proxy, so
-    // presence must be checked through `$raw()`.
-    const wrappedMissing = { id: 1, author: undefined, $raw: () => ({ id: 1 }) }
-    const wrappedEmbedded = { id: 2, $raw: () => ({ id: 2, author: null }) }
-
-    await fetchMissingMonospaceRelations(store, createTodosCollection(), [
-      wrappedMissing,
-      wrappedEmbedded,
-    ], { author: true })
-
-    expect(findMany).toHaveBeenCalledWith({
-      fetchPolicy: 'fetch-only',
-      filter: {
-        id: {
-          _in: [1],
-        },
-      },
-      include: { author: true },
+  it('checks raw relation presence through real wrapped cache items', async () => {
+    const { readManyMock, store, todos } = await createFetchingStore({ Todos: [{ id: 1 }, { id: 2, author_id: null }] })
+    const missing = store.$cache.readItem({ collection: todos, key: 1 })
+    const embedded = store.$cache.readItem({ collection: todos, key: 2 })
+    await fetchMissingMonospaceRelations(store, todos, [missing, embedded], { author: true })
+    expect(readManyMock).toHaveBeenCalledExactlyOnceWith('Todos', {
+      fields: ['*'],
+      filter: { id: { _in: [1] } },
+      include: { author: { fields: ['*'] } },
     })
+    expect(store.$cache.readItem({ collection: todos, key: 1 }).author.name).toBe('Jane')
   })
 
-  it('throws for includes that do not match a relation', async () => {
-    await expect(fetchMissingMonospaceRelations({
-      $collection: vi.fn(),
-    } as any, createTodosCollection(), [{ id: 1 }], { unknown: true })).rejects.toThrow(
+  it('rejects unknown includes without requesting external data', async () => {
+    const { store, readManyMock, todos } = await createFetchingStore()
+    await expect(fetchMissingMonospaceRelations(store, todos, [{ id: 1 }], { unknown: true })).rejects.toThrow(
       'Relation "unknown" does not exist on collection "Todos"',
     )
+    expect(readManyMock).not.toHaveBeenCalled()
   })
 })

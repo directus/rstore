@@ -1,150 +1,111 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMockClient, createProfilesCollection, createRelationStore, createTodosCollection, runHook, setupPlugin } from './utils/plugin'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { createMockClient, createProfilesCollection, createTodosCollection } from './utils/plugin'
+import { createRelationStore, runMonospaceOperation } from './utils/store'
 
 const client = createMockClient()
 
 beforeEach(() => {
-  for (const fn of Object.values(client)) {
-    fn.mockReset()
+  for (const method of Object.values(client)) {
+    method.mockReset()
   }
 })
 
-describe('createMonospaceRstorePlugin relations', () => {
+describe('monospace relation queries through real store/cache', () => {
   it('embeds included relations through Monospace include selections', async () => {
-    const hooks = setupPlugin(client)
     client.readMany.mockResolvedValueOnce([{ id: 1, title: 'A', author_id: 'p1', author: { id: 'p1', name: 'Jane' } }])
-
-    const result: any = await runHook(hooks.fetchMany, {
+    const result = await runMonospaceOperation(client, 'fetchMany', {
       collection: createTodosCollection(),
-      findOptions: {
-        include: { author: true },
-      },
-      store: createRelationStore(),
+      findOptions: { include: { author: true } },
     })
 
-    expect(client.readMany).toHaveBeenCalledWith('Todos', {
+    expect(client.readMany).toHaveBeenCalledExactlyOnceWith('Todos', {
       fields: ['*'],
       include: { author: { fields: ['*'] } },
     })
-    // The API returns the real FK column; nothing is injected or rewritten.
-    expect(result[0]).toEqual({
-      id: 1,
-      title: 'A',
-      author_id: 'p1',
-      author: { id: 'p1', name: 'Jane' },
-    })
+    expect(result.map((item: any) => ({
+      id: item.id,
+      title: item.title,
+      author_id: item.author_id,
+      author: { id: item.author.id, name: item.author.name },
+    }))).toEqual([{ id: 1, title: 'A', author_id: 'p1', author: { id: 'p1', name: 'Jane' } }])
   })
 
   it('appends relation FK columns to explicit fields on key fetches', async () => {
-    const hooks = setupPlugin(client)
     client.readOne.mockResolvedValueOnce({ id: 1, author_id: null, author: null })
-
-    await runHook(hooks.fetchFirst, {
+    const result = await runMonospaceOperation(client, 'fetchFirst', {
       collection: createTodosCollection(),
-      findOptions: {
-        fields: ['id', 'title'],
-        include: { author: true },
-      },
       key: 1,
-      store: createRelationStore(),
+      findOptions: { fields: ['id', 'title'], include: { author: true } },
     })
 
-    // `author_id` backs the cache join, so it is added to the explicit
-    // selection while the relation is selected through `include`.
-    expect(client.readOne).toHaveBeenCalledWith('Todos', 1, {
+    expect(client.readOne).toHaveBeenCalledExactlyOnceWith('Todos', 1, {
       fields: ['id', 'title', 'author_id'],
       include: { author: { fields: ['*'] } },
     })
+    expect(result.id).toBe(1)
+    expect(result.author_id).toBeNull()
+    expect(result.author).toBeUndefined()
   })
 
   it('unwraps to-many data envelopes on fetched items', async () => {
-    const hooks = setupPlugin(client)
     client.readMany.mockResolvedValueOnce([{
       id: 'p1',
-      todos: {
-        data: [{ id: 1, title: 'A', author_id: 'p1' }],
-      },
+      todos: { data: [{ id: 1, title: 'A', author_id: 'p1' }] },
     }])
-
-    const result: any = await runHook(hooks.fetchMany, {
+    const result = await runMonospaceOperation(client, 'fetchMany', {
       collection: createProfilesCollection(),
-      findOptions: {
-        include: { todos: true },
-      },
-      store: createRelationStore(),
+      findOptions: { include: { todos: true } },
     })
 
-    expect(client.readMany).toHaveBeenCalledWith('Profiles', {
+    expect(client.readMany).toHaveBeenCalledExactlyOnceWith('Profiles', {
       fields: ['*'],
       include: { todos: { fields: ['*'], limit: -1 } },
     })
-    expect(result[0].todos).toEqual([{ id: 1, title: 'A', author_id: 'p1' }])
+    expect(result[0].todos.map((item: any) => ({ id: item.id, title: item.title, author_id: item.author_id })))
+      .toEqual([{ id: 1, title: 'A', author_id: 'p1' }])
   })
 
-  it('fetches missing relations for cache-served results', async () => {
-    const hooks = setupPlugin(client)
-    const findMany = vi.fn(async () => [])
-    const store = {
-      $collection: vi.fn(() => ({ findMany })),
-    }
+  it('recovers missing relations for cache-served results', async () => {
+    const store = await createRelationStore(client, { cacheItems: { Todos: [{ id: 1 }] }, cachedQueries: { Todos: [{ include: { author: true } }] } })
+    client.readMany.mockResolvedValueOnce([{
+      id: 1,
+      author_id: 'p1',
+      author: { id: 'p1', name: 'Jane' },
+    }])
 
-    await hooks.fetchRelations({
-      collection: createTodosCollection(),
-      findOptions: {
-        include: { author: true },
-      },
-      getResult: () => [{ id: 1 }],
-      store,
-    })
+    const result = await store.Todos.findMany({ include: { author: true } })
 
-    expect(store.$collection).toHaveBeenCalledWith('Todos')
-    expect(findMany).toHaveBeenCalledWith({
-      fetchPolicy: 'fetch-only',
-      filter: {
-        id: {
-          _in: [1],
-        },
-      },
-      include: { author: true },
+    expect(client.readMany).toHaveBeenCalledExactlyOnceWith('Todos', {
+      fields: ['*'],
+      filter: { id: { _in: [1] } },
+      include: { author: { fields: ['*'] } },
     })
+    expect(result.map((item: any) => ({ id: item.id, name: item.author?.name }))).toEqual([{ id: 1, name: 'Jane' }])
   })
 
-  it('skips relation fetches when results already embed relations', async () => {
-    const hooks = setupPlugin(client)
-    const store = {
-      $collection: vi.fn(),
-    }
-
-    await hooks.fetchRelations({
-      collection: createTodosCollection(),
-      findOptions: {
-        include: { author: true },
-      },
-      getResult: () => ({ id: 1, author: { id: 'p1' } }),
-      store,
+  it('skips external reads for already embedded relations', async () => {
+    const store = await createRelationStore(client, {
+      cacheItems: { Todos: [{ id: 1, author_id: 'p1', author: { id: 'p1', name: 'Jane' } }] },
+      cachedQueries: { Todos: [{ include: { author: true } }] },
     })
 
-    expect(store.$collection).not.toHaveBeenCalled()
+    const result = await store.Todos.findMany({ include: { author: true } })
+
+    expect(result[0].author.name).toBe('Jane')
+    expect(client.readMany).not.toHaveBeenCalled()
+    expect(client.readOne).not.toHaveBeenCalled()
   })
 
-  it('skips relation fetches when the FK join resolves from the cache', async () => {
-    const hooks = setupPlugin(client)
-    const store = createRelationStore({
-      cacheItems: {
-        Profiles: [{ id: 'p1', name: 'Jane' }],
-      },
-    })
-    store.$collection = vi.fn()
-
-    await hooks.fetchRelations({
-      collection: createTodosCollection(),
-      findOptions: {
-        include: { author: true },
-      },
-      getResult: () => [{ id: 1, author_id: 'p1' }],
-      store,
+  it('skips external reads when an FK join resolves from separately cached records', async () => {
+    const store = await createRelationStore(client, {
+      cacheItems: { Profiles: [{ id: 'p1', name: 'Jane' }], Todos: [{ id: 1, author_id: 'p1' }] },
+      cachedQueries: { Todos: [{ include: { author: true } }] },
     })
 
-    expect(store.$collection).not.toHaveBeenCalled()
+    const result = await store.Todos.findMany({ include: { author: true } })
+
+    expect(result[0].author.name).toBe('Jane')
+    expect(client.readMany).not.toHaveBeenCalled()
+    expect(client.readOne).not.toHaveBeenCalled()
   })
 })

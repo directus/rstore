@@ -97,18 +97,18 @@ describe('fetchMany', () => {
 describe('cacheFilterFirst', () => {
   it('keeps key-based results untouched, including the falsy key 0', () => {
     const hooks = setupPlugin(client)
-    const setResult = vi.fn()
+    let result = { id: 0 }
 
     hooks.cacheFilterFirst({
       collection: createTodosCollection(),
       findOptions: {},
       key: 0,
       readItemsFromCache: () => [],
-      getResult: () => ({ id: 0 }),
-      setResult,
+      getResult: () => result,
+      setResult: (value: any) => { result = value },
     })
 
-    expect(setResult).not.toHaveBeenCalled()
+    expect(result).toEqual({ id: 0 })
   })
 
   it('filters cached items and falls back on unsupported filters', async () => {

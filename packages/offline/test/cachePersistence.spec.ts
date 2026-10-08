@@ -1,6 +1,8 @@
+import { resolveCollection } from '@rstore/core'
+import { createHooks } from '@rstore/shared'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { installMutationHooks } from '../src/plugin/mutations'
-import { createCollection, createHookCollector, createRuntime } from './utils/plugin'
+import { createRuntime } from './utils/plugin'
 
 // The offline cache mirrors every committed mutation into IndexedDB. If a
 // mutation is not mirrored the local database silently diverges from the
@@ -8,22 +10,22 @@ import { createCollection, createHookCollector, createRuntime } from './utils/pl
 // wipe fields the server never sent back.
 
 describe('offline cache persistence', () => {
-  let collector: ReturnType<typeof createHookCollector>
+  let hooks: ReturnType<typeof createHooks>
   let runtime: ReturnType<typeof createRuntime>['runtime']
   let db: ReturnType<typeof createRuntime>['db']
   let collection: any
 
   beforeEach(() => {
-    collector = createHookCollector()
+    hooks = createHooks()
     const created = createRuntime()
     runtime = created.runtime
     db = created.db
-    collection = createCollection()
-    installMutationHooks(runtime, collector.hook)
+    collection = resolveCollection({ name: 'Todos' }, undefined)
+    installMutationHooks(runtime, hooks.hook.bind(hooks))
   })
 
   /** Builds an `afterMutation` payload with the fields core actually provides. */
-  function payload(overrides: Record<string, any>) {
+  function payload(overrides: Record<string, any>): any {
     return {
       collection,
       getResult: () => undefined,
@@ -37,20 +39,20 @@ describe('offline cache persistence', () => {
       // cannot go looking for one.
       db.stores.set('Todos', new Map([['1', { id: '1', text: 'a' }]]))
 
-      await collector.run('afterMutation', payload({ mutation: 'delete', key: '1' }))
+      await hooks.callHook('afterMutation', payload({ mutation: 'delete', key: '1' }))
 
       expect(db.deleteItem).toHaveBeenCalledWith('Todos', '1')
       expect(db.stores.get('Todos')!.has('1')).toBe(false)
     })
 
     it('falls back to deriving the key from the item', async () => {
-      await collector.run('afterMutation', payload({ mutation: 'delete', item: { id: '2' } }))
+      await hooks.callHook('afterMutation', payload({ mutation: 'delete', item: { id: '2' } }))
 
       expect(db.deleteItem).toHaveBeenCalledWith('Todos', '2')
     })
 
     it('does nothing when neither a key nor an item is available', async () => {
-      await collector.run('afterMutation', payload({ mutation: 'delete' }))
+      await hooks.callHook('afterMutation', payload({ mutation: 'delete' }))
 
       expect(db.deleteItem).not.toHaveBeenCalled()
     })
@@ -60,13 +62,13 @@ describe('offline cache persistence', () => {
     it('writes the result', async () => {
       const result = { id: '1', text: 'a' }
 
-      await collector.run('afterMutation', payload({ mutation: 'create', getResult: () => result }))
+      await hooks.callHook('afterMutation', payload({ mutation: 'create', getResult: () => result }))
 
-      expect(db.writeItem).toHaveBeenCalledWith('Todos', '1', result)
+      expect(db.writeItem).toHaveBeenCalledWith('Todos', '1', { id: '1', text: 'a' })
     })
 
     it('skips when the mutation produced no result', async () => {
-      await collector.run('afterMutation', payload({ mutation: 'create' }))
+      await hooks.callHook('afterMutation', payload({ mutation: 'create' }))
 
       expect(db.writeItem).not.toHaveBeenCalled()
     })
@@ -78,7 +80,7 @@ describe('offline cache persistence', () => {
       // would drop everything the server left out.
       db.stores.set('Todos', new Map([['1', { id: '1', text: 'a', done: false }]]))
 
-      await collector.run('afterMutation', payload({
+      await hooks.callHook('afterMutation', payload({
         mutation: 'update',
         key: '1',
         getResult: () => ({ id: '1', done: true }),
@@ -90,49 +92,53 @@ describe('offline cache persistence', () => {
     it('writes the result as-is when nothing is cached yet', async () => {
       const result = { id: '1', done: true }
 
-      await collector.run('afterMutation', payload({ mutation: 'update', key: '1', getResult: () => result }))
+      await hooks.callHook('afterMutation', payload({ mutation: 'update', key: '1', getResult: () => result }))
 
-      expect(db.stores.get('Todos')!.get('1')).toEqual(result)
+      expect(db.stores.get('Todos')!.get('1')).toEqual({ id: '1', done: true })
     })
   })
 
   describe('key resolution', () => {
     it('falls back to the payload key when the result carries no key fields', async () => {
-      collection = createCollection('Todos', () => undefined)
       const result = { text: 'a' }
 
-      await collector.run('afterMutation', payload({ mutation: 'create', collection, key: '7', getResult: () => result }))
+      await hooks.callHook('afterMutation', payload({ mutation: 'create', collection, key: '7', getResult: () => result }))
 
-      expect(db.writeItem).toHaveBeenCalledWith('Todos', '7', result)
+      expect(db.writeItem).toHaveBeenCalledWith('Todos', '7', { text: 'a' })
     })
 
     it('persists a falsy but valid key', async () => {
       const result = { id: 0, text: 'a' }
 
-      await collector.run('afterMutation', payload({ mutation: 'create', getResult: () => result }))
+      await hooks.callHook('afterMutation', payload({ mutation: 'create', getResult: () => result }))
 
-      expect(db.writeItem).toHaveBeenCalledWith('Todos', '0', result)
+      expect(db.writeItem).toHaveBeenCalledWith('Todos', '0', { id: 0, text: 'a' })
     })
 
     it('skips when no key can be resolved at all', async () => {
-      collection = createCollection('Todos', () => undefined)
-
-      await collector.run('afterMutation', payload({ mutation: 'create', collection, getResult: () => ({ text: 'a' }) }))
+      await hooks.callHook('afterMutation', payload({ mutation: 'create', collection, getResult: () => ({ text: 'a' }) }))
 
       expect(db.writeItem).not.toHaveBeenCalled()
     })
   })
 
-  it('ignores collections excluded by the plugin filter', async () => {
-    const excluded = createRuntime({ options: { filterCollection: () => false } })
-    const excludedCollector = createHookCollector()
-    installMutationHooks(excluded.runtime, excludedCollector.hook)
+  it('persists selected collection mutations while preserving excluded rows', async () => {
+    const filtered = createRuntime({ options: { filterCollection: collection => collection.name === 'Todos' } })
+    const filteredHooks = createHooks()
+    installMutationHooks(filtered.runtime, filteredHooks.hook.bind(filteredHooks))
+    const notes = resolveCollection({ name: 'Notes' }, undefined)
+    filtered.db.stores.set('Todos', new Map([['old', { id: 'old', text: 'replace' }]]))
+    filtered.db.stores.set('Notes', new Map([['old', { id: 'old', text: 'private' }]]))
 
-    await excludedCollector.run('afterMutation', payload({ mutation: 'delete', key: '1' }))
-    await excludedCollector.run('afterMutation', payload({ mutation: 'create', getResult: () => ({ id: '1' }) }))
+    for (const selected of [collection, notes]) {
+      await filteredHooks.callHook('afterMutation', payload({ collection: selected, mutation: 'delete', key: 'old' }))
+      await filteredHooks.callHook('afterMutation', payload({ collection: selected, mutation: 'create', getResult: () => ({ id: 'new', text: 'saved' }) }))
+    }
 
-    expect(excluded.db.deleteItem).not.toHaveBeenCalled()
-    expect(excluded.db.writeItem).not.toHaveBeenCalled()
+    expect(filtered.db.deleteItem.mock.calls).toEqual([['Todos', 'old']])
+    expect(filtered.db.writeItem.mock.calls).toEqual([['Todos', 'new', { id: 'new', text: 'saved' }]])
+    expect(filtered.db.stores.get('Todos')).toEqual(new Map([['new', { id: 'new', text: 'saved' }]]))
+    expect(filtered.db.stores.get('Notes')).toEqual(new Map([['old', { id: 'old', text: 'private' }]]))
   })
 
   describe('many mutations', () => {
@@ -140,7 +146,7 @@ describe('offline cache persistence', () => {
       // Offline queue hooks abort many mutations after setting the queued
       // result, so core reaches afterManyMutation without emitting the normal
       // per-item afterMutation hooks.
-      await collector.run('afterManyMutation', {
+      await hooks.callHook('afterManyMutation', {
         meta: {},
         collection,
         mutation: 'create',
@@ -152,7 +158,7 @@ describe('offline cache persistence', () => {
           { id: 'b', text: 'B' },
           { id: 'c', text: 'C' },
         ],
-      })
+      } as any)
 
       expect(db.stores.get('Todos')).toEqual(new Map([
         ['b', { id: 'b', text: 'B' }],
@@ -166,33 +172,33 @@ describe('offline cache persistence', () => {
         ['c', { id: 'c' }],
       ]))
 
-      await collector.run('afterManyMutation', {
+      await hooks.callHook('afterManyMutation', {
         meta: {},
         collection,
         mutation: 'delete',
         keys: ['b', 'c'],
         getResult: () => [],
-      })
+      } as any)
 
       expect(db.stores.get('Todos')!.size).toBe(0)
     })
 
     it('skips afterManyMutation when core already emitted per-item hooks', async () => {
       const meta = {}
-      await collector.run('afterMutation', payload({
+      await hooks.callHook('afterMutation', payload({
         meta,
         mutation: 'create',
         getResult: () => ({ id: 'b', text: 'B' }),
       }))
       db.writeItem.mockClear()
 
-      await collector.run('afterManyMutation', {
+      await hooks.callHook('afterManyMutation', {
         meta,
         collection,
         mutation: 'create',
         items: [{ key: 'b', item: { id: 'b', text: 'B' } }],
         getResult: () => [{ id: 'b', text: 'B' }],
-      })
+      } as any)
 
       expect(db.writeItem).not.toHaveBeenCalled()
     })

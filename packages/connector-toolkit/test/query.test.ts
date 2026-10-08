@@ -70,6 +70,23 @@ describe('createConnectorQuery', () => {
     }, {}, { knownKeys: KNOWN_KEYS })).toEqual({ offset: 1 })
   })
 
+  it('preserves explicit zero pagination from find options and params', () => {
+    // Zero is an explicit connector option, even when rstore pagination is present.
+    for (const pagination of [{ limit: 0 }, { offset: 0 }]) {
+      expect(createConnectorQuery({
+        pageIndex: 2,
+        pageSize: 25,
+        ...pagination,
+      }, {}, { knownKeys: KNOWN_KEYS })).toEqual(pagination)
+
+      expect(createConnectorQuery({
+        pageIndex: 2,
+        pageSize: 25,
+        params: pagination,
+      }, {}, { knownKeys: KNOWN_KEYS })).toEqual(pagination)
+    }
+  })
+
   it('guards the page mapping on the page option only with respectPageOption', () => {
     const findOptions = { pageIndex: 2, pageSize: 25, page: 3 }
 

@@ -1,184 +1,145 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { createMockClient, createOrdersCollection, createRelationStore, createTodosCollection, runHook, setupPlugin } from './utils/plugin'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { createMockClient, createOrdersCollection, createTodosCollection } from './utils/plugin'
+import { createRelationStore, runMonospaceOperation } from './utils/store'
 
 const client = createMockClient()
 
 beforeEach(() => {
-  for (const fn of Object.values(client)) {
-    fn.mockReset()
+  for (const method of Object.values(client)) {
+    method.mockReset()
   }
 })
 
-describe('createMonospaceRstorePlugin', () => {
+describe('monospace public queries and mutations', () => {
   it('handles fetches and mutations through the REST client', async () => {
-    const hooks = setupPlugin(client)
+    const store = await createRelationStore(client)
     const collection = createTodosCollection()
     client.readOne.mockResolvedValueOnce({ id: 1, title: 'Fetched' })
     client.createOne.mockResolvedValueOnce({ id: 2, title: 'Created' })
     client.updateOne.mockResolvedValueOnce({ id: 1, title: 'Updated' })
 
-    const fetched = await runHook(hooks.fetchFirst, {
-      collection,
-      key: 1,
-    })
-    const created = await runHook(hooks.createItem, {
-      collection,
-      item: { title: 'Created' },
-    })
-    const updated = await runHook(hooks.updateItem, {
-      collection,
-      item: { id: 1, title: 'Updated' },
-      key: 1,
-    })
+    const fetched = await runMonospaceOperation(client, 'fetchFirst', { store, collection, key: 1 })
+    expect({ id: fetched.id, title: fetched.title }).toEqual({ id: 1, title: 'Fetched' })
+    const created = await runMonospaceOperation(client, 'createItem', { store, collection, item: { title: 'Created' } })
+    const updated = await runMonospaceOperation(client, 'updateItem', { store, collection, item: { id: 1, title: 'Updated' }, key: 1 })
 
-    expect(client.readOne).toHaveBeenCalledWith('Todos', 1, { fields: ['*'] })
-    expect(fetched).toEqual({ id: 1, title: 'Fetched' })
+    expect(client.readOne).toHaveBeenCalledExactlyOnceWith('Todos', 1, { fields: ['*'] })
     expect(created).toEqual({ id: 2, title: 'Created' })
     expect(updated).toEqual({ id: 1, title: 'Updated' })
-    expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, { title: 'Updated' }, { fields: ['*'] })
+    expect(client.updateOne).toHaveBeenCalledExactlyOnceWith('Todos', 1, { title: 'Updated' }, { fields: ['*'] })
+    expect((await store.Todos.findFirst(1)).title).toBe('Updated')
+    expect((await store.Todos.findFirst(2)).title).toBe('Created')
+  })
+
+  it('reads a numeric zero key through its item route', async () => {
+    client.readOne.mockResolvedValueOnce({ id: 0, title: 'Zero' })
+    const result = await runMonospaceOperation(client, 'fetchFirst', { collection: createTodosCollection(), key: 0 })
+
+    expect(client.readOne).toHaveBeenCalledExactlyOnceWith('Todos', 0, { fields: ['*'] })
+    expect({ id: result.id, title: result.title }).toEqual({ id: 0, title: 'Zero' })
+    expect(client.readMany).not.toHaveBeenCalled()
   })
 
   it('reads composite-key items by their key column values', async () => {
-    const hooks = setupPlugin(client)
     client.readOne.mockResolvedValueOnce({ shop_id: 1, code: 'A' })
+    const result = await runMonospaceOperation(client, 'fetchFirst', { collection: createOrdersCollection(), key: '1::A' })
 
-    // Composite keys have no `/{key}` route: the client sends a key filter.
-    await runHook(hooks.fetchFirst, {
-      collection: createOrdersCollection(),
-      store: createRelationStore({ collections: [createOrdersCollection()] }),
-      key: '1::A',
-    })
-
-    expect(client.readOne).toHaveBeenCalledWith('Orders', { shop_id: '1', code: 'A' }, { fields: ['*'] })
+    expect(client.readOne).toHaveBeenCalledExactlyOnceWith('Orders', { shop_id: '1', code: 'A' }, { fields: ['*'] })
+    expect(result.shop_id).toBe(1)
+    expect(result.code).toBe('A')
   })
 
   it('reads items of collections without item routes by key filter', async () => {
-    const hooks = setupPlugin(client)
     const collection = createTodosCollection()
     collection.meta.monospace.itemRoutes = false
     client.readOne.mockResolvedValueOnce({ id: 1 })
 
-    await runHook(hooks.fetchFirst, { collection, key: 1 })
+    const result = await runMonospaceOperation(client, 'fetchFirst', { collection, key: 1 })
 
-    expect(client.readOne).toHaveBeenCalledWith('Todos', { id: 1 }, { fields: ['*'] })
+    expect(client.readOne).toHaveBeenCalledExactlyOnceWith('Todos', { id: 1 }, { fields: ['*'] })
+    expect(result.id).toBe(1)
   })
 
-  it('deletes many items with a primary-key filter', async () => {
-    const hooks = setupPlugin(client)
-    const collection = createTodosCollection()
-    await hooks.deleteMany({
-      abort: vi.fn(),
-      collection,
-      keys: [1, 2],
-    } as any)
+  it('deletes both selected items while retaining an unrelated record', async () => {
+    const store = await createRelationStore(client, { cacheItems: { Todos: [{ id: 1 }, { id: 2 }, { id: 3 }] } })
+    await store.Todos.deleteMany([1, 2])
 
-    expect(client.deleteMany).toHaveBeenCalledWith('Todos', {
-      filter: {
-        id: {
-          _in: [1, 2],
-        },
-      },
-    })
+    expect(client.deleteMany).toHaveBeenCalledExactlyOnceWith('Todos', { filter: { id: { _in: [1, 2] } } })
+    expect((await store.Todos.findMany({ fetchPolicy: 'cache-only' })).map((item: any) => item.id)).toEqual([3])
   })
 
   it('selects every field on list reads without explicit fields', async () => {
-    const hooks = setupPlugin(client)
     client.readMany.mockResolvedValueOnce([{ id: 1 }])
-
-    const first = await runHook(hooks.fetchFirst, {
+    const first = await runMonospaceOperation(client, 'fetchFirst', {
       collection: createTodosCollection(),
       findOptions: { filter: { id: { _eq: 1 } } },
     })
 
-    expect(client.readMany).toHaveBeenCalledWith('Todos', {
-      fields: ['*'],
-      filter: { id: { _eq: 1 } },
-      limit: 1,
-    })
-    expect(first).toEqual({ id: 1 })
+    expect(client.readMany).toHaveBeenCalledExactlyOnceWith('Todos', { fields: ['*'], filter: { id: { _eq: 1 } }, limit: 1 })
+    expect(first.id).toBe(1)
   })
 
-  it('filters cached items with cacheFilterMany', () => {
-    const hooks = setupPlugin(client)
-    const items = [
-      { id: 1, completed: false },
-      { id: 2, completed: true },
-    ]
-    let result: unknown = items
+  it('filters real cached records before returning a list', async () => {
+    const store = await createRelationStore(client, { cacheItems: { Todos: [{ id: 1, completed: false }, { id: 2, completed: true }] }, cachedQueries: { Todos: [{ filter: { completed: { _eq: false } } }] } })
+    const result = await store.Todos.findMany({ filter: { completed: { _eq: false } } })
 
-    hooks.cacheFilterMany({
-      collection: createTodosCollection(),
-      findOptions: {
-        filter: { completed: { _eq: false } },
-      },
-      getResult: () => result,
-      setResult: (value: unknown) => {
-        result = value
-      },
-    })
-
-    expect(result).toEqual([{ id: 1, completed: false }])
+    expect(result.map((item: any) => ({ id: item.id, completed: item.completed }))).toEqual([{ id: 1, completed: false }])
+    expect(client.readMany).not.toHaveBeenCalled()
   })
 
-  it('falls back to fetching when the cached filter is unsupported', () => {
-    const hooks = setupPlugin(client)
-    let firstResult: unknown = { id: 1 }
-    let manyResult: unknown = [{ id: 1 }]
+  it('fetches first and many results when a cached relation filter is unsupported', async () => {
+    const filter = { author: { name: { _eq: 'Jane' } } }
+    // Seed the completed query marker so real cache candidates reach both filter hooks.
+    const store = await createRelationStore(client, {
+      cacheItems: { Todos: [{ id: 1 }] },
+      cachedQueries: { Todos: [{ filter }] },
+    })
+    client.readMany.mockResolvedValue([{ id: 2, author_id: 'p1' }])
 
-    hooks.cacheFilterFirst({
-      collection: createTodosCollection(),
-      findOptions: {
-        filter: { author: { name: { _eq: 'Jane' } } },
-      },
+    expect((await store.Todos.findFirst({ filter })).id).toBe(2)
+    expect((await store.Todos.findMany({ filter })).map((item: any) => item.id)).toEqual([2])
+    expect(client.readMany).toHaveBeenNthCalledWith(1, 'Todos', { fields: ['*'], filter, limit: 1 })
+    expect(client.readMany).toHaveBeenNthCalledWith(2, 'Todos', { fields: ['*'], filter })
+    expect(client.readMany).toHaveBeenCalledTimes(2)
+  })
+
+  it('clears an unsupported first-result candidate supplied to the real adapter hook', async () => {
+    const store = await createRelationStore(client, { cacheItems: { Todos: [{ id: 1, title: 'Unfiltered' }] } })
+    const collection = store.$collections.find((entry: any) => entry.name === 'Todos')
+    let result: any = store.$cache.readItem({ collection, key: 1 })
+    // Another cache plugin can publish a candidate before Monospace evaluates it.
+    // Core's default object-filter path starts empty, so preserve this adapter contract separately.
+    store.$hooks.callHookSync('cacheFilterFirst', {
+      store,
+      collection,
+      meta: {},
       key: undefined,
-      readItemsFromCache: () => [{ id: 1 }],
-      getResult: () => firstResult,
-      setResult: (value: unknown) => {
-        firstResult = value
-      },
-    })
-    hooks.cacheFilterMany({
-      collection: createTodosCollection(),
-      findOptions: {
-        filter: { author: { name: { _eq: 'Jane' } } },
-      },
-      getResult: () => manyResult,
-      setResult: (value: unknown) => {
-        manyResult = value
-      },
+      findOptions: { filter: { author: { name: { _eq: 'Jane' } } } },
+      readItemsFromCache: () => store.$cache.readItems({ collection }),
+      getResult: () => result,
+      setResult: (value: any) => { result = value },
     })
 
-    expect(firstResult).toBeUndefined()
-    expect(manyResult).toEqual([])
+    expect(result).toBeUndefined()
+    expect(store.$cache.getState().collections.Todos[1]).toEqual({ id: 1, title: 'Unfiltered' })
+    expect(client.readMany).not.toHaveBeenCalled()
   })
 
-  it('keeps key-based cacheFilterFirst results untouched', () => {
-    const hooks = setupPlugin(client)
-    const setResult = vi.fn()
+  it('returns key-based cache results without evaluating an unsupported filter', async () => {
+    const store = await createRelationStore(client, { cacheItems: { Todos: [{ id: 1, title: 'Cached' }] } })
+    const result = await store.Todos.findFirst({ key: 1, filter: { author: { name: { _eq: 'Jane' } } } })
 
-    hooks.cacheFilterFirst({
-      collection: createTodosCollection(),
-      findOptions: {},
-      key: 1,
-      readItemsFromCache: () => [],
-      getResult: () => ({ id: 1 }),
-      setResult,
-    })
-
-    expect(setResult).not.toHaveBeenCalled()
+    expect(result.title).toBe('Cached')
+    expect(client.readOne).not.toHaveBeenCalled()
+    expect(client.readMany).not.toHaveBeenCalled()
   })
 
-  it('does not call Monospace when deleteMany receives no keys', async () => {
-    const hooks = setupPlugin(client)
-    const abort = vi.fn()
-    await hooks.deleteMany({
-      abort,
-      collection: createTodosCollection(),
-      keys: [],
-    } as any)
+  it('does not call Monospace or delete cached records for an empty batch', async () => {
+    const store = await createRelationStore(client, { cacheItems: { Todos: [{ id: 1 }] } })
+    await store.Todos.deleteMany([])
 
     expect(client.deleteMany).not.toHaveBeenCalled()
     expect(client.deleteOne).not.toHaveBeenCalled()
-    expect(abort).toHaveBeenCalled()
+    expect((await store.Todos.findMany({ fetchPolicy: 'cache-only' })).map((item: any) => item.id)).toEqual([1])
   })
 })

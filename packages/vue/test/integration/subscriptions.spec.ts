@@ -151,18 +151,42 @@ describe('realtime subscriptions', () => {
     const second = scope(() => store.todos.liveQuery((q: any) => q.first('1')))
     await first.result
     await second.result
+    await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(2))
+    remote.seed('todos', [
+      { id: '1', title: 'One after reconnect', done: true },
+      { id: '2', title: 'Two after reconnect', done: false },
+      { id: '3', title: 'Created while disconnected', done: false },
+    ])
     const many = remote.callCount('fetchMany')
     const one = remote.callCount('fetchFirst')
 
     await realtimeReconnectEventHook.trigger()
     expect(remote.callCount('fetchMany')).toBe(many + 1)
     expect(remote.callCount('fetchFirst')).toBe(one + 1)
+    const refreshedTodos = first.result.data.value.map((todo: any) => ({ id: todo.id, title: todo.title, done: todo.done }))
+    expect(refreshedTodos.sort((a: any, b: any) => a.id.localeCompare(b.id))).toEqual([
+      { id: '1', title: 'One after reconnect', done: true },
+      { id: '2', title: 'Two after reconnect', done: false },
+      { id: '3', title: 'Created while disconnected', done: false },
+    ])
+    expect(second.result.data.value).toMatchObject({ id: '1', title: 'One after reconnect', done: true })
 
     first.stop()
+    await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(1))
+    remote.seed('todos', [
+      { id: '1', title: 'Still connected', done: false },
+      { id: '2', title: 'Two after reconnect', done: false },
+    ])
     await realtimeReconnectEventHook.trigger()
 
     // The disposed query's listener is detached; the live one still refetches.
     expect(remote.callCount('fetchMany')).toBe(many + 1)
+    expect(remote.callCount('fetchFirst')).toBe(one + 2)
+    expect(second.result.data.value).toMatchObject({ id: '1', title: 'Still connected', done: false })
+
+    second.stop()
+    await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(0))
+    await realtimeReconnectEventHook.trigger()
     expect(remote.callCount('fetchFirst')).toBe(one + 2)
   })
 
@@ -185,12 +209,24 @@ describe('realtime subscriptions', () => {
     const { store, remote, scope } = await setup()
     const release = remote.holdNext('fetchMany')
     const { result, stop } = scope(() => store.todos.liveQuery((q: any) => q.many()))
-    await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(1))
+    let settled = false
+    void result.then(() => {
+      settled = true
+    }, () => {
+      settled = true
+    })
+    try {
+      await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(1))
+      stop()
+      // Scope disposal must reach the backend before the held fetch replies.
+      await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(0))
+    }
+    finally {
+      release()
+      await vi.waitFor(() => expect(settled, 'released initial fetch must settle').toBe(true))
+      await result
+    }
 
-    stop()
-    release()
-    await result
-
-    await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(0))
+    expect(remote.subscriptions()).toEqual([])
   })
 })

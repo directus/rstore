@@ -1,23 +1,7 @@
-import type { OfflineQueuedOperation } from '../src/plugin/types'
-import { createItem, deleteItem, updateItem } from '@rstore/core'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { replayQueuedOperations, shouldDropFailedOperation } from '../src/plugin/queuedOperations'
-import { createRuntime } from './utils/plugin'
+import { describe, expect, it } from 'vitest'
+import { shouldDropFailedOperation } from '../src/plugin/queuedOperations'
 
-// Queued mutations are replayed in order on reconnect. An operation that can
-// never succeed — the row is gone, the payload is rejected — would otherwise be
-// retried on every reconnect forever, and because replay is sequential it also
-// blocks every operation queued behind it.
-
-vi.mock('@rstore/core', () => ({
-  createItem: vi.fn(),
-  createMany: vi.fn(),
-  deleteItem: vi.fn(),
-  deleteMany: vi.fn(),
-  updateItem: vi.fn(),
-  updateMany: vi.fn(),
-}))
-
+// Browser queue/replay workflows live in test/browser/offlineQueue.spec.ts.
 describe('shouldDropFailedOperation', () => {
   it('drops permanent client errors', () => {
     // 409 is load-bearing: a backend answers a replayed create whose first
@@ -46,109 +30,5 @@ describe('shouldDropFailedOperation', () => {
     expect(shouldDropFailedOperation(new Error('Failed to fetch'))).toBe(false)
     expect(shouldDropFailedOperation({ statusCode: '404' })).toBe(false)
     expect(shouldDropFailedOperation(undefined)).toBe(false)
-  })
-})
-
-describe('queued operation replay', () => {
-  let runtime: ReturnType<typeof createRuntime>['runtime']
-  let db: ReturnType<typeof createRuntime>['db']
-  let store: any
-
-  beforeEach(() => {
-    vi.clearAllMocks()
-    vi.stubGlobal('navigator', { onLine: true })
-    // The replay logs every failure; keep the test output readable.
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-
-    const created = createRuntime()
-    runtime = created.runtime
-    db = created.db
-    store = { $collections: [{ name: 'Todos' }] }
-  })
-
-  afterEach(() => {
-    vi.unstubAllGlobals()
-  })
-
-  /** Seeds one queued operation into the ops store. */
-  function queueOperation(op: Partial<OfflineQueuedOperation> = {}) {
-    const queued = {
-      id: 'op-1',
-      type: 'update',
-      collectionName: 'Todos',
-      key: '1',
-      item: { id: '1' },
-      time: new Date(0),
-      ...op,
-    } as OfflineQueuedOperation
-    db.stores.set(runtime.opsStoreName, new Map([[queued.id, queued]]))
-    return queued
-  }
-
-  function queuedIds() {
-    return [...(db.stores.get(runtime.opsStoreName)?.keys() ?? [])]
-  }
-
-  it('removes an operation once it replays successfully', async () => {
-    queueOperation()
-
-    await replayQueuedOperations(runtime, store)
-
-    expect(updateItem).toHaveBeenCalled()
-    expect(queuedIds()).toEqual([])
-  })
-
-  it('drops an operation the server will never accept', async () => {
-    queueOperation()
-    vi.mocked(updateItem).mockRejectedValue({ statusCode: 422 })
-
-    await replayQueuedOperations(runtime, store)
-
-    expect(queuedIds()).toEqual([])
-  })
-
-  it('keeps an operation that failed for a transient reason', async () => {
-    queueOperation()
-    vi.mocked(updateItem).mockRejectedValue({ statusCode: 503 })
-
-    await replayQueuedOperations(runtime, store)
-
-    expect(queuedIds()).toEqual(['op-1'])
-  })
-
-  it('keeps every operation when the device goes offline mid-sync', async () => {
-    queueOperation()
-    vi.stubGlobal('navigator', { onLine: false })
-
-    await replayQueuedOperations(runtime, store)
-
-    expect(updateItem).not.toHaveBeenCalled()
-    expect(queuedIds()).toEqual(['op-1'])
-  })
-
-  it('drops a delete whose target no longer exists', async () => {
-    queueOperation({ type: 'delete', item: undefined })
-    vi.mocked(deleteItem).mockRejectedValue({ response: { status: 404 } })
-
-    await replayQueuedOperations(runtime, store)
-
-    expect(queuedIds()).toEqual([])
-  })
-
-  it('removes a queued create mirror when the server assigns another key', async () => {
-    const localKey = 'local-key'
-    db.stores.set('Todos', new Map([[localKey, { id: localKey, text: 'draft' }]]))
-    store.$cache = { deleteItem: vi.fn() }
-    store.$collections[0].getKey = (item: { id: string }) => item.id
-    queueOperation({ type: 'create', key: localKey, item: { id: localKey, text: 'draft' } })
-    vi.mocked(createItem).mockResolvedValue({ id: 'server-key', text: 'draft' } as any)
-
-    await replayQueuedOperations(runtime, store)
-
-    expect(db.stores.get('Todos')!.has(localKey)).toBe(false)
-    expect(store.$cache.deleteItem).toHaveBeenCalledWith(expect.objectContaining({
-      collection: store.$collections[0],
-      key: localKey,
-    }))
   })
 })

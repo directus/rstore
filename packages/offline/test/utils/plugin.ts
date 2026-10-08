@@ -2,44 +2,6 @@ import type { OfflinePluginRuntime } from '../../src/plugin/types'
 import { vi } from 'vitest'
 
 /**
- * Captures the hooks an installer registers so tests can invoke them directly,
- * without booting a real store.
- */
-export interface HookCollector {
-  /** Stand-in for the plugin `hook()` api passed to the installers. */
-  hook: (name: string, callback: (payload: any) => any) => void
-  /** Invokes every handler registered under `name`, awaiting each one. */
-  run: (name: string, payload: Record<string, any>) => Promise<void>
-}
-
-/**
- * Creates a hook collector.
- *
- * Handlers are kept in a list per name because several installers may register
- * under the same hook (`init` is claimed by version cleanup and reconnect).
- */
-export function createHookCollector(): HookCollector {
-  const handlers = new Map<string, Array<(payload: any) => any>>()
-
-  return {
-    hook: (name, callback) => {
-      const existing = handlers.get(name)
-      if (existing) {
-        existing.push(callback)
-      }
-      else {
-        handlers.set(name, [callback])
-      }
-    },
-    run: async (name, payload) => {
-      for (const handler of handlers.get(name) ?? []) {
-        await handler(payload)
-      }
-    },
-  }
-}
-
-/**
  * In-memory stand-in for the api returned by `useIndexedDb`.
  *
  * Every method is a spy so tests can assert on calls, and the backing `stores`
@@ -48,18 +10,19 @@ export function createHookCollector(): HookCollector {
 export interface FakeOfflineDb {
   /** Store name to its key/value contents. */
   stores: Map<string, Map<string, any>>
-  readAllItems: ReturnType<typeof vi.fn>
+  /** Read one stored row at the allowed DB boundary. */
   readItem: ReturnType<typeof vi.fn>
+  /** Persist exact received row so writes can be asserted independently. */
   writeItem: ReturnType<typeof vi.fn>
+  /** Delete only addressed row in simulated DB persistence. */
   deleteItem: ReturnType<typeof vi.fn>
-  applyChanges: ReturnType<typeof vi.fn>
-  clearDatabase: ReturnType<typeof vi.fn>
 }
 
 /** Creates an in-memory fake of the IndexedDB helper. */
 export function createFakeDb(): FakeOfflineDb {
   const stores = new Map<string, Map<string, any>>()
 
+  /** Acquire simulated DB table for the allowed persistence boundary. */
   function getStore(storeName: string) {
     let store = stores.get(storeName)
     if (!store) {
@@ -71,7 +34,6 @@ export function createFakeDb(): FakeOfflineDb {
 
   return {
     stores,
-    readAllItems: vi.fn(async (storeName: string) => [...getStore(storeName).values()]),
     readItem: vi.fn(async (storeName: string, key: string) => getStore(storeName).get(key)),
     writeItem: vi.fn(async (storeName: string, key: string, value: any) => {
       getStore(storeName).set(key, value)
@@ -79,18 +41,7 @@ export function createFakeDb(): FakeOfflineDb {
     deleteItem: vi.fn(async (storeName: string, key: string) => {
       getStore(storeName).delete(key)
     }),
-    applyChanges: vi.fn(async (storeName: string, changes: { deleteKeys: string[], writes: Array<{ key: string, value: any }> }) => {
-      const store = getStore(storeName)
-      for (const key of changes.deleteKeys) {
-        store.delete(key)
-      }
-      for (const { key, value } of changes.writes) {
-        store.set(key, value)
-      }
-    }),
-    clearDatabase: vi.fn(async (storeName: string) => {
-      getStore(storeName).clear()
-    }),
+
   }
 }
 
@@ -112,54 +63,4 @@ export function createRuntime(overrides: Partial<OfflinePluginRuntime> = {}): {
     ...overrides,
   }
   return { runtime, db }
-}
-
-/**
- * Creates a minimal resolved collection, keyed on `id` unless a custom `getKey`
- * is provided.
- */
-export function createCollection(name = 'Todos', getKey: (item: any) => any = item => item?.id): any {
-  return {
-    name,
-    getKey: vi.fn(getKey),
-  }
-}
-
-/**
- * Creates a minimal store stand-in exposing the surfaces the offline sync
- * pipeline touches: collections, the cache api and the hookable dispatcher.
- */
-export function createFakeStore(collections: any[] = []): any {
-  return {
-    $collections: collections,
-    $cache: {
-      pause: vi.fn(),
-      resume: vi.fn(),
-      writeItem: vi.fn(),
-      deleteItem: vi.fn(),
-    },
-    $hooks: {
-      callHook: vi.fn(async () => {}),
-    },
-  }
-}
-
-/**
- * Installs an in-memory `localStorage` stub via `vi.stubGlobal` and returns its
- * backing map so tests can seed and inspect stored values.
- *
- * Callers are expected to run `vi.unstubAllGlobals()` in their own cleanup.
- */
-export function stubLocalStorage(): Map<string, string> {
-  const backing = new Map<string, string>()
-  vi.stubGlobal('localStorage', {
-    getItem: (key: string) => backing.get(key) ?? null,
-    setItem: (key: string, value: string) => {
-      backing.set(key, String(value))
-    },
-    removeItem: (key: string) => {
-      backing.delete(key)
-    },
-  })
-  return backing
 }

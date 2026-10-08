@@ -75,6 +75,19 @@ jobs:
       - run: pnpm -C "${{ matrix.package }}" exec playwright install --with-deps chromium
       - run: pnpm -C "${{ matrix.package }}" test:e2e
 
+  browser-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 26
+          cache: pnpm
+      - run: pnpm install
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm test:browser
+
   ci:
     runs-on: ubuntu-latest
     if: ${{ always() }}
@@ -83,13 +96,15 @@ jobs:
       - typecheck
       - unit-test
       - e2e
+      - browser-test
     steps:
       - name: Ensure all CI jobs succeeded
         run: |
           if [[ "${{ needs.lint.result }}" != "success" \
             || "${{ needs.typecheck.result }}" != "success" \
             || "${{ needs.unit-test.result }}" != "success" \
-            || "${{ needs.e2e.result }}" != "success" ]]; then
+            || "${{ needs.e2e.result }}" != "success" \
+            || "${{ needs.browser-test.result }}" != "success" ]]; then
             echo "One or more CI jobs failed."
             exit 1
           fi

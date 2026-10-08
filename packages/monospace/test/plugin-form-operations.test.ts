@@ -5,11 +5,9 @@ import {
   createOrderItemsCollection,
   createOrdersCollection,
   createProfilesCollection,
-  createRelationStore,
   createTodosCollection,
-  runHook,
-  setupPlugin,
 } from './utils/plugin'
+import { createRelationStore, runMonospaceOperation } from './utils/store'
 
 const client = createMockClient()
 
@@ -22,15 +20,13 @@ beforeEach(() => {
 describe('createMonospaceRstorePlugin form relation operations', () => {
   describe('to-one relations', () => {
     it('translates connect on create into a single _connect object', async () => {
-      const hooks = setupPlugin(client)
       client.createOne.mockResolvedValueOnce({ id: 5, title: 'A', author_id: 'p1' })
 
       // The form projection already wrote `author_id` on the body, but
       // Monospace create inputs reject FK columns: the relation field
       // carries the `_connect` operation instead.
-      const result: any = await runHook(hooks.createItem, {
+      const result: any = await runMonospaceOperation(client, 'createItem', {
         collection: createTodosCollection(),
-        store: createRelationStore(),
         item: { title: 'A', author_id: 'p1' },
         formOperations: [createFormOp('author', 'connect', { id: 'p1', name: 'Jane' })],
       })
@@ -43,12 +39,10 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
     })
 
     it('writes the FK column for connect on update', async () => {
-      const hooks = setupPlugin(client)
       client.updateOne.mockResolvedValueOnce({ id: 1, title: 'A', author_id: 'p1' })
 
-      const result: any = await runHook(hooks.updateItem, {
+      const result: any = await runMonospaceOperation(client, 'updateItem', {
         collection: createTodosCollection(),
-        store: createRelationStore(),
         key: 1,
         item: { id: 1, author_id: 'p1' },
         formOperations: [createFormOp('author', 'connect', { id: 'p1', name: 'Jane' })],
@@ -61,12 +55,10 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
     })
 
     it('nulls the FK column for disconnect on update', async () => {
-      const hooks = setupPlugin(client)
       client.updateOne.mockResolvedValueOnce({ id: 1, title: 'A', author_id: null })
 
-      const result: any = await runHook(hooks.updateItem, {
+      const result: any = await runMonospaceOperation(client, 'updateItem', {
         collection: createTodosCollection(),
-        store: createRelationStore(),
         key: 1,
         item: { id: 1, author_id: null },
         formOperations: [createFormOp('author', 'disconnect', undefined, undefined)],
@@ -79,12 +71,10 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
     })
 
     it('omits the relation for disconnect on create', async () => {
-      const hooks = setupPlugin(client)
       client.createOne.mockResolvedValueOnce({ id: 5, title: 'A', author_id: null })
 
-      await runHook(hooks.createItem, {
+      await runMonospaceOperation(client, 'createItem', {
         collection: createTodosCollection(),
-        store: createRelationStore(),
         item: { title: 'A', author_id: null },
         formOperations: [createFormOp('author', 'disconnect', undefined, undefined)],
       })
@@ -93,13 +83,13 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
     })
 
     it('writes composite FK columns for connect', async () => {
-      const hooks = setupPlugin(client)
-      const store = createRelationStore({
+      const store = await createRelationStore(client, {
         collections: [createOrdersCollection(), createOrderItemsCollection()],
       })
+
       client.updateOne.mockResolvedValueOnce({ id: 9, order_shop_id: 1, order_code: 'A' })
 
-      const result: any = await runHook(hooks.updateItem, {
+      const result: any = await runMonospaceOperation(client, 'updateItem', {
         collection: createOrderItemsCollection(),
         store,
         key: 9,
@@ -115,11 +105,8 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
     })
 
     it('throws when the referenced columns cannot be resolved', async () => {
-      const hooks = setupPlugin(client)
-
-      await expect(runHook(hooks.createItem, {
+      await expect(runMonospaceOperation(client, 'createItem', {
         collection: createTodosCollection(),
-        store: createRelationStore(),
         item: { title: 'A' },
         formOperations: [createFormOp('author', 'connect', { name: 'Jane' })],
       })).rejects.toThrow(/connect key column\(s\) "id"/)
@@ -127,236 +114,41 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
     })
   })
 
-  describe('to-many relations', () => {
-    it('translates connect ops and patches the target FK column in the cache', async () => {
-      const hooks = setupPlugin(client)
-      const store = createRelationStore()
-      client.updateOne.mockResolvedValueOnce({ id: 'p1', name: 'Jane' })
-
-      await runHook(hooks.updateItem, {
-        collection: createProfilesCollection(),
-        store,
-        key: 'p1',
-        item: {},
-        formOperations: [createFormOp('todos', 'connect', { id: 3, title: 'C' })],
-      })
-
-      expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
-        todos: [{ _connect: { keys: [{ id: 3 }] } }],
-      }, { fields: ['*'] })
-      // The connected todo's real FK column is patched in the cache so the
-      // relation accessor resolves without a refetch.
-      expect(store.$cache.writeItem).toHaveBeenCalledWith({
-        collection: expect.objectContaining({ name: 'Todos' }),
-        key: 3,
-        item: { id: 3, author_id: 'p1' },
-      })
-    })
-
-    it('translates a targeted disconnect into a keyed _disconnect filter', async () => {
-      const hooks = setupPlugin(client)
-      const store = createRelationStore()
-      client.updateOne.mockResolvedValueOnce({ id: 'p1', name: 'Jane' })
-
-      await runHook(hooks.updateItem, {
-        collection: createProfilesCollection(),
-        store,
-        key: 'p1',
-        item: {},
-        formOperations: [createFormOp('todos', 'disconnect', undefined, { id: 2, title: 'B' })],
-      })
-
-      expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
-        todos: [{ _disconnect: { filter: { id: 2 } } }],
-      }, { fields: ['*'] })
-      expect(store.$cache.writeItem).toHaveBeenCalledWith({
-        collection: expect.objectContaining({ name: 'Todos' }),
-        key: 2,
-        item: { id: 2, author_id: null },
-      })
-    })
-
-    it('combines multiple targeted disconnects into one _or filter', async () => {
-      const hooks = setupPlugin(client)
-      client.updateOne.mockResolvedValueOnce({ id: 'p1' })
-
-      await runHook(hooks.updateItem, {
-        collection: createProfilesCollection(),
-        store: createRelationStore(),
-        key: 'p1',
-        item: {},
-        formOperations: [
-          createFormOp('todos', 'disconnect', undefined, { id: 1 }),
-          createFormOp('todos', 'disconnect', undefined, { id: 2 }),
-        ],
-      })
-
-      expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
-        todos: [{ _disconnect: { filter: { _or: [{ id: 1 }, { id: 2 }] } } }],
-      }, { fields: ['*'] })
-    })
-
-    it('translates disconnect-all into an empty _disconnect and clears cached FK columns', async () => {
-      const hooks = setupPlugin(client)
-      const store = createRelationStore({
-        cacheItems: {
-          Todos: [
-            { id: 1, author_id: 'p1' },
-            { id: 2, author_id: 'p1' },
-            { id: 9, author_id: 'p2' },
-          ],
-        },
-      })
-      client.updateOne.mockResolvedValueOnce({ id: 'p1' })
-
-      await runHook(hooks.updateItem, {
-        collection: createProfilesCollection(),
-        store,
-        key: 'p1',
-        item: {},
-        formOperations: [createFormOp('todos', 'disconnect', [], [{ id: 1 }, { id: 2 }])],
-      })
-
-      expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
-        todos: [{ _disconnect: {} }],
-      }, { fields: ['*'] })
-      expect(store.$cache.writeItem).toHaveBeenCalledWith({
-        collection: expect.objectContaining({ name: 'Todos' }),
-        key: 1,
-        item: { id: 1, author_id: null },
-      })
-      expect(store.$cache.writeItem).toHaveBeenCalledWith({
-        collection: expect.objectContaining({ name: 'Todos' }),
-        key: 2,
-        item: { id: 2, author_id: null },
-      })
-      expect(store.$cache.writeItem).not.toHaveBeenCalledWith(expect.objectContaining({ key: 9 }))
-    })
-
-    it('decomposes $set into connects and disconnects against the cache state', async () => {
-      const hooks = setupPlugin(client)
-      const store = createRelationStore({
-        cacheItems: {
-          Todos: [
-            { id: 1, author_id: 'p1' },
-            { id: 2, author_id: 'p1' },
-          ],
-        },
-      })
-      client.updateOne.mockResolvedValueOnce({ id: 'p1' })
-
-      await runHook(hooks.updateItem, {
-        collection: createProfilesCollection(),
-        store,
-        key: 'p1',
-        item: {},
-        formOperations: [createFormOp('todos', 'set', [{ id: 2 }, { id: 3 }], [{ id: 1 }, { id: 2 }])],
-      })
-
-      expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
-        todos: [
-          { _disconnect: { filter: { id: 1 } } },
-          { _connect: { keys: [{ id: 3 }] } },
-        ],
-      }, { fields: ['*'] })
-      expect(store.$cache.writeItem).toHaveBeenCalledWith({
-        collection: expect.objectContaining({ name: 'Todos' }),
-        key: 1,
-        item: { id: 1, author_id: null },
-      })
-      expect(store.$cache.writeItem).toHaveBeenCalledWith({
-        collection: expect.objectContaining({ name: 'Todos' }),
-        key: 3,
-        item: { id: 3, author_id: 'p1' },
-      })
-      // The kept item is left untouched.
-      expect(store.$cache.writeItem).not.toHaveBeenCalledWith(expect.objectContaining({ key: 2 }))
-    })
-
-    it('connects all $set items with an operation array on create', async () => {
-      const hooks = setupPlugin(client)
-      client.createOne.mockResolvedValueOnce({ id: 'p2', name: 'John' })
-
-      await runHook(hooks.createItem, {
-        collection: createProfilesCollection(),
-        store: createRelationStore(),
-        item: { name: 'John' },
-        formOperations: [createFormOp('todos', 'set', [{ id: 1 }, { id: 2 }], [])],
-      })
-
-      expect(client.createOne).toHaveBeenCalledWith('Profiles', {
-        name: 'John',
-        todos: [{ _connect: { keys: [{ id: 1 }, { id: 2 }] } }],
-      }, { fields: ['*'] })
-    })
-
-    it('uses composite parent keys for FK column patches', async () => {
-      const hooks = setupPlugin(client)
-      const store = createRelationStore({
-        collections: [createOrdersCollection(), createOrderItemsCollection()],
-      })
-      client.updateOne.mockResolvedValueOnce({ shop_id: 1, code: 'A' })
-
-      await runHook(hooks.updateItem, {
-        collection: createOrdersCollection(),
-        store,
-        key: '1::A',
-        item: {},
-        formOperations: [createFormOp('items', 'connect', { id: 5 })],
-      })
-
-      expect(client.updateOne).toHaveBeenCalledWith('Orders', { shop_id: '1', code: 'A' }, {
-        items: [{ _connect: { keys: [{ id: 5 }] } }],
-      }, { fields: ['*'] })
-      expect(store.$cache.writeItem).toHaveBeenCalledWith({
-        collection: expect.objectContaining({ name: 'OrderItems' }),
-        key: 5,
-        item: { id: 5, order_shop_id: 1, order_code: 'A' },
-      })
-    })
-  })
-
   describe('raw relation payloads', () => {
     it('passes op-shaped payloads through untouched on update', async () => {
-      const hooks = setupPlugin(client)
       const payload = [{ _connect: { key: { id: 'p9' } } }]
       client.updateOne.mockResolvedValueOnce({ id: 1 })
 
-      await runHook(hooks.updateItem, {
+      await runMonospaceOperation(client, 'updateItem', {
         collection: createTodosCollection(),
-        store: createRelationStore(),
         key: 1,
         item: { id: 1, author: payload },
         formOperations: [createFormOp('author', 'set', payload, undefined)],
       })
 
-      expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, { author: payload }, { fields: ['*'] })
+      expect(client.updateOne).toHaveBeenCalledWith('Todos', 1, { author: [{ _connect: { key: { id: 'p9' } } }] }, { fields: ['*'] })
     })
 
     it('passes op-shaped payloads through untouched on create', async () => {
-      const hooks = setupPlugin(client)
       const payload = { _create: { data: { title: 'Nested' } } }
       client.createOne.mockResolvedValueOnce({ id: 'p2' })
 
-      await runHook(hooks.createItem, {
+      await runMonospaceOperation(client, 'createItem', {
         collection: createProfilesCollection(),
-        store: createRelationStore(),
         item: { name: 'John', todos: payload },
         formOperations: [createFormOp('todos', 'set', payload, undefined)],
       })
 
-      expect(client.createOne).toHaveBeenCalledWith('Profiles', { name: 'John', todos: payload }, { fields: ['*'] })
+      expect(client.createOne).toHaveBeenCalledWith('Profiles', { name: 'John', todos: { _create: { data: { title: 'Nested' } } } }, { fields: ['*'] })
     })
   })
 
   describe('fK columns in mutation bodies', () => {
     it('keeps FK columns and strips only primary keys from updateItem bodies', async () => {
-      const hooks = setupPlugin(client)
       client.updateOne.mockResolvedValueOnce({ id: 1 })
 
-      await runHook(hooks.updateItem, {
+      await runMonospaceOperation(client, 'updateItem', {
         collection: createTodosCollection(),
-        store: createRelationStore(),
         key: 1,
         item: { id: 1, title: 'A', author_id: 'p1' },
       })
@@ -365,15 +157,13 @@ describe('createMonospaceRstorePlugin form relation operations', () => {
     })
 
     it('keeps FK columns and strips only primary keys from updateMany bodies', async () => {
-      const hooks = setupPlugin(client)
       client.updateOne.mockResolvedValue({ id: 1 })
 
-      await runHook(hooks.updateMany, {
+      await runMonospaceOperation(client, 'updateMany', {
         collection: createTodosCollection(),
-        store: createRelationStore(),
         items: [
-          { key: 1, item: { id: 1, title: 'A', author_id: 'p1' } },
-          { key: 2, item: { id: 2, title: 'B', author_id: 'p2' } },
+          { id: 1, title: 'A', author_id: 'p1' },
+          { id: 2, title: 'B', author_id: 'p2' },
         ],
       })
 

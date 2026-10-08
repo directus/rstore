@@ -1,4 +1,6 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { TombstoneGcSweepInfo } from '../src'
+import { waitForTombstoneSweeps } from '#test-utils/tombstoneSweeps'
+import { describe, expect, it, vi } from 'vitest'
 import { createTombstoneStore, gcTombstones, scheduleTombstoneGc, stringifyHLC } from '../src'
 
 /** Encode an HLC timestamp for the timer scenarios. */
@@ -7,9 +9,6 @@ function hlc(physical: number): string {
 }
 
 describe('tombstone garbage collection', () => {
-  beforeEach(() => vi.useFakeTimers())
-  afterEach(() => vi.useRealTimers())
-
   it('uses an exclusive cutoff for older, equal, newer, and numeric tombstones', () => {
     const store = createTombstoneStore()
     store.set({ collection: 'todos', key: 'old', deletedAt: hlc(100) })
@@ -25,27 +24,28 @@ describe('tombstone garbage collection', () => {
     expect(store.get('todos', 'new')).toBeDefined()
   })
 
-  it('uses the current injected clock on each sweep and reports zero drops', () => {
+  it('uses the current injected clock on each real sweep and reports zero drops', async () => {
     const store = createTombstoneStore()
-    const sweeps: any[] = []
+    const sweeps: TombstoneGcSweepInfo[] = []
     let now = 10_000
     const stop = scheduleTombstoneGc(store, {
-      intervalMs: 100,
+      intervalMs: 5,
       ttlMs: 1_000,
       now: () => now,
       onSweep: sweep => sweeps.push(sweep),
     })
-    store.set({ collection: 'todos', key: 'recent', deletedAt: hlc(9_500) })
+    try {
+      store.set({ collection: 'todos', key: 'recent', deletedAt: hlc(9_500) })
+      await vi.waitFor(() => expect(sweeps[0], 'first real sweep must report zero drops').toEqual({ droppedCount: 0, cutoffMs: 9_000 }))
+      expect(store.get('todos', 'recent')).toBeDefined()
 
-    vi.advanceTimersByTime(100)
-    expect(store.get('todos', 'recent')).toBeDefined()
-    expect(sweeps).toEqual([{ droppedCount: 0, cutoffMs: 9_000 }])
-
-    now = 12_000
-    vi.advanceTimersByTime(100)
-    expect(store.get('todos', 'recent')).toBeUndefined()
-    expect(sweeps[1]).toEqual({ droppedCount: 1, cutoffMs: 11_000 })
-    stop()
+      now = 12_000
+      await vi.waitFor(() => expect(sweeps, 'next sweep must use updated clock').toContainEqual({ droppedCount: 1, cutoffMs: 11_000 }))
+      expect(store.get('todos', 'recent')).toBeUndefined()
+    }
+    finally {
+      stop()
+    }
   })
 
   it('rejects exact non-positive intervals', () => {
@@ -54,14 +54,23 @@ describe('tombstone garbage collection', () => {
     expect(() => scheduleTombstoneGc(store, { intervalMs: -1, ttlMs: 1_000 })).toThrow('intervalMs must be > 0 (received -1)')
   })
 
-  it('returns an idempotent stop function', () => {
+  it('returns an idempotent stop function that prevents later real sweeps', async () => {
     const store = createTombstoneStore()
-    const stop = scheduleTombstoneGc(store, { intervalMs: 100, ttlMs: 1_000, now: () => 10_000 })
-    store.set({ collection: 'todos', key: 'old', deletedAt: hlc(1) })
-    stop()
-    stop()
+    let sweeps = 0
+    const stop = scheduleTombstoneGc(store, { intervalMs: 5, ttlMs: 1_000, now: () => 10_000, onSweep: () => sweeps++ })
+    try {
+      await vi.waitFor(() => expect(sweeps, 'collector must run before stopping').toBeGreaterThan(0))
+      stop()
+      stop()
+      const stoppedSweeps = sweeps
+      store.set({ collection: 'todos', key: 'old', deletedAt: hlc(1) })
 
-    vi.advanceTimersByTime(1_000)
-    expect(store.get('todos', 'old')).toBeDefined()
+      await waitForTombstoneSweeps(5)
+      expect(store.get('todos', 'old'), 'stopped collector must retain eligible tombstone').toBeDefined()
+      expect(sweeps, 'stopped collector must publish no later sweep').toBe(stoppedSweeps)
+    }
+    finally {
+      stop()
+    }
   })
 })

@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { createDeferred } from '../../../test/utils/deferred'
 import {
   createMockDirectusClient,
   createOrdersCollection,
@@ -63,61 +64,137 @@ describe('mutations', () => {
     expect(client.request).toHaveBeenCalledTimes(2)
   })
 
-  it('updates items with stripped primary keys', async () => {
+  it('updates the requested key without deleting primary keys from caller-owned items', async () => {
     const hooks = setupPlugin(client)
+    const item = { id: 99, title: 'Updated', completed: false }
+    const settings = { id: 4, title: 'Site' }
     client.request.mockResolvedValueOnce({ id: 1, title: 'Updated' })
     client.request.mockResolvedValueOnce({ title: 'Site' })
 
     const updated = await runHook(hooks.updateItem, {
       collection: createTodosCollection(),
       key: 1,
-      item: { id: 1, title: 'Updated' },
+      item,
     })
     const singleton = await runHook(hooks.updateItem, {
       collection: createSettingsCollection(),
       key: 'singleton',
-      item: { id: 1, title: 'Site' },
+      item: settings,
     })
 
     expect(updated).toEqual({ id: 1, title: 'Updated' })
     expect(singleton).toEqual({ title: 'Site' })
-    expect(client.request).toHaveBeenNthCalledWith(1, { op: 'updateItem', args: ['Todos', 1, { title: 'Updated' }] })
+    expect(client.request).toHaveBeenNthCalledWith(1, { op: 'updateItem', args: ['Todos', 1, { title: 'Updated', completed: false }] })
     expect(client.request).toHaveBeenNthCalledWith(2, { op: 'updateSingleton', args: ['Settings', { title: 'Site' }] })
+    expect(item).toEqual({ id: 99, title: 'Updated', completed: false })
+    expect(settings).toEqual({ id: 4, title: 'Site' })
   })
 
-  it('batch-updates single-key collections with reinjected keys', async () => {
+  it('batch-updates each requested key even when item bodies contain different keys', async () => {
+    const hooks = setupPlugin(client)
+    const items = [
+      { key: 0, item: { id: 99, title: 'A', completed: false } },
+      { key: 2, item: { id: 98, title: 'B', completed: true } },
+    ]
+    client.request.mockResolvedValueOnce([
+      { id: 0, title: 'A', completed: false },
+      { id: 2, title: 'B', completed: true },
+    ])
+
+    const result = await runHook(hooks.updateMany, {
+      collection: createTodosCollection(),
+      items,
+    })
+
+    expect(result).toEqual([
+      { id: 0, title: 'A', completed: false },
+      { id: 2, title: 'B', completed: true },
+    ])
+    expect(client.request.mock.calls).toEqual([[{
+      op: 'updateItemsBatch',
+      args: ['Todos', [
+        { id: 0, title: 'A', completed: false },
+        { id: 2, title: 'B', completed: true },
+      ]],
+    }]])
+    expect(items).toEqual([
+      { key: 0, item: { id: 99, title: 'A', completed: false } },
+      { key: 2, item: { id: 98, title: 'B', completed: true } },
+    ])
+  })
+
+  it('preserves sparse batch replies instead of synthesizing omitted server fields', async () => {
     const hooks = setupPlugin(client)
     client.request.mockResolvedValueOnce([{ id: 1 }, { id: 2 }])
 
     const result = await runHook(hooks.updateMany, {
       collection: createTodosCollection(),
-      items: [
-        { key: 1, item: { id: 1, title: 'A' } },
-        { key: 2, item: { id: 2, title: 'B' } },
-      ],
+      items: [{ key: 1, item: { id: 1, title: 'A' } }, { key: 2, item: { id: 2, title: 'B' } }],
     })
 
     expect(result).toEqual([{ id: 1 }, { id: 2 }])
-    expect(client.request).toHaveBeenCalledWith({
+    expect(client.request.mock.calls).toEqual([[{
       op: 'updateItemsBatch',
-      args: ['Todos', [
-        { id: 1, title: 'A' },
-        { id: 2, title: 'B' },
-      ]],
-    })
+      args: ['Todos', [{ id: 1, title: 'A' }, { id: 2, title: 'B' }]],
+    }]])
   })
 
-  it('updates composite-key collections item by item and singletons once', async () => {
+  it('waits for every composite-key update and preserves input order when replies arrive out of order', async () => {
     const hooks = setupPlugin(client)
-    client.request.mockResolvedValueOnce({ shop_id: 's1', code: 'c1', total: 5 })
-    client.request.mockResolvedValueOnce({ title: 'Site' })
+    const first = createDeferred<{ shop_id: string, code: string, total: number }>()
+    const second = createDeferred<{ shop_id: string, code: string, total: number }>()
+    const secondPublished = createDeferred<void>()
+    client.request.mockReturnValueOnce(first.promise)
+    client.request.mockReturnValueOnce(second.promise)
 
-    const composite = await runHook(hooks.updateMany, {
+    let result: unknown
+    const composite = runHook(hooks.updateMany, {
       collection: createOrdersCollection(),
       items: [
         { key: 's1:c1', item: { shop_id: 's1', code: 'c1', total: 5 } },
+        { key: 's2:c2', item: { shop_id: 's2', code: 'c2', total: 8 } },
       ],
+      // Observe publication separately: returning a Promise would make an async
+      // helper adopt it, hiding a missing await inside the production hook.
+      setResult: (value: unknown) => {
+        result = value
+      },
     })
+    let settled = false
+    void composite.then(() => {
+      settled = true
+    }, () => {
+      settled = true
+    })
+    second.promise.then(() => secondPublished.resolve())
+    try {
+      second.resolve({ shop_id: 's2', code: 'c2', total: 8 })
+      // Observe a completed external reply while the first update remains pending.
+      await secondPublished.promise
+      expect(settled).toBe(false)
+      expect(result).toBeUndefined()
+      expect(client.request.mock.calls).toEqual([
+        [{ op: 'updateItem', args: ['Orders', 's1:c1', { total: 5 }] }],
+        [{ op: 'updateItem', args: ['Orders', 's2:c2', { total: 8 }] }],
+      ])
+      first.resolve({ shop_id: 's1', code: 'c1', total: 5 })
+      await vi.waitFor(() => expect(settled, 'all composite replies complete the update').toBe(true))
+      await composite
+      expect(result).toEqual([
+        { shop_id: 's1', code: 'c1', total: 5 },
+        { shop_id: 's2', code: 'c2', total: 8 },
+      ])
+    }
+    finally {
+      // Release both external replies even if an intermediate assertion fails.
+      first.resolve({ shop_id: 's1', code: 'c1', total: 5 })
+      second.resolve({ shop_id: 's2', code: 'c2', total: 8 })
+    }
+  })
+
+  it('updates singletons once with stripped primary keys', async () => {
+    const hooks = setupPlugin(client)
+    client.request.mockResolvedValueOnce({ title: 'Site' })
     const singleton = await runHook(hooks.updateMany, {
       collection: createSettingsCollection(),
       items: [
@@ -125,16 +202,14 @@ describe('mutations', () => {
       ],
     })
 
-    expect(composite).toEqual([{ shop_id: 's1', code: 'c1', total: 5 }])
     expect(singleton).toEqual([{ title: 'Site' }])
-    expect(client.request).toHaveBeenNthCalledWith(1, { op: 'updateItem', args: ['Orders', 's1:c1', { total: 5 }] })
-    expect(client.request).toHaveBeenNthCalledWith(2, { op: 'updateSingleton', args: ['Settings', { title: 'Site' }] })
+    expect(client.request.mock.calls).toEqual([[{ op: 'updateSingleton', args: ['Settings', { title: 'Site' }] }]])
   })
 
   it('deletes items and aborts deleteMany unconditionally', async () => {
     const hooks = setupPlugin(client)
-    const abort = vi.fn()
-    const singletonAbort = vi.fn()
+    let aborted = false
+    let singletonAborted = false
 
     await runHook(hooks.deleteItem, {
       collection: createTodosCollection(),
@@ -145,12 +220,12 @@ describe('mutations', () => {
       key: 'singleton',
     })
     await runHook(hooks.deleteMany, {
-      abort,
+      abort: () => { aborted = true },
       collection: createTodosCollection(),
       keys: [1, 2],
     })
     await runHook(hooks.deleteMany, {
-      abort: singletonAbort,
+      abort: () => { singletonAborted = true },
       collection: createSettingsCollection(),
       keys: ['singleton'],
     })
@@ -159,7 +234,7 @@ describe('mutations', () => {
     expect(client.request).toHaveBeenNthCalledWith(2, { op: 'deleteItems', args: ['Todos', [1, 2]] })
     // Singletons are never deleted, but deleteMany still aborts (current behavior).
     expect(client.request).toHaveBeenCalledTimes(2)
-    expect(abort).toHaveBeenCalled()
-    expect(singletonAbort).toHaveBeenCalled()
+    expect(aborted).toBe(true)
+    expect(singletonAborted).toBe(true)
   })
 })

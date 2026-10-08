@@ -1,51 +1,6 @@
-import type { Peer } from 'crossws'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { rstoreMultiplayerServerHooks } from '../src/runtime/server/hooks'
-import { createMultiplayerWebSocketHandler } from '../src/runtime/server/ws-handler'
-
-/** crossws-like hook surface extracted from the h3 handler. */
-interface WsHooks {
-  upgrade: (request: { url: string, headers: Headers }) => Promise<Response | void> | Response | void
-  message: (peer: Peer, message: { text: () => string }) => Promise<void>
-  close: (peer: Peer) => void
-}
-
-/** Test peer capturing every payload sent to it (parsed from JSON). */
-function makePeer(id: string): Peer & { received: any[] } {
-  const received: any[] = []
-  return {
-    id,
-    send: (payload: unknown) => {
-      received.push(typeof payload === 'string' ? JSON.parse(payload) : payload)
-      return 0
-    },
-    received,
-  } as unknown as Peer & { received: any[] }
-}
-
-function makeHandler(options: { allowedOrigins?: string[] | false } = {}): WsHooks {
-  const handler = createMultiplayerWebSocketHandler({
-    maxRoomSize: 10,
-    maxMessageBytes: 64 * 1024,
-    rateLimit: null,
-    allowedOrigins: options.allowedOrigins,
-  })
-  return (handler as any).__websocket__ as WsHooks
-}
-
-function frame(payload: Record<string, unknown>) {
-  const text = JSON.stringify(payload)
-  return { text: () => text }
-}
-
-function presence(roomId: string, userId: string, clientId: string) {
-  return frame({
-    type: 'multiplayer:presence',
-    roomId,
-    clientId,
-    user: { id: userId, name: userId, color: '#fff' },
-  })
-}
+import { frame, makeHandler, makePeer, presence } from './ws-helpers'
 
 describe('ws-handler identity binding', () => {
   const disposers: Array<() => void> = []
@@ -74,13 +29,37 @@ describe('ws-handler identity binding', () => {
       clientId: 'cB',
     }))
 
-    expect(bob.received).toHaveLength(1)
-    // The frame was stamped with Alice's bound identity, not Bob's.
-    expect(bob.received[0]).toMatchObject({
+    expect(bob.received).toEqual([{
       type: 'multiplayer:leave',
+      roomId: 'room',
       userId: 'alice',
       clientId: 'cA',
+    }])
+    alice.received.length = 0
+    const carol = makePeer('pC')
+    await hooks.message(carol, presence('room', 'carol', 'cC'))
+    expect(bob.received[1]).toEqual({
+      type: 'multiplayer:presence',
+      roomId: 'room',
+      clientId: 'cC',
+      user: { id: 'carol', name: 'carol', color: '#fff' },
     })
+    carol.received.length = 0
+    await hooks.message(bob, frame({
+      type: 'multiplayer:update',
+      roomId: 'room',
+      userId: 'bob',
+      clientId: 'cB',
+      data: { title: 'Bob still belongs to the room' },
+    }))
+    expect(carol.received).toEqual([{
+      type: 'multiplayer:update',
+      roomId: 'room',
+      userId: 'bob',
+      clientId: 'cB',
+      data: { title: 'Bob still belongs to the room' },
+    }])
+    expect(alice.received).toEqual([])
   })
 
   it('rewrites spoofed presence user.id to the bound identity', async () => {
@@ -93,10 +72,23 @@ describe('ws-handler identity binding', () => {
     bob.received.length = 0
 
     // Alice impersonates Bob in a presence frame.
-    await hooks.message(alice, presence('room', 'bob', 'cA'))
+    await hooks.message(alice, frame({
+      type: 'multiplayer:presence',
+      roomId: 'room',
+      clientId: 'spoofed-tab',
+      user: { id: 'bob', name: 'bob', color: '#fff' },
+      field: 'body',
+      cursor: { start: 3, end: 11, direction: 'backward' },
+    }))
 
-    expect(bob.received).toHaveLength(1)
-    expect(bob.received[0].user.id).toBe('alice')
+    expect(bob.received).toEqual([{
+      type: 'multiplayer:presence',
+      roomId: 'room',
+      clientId: 'cA',
+      user: { id: 'alice', name: 'bob', color: '#fff' },
+      field: 'body',
+      cursor: { start: 3, end: 11, direction: 'backward' },
+    }])
   })
 
   it('stamps updates with the bound clientId', async () => {
@@ -116,7 +108,13 @@ describe('ws-handler identity binding', () => {
       data: { title: 'x' },
     }))
 
-    expect(bob.received[0].clientId).toBe('cA')
+    expect(bob.received).toEqual([{
+      type: 'multiplayer:update',
+      roomId: 'room',
+      userId: 'alice',
+      clientId: 'cA',
+      data: { title: 'x' },
+    }])
   })
 
   it('binds the identity set by the authorize hook over client-supplied ids', async () => {
@@ -140,47 +138,22 @@ describe('ws-handler identity binding', () => {
       data: { title: 'x' },
     }))
 
-    expect(bob.received[0].userId).toBe('server-verified')
-  })
-
-  it('broadcasts the bound identity on disconnect', async () => {
-    const hooks = makeHandler()
-    const alice = makePeer('pA')
-    const bob = makePeer('pB')
-
-    await hooks.message(alice, presence('room', 'alice', 'cA'))
-    // Alice later claims to be Bob — must not affect the bound identity.
-    await hooks.message(alice, frame({
+    expect(bob.received).toEqual([{
       type: 'multiplayer:update',
       roomId: 'room',
-      userId: 'bob',
-      clientId: 'cB',
-      data: {},
-    }))
-    await hooks.message(bob, presence('room', 'bob', 'cB'))
-    bob.received.length = 0
-
-    hooks.close(alice)
-
-    expect(bob.received).toHaveLength(1)
-    expect(bob.received[0]).toMatchObject({
-      type: 'multiplayer:leave',
-      userId: 'alice',
+      userId: 'server-verified',
       clientId: 'cA',
-    })
+      data: { title: 'x' },
+    }])
   })
 })
 
 describe('ws-handler upgrade origin check', () => {
-  beforeEach(() => {
-    // Silence the missing-authorize-hook warning in origin-focused tests.
-    vi.spyOn(console, 'warn').mockImplementation(() => {})
-  })
-
   afterEach(() => {
     vi.restoreAllMocks()
   })
 
+  /** Builds the real upgrade request headers consumed by h3 hooks. */
   function upgradeRequest(origin: string | null, host = 'example.com') {
     const headers = new Headers({ host })
     if (origin) {
@@ -220,7 +193,7 @@ describe('ws-handler authorize hook warning', () => {
   })
 
   it('warns once when no authorize handler is registered', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn')
     const hooks = makeHandler()
     const request = { url: 'http://example.com/ws', headers: new Headers({ host: 'example.com', origin: 'http://example.com' }) }
 
@@ -234,7 +207,7 @@ describe('ws-handler authorize hook warning', () => {
   it('does not warn when an authorize handler is registered', async () => {
     const dispose = rstoreMultiplayerServerHooks.hook('multiplayer.authorize', () => {})
     try {
-      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const warn = vi.spyOn(console, 'warn')
       const hooks = makeHandler()
       await hooks.upgrade({ url: 'http://example.com/ws', headers: new Headers({ host: 'example.com' }) })
       const authorizeWarnings = warn.mock.calls.filter(call => String(call[0]).includes('multiplayer.authorize'))

@@ -1,51 +1,11 @@
-// End-to-end coverage of the Monospace relations design against a real
-// rstore Vue store. This file is excluded from `tsc --noEmit` (see
+// Integration coverage of Monospace relations with a real rstore Vue store
+// and mocked REST client. This file is excluded from `tsc --noEmit` (see
 // tsconfig.json) because the @rstore/vue sources only type-check in their
 // own package context; vitest still runs it.
-import { describe, expect, it, vi } from 'vitest'
-import { createStore } from '../../vue/src/store'
-import { createMonospaceRstorePlugin } from '../src'
+import { describe, expect, it } from 'vitest'
+import { createMonospaceTestStore as createTestStore } from './utils/store'
 
-/**
- * Creates a real rstore Vue store wired to the Monospace plugin with a
- * mocked REST client, mirroring the generated collection shapes: relations
- * join on the real `author_id` FK column.
- */
-function createTestStore(readMany: (collection: string, query: any) => Promise<any[]>) {
-  const readManyMock = vi.fn(readMany)
-  const client: any = {
-    readMany: readManyMock,
-    readOne: vi.fn(),
-    createOne: vi.fn(),
-    createMany: vi.fn(),
-    updateOne: vi.fn(),
-    updateMany: vi.fn(),
-    deleteOne: vi.fn(),
-    deleteMany: vi.fn(),
-  }
-  const storePromise = createStore({
-    schema: [
-      {
-        name: 'Todos',
-        scopeId: 'test-scope',
-        meta: { primaryKeys: ['id'], monospace: { collection: 'Todos' } } as any,
-        relations: { author: { to: { Profiles: { on: { id: 'author_id' } } } } },
-        getKey: (item: any) => item.id,
-      },
-      {
-        name: 'Profiles',
-        scopeId: 'test-scope',
-        meta: { primaryKeys: ['id'], monospace: { collection: 'Profiles' } } as any,
-        relations: { todos: { many: true, to: { Todos: { on: { author_id: 'id' } } } } },
-        getKey: (item: any) => item.id,
-      },
-    ],
-    plugins: [createMonospaceRstorePlugin({ client, scopeId: 'test-scope' })],
-  })
-  return { storePromise, readManyMock, client }
-}
-
-describe('monospace relations end-to-end', () => {
+describe('monospace relations with a real rstore store', () => {
   it('resolves included to-one relations through the real FK column join', async () => {
     const { storePromise, readManyMock } = createTestStore(async (collection) => {
       if (collection === 'Todos') {
@@ -123,10 +83,18 @@ describe('monospace relations end-to-end', () => {
     expect(todos[0].author?.name).toBe('Jane')
   })
 
-  it('re-fetches cache-served items whose FK target is not cached', async () => {
-    const { storePromise, readManyMock } = createTestStore(async (collection) => {
+  it('recovers every missing FK target without refetching satisfied or null relations', async () => {
+    const { storePromise, readManyMock } = createTestStore(async (collection, query) => {
       if (collection === 'Todos') {
-        return [{ id: 1, title: 'A', author_id: 'p1', author: { id: 'p1', name: 'Jane' } }]
+        const items = [
+          { id: 1, title: 'A', author_id: 'p1', author: { id: 'p1', name: 'Jane' } },
+          { id: 2, title: 'B', author_id: 'p2', author: { id: 'p2', name: 'John' } },
+          { id: 3, title: 'C', author_id: null, author: null },
+          { id: 4, title: 'D', author_id: 'p4', author: { id: 'p4', name: 'Jo' } },
+        ]
+        // Simulated REST selection makes incomplete recovery observable:
+        // omitted IDs cannot be rescued by a canned full-batch response.
+        return query.filter ? items.filter(item => query.filter.id._in.includes(item.id)) : items
       }
       return []
     })
@@ -135,21 +103,39 @@ describe('monospace relations end-to-end', () => {
     await store.Todos.findMany({ include: { author: true } })
     expect(readManyMock).toHaveBeenCalledTimes(1)
 
-    // Drop the related Profiles items so the FK column alone can no longer
-    // resolve the accessor for cache-served results.
+    // Leave p2 cached and a null FK in place; only IDs 1 and 4 need recovery.
     const profilesCollection = store.$collections.find((c: any) => c.name === 'Profiles')
-    store.$cache.clearCollection({ collection: profilesCollection })
+    store.$cache.deleteItem({ collection: profilesCollection, key: 'p1' })
+    store.$cache.deleteItem({ collection: profilesCollection, key: 'p4' })
 
     // The cache-served result triggers one fetch-only re-fetch that embeds
     // the missing relation again.
     const todos = await store.Todos.findMany({ include: { author: true } })
     expect(readManyMock).toHaveBeenCalledTimes(2)
+    expect(todos.map((todo: any) => ({
+      id: todo.id,
+      title: todo.title,
+      author_id: todo.author_id,
+      author: todo.author ? { id: todo.author.id, name: todo.author.name } : null,
+    }))).toEqual([
+      { id: 1, title: 'A', author_id: 'p1', author: { id: 'p1', name: 'Jane' } },
+      { id: 2, title: 'B', author_id: 'p2', author: { id: 'p2', name: 'John' } },
+      { id: 3, title: 'C', author_id: null, author: null },
+      { id: 4, title: 'D', author_id: 'p4', author: { id: 'p4', name: 'Jo' } },
+    ])
     expect(readManyMock).toHaveBeenLastCalledWith('Todos', {
       fields: ['*'],
-      filter: { id: { _in: [1] } },
+      filter: { id: { _in: expect.arrayContaining([1, 4]) } },
       include: { author: { fields: ['*'] } },
     })
-    expect(todos[0].author?.name).toBe('Jane')
+    expect(readManyMock.mock.lastCall![1].filter.id._in).toHaveLength(2)
+    const profiles = store.$cache.readItems({ collection: profilesCollection })
+    expect(profiles.map((profile: any) => ({ id: profile.id, name: profile.name })).sort((a: any, b: any) => a.id.localeCompare(b.id))).toEqual([
+      { id: 'p1', name: 'Jane' },
+      { id: 'p2', name: 'John' },
+      { id: 'p4', name: 'Jo' },
+    ])
+    expect(readManyMock).toHaveBeenCalledTimes(2)
   })
 
   it('serializes create-form $connect into a to-one _connect operation', async () => {

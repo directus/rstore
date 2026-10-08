@@ -70,12 +70,16 @@ We use [Vitest](https://vitest.dev/) for everything except the browser suites. T
 | `nuxt-boot` | the three `test/basic.test.ts` files | `pnpm test --project nuxt-boot` | The Nuxt module builds and server-renders. |
 | e2e | `packages/playground*/e2e/**` | `pnpm test:e2e` | Browser behaviour, SSR and realtime against a running app. |
 
-Run everything with:
+Run all Vitest projects with:
 
 ```sh
 # Root of the mono-repo
 pnpm run test
 ```
+
+Run native browser scenarios separately with `pnpm test:browser`. Its Linux runner
+uses a private Xvfb display, rejects remote browser connections and closes owned
+processes on interruption. Playground E2E remains `pnpm test:e2e`.
 
 For an in-process coverage report, run `pnpm test:coverage`. It reports every
 shipped `packages/*/src` tree exercised by the `unit`, `nuxt`, and
@@ -196,7 +200,7 @@ No `disposers` array and no `afterEach`: the stack registers its own teardown wi
 | `withInjectionContext` / `withScope` / `runInTestScope` (`vueApp.ts`) | Real injection or effect scope; `runInTestScope` registers automatic scope teardown for standalone consumers. |
 | `mountStoreComponent` (`mountedComponent.ts`) | Actual Vue component setup and unmount through `createRenderer`, with a minimal in-memory host and automatic cleanup. |
 | `createTestStore` (`integrationStore.ts`) | Typed real store with automatic cache disposal for direct Cache/collection-hook contracts. Pair queries with `runInTestScope`; prefer `createVueStack` for workflows. |
-| `stubWindow` (`windowStub.ts`) | An `EventTarget`-backed `window` with a `localStorage`. Kept out of `vueApp.ts` so the unit-layer specs that use it don't drag `@rstore/vue` sources into their package's `tsc` run. |
+| `stubBrowserStorage` (`browserStorageStub.ts`) | Stateful `localStorage` persistence double for real Core synchronization and restoration scenarios. This allowed DB/storage boundary does not simulate focus or component lifecycle. |
 | `serializeCacheState` / `hydrate` (`ssr.ts`) | Round-trips a `getState()` payload through the shape Nuxt uses, with a `structuredClone` so two stores can never share a live reference. |
 
 Both factories take the same options, on top of everything their `createStore` accepts
@@ -290,7 +294,8 @@ Vue lifecycles are reachable without a DOM, so do not reach for `jsdom`, `happy-
 | Injection context (`useStore`, `defineModule`) | `createApp({}).runWithContext()` — `withInjectionContext` |
 | Effect ownership and scenario matrices | `effectScope()` + `scope.stop()` — `stack.scope` / `runInTestScope` |
 | Actual component setup/unmount and app isolation | Vue `createRenderer()` — `mountStoreComponent` |
-| `window` focus events, `localStorage` | `vi.stubGlobal('window', …)` — `stubWindow` |
+| `window` focus events, connectivity and browser lifecycle | Native Chromium through `pnpm test:browser`; headless except native focus inside a private Xvfb display. |
+| `localStorage` persistence in a focused Core scenario | `stubBrowserStorage`, an allowed storage dependency double; native browser scenarios cover actual browser storage. |
 | SSR half of hydration | `renderToString` from `vue/server-renderer`, which ships with `vue` |
 
 Finally, `packages/{core,shared}/tsconfig.json` exclude

@@ -31,13 +31,16 @@ export function createMultiplayerWebSocketHandler(options: MultiplayerServerHand
   const rateLimiter = options.rateLimit
     ? new PeerRateLimiter(options.rateLimit)
     : null
-  /** Rooms each peer belongs to. Used on disconnect to clean up membership. */
-  const peerRooms = new Map<string, Set<string>>()
+  /** Membership tokens change on rejoin, invalidating pending work from an earlier visit. */
+  const peerRooms = new Map<string, Map<string, symbol>>()
+  /** Closed connections cannot resume joins; weak references avoid retaining dead peers. */
+  const closedPeers = new WeakSet<Peer>()
   /** Identity bound to each connection — stamps every outbound frame. */
   const identities = new PeerIdentityStore()
   /** One-shot flag for the missing-authorize-hook warning. */
   let warnedNoAuthorizeHook = false
 
+  /** Adapts the external transport to the room's serialized delivery boundary. */
   function asRoomPeer(peer: Peer): RoomPeer {
     return {
       id: peer.id,
@@ -71,6 +74,9 @@ export function createMultiplayerWebSocketHandler(options: MultiplayerServerHand
     },
 
     async message(peer, message) {
+      if (closedPeers.has(peer)) {
+        return
+      }
       const text = message.text()
       if (text.length > options.maxMessageBytes) {
         return
@@ -86,8 +92,8 @@ export function createMultiplayerWebSocketHandler(options: MultiplayerServerHand
       }
 
       const { roomId } = parsed
-      const rooms = peerRooms.get(peer.id) ?? new Set<string>()
-      const alreadyInRoom = rooms.has(roomId)
+      let rooms = peerRooms.get(peer.id) ?? new Map<string, symbol>()
+      let membership = rooms.get(roomId)
 
       // User id bound by an authorize handler for this join, if any.
       let authorizedUserId: string | undefined
@@ -95,7 +101,7 @@ export function createMultiplayerWebSocketHandler(options: MultiplayerServerHand
       // Authorize once per (peer, room). Subsequent frames for the same
       // room bypass the hook — the authorize result is cached implicitly
       // via the peer's room membership.
-      if (!alreadyInRoom) {
+      if (!membership) {
         let rejected = false
         try {
           await rstoreMultiplayerServerHooks.callHook('multiplayer.authorize', {
@@ -113,7 +119,7 @@ export function createMultiplayerWebSocketHandler(options: MultiplayerServerHand
           console.error('[rstore-multiplayer-server] authorize hook threw', error)
           rejected = true
         }
-        if (rejected) {
+        if (rejected || closedPeers.has(peer)) {
           return
         }
 
@@ -121,7 +127,10 @@ export function createMultiplayerWebSocketHandler(options: MultiplayerServerHand
         if (!room.add(asRoomPeer(peer))) {
           return
         }
-        rooms.add(roomId)
+        // Another authorized frame may have joined while this policy was pending.
+        rooms = peerRooms.get(peer.id) ?? rooms
+        membership = rooms.get(roomId) ?? Symbol(roomId)
+        rooms.set(roomId, membership)
         peerRooms.set(peer.id, rooms)
       }
 
@@ -145,11 +154,12 @@ export function createMultiplayerWebSocketHandler(options: MultiplayerServerHand
         console.error('[rstore-multiplayer-server] filter hook threw', error)
         filtered = true
       }
-      if (filtered) {
+      // Async policies cannot publish work from a connection or room visit that ended.
+      if (filtered || closedPeers.has(peer) || peerRooms.get(peer.id)?.get(roomId) !== membership) {
         return
       }
 
-      const room = registry.getOrCreate(roomId)
+      const room = registry.rooms.get(roomId)!
       // Explicit leave — broadcast, then drop membership.
       if (parsed.type === 'multiplayer:leave') {
         room.broadcast(parsed, peer.id)
@@ -162,10 +172,11 @@ export function createMultiplayerWebSocketHandler(options: MultiplayerServerHand
     },
 
     close(peer) {
+      closedPeers.add(peer)
       const rooms = peerRooms.get(peer.id)
       if (rooms && rooms.size > 0) {
         const identity = identities.get(peer.id)
-        for (const roomId of rooms) {
+        for (const roomId of rooms.keys()) {
           const room = registry.rooms.get(roomId)
           if (!room) {
             continue

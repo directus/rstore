@@ -1,6 +1,5 @@
 import { withInjectionContext, withScope } from '#test-utils/store/vueApp'
 import { createVueStack } from '#test-utils/store/vueStack'
-import { stubWindow } from '#test-utils/store/windowStub'
 import { describe, expect, it, vi } from 'vitest'
 import { useStore } from '../../../src'
 import { harnessSchema } from './shared'
@@ -19,21 +18,6 @@ describe('vue context and scope helpers', () => {
     await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(1))
     stop()
     await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(0))
-  })
-
-  it('provides an addressable window and localStorage', () => {
-    const stub = stubWindow()
-    try {
-      let focused = 0
-      window.addEventListener('focus', () => focused++)
-      stub.dispatch('focus')
-      expect(focused).toBe(1)
-      window.localStorage.setItem('k', 'v')
-      expect(stub.storage.get('k')).toBe('v')
-    }
-    finally {
-      stub.restore()
-    }
   })
 
   it('opens and stops a scope outside a stack', () => {

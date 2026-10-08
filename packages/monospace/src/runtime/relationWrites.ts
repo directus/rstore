@@ -261,7 +261,10 @@ function resolveCurrentTargetItems(
   const sourcePrimaryKeys = getMonospacePrimaryKeys(collection)
   const parentItem = key != null ? store.$cache.readItem?.({ collection, key }) : undefined
   let parentValues: Record<string, any> | undefined
-  if (parentItem) {
+  // An optimistic empty patch can expose a parent without its join columns.
+  // Use cached values only when complete; primary-key joins can safely fall
+  // back to the mutation identity without guessing non-primary-key values.
+  if (parentItem && sourceFields.every(field => parentItem[field] != null)) {
     parentValues = Object.fromEntries(sourceFields.map(field => [field, parentItem[field]]))
   }
   else if (key != null && sourcePrimaryKeys.length === 1 && sourceFields.length === 1 && sourceFields[0] === sourcePrimaryKeys[0]) {

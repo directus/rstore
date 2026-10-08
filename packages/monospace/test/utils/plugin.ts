@@ -1,18 +1,24 @@
-import type { PluginSetupApi } from '@rstore/shared'
 import { vi } from 'vitest'
-import { createMonospaceRstorePlugin } from '../../src'
 
 /**
  * Mocked Monospace REST client shape used by plugin tests.
  */
 export interface MockMonospaceClient {
+  /** External REST createMany operation. */
   createMany: ReturnType<typeof vi.fn>
+  /** External REST createOne operation. */
   createOne: ReturnType<typeof vi.fn>
+  /** External REST deleteMany operation. */
   deleteMany: ReturnType<typeof vi.fn>
+  /** External REST deleteOne operation. */
   deleteOne: ReturnType<typeof vi.fn>
+  /** External REST readMany operation. */
   readMany: ReturnType<typeof vi.fn>
+  /** External REST readOne operation. */
   readOne: ReturnType<typeof vi.fn>
+  /** External REST updateMany operation. */
   updateMany: ReturnType<typeof vi.fn>
+  /** External REST updateOne operation. */
   updateOne: ReturnType<typeof vi.fn>
 }
 
@@ -30,42 +36,6 @@ export function createMockClient(): MockMonospaceClient {
     updateMany: vi.fn(),
     updateOne: vi.fn(),
   }
-}
-
-/**
- * Creates a test plugin and captures registered rstore hooks.
- */
-export function setupPlugin(client: MockMonospaceClient): Record<string, any> {
-  const hooks: Record<string, any> = {}
-  const plugin = createMonospaceRstorePlugin({
-    client: client as any,
-    scopeId: 'test-scope',
-  })
-  plugin.setup({
-    addCollectionDefaults: vi.fn(),
-    hook: vi.fn((name, callback) => {
-      hooks[name] = callback
-      return vi.fn()
-    }),
-  } as unknown as PluginSetupApi)
-  return hooks
-}
-
-/**
- * Runs a data hook and returns the value passed to `setResult`.
- */
-export async function runHook(callback: any, payload: Record<string, any>): Promise<unknown> {
-  let result: unknown
-  await callback({
-    abort: vi.fn(),
-    findOptions: {},
-    getResult: () => result,
-    setResult: (value: unknown) => {
-      result = value
-    },
-    ...payload,
-  })
-  return result
 }
 
 /**
@@ -191,41 +161,4 @@ export function withConnectKeys(collection: any, relationKey: string, connectKey
     [relationKey]: { connectKeys },
   }
   return collection
-}
-
-/**
- * Options accepted by {@link createRelationStore}.
- */
-export interface CreateRelationStoreOptions {
-  /**
-   * Resolved collections registered in the store.
-   */
-  collections?: any[]
-
-  /**
-   * Cache contents keyed by collection name.
-   */
-  cacheItems?: Record<string, any[]>
-}
-
-/**
- * Creates a minimal store shape exposing the test collections and a cache.
- */
-export function createRelationStore(options: CreateRelationStoreOptions = {}): any {
-  const collections = options.collections ?? [createTodosCollection(), createProfilesCollection()]
-  const cacheItems = options.cacheItems ?? {}
-  return {
-    $collections: collections,
-    $collection: vi.fn(() => ({ findMany: vi.fn() })),
-    $cache: {
-      readItem: vi.fn(({ collection, key }: any) => {
-        return cacheItems[collection.name]?.find((item: any) => collection.getKey?.(item) === key)
-      }),
-      readItems: vi.fn(({ collection, filter }: any) => {
-        const items = cacheItems[collection.name] ?? []
-        return filter ? items.filter(filter) : items
-      }),
-      writeItem: vi.fn(),
-    },
-  }
 }

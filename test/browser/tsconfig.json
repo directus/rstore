@@ -1,0 +1,16 @@
+{
+  "extends": "../../tsconfig.integration.json",
+  "compilerOptions": {
+    "moduleResolution": "Bundler",
+    "paths": {
+      "#test-utils/*": ["../utils/*"],
+      "@rstore/core": ["../../packages/core/src/index.ts"],
+      "@rstore/shared": ["../../packages/shared/src/index.ts"],
+      "@rstore/vue": ["../../packages/vue/src/index.ts"],
+      "@rstore/connector-toolkit": ["../../packages/connector-toolkit/src/index.ts"],
+      "@rstore/offline": ["../../packages/offline/src/index.ts"]
+    }
+  },
+  "include": ["./**/*.ts", "../browser-runner.spec.ts", "../utils/**/*.ts"],
+  "exclude": []
+}

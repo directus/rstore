@@ -9,8 +9,8 @@ import { RstorePlugin } from '../../../packages/vue/src'
  * `useStore`, `defineModule` and `useQueryTracking` only take their real branch
  * inside an injection context or an effect scope. Both are reachable without
  * `jsdom`, `happy-dom` or `@vue/test-utils`, which is why this file exists
- * instead of a dependency. The `window` stub lives in `windowStub.ts`, which
- * imports no package source.
+ * instead of a dependency. Native focus scenarios use the isolated Chromium
+ * runner in `test/browser`.
  */
 
 /** Result of {@link withInjectionContext}. */

@@ -1,12 +1,12 @@
 import { describe, expect, it } from 'vitest'
 import { createMonospaceReadQuery } from '../src'
-import { createProfilesCollection, createRelationStore, createTodosCollection } from './utils/plugin'
+import { createProfilesCollection, createTodosCollection } from './utils/plugin'
 
 /**
  * Creates the read context for a collection backed by the default relation store.
  */
 function createContext(collection: any) {
-  return { collection, store: createRelationStore() }
+  return { collection, store: { $collections: [createTodosCollection(), createProfilesCollection()] } }
 }
 
 describe('createMonospaceReadQuery', () => {

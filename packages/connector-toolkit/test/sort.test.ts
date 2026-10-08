@@ -15,7 +15,7 @@ describe('sortItems', () => {
     expect(sortItems(items, [{ field: 'v', desc: false }]).map(item => item.v)).toEqual(['a', 'A', 'b'])
   })
 
-  it('applies multiple fields in priority order', () => {
+  it('applies multiple fields in priority order without reordering the input', () => {
     const items = [
       { a: 1, b: 2 },
       { a: 2, b: 1 },
@@ -29,6 +29,12 @@ describe('sortItems', () => {
       { a: 1, b: 2 },
       { a: 1, b: 1 },
       { a: 2, b: 1 },
+    ])
+    // Other queries still consume the original cache insertion order.
+    expect(sortItems(items, [])).toEqual([
+      { a: 1, b: 2 },
+      { a: 2, b: 1 },
+      { a: 1, b: 1 },
     ])
   })
 

@@ -3,12 +3,10 @@ import {
   createFormOp,
   createMockClient,
   createProfilesCollection,
-  createRelationStore,
   createTodosCollection,
-  runHook,
-  setupPlugin,
   withConnectKeys,
 } from './utils/plugin'
+import { createRelationStore, runMonospaceOperation } from './utils/store'
 
 const client = createMockClient()
 
@@ -30,13 +28,12 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
   }
 
   it('connects through the referenced email column on create', async () => {
-    const hooks = setupPlugin(client)
     const collection = createEmailJoinedTodosCollection()
     client.createOne.mockResolvedValueOnce({ id: 5, title: 'A', author_id: 'jane@acme.dev' })
 
-    const result: any = await runHook(hooks.createItem, {
+    const result: any = await runMonospaceOperation(client, 'createItem', {
       collection,
-      store: createRelationStore({ collections: [collection, createProfilesCollection()] }),
+      store: await createRelationStore(client, { collections: [collection, createProfilesCollection()] }),
       item: { title: 'A' },
       formOperations: [createFormOp('author', 'connect', { id: 'p1', email: 'jane@acme.dev' })],
     })
@@ -50,13 +47,12 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
   })
 
   it('writes the FK column from the referenced email column on update', async () => {
-    const hooks = setupPlugin(client)
     const collection = createEmailJoinedTodosCollection()
     client.updateOne.mockResolvedValueOnce({ id: 1, title: 'A', author_id: 'jane@acme.dev' })
 
-    await runHook(hooks.updateItem, {
+    await runMonospaceOperation(client, 'updateItem', {
       collection,
-      store: createRelationStore({ collections: [collection, createProfilesCollection()] }),
+      store: await createRelationStore(client, { collections: [collection, createProfilesCollection()] }),
       key: 1,
       item: { id: 1 },
       formOperations: [createFormOp('author', 'connect', { id: 'p1', email: 'jane@acme.dev' })],
@@ -68,19 +64,19 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
   })
 
   it('resolves missing referenced columns from the cache', async () => {
-    const hooks = setupPlugin(client)
     const collection = createEmailJoinedTodosCollection()
-    const store = createRelationStore({
+    const store = await createRelationStore(client, {
       collections: [collection, createProfilesCollection()],
       cacheItems: {
         Profiles: [{ id: 'p1', name: 'Jane', email: 'jane@acme.dev' }],
       },
     })
+
     client.createOne.mockResolvedValueOnce({ id: 5, title: 'A' })
 
     // The connected item is only known by its primary key; the referenced
     // email column is recovered from the cached Profiles item.
-    await runHook(hooks.createItem, {
+    await runMonospaceOperation(client, 'createItem', {
       collection,
       store,
       item: { title: 'A' },
@@ -94,12 +90,11 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
   })
 
   it('throws when the referenced columns cannot be resolved', async () => {
-    const hooks = setupPlugin(client)
     const collection = createEmailJoinedTodosCollection()
 
-    await expect(runHook(hooks.createItem, {
+    await expect(runMonospaceOperation(client, 'createItem', {
       collection,
-      store: createRelationStore({ collections: [collection, createProfilesCollection()] }),
+      store: await createRelationStore(client, { collections: [collection, createProfilesCollection()] }),
       item: { title: 'A' },
       formOperations: [createFormOp('author', 'connect', { id: 'p1' })],
     })).rejects.toThrow(/email/)
@@ -107,12 +102,12 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
   })
 
   it('uses connect key metadata for to-many keys', async () => {
-    const hooks = setupPlugin(client)
     const collection = withConnectKeys(createProfilesCollection(), 'todos', ['uuid'])
-    const store = createRelationStore({ collections: [createTodosCollection(), collection] })
+    const store = await createRelationStore(client, { collections: [createTodosCollection(), collection] })
+
     client.updateOne.mockResolvedValueOnce({ id: 'p1', name: 'Jane' })
 
-    await runHook(hooks.updateItem, {
+    await runMonospaceOperation(client, 'updateItem', {
       collection,
       store,
       key: 'p1',
@@ -124,30 +119,27 @@ describe('createMonospaceRstorePlugin non-PK join columns', () => {
       todos: [{ _connect: { keys: [{ uuid: 'u3' }] } }],
     }, { fields: ['*'] })
     // Cache reconciliation still keys the FK column patch by PK.
-    expect(store.$cache.writeItem).toHaveBeenCalledWith({
-      collection: expect.objectContaining({ name: 'Todos' }),
-      key: 3,
-      item: { id: 3, author_id: 'p1' },
-    })
+    expect(store.$cache.getState().collections.Todos[3]).toEqual({ id: 3, author_id: 'p1' })
   })
 
   it('skips to-many cache patches when the connected item is only known by connect keys', async () => {
-    const hooks = setupPlugin(client)
     const profiles = withConnectKeys(createProfilesCollection(), 'todos', ['uuid'])
-    const store = createRelationStore({ collections: [createTodosCollection(), profiles] })
+    const store = await createRelationStore(client, { collections: [createTodosCollection(), profiles] })
+
     client.updateOne.mockResolvedValueOnce({ id: 'p1', name: 'Jane' })
 
     // The target primary key is unknown, so no FK column patch is written.
-    await runHook(hooks.updateItem, {
+    await runMonospaceOperation(client, 'updateItem', {
       collection: profiles,
       store,
       key: 'p1',
       item: {},
       formOperations: [createFormOp('todos', 'connect', { uuid: 'u9' })],
     })
+
     expect(client.updateOne).toHaveBeenCalledWith('Profiles', 'p1', {
       todos: [{ _connect: { keys: [{ uuid: 'u9' }] } }],
     }, { fields: ['*'] })
-    expect(store.$cache.writeItem).not.toHaveBeenCalled()
+    expect(store.$cache.getState().collections.Todos ?? {}).toEqual({})
   })
 })

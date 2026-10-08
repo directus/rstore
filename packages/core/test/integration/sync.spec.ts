@@ -1,6 +1,6 @@
 import type { Plugin } from '@rstore/shared'
+import { stubBrowserStorage } from '#test-utils/store/browserStorageStub'
 import { createCoreStack } from '#test-utils/store/coreStack'
-import { stubWindow } from '#test-utils/store/windowStub'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 
 // `store.spec.ts` covers `$sync` persistence and its re-entrancy guard. The
@@ -140,7 +140,7 @@ describe('sync failure', () => {
   })
 
   it('records the error, settles, persists nothing, and recovers on the next run', async () => {
-    const stub = stubWindow()
+    const stub = stubBrowserStorage()
     restore = stub.restore
 
     let shouldFail = true

@@ -4,11 +4,9 @@ import {
   createMockClient,
   createOrdersCollection,
   createProfilesCollection,
-  createRelationStore,
   createTodosCollection,
-  runHook,
-  setupPlugin,
 } from './utils/plugin'
+import { createRelationStore, runMonospaceOperation } from './utils/store'
 
 const client = createMockClient()
 
@@ -21,20 +19,17 @@ beforeEach(() => {
 describe('createMonospaceRstorePlugin writes', () => {
   describe('create bodies', () => {
     it('translates FK columns into to-one _connect operations and omits null ones', async () => {
-      const hooks = setupPlugin(client)
       client.createOne.mockResolvedValueOnce({ id: 5, title: 'A', author_id: 'p1' })
       client.createMany.mockResolvedValueOnce([{ id: 6 }, { id: 7 }])
 
       // Monospace create inputs reject FK columns: the relation field
       // carries a single `_connect` object instead.
-      await runHook(hooks.createItem, {
+      await runMonospaceOperation(client, 'createItem', {
         collection: createTodosCollection(),
-        store: createRelationStore(),
         item: { title: 'A', author_id: 'p1' },
       })
-      await runHook(hooks.createMany, {
+      await runMonospaceOperation(client, 'createMany', {
         collection: createTodosCollection(),
-        store: createRelationStore(),
         items: [
           { title: 'B', author_id: 'p2' },
           { title: 'C', author_id: null },
@@ -52,12 +47,10 @@ describe('createMonospaceRstorePlugin writes', () => {
     })
 
     it('keeps source primary keys joined by backward to-one relations', async () => {
-      const hooks = setupPlugin(client)
       client.createOne.mockResolvedValueOnce({ id: 'p1' })
 
-      await runHook(hooks.createItem, {
+      await runMonospaceOperation(client, 'createItem', {
         collection: createProfilesWithSettings(),
-        store: createRelationStore(),
         item: { id: 'p1', name: 'Jane' },
       })
 
@@ -66,21 +59,18 @@ describe('createMonospaceRstorePlugin writes', () => {
   })
 
   it('translates backward to-one form operations into nested operations', async () => {
-    const hooks = setupPlugin(client)
     client.updateOne.mockResolvedValue({ id: 'p1' })
 
     // The FK lives on the Settings side: the parent primary key must never
     // be overwritten, Monospace links the related item instead.
-    await runHook(hooks.updateItem, {
+    await runMonospaceOperation(client, 'updateItem', {
       collection: createProfilesWithSettings(),
-      store: createRelationStore(),
       key: 'p1',
       item: { id: 'p1' },
       formOperations: [createFormOp('settings', 'connect', { id: 's1', profile_id: null })],
     })
-    await runHook(hooks.updateItem, {
+    await runMonospaceOperation(client, 'updateItem', {
       collection: createProfilesWithSettings(),
-      store: createRelationStore(),
       key: 'p1',
       item: { id: 'p1' },
       formOperations: [createFormOp('settings', 'disconnect', undefined, { id: 's1' })],
@@ -96,14 +86,12 @@ describe('createMonospaceRstorePlugin writes', () => {
 
   describe('one-to-one relations whose FK is the primary key', () => {
     it('translates the FK primary key column into a _connect operation on create', async () => {
-      const hooks = setupPlugin(client)
       client.createOne.mockResolvedValueOnce({ profile_id: 'p1', theme: 'dark' })
 
       // The generated meta marks the relation as forward even though it
       // joins on exactly the source primary key.
-      await runHook(hooks.createItem, {
+      await runMonospaceOperation(client, 'createItem', {
         collection: createSettingsWithProfile(),
-        store: createRelationStore(),
         item: { profile_id: 'p1', theme: 'dark' },
       })
 
@@ -114,12 +102,10 @@ describe('createMonospaceRstorePlugin writes', () => {
     })
 
     it('connects through the referenced columns for form connect on create', async () => {
-      const hooks = setupPlugin(client)
       client.createOne.mockResolvedValueOnce({ profile_id: 'p1', theme: 'dark' })
 
-      await runHook(hooks.createItem, {
+      await runMonospaceOperation(client, 'createItem', {
         collection: createSettingsWithProfile(),
-        store: createRelationStore(),
         item: { profile_id: 'p1', theme: 'dark' },
         formOperations: [createFormOp('profile', 'connect', { id: 'p1', name: 'Jane' })],
       })
@@ -133,12 +119,11 @@ describe('createMonospaceRstorePlugin writes', () => {
 
   describe('composite primary keys', () => {
     it('updates with the key column values resolved from the item', async () => {
-      const hooks = setupPlugin(client)
       client.updateOne.mockResolvedValueOnce({ shop_id: 1, code: 'A', total: 3 })
 
-      const result = await runHook(hooks.updateItem, {
+      const result = await runMonospaceOperation(client, 'updateItem', {
         collection: createOrdersCollection(),
-        store: createRelationStore({ collections: [createOrdersCollection()] }),
+        store: await createRelationStore(client, { collections: [createOrdersCollection()] }),
         key: '1::A',
         item: { shop_id: 1, code: 'A', total: 3 },
       })
@@ -147,44 +132,89 @@ describe('createMonospaceRstorePlugin writes', () => {
       expect(result).toEqual({ shop_id: 1, code: 'A', total: 3 })
     })
 
+    it('updates the explicit composite target when the patch carries a rival identity', async () => {
+      const rows = [{ shop_id: 1, code: 'A', total: 1 }, { shop_id: 2, code: 'B', total: 2 }]
+      const requests: any[] = []
+      const store = await createRelationStore(client, {
+        collections: [createOrdersCollection()],
+        cacheItems: { Orders: [{ shop_id: 2, code: 'B', total: 2 }] },
+      })
+
+      /** Applies the external REST write to its addressed row, preserving request evidence. */
+      async function persistOrderUpdate(collection: string, key: any, patch: any, query: any) {
+        requests.push(structuredClone({ collection, key, patch, query }))
+        const index = rows.findIndex(row => String(row.shop_id) === String(key.shop_id) && row.code === key.code)
+        if (collection !== 'Orders' || index === -1) {
+          throw new Error('Order not found')
+        }
+        rows[index] = { ...rows[index]!, ...patch }
+        return { ...rows[index]! }
+      }
+      client.updateOne.mockImplementation(persistOrderUpdate)
+
+      // No target cache entry or optimistic layer may mask key resolution.
+      // Public updateItem accepts an explicit target independently of its patch.
+      const item = { shop_id: 2, code: 'B', total: 3 }
+      const result = await runMonospaceOperation(client, 'updateItem', {
+        collection: createOrdersCollection(),
+        store,
+        key: '1::A',
+        item,
+        optimistic: false,
+      })
+
+      expect(requests).toEqual([{
+        collection: 'Orders',
+        key: { shop_id: '1', code: 'A' },
+        patch: { total: 3 },
+        query: { fields: ['*'] },
+      }])
+      expect(rows).toEqual([{ shop_id: 1, code: 'A', total: 3 }, { shop_id: 2, code: 'B', total: 2 }])
+      expect(result).toEqual({ shop_id: 1, code: 'A', total: 3 })
+      expect(store.$cache.getState().collections.Orders).toEqual({
+        '1::A': { shop_id: 1, code: 'A', total: 3 },
+        '2::B': { shop_id: 2, code: 'B', total: 2 },
+      })
+      expect(item).toEqual({ shop_id: 2, code: 'B', total: 3 })
+    })
+
     it('deletes with the key column values resolved from the cache', async () => {
-      const hooks = setupPlugin(client)
-      const store = createRelationStore({
+      const store = await createRelationStore(client, {
         collections: [createOrdersCollection()],
         cacheItems: { Orders: [{ shop_id: 1, code: 'A' }] },
       })
 
-      await runHook(hooks.deleteItem, { collection: createOrdersCollection(), store, key: '1::A' })
+      // Non-optimistic mode keeps cached key column types available to the adapter.
+      await runMonospaceOperation(client, 'deleteItem', { collection: createOrdersCollection(), store, key: '1::A', optimistic: false })
 
       expect(client.deleteOne).toHaveBeenCalledWith('Orders', { shop_id: 1, code: 'A' })
     })
 
     it('batches deleteMany into one filtered request, splitting uncached keys', async () => {
-      const hooks = setupPlugin(client)
-
-      await runHook(hooks.deleteMany, {
+      await runMonospaceOperation(client, 'deleteMany', {
         collection: createOrdersCollection(),
-        store: createRelationStore({ collections: [createOrdersCollection()] }),
+        store: await createRelationStore(client, { collections: [createOrdersCollection()] }),
         keys: ['1::A', '2::B'],
       })
 
       expect(client.deleteOne).not.toHaveBeenCalled()
       expect(client.deleteMany).toHaveBeenCalledWith('Orders', {
         filter: {
-          _or: [
-            { _and: [{ shop_id: { _eq: '1' } }, { code: { _eq: 'A' } }] },
-            { _and: [{ shop_id: { _eq: '2' } }, { code: { _eq: 'B' } }] },
-          ],
+          _or: expect.arrayContaining([
+            { _and: expect.arrayContaining([{ shop_id: { _eq: '1' } }, { code: { _eq: 'A' } }]) },
+            { _and: expect.arrayContaining([{ shop_id: { _eq: '2' } }, { code: { _eq: 'B' } }]) },
+          ]),
         },
       })
+      const groups = client.deleteMany.mock.lastCall![1].filter._or
+      expect(groups).toHaveLength(2)
+      expect(groups.map((group: any) => group._and.length)).toEqual([2, 2])
     })
 
     it('throws when the key cannot be resolved into column values', async () => {
-      const hooks = setupPlugin(client)
-
-      await expect(runHook(hooks.deleteItem, {
+      await expect(runMonospaceOperation(client, 'deleteItem', {
         collection: createOrdersCollection(),
-        store: createRelationStore({ collections: [createOrdersCollection()] }),
+        store: await createRelationStore(client, { collections: [createOrdersCollection()] }),
         key: 'broken',
       })).rejects.toThrow(/shop_id/)
       expect(client.deleteOne).not.toHaveBeenCalled()
@@ -192,17 +222,16 @@ describe('createMonospaceRstorePlugin writes', () => {
   })
 
   it('uses filtered requests for collections without item routes', async () => {
-    const hooks = setupPlugin(client)
     const collection = createTodosCollection()
     collection.meta.monospace.itemRoutes = false
     client.updateOne.mockResolvedValue({ id: 1, title: 'A' })
 
-    await runHook(hooks.updateMany, {
+    await runMonospaceOperation(client, 'updateMany', {
       collection,
-      store: createRelationStore({ collections: [collection] }),
-      items: [{ key: 1, item: { id: 1, title: 'A' } }],
+      store: await createRelationStore(client, { collections: [collection] }),
+      items: [{ id: 1, title: 'A' }],
     })
-    await runHook(hooks.deleteItem, { collection, store: createRelationStore({ collections: [collection] }), key: 1 })
+    await runMonospaceOperation(client, 'deleteItem', { collection, store: await createRelationStore(client, { collections: [collection] }), key: 1 })
 
     expect(client.updateOne).toHaveBeenCalledWith('Todos', { id: 1 }, { title: 'A' }, { fields: ['*'] })
     expect(client.deleteOne).toHaveBeenCalledWith('Todos', { id: 1 })

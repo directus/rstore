@@ -1,99 +1,49 @@
-import { stubWindow } from '#test-utils/store/windowStub'
-import { until } from '@vueuse/core'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createVueStack } from '#test-utils/store/vueStack'
+import { describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
-import { setup } from '../../utils/query'
 
 describe('query', () => {
-  afterEach(() => {
-    // The stacks stop their own effect scopes; the globals are ours to restore.
-    vi.unstubAllGlobals()
-  })
-
   it('should handle fetch errors', async () => {
-    const { store, run } = await setup([
-      {
-        name: 'messages',
-        hooks: {
-          fetchMany: () => {
-            throw new Error('Fetch failed')
-          },
-        },
-      },
-    ])
+    const { store, run, remote, readMany } = await createVueStack({
+      schema: [{ name: 'messages' }],
+      data: { messages: [{ id: 'foo', text: 'Initial' }] },
+    })
+    remote.failNext('fetchMany', new Error('Fetch failed'))
 
     const query = await run(() => store.messages.query((q: any) => q.many({
       fetchPolicy: 'no-cache',
     })))
 
     expect(query.error.value?.message).toBe('Fetch failed')
+    expect(query.data.value).toEqual([])
+    expect(query.loading.value).toBe(false)
+    expect(readMany('messages')).toEqual([])
   })
 
   it('should refresh data when refresh is called', async () => {
-    let data = { id: 'foo', text: 'initial' }
-    const { store, run } = await setup([
-      {
-        name: 'messages',
-        hooks: {
-          fetchFirst: () => data,
-        },
-      },
-    ])
+    const { store, run, remote } = await createVueStack({
+      schema: [{ name: 'messages' }],
+      data: { messages: [{ id: 'foo', text: 'initial' }] },
+    })
 
     const query = await run(() => store.messages.query((q: any) => q.first('foo')))
 
     expect(query.data.value?.text).toBe('initial')
 
-    data = { id: 'foo', text: 'refreshed' }
+    remote.seed('messages', [{ id: 'foo', text: 'refreshed' }])
 
     await query.refresh()
 
-    expect(query.data.value?.text).toBe('refreshed')
-  })
-
-  it('should refresh data on window focus when enabled', async () => {
-    const window = stubWindow()
-
-    let data = { id: 'foo', text: 'initial' }
-    const { store, run } = await setup([
-      {
-        name: 'messages',
-        hooks: {
-          fetchFirst: () => data,
-        },
-      },
-    ], { syncImmediately: false })
-
-    const query = await run(() => store.messages.query((q: any) => q.first({
-      key: 'foo',
-      fetchOptions: {
-        autoRefresh: 'windowFocus',
-      },
-    })))
-
-    expect(query.data.value?.text).toBe('initial')
-
-    data = { id: 'foo', text: 'focused' }
-    window.dispatch('focus')
-
-    await until(() => query.data.value?.text === 'focused').toBe(true)
+    expect(query.data.value).toMatchObject({ id: 'foo', text: 'refreshed' })
+    expect(query.loading.value).toBe(false)
+    expect(query.error.value).toBeNull()
   })
 
   it('should refresh data when options change', async () => {
-    const data = {
-      foo: { id: 'foo', text: 'foo' },
-      bar: { id: 'bar', text: 'bar' },
-    }
-    const { store, run } = await setup([
-      {
-        name: 'messages',
-        hooks: {
-          fetchFirst: ({ key }) => {
-            return data[key as keyof typeof data]
-          },
-        },
-      },
-    ])
+    const { store, run, remote } = await createVueStack({
+      schema: [{ name: 'messages' }],
+      data: { messages: [{ id: 'foo', text: 'foo' }, { id: 'bar', text: 'bar' }] },
+    })
 
     const key = ref('foo')
 
@@ -106,22 +56,18 @@ describe('query', () => {
     key.value = 'bar'
     await nextTick()
     expect(query.loading.value).toBe(true)
-    await until((): boolean => query.loading.value).toBe(false)
+    await vi.waitFor(() => expect(query.loading.value).toBe(false))
 
-    expect(query.data.value?.text).toBe('bar')
+    expect(query.data.value).toMatchObject({ id: 'bar', text: 'bar' })
+    expect(remote.lastRequest('fetchFirst')).toMatchObject({ collection: 'messages', key: 'bar' })
+    expect(query.error.value).toBeNull()
   })
 
-  it('should not load data when query is disabled', async () => {
-    const { store, run } = await setup([
-      {
-        name: 'messages',
-        hooks: {
-          fetchFirst: () => {
-            throw new Error('Should not be called')
-          },
-        },
-      },
-    ])
+  it('should not load data when query is disabled, including explicit refresh', async () => {
+    const { store, run, remote, readMany } = await createVueStack({
+      schema: [{ name: 'messages' }],
+      data: { messages: [{ id: 'foo', text: 'Private message' }, { id: 'bar', text: 'Other message' }] },
+    })
 
     const query = await run(() => store.messages.query((q: any) => q.first({
       key: 'foo',
@@ -130,19 +76,19 @@ describe('query', () => {
 
     expect(query.data.value).toBeNull()
     expect(query.loading.value).toBe(false)
+    await query.refresh()
+    expect(remote.requests('fetchFirst')).toEqual([])
+    expect(query.error.value).toBeNull()
+    expect(query.data.value).toBeNull()
+    expect(query.loading.value).toBe(false)
+    expect(readMany('messages')).toEqual([])
   })
 
   it('should re-enable query by setting option to object', async () => {
-    const { store, run } = await setup([
-      {
-        name: 'messages',
-        hooks: {
-          fetchFirst: ({ key }) => {
-            return { id: key, text: 'from network' }
-          },
-        },
-      },
-    ])
+    const { store, run, remote, read } = await createVueStack({
+      schema: [{ name: 'messages' }],
+      data: { messages: [{ id: 'bar', text: 'Other message' }, { id: 'foo', text: 'from network' }] },
+    })
 
     const options = ref<any>({ enabled: false })
 
@@ -153,14 +99,20 @@ describe('query', () => {
 
     expect(query.data.value).toBeNull()
     expect(query.loading.value).toBe(false)
+    expect(remote.requests('fetchFirst')).toEqual([])
 
     options.value = {}
 
     await nextTick()
 
     expect(query.loading.value).toBe(true)
-    await until((): boolean => query.loading.value).toBe(false)
+    await vi.waitFor(() => expect(query.loading.value).toBe(false))
 
-    expect(query.data.value?.text).toBe('from network')
+    expect(remote.requests('fetchFirst')).toHaveLength(1)
+    expect(remote.lastRequest('fetchFirst')).toMatchObject({ collection: 'messages', key: 'foo' })
+    expect(query.data.value).toMatchObject({ id: 'foo', text: 'from network' })
+    expect(query.error.value).toBeNull()
+    expect(read('messages', 'foo')).toMatchObject({ id: 'foo', text: 'from network' })
+    expect(read('messages', 'bar')).toBeUndefined()
   })
 })

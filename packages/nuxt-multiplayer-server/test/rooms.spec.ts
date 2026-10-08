@@ -2,6 +2,7 @@ import type { RoomPeer } from '../src/runtime/server/rooms'
 import { describe, expect, it, vi } from 'vitest'
 import { Room, RoomRegistry } from '../src/runtime/server/rooms'
 
+/** Records transport sends while leaving real room membership and delivery intact. */
 function makePeer(id: string): RoomPeer & { sent: unknown[] } {
   const sent: unknown[] = []
   return {
@@ -39,9 +40,9 @@ describe('room', () => {
     room.add(b)
     room.add(c)
     room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' }, 'b')
-    expect(a.sent).toHaveLength(1)
-    expect(b.sent).toHaveLength(0)
-    expect(c.sent).toHaveLength(1)
+    expect(a.sent).toEqual([{ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' }])
+    expect(b.sent).toEqual([])
+    expect(c.sent).toEqual([{ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' }])
   })
 
   it('broadcast isolates per-peer send failures', () => {
@@ -53,7 +54,7 @@ describe('room', () => {
     }
     room.add(bad)
     room.add(good)
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const spy = vi.spyOn(console, 'error')
     room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' })
     expect(good.sent).toHaveLength(1)
     expect(spy).toHaveBeenCalled()
@@ -74,7 +75,7 @@ describe('room', () => {
     room.add(first)
     room.add(middle)
     room.add(last)
-    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const spy = vi.spyOn(console, 'error')
     room.broadcast({ type: 'multiplayer:leave', roomId: 'r', userId: 'u', clientId: 'c' })
     spy.mockRestore()
     expect(first.sent).toHaveLength(1)
@@ -100,6 +101,15 @@ describe('room', () => {
     // truncation, identical reference.
     expect(a.sent[0]).toBe(message)
     expect(b.sent[0]).toBe(message)
+    const expected = {
+      type: 'multiplayer:update',
+      roomId: 'r',
+      userId: 'u',
+      clientId: 'c',
+      data: { cursor: { line: 1, ch: 5 } },
+    }
+    expect(a.sent).toEqual([expected])
+    expect(b.sent).toEqual([expected])
   })
 
   it('does not deliver to a peer that joined after broadcast started', () => {

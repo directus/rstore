@@ -28,11 +28,12 @@ export function setupPlugin(client: MockDirectusClient): Record<string, any> {
     scopeId: 'test-scope',
   })
   plugin.setup({
-    addCollectionDefaults: vi.fn(),
-    hook: vi.fn((name, callback) => {
+    hook: (name: string, callback: any) => {
       hooks[name] = callback
-      return vi.fn()
-    }),
+      return () => {
+        delete hooks[name]
+      }
+    },
   } as unknown as PluginSetupApi)
   return hooks
 }
@@ -43,7 +44,7 @@ export function setupPlugin(client: MockDirectusClient): Record<string, any> {
 export async function runHook(callback: any, payload: Record<string, any>): Promise<unknown> {
   let result: unknown
   await callback({
-    abort: vi.fn(),
+    abort: () => {},
     findOptions: {},
     getResult: () => result,
     setResult: (value: unknown) => {
@@ -180,46 +181,6 @@ export function createOrderItemsCollection(): any {
           on: { shop_id: 'order_shop_id', code: 'order_code' },
         }],
       },
-    },
-  }
-}
-
-/**
- * Options accepted by {@link createRelationStore}.
- */
-export interface CreateRelationStoreOptions {
-  /**
-   * Resolved collections registered in the store.
-   */
-  collections?: any[]
-
-  /**
-   * Cache contents keyed by collection name.
-   */
-  cacheItems?: Record<string, any[]>
-}
-
-/**
- * Creates a minimal store shape whose per-collection `findMany` mocks are
- * memoized by collection name so tests can assert batched relation fetches.
- */
-export function createRelationStore(options: CreateRelationStoreOptions = {}): any {
-  const collections = options.collections ?? [createTodosCollection(), createProfilesCollection()]
-  const cacheItems = options.cacheItems ?? {}
-  const collectionApis = new Map<string, { findMany: ReturnType<typeof vi.fn> }>()
-  return {
-    $collections: collections,
-    $collection: vi.fn((name: string) => {
-      if (!collectionApis.has(name)) {
-        collectionApis.set(name, { findMany: vi.fn(async () => []) })
-      }
-      return collectionApis.get(name)!
-    }),
-    $cache: {
-      readItems: vi.fn(({ collection, filter }: any) => {
-        const items = cacheItems[collection.name] ?? []
-        return filter ? items.filter(filter) : items
-      }),
     },
   }
 }

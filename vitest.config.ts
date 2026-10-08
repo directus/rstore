@@ -102,6 +102,7 @@ export default defineConfig({
           ],
           exclude: [
             ...configDefaults.exclude,
+            'test/browser/**',
             '**/e2e/**',
             '**/test/integration/**',
             'packages/nuxt*/**',

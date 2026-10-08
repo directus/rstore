@@ -1,7 +1,7 @@
 import type { CreateStoreCoreOptions } from '@rstore/core'
 import type { Cache, CollectionDefaults, StoreSchema } from '@rstore/shared'
+import { stubBrowserStorage } from '#test-utils/store/browserStorageStub'
 import { createVueStack } from '#test-utils/store/vueStack'
-import { stubWindow } from '#test-utils/store/windowStub'
 import { createStoreCore } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -120,7 +120,7 @@ describe('createStoreCore', () => {
     })
 
     it('persists lastSyncAt and restores it in a new store', async () => {
-      const { storage } = stubWindow()
+      const { storage } = stubBrowserStorage()
       const store = await createSubject()
 
       await store.$sync()
@@ -133,7 +133,7 @@ describe('createStoreCore', () => {
     })
 
     it('restores legacy epoch milliseconds', async () => {
-      const { storage } = stubWindow()
+      const { storage } = stubBrowserStorage()
       const date = new Date('2023-01-01T00:00:00Z')
       storage.set('rstore-last-sync-at', String(date.getTime()))
 
