@@ -1,5 +1,6 @@
 import type { MultiplayerTextCursor } from '../types'
 import type { RstoreMultiplayerChannel } from './useRstoreMultiplayerChannel'
+import { isPublicKey } from '@rstore/shared'
 import { nextTick, onUnmounted, watch } from 'vue'
 import { rebaseMultiplayerTextCursor } from '../utils/multiplayerTextCursor'
 import { sanitizeMultiplayerUpdate } from '../utils/sanitizeUpdate'
@@ -17,7 +18,8 @@ export interface MultiplayerRebaseFormLike<
   TField extends keyof TData & string = keyof TData & string,
 > extends Record<string, any> {
   $rebase: (base: TData, changedFields?: TField[]) => void
-  $onChange: (callback: (changes: FormChanges<TData, TField>) => void) => void | (() => void)
+  /** Accepts function disposers and rstore's VueUse EventHook subscription. */
+  $onChange: (callback: (changes: FormChanges<TData, TField>) => void) => void | (() => void) | { off: () => void }
   $opLog: MultiplayerOpLogLike
 }
 
@@ -25,7 +27,8 @@ export interface UseRstoreMultiplayerFormOptions<
   TData extends Record<string, any>,
   TField extends keyof TData & string = keyof TData & string,
 > {
-  form: MultiplayerRebaseFormLike<TData, TField> & TData
+  /** Real rstore forms allow unset fields before defaults or remote data arrive. */
+  form: MultiplayerRebaseFormLike<TData, TField> & Partial<TData>
   channel: RstoreMultiplayerChannel<Partial<Pick<TData, TField>>, TField>
   getBaseValue: () => TData | null | undefined
   setBaseValue?: (value: TData, context: {
@@ -36,16 +39,18 @@ export interface UseRstoreMultiplayerFormOptions<
   getTextFieldElement?: (field: TField) => HTMLInputElement | HTMLTextAreaElement | null | undefined
 }
 
+/** Synchronize real form changes, remote rebases and history within its component lifetime. */
 export function useRstoreMultiplayerForm<
   TData extends Record<string, any>,
   TField extends keyof TData & string = keyof TData & string,
 >(
   options: UseRstoreMultiplayerFormOptions<TData, TField>,
 ) {
-  let suppressBroadcast = false
+  let suppressedBroadcasts = 0
+  let disposed = false
 
   const stopChange = options.form.$onChange((changes) => {
-    if (suppressBroadcast) {
+    if (suppressedBroadcasts > 0) {
       return
     }
 
@@ -85,7 +90,7 @@ export function useRstoreMultiplayerForm<
       ...update,
     }
     const changedFields = Object.keys(update) as TField[]
-    const previousValues = new Map<TField, TData[TField]>()
+    const previousValues = new Map<TField, TData[TField] | undefined>()
     const pendingSelectionRebases: Array<{
       cursor: MultiplayerTextCursor
       field: TField
@@ -120,7 +125,11 @@ export function useRstoreMultiplayerForm<
       update,
       changedFields,
     })
-    options.form.$rebase(nextBase, changedFields)
+    // Rebasing rebuilds pending local operations and queues their notification.
+    // Keep that notification local instead of echoing it back to other peers.
+    await withSuppressedBroadcast(() => options.form.$rebase(nextBase, changedFields))
+    if (disposed)
+      return
 
     for (const field of changedFields) {
       const previousValue = previousValues.get(field)
@@ -138,6 +147,8 @@ export function useRstoreMultiplayerForm<
 
     if (pendingSelectionRebases.length > 0) {
       await nextTick()
+      if (disposed)
+        return
 
       for (const pendingSelection of pendingSelectionRebases) {
         if (!pendingSelection.target.isConnected || !isFocusedTextField(pendingSelection.target)) {
@@ -159,9 +170,12 @@ export function useRstoreMultiplayerForm<
     }
   })
 
+  /** Publish explicit tracked fields or every public form field when no allowlist is configured. */
   function broadcastCurrentState() {
-    const trackedFields = options.trackedFields
-    if (!trackedFields?.length) {
+    if (disposed)
+      return
+    const trackedFields = options.trackedFields ?? Object.keys(options.form).filter(isPublicKey) as TField[]
+    if (!trackedFields.length) {
       return
     }
 
@@ -169,36 +183,46 @@ export function useRstoreMultiplayerForm<
     for (const field of trackedFields) {
       update[field] = options.form[field]
     }
-    options.channel.sendUpdate(update)
+    const safeUpdate = sanitizeMultiplayerUpdate(update)
+    if (safeUpdate)
+      options.channel.sendUpdate(safeUpdate)
   }
 
-  function withSuppressedBroadcast(action: () => void) {
-    suppressBroadcast = true
+  /** Keep suppression through rstore's queued change notification, including overlapping actions. */
+  async function withSuppressedBroadcast(action: () => void) {
+    suppressedBroadcasts++
     try {
       action()
+      await nextTick()
     }
     finally {
-      suppressBroadcast = false
+      suppressedBroadcasts--
     }
   }
 
-  function undoAndSync() {
-    withSuppressedBroadcast(() => {
+  /** Publish one complete tracked state after undo's queued notification settles. */
+  async function undoAndSync() {
+    await withSuppressedBroadcast(() => {
       options.form.$opLog.undo()
     })
     broadcastCurrentState()
   }
 
-  function redoAndSync() {
-    withSuppressedBroadcast(() => {
+  /** Publish one complete tracked state after redo's queued notification settles. */
+  async function redoAndSync() {
+    await withSuppressedBroadcast(() => {
       options.form.$opLog.redo()
     })
     broadcastCurrentState()
   }
 
   onUnmounted(() => {
+    disposed = true
     if (typeof stopChange === 'function') {
       stopChange()
+    }
+    else {
+      stopChange?.off()
     }
   })
 

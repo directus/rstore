@@ -11,5 +11,6 @@ export const runtimeSourceAliases = {
   '@rstore/shared': sourceEntry('shared'),
   '@rstore/vue': sourceEntry('vue'),
   '@rstore/connector-toolkit': sourceEntry('connector-toolkit'),
+  '@rstore/directus': sourceEntry('directus'),
   '@rstore/monospace': sourceEntry('monospace'),
 }

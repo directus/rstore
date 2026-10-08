@@ -161,4 +161,64 @@ describe('mounted store consumers', () => {
     expect(stack.read('todos', '1')?.title).toBe('One')
     expect(stack.read('todos', '2')).toBeUndefined()
   })
+
+  it('keeps fresh rows and releases final ownership after an old visit replies to the same remounted query', async () => {
+    const stack = await setup()
+    const release = stack.remote.holdNext('fetchMany')
+    onTestFinished(release)
+    stack.remote.respondNext('fetchMany', () => [
+      { id: '1', title: 'Stale one' },
+      { id: '2', title: 'Stale two' },
+    ])
+    /** Each visit owns its real component scope and an independent request. */
+    const mount = () => mountStoreComponent(stack.store, () => useTodosStore().todos!.liveQuery(q => q.many({
+      dedupe: false,
+      resultMode: 'responseRefs',
+      experimentalGarbageCollection: true,
+    })))
+    const oldVisit = mount()
+    let oldSettled = false
+    void oldVisit.result.then(() => {
+      oldSettled = true
+    }, () => {
+      oldSettled = true
+    })
+    await vi.waitFor(() => {
+      expect(stack.remote.callCount('fetchMany')).toBe(1)
+      expect(stack.remote.subscriptions()).toHaveLength(1)
+    })
+    oldVisit.unmount()
+    await vi.waitFor(() => expect(stack.remote.subscriptions()).toHaveLength(0))
+    stack.remote.seed('todos', [{ id: '1', title: 'Fresh one' }, { id: '3', title: 'Fresh three' }])
+    const currentVisit = mount()
+    let currentSettled = false
+    void currentVisit.result.then(() => {
+      currentSettled = true
+    }, () => {
+      currentSettled = true
+    })
+    await vi.waitFor(() => expect(currentSettled, 'remounted query must settle while old reply remains held').toBe(true))
+    await currentVisit.result
+    await vi.waitFor(() => expect(stack.remote.subscriptions()).toHaveLength(1))
+    expect(stack.remote.callCount('fetchMany')).toBe(2)
+
+    release()
+    await vi.waitFor(() => expect(oldSettled, 'released old query must settle').toBe(true))
+    await oldVisit.result
+    await nextTick()
+    stack.cache.garbageCollect()
+    expect(currentVisit.result.data.value.map(item => ({ id: item.id, title: item.title }))).toEqual([
+      { id: '1', title: 'Fresh one' },
+      { id: '3', title: 'Fresh three' },
+    ])
+    expect(stack.read('todos', '1')?.title).toBe('Fresh one')
+    expect(stack.read('todos', '2')).toBeUndefined()
+    expect(stack.remote.subscriptions()).toHaveLength(1)
+
+    currentVisit.unmount()
+    await vi.waitFor(() => expect(stack.remote.subscriptions()).toHaveLength(0))
+    await nextTick()
+    stack.cache.garbageCollect()
+    expect(stack.readMany('todos')).toEqual([])
+  })
 })

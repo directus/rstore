@@ -1,68 +1,38 @@
-import type { MonospaceCollectionDefinition } from '@rstore/monospace/schema'
-import type { Plugin, ResolvedConfig } from 'vite'
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
+import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { build } from 'vite'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { createServer } from 'vite'
+import { afterEach, beforeEach, describe, expect, it, onTestFinished, vi } from 'vitest'
+import { jsonResponse } from '../../monospace/test/utils/http'
+import { createStructureResponseFixture } from '../../monospace/test/utils/structure'
+import { buildSchema, importSchema, runBuildStart, runConfigResolved, runLoad } from './utils/vite'
 
-const fixtures = vi.hoisted(() => {
-  const collections: MonospaceCollectionDefinition[] = [{
-    name: 'Todos',
-    scopeId: 'test-scope',
-    meta: {
-      primaryKeys: ['id'],
-      monospace: {
-        collection: 'Todos',
-      },
-    },
-    relations: {
-      author: {
-        to: {
-          Profiles: {
-            on: {
-              id: 'author$id',
-            },
-          },
-        },
-      },
-    },
-    itemFields: [{
-      name: 'id',
-      optional: false,
-      type: 'number',
-    }, {
-      name: 'title',
-      optional: false,
-      type: 'string',
-    }],
-    typeName: 'Todos',
-    getKeyExpression: 'item.id',
-  } as MonospaceCollectionDefinition]
-  collections[0]!['~type'] = 'collection'
+let document: any
+let metadata: any
+const fetchMock = vi.fn()
 
-  return {
-    collections,
-    loadMonospaceCollections: vi.fn(async () => collections),
-  }
-})
-
-vi.mock('@rstore/monospace', async () => {
-  return await import('../../monospace/src')
-})
-
-vi.mock('@rstore/monospace/schema', async () => {
-  const actual = await import('../../monospace/src/schema')
-  return {
-    ...actual,
-    loadMonospaceCollections: fixtures.loadMonospaceCollections,
-  }
+beforeEach(async () => {
+  const fixtureRoot = new URL('../../nuxt-monospace/test/fixtures/basic/openapi/', import.meta.url)
+  // Retain the original generated relation's punctuation-bearing FK name.
+  document = JSON.parse((await readFile(new URL('schema.json', fixtureRoot), 'utf8')).replaceAll('author_id', 'author$id'))
+  metadata = JSON.parse((await readFile(new URL('schema-metadata.json', fixtureRoot), 'utf8')).replaceAll('author_id', 'author$id'))
+  fetchMock.mockReset().mockImplementation(async (input: string) => {
+    const url = new URL(input)
+    if (url.pathname.endsWith('/openapi')) {
+      return jsonResponse(document)
+    }
+    if (url.pathname.endsWith('/schema/structure/sources')) {
+      return jsonResponse(createStructureResponseFixture(metadata))
+    }
+    throw new Error(`Unexpected Monospace metadata request: ${input}`)
+  })
+  vi.stubGlobal('fetch', fetchMock)
 })
 
 const tempDirs: string[] = []
 
 afterEach(async () => {
-  fixtures.loadMonospaceCollections.mockClear()
+  vi.unstubAllGlobals()
   await Promise.all(tempDirs.splice(0).map(dir => rm(dir, {
     force: true,
     recursive: true,
@@ -103,13 +73,12 @@ describe('rstoreMonospace', () => {
     runConfigResolved(plugin, root)
     await runBuildStart(plugin)
 
-    expect(fixtures.loadMonospaceCollections).toHaveBeenCalledWith(expect.objectContaining({
-      input: join(root, 'openapi.json'),
-      metadataInput: join(root, 'schema-metadata.json'),
-      workspace: undefined,
-      scopeId: 'test-scope',
-      url: undefined,
-    }))
+    expect(fetchMock).not.toHaveBeenCalled()
+    const schema = await importSchema(plugin, 'virtual:rstore-monospace/schema')
+    expect(schema.map(collection => collection.name)).toEqual(['Todos', 'Profiles'])
+    expect(schema[0].getKey({ id: 0 })).toBe(0)
+    expect(schema[0].scopeId).toBe('test-scope')
+    expect(schema[0].relations.author.to).toEqual({ Profiles: { on: { id: 'author$id' } } })
   })
 
   it('generates virtual schema, plugin, index, and declarations without leaking schema credentials', async () => {
@@ -132,6 +101,13 @@ describe('rstoreMonospace', () => {
     const pluginCode = await runLoad(plugin, 'virtual:rstore-monospace/plugin')
     const declarations = await readFile(join(root, 'rstore-monospace.d.ts'), 'utf8')
 
+    expect(fetchMock.mock.calls.map(([input]) => new URL(input).pathname).sort()).toEqual([
+      '/api/blog/openapi',
+      '/api/blog/schema/structure/sources',
+    ])
+    for (const [, init] of fetchMock.mock.calls) {
+      expect(init).toEqual({ headers: { Authorization: 'Bearer secret-schema-token' } })
+    }
     expect(indexCode).toContain('virtual:rstore-monospace/schema')
     expect(schemaCode).toContain('export const schema')
     expect(pluginCode).toContain('createMonospaceRestClient')
@@ -143,8 +119,8 @@ describe('rstoreMonospace', () => {
     expect(pluginCode).not.toContain('secret-schema-token')
     expect(declarations).toContain('declare module \'virtual:rstore-monospace/schema\'')
     expect(declarations).toContain('export interface Todos')
-    expect(declarations).toContain('readonly relations: {"author":{"to":{"Profiles":{"on":{"id":"author$id"}}}}}')
-    expect(schemaCode).toContain('"author":{"to":{"Profiles":{"on":{"id":"author$id"}}}}')
+    expect(declarations).toContain('"Profiles":{"on":{"id":"author$id"}}}')
+    expect(schemaCode).toContain('"Profiles":{"on":{"id":"author$id"}}}')
   })
 
   it('accepts the deprecated project option as the workspace', async () => {
@@ -158,7 +134,10 @@ describe('rstoreMonospace', () => {
     runConfigResolved(plugin, await createTempRoot())
     await runBuildStart(plugin)
 
-    expect(fixtures.loadMonospaceCollections).toHaveBeenCalledWith(expect.objectContaining({ workspace: 'legacy' }))
+    expect(fetchMock.mock.calls.map(([input]) => new URL(input).pathname).sort()).toEqual([
+      '/api/legacy/openapi',
+      '/api/legacy/schema/structure/sources',
+    ])
     expect(await runLoad(plugin, 'virtual:rstore-monospace/plugin')).toContain('workspace: "legacy"')
   })
 
@@ -174,18 +153,16 @@ describe('rstoreMonospace', () => {
     })
 
     runConfigResolved(plugin, root)
-    const addWatchFile = vi.fn()
-    await runBuildStart(plugin, { addWatchFile })
-    expect(addWatchFile).toHaveBeenCalledWith(input)
-    expect(addWatchFile).toHaveBeenCalledWith(metadataInput)
-    expect(fixtures.loadMonospaceCollections).toHaveBeenCalledTimes(1)
+    expect(await runBuildStart(plugin)).toEqual([input, metadataInput])
+    expect((await importSchema(plugin, 'virtual:rstore-monospace/schema'))[0].getKey({ id: 7 })).toBe(7)
+    await writeFile(metadataInput, JSON.stringify({ ...metadata, MonospaceSingleConstraintField: [{ ...metadata.MonospaceSingleConstraintField[0], constrainedFieldId: 'pf_todos_title' }] }))
 
     const watchChange = plugin.watchChange
     if (typeof watchChange === 'function') {
       ;(watchChange as any).call({}, metadataInput, { event: 'update' })
     }
-    await runLoad(plugin, 'virtual:rstore-monospace/schema')
-    expect(fixtures.loadMonospaceCollections).toHaveBeenCalledTimes(2)
+    expect((await importSchema(plugin, 'virtual:rstore-monospace/schema'))[0].relations.author.to).toEqual({ Profiles: { on: { id: 'title' } } })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('invalidates virtual modules when the dev server sees input changes', async () => {
@@ -198,59 +175,43 @@ describe('rstoreMonospace', () => {
       scopeId: 'test-scope',
     })
 
-    runConfigResolved(plugin, root)
-    await runBuildStart(plugin, { addWatchFile: vi.fn() })
-
-    const changeListeners: Array<(file: string) => void> = []
-    const invalidateModule = vi.fn()
-    const send = vi.fn()
-    const server = {
-      moduleGraph: {
-        getModuleById: vi.fn((id: string) => id.includes('schema') ? { id } : undefined),
-        invalidateModule,
-      },
-      watcher: {
-        add: vi.fn(),
-        on: vi.fn((event: string, listener: (file: string) => void) => {
-          if (event === 'change') {
-            changeListeners.push(listener)
-          }
-        }),
-      },
-      ws: { send },
-    }
-
-    const configureServer = plugin.configureServer
-    if (typeof configureServer === 'function') {
-      await (configureServer as any).call({}, server)
-    }
-
-    expect(server.watcher.add).toHaveBeenCalledWith(input)
-    changeListeners.forEach(listener => listener(input))
-
-    expect(invalidateModule).toHaveBeenCalled()
-    expect(send).toHaveBeenCalledWith({ type: 'full-reload' })
-    await runLoad(plugin, 'virtual:rstore-monospace/schema')
-    expect(fixtures.loadMonospaceCollections).toHaveBeenCalledTimes(2)
+    const server = await createServer({
+      root,
+      configFile: false,
+      logLevel: 'silent',
+      plugins: [plugin],
+      server: { middlewareMode: true, hmr: false },
+    })
+    onTestFinished(() => server.close())
+    const original = await server.ssrLoadModule('virtual:rstore-monospace/schema')
+    expect(original.default[0].getKey({ id: 7 })).toBe(7)
+    expect(original.default[0].relations.author.to).toEqual({ Profiles: { on: { id: 'author$id' } } })
+    const send = vi.spyOn(server.ws, 'send')
+    // This targets the real watcher and module graph; no authored server stub.
+    delete document.components.schemas.TodosCollectionOutput.properties.author
+    await writeFile(input, JSON.stringify(document))
+    await vi.waitFor(() => expect(send).toHaveBeenCalledWith({ type: 'full-reload' }))
+    await vi.waitFor(async () => {
+      const changed = await server.ssrLoadModule('virtual:rstore-monospace/schema')
+      expect(changed.default[0].relations, 'changed OpenAPI input must replace the cached virtual schema').toEqual({})
+    })
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('builds the virtual schema module as plain JavaScript', async () => {
     const { rstoreMonospace } = await import('../src')
     const root = await createTempRoot()
-    await writeViteEntry(root)
-
-    await build({
-      root,
-      logLevel: 'silent',
-      plugins: [
-        rstoreMonospace({
-          workspace: 'blog',
-          schemaApiKey: 'secret-schema-token',
-          scopeId: 'test-scope',
-          url: 'https://example.monospace.io',
-        }),
-      ],
-    })
+    const schema = await buildSchema(root, rstoreMonospace({
+      workspace: 'blog',
+      schemaApiKey: 'secret-schema-token',
+      scopeId: 'test-scope',
+      url: 'https://example.monospace.io',
+    }), 'virtual:rstore-monospace/schema')
+    expect(schema.map(collection => collection.name)).toEqual(['Todos', 'Profiles'])
+    expect(schema[0].getKey({ id: 0 })).toBe(0)
+    expect(schema[0].scopeId).toBe('test-scope')
+    expect(schema[0].relations.author.to).toEqual({ Profiles: { on: { id: 'author$id' } } })
+    expect(schema[1].getKey({ id: 'profile-1' })).toBe('profile-1')
   })
 })
 
@@ -260,51 +221,7 @@ describe('rstoreMonospace', () => {
 async function createTempRoot(): Promise<string> {
   const dir = await mkdtemp(join(tmpdir(), 'rstore-vite-monospace-'))
   tempDirs.push(dir)
+  await writeFile(join(dir, 'openapi.json'), JSON.stringify(document))
+  await writeFile(join(dir, 'schema-metadata.json'), JSON.stringify(metadata))
   return dir
-}
-
-/**
- * Writes a minimal Vite app that imports the generated schema virtual module.
- */
-async function writeViteEntry(root: string): Promise<void> {
-  await mkdir(join(root, 'src'), { recursive: true })
-  await writeFile(join(root, 'index.html'), '<script type="module" src="/src/main.ts"></script>')
-  await writeFile(join(root, 'src/main.ts'), `import schema from 'virtual:rstore-monospace/schema'
-
-console.log(schema.length)
-`)
-}
-
-/**
- * Runs the Vite configResolved hook with the minimum config shape used by tests.
- */
-function runConfigResolved(plugin: Plugin, root: string): void {
-  const hook = plugin.configResolved
-  if (typeof hook === 'function') {
-    ;(hook as any)({ root } as ResolvedConfig)
-  }
-}
-
-/**
- * Runs the Vite buildStart hook with an optional plugin context.
- */
-async function runBuildStart(plugin: Plugin, context: Record<string, any> = { addWatchFile: vi.fn() }): Promise<void> {
-  const hook = plugin.buildStart
-  if (typeof hook === 'function') {
-    await (hook as any).call(context as any, {} as any)
-  }
-}
-
-/**
- * Resolves and loads one virtual module from the plugin.
- */
-async function runLoad(plugin: Plugin, id: string): Promise<string> {
-  const resolved = typeof plugin.resolveId === 'function'
-    ? await (plugin.resolveId as any).call({} as any, id, undefined, {} as any)
-    : id
-  const code = typeof plugin.load === 'function'
-    ? await (plugin.load as any).call({} as any, String(resolved ?? id), {} as any)
-    : undefined
-
-  return String(code ?? '')
 }

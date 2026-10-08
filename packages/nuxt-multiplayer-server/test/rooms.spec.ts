@@ -135,6 +135,54 @@ describe('room', () => {
     expect(attemptedAdd).toBe(true)
   })
 
+  it('delivers the in-flight frame to a departing peer, then excludes it from later frames', () => {
+    const room = new Room('document', 4)
+    const first = makePeer('first')
+    const departing = makePeer('departing')
+    const last = makePeer('last')
+    room.add({
+      id: first.id,
+      send: (payload) => {
+        first.send(payload)
+        room.remove(departing.id)
+      },
+    })
+    room.add(departing)
+    room.add(last)
+    room.broadcast({
+      type: 'multiplayer:update',
+      roomId: 'document',
+      userId: 'alice',
+      clientId: 'alice-tab',
+      data: { title: 'in flight' },
+    })
+    room.broadcast({
+      type: 'multiplayer:update',
+      roomId: 'document',
+      userId: 'alice',
+      clientId: 'alice-tab',
+      data: { title: 'after leave' },
+    })
+
+    const inFlight = {
+      type: 'multiplayer:update',
+      roomId: 'document',
+      userId: 'alice',
+      clientId: 'alice-tab',
+      data: { title: 'in flight' },
+    }
+    const afterLeave = {
+      type: 'multiplayer:update',
+      roomId: 'document',
+      userId: 'alice',
+      clientId: 'alice-tab',
+      data: { title: 'after leave' },
+    }
+    expect(departing.sent).toEqual([inFlight])
+    expect(first.sent).toEqual([inFlight, afterLeave])
+    expect(last.sent).toEqual([inFlight, afterLeave])
+  })
+
   it('exceptPeerId is matched as a string — does not skip peers with similar ids', () => {
     const room = new Room('r', 4)
     const a = makePeer('a')

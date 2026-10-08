@@ -34,7 +34,7 @@ export default defineConfig({
     trace: 'retain-on-failure',
   },
   projects: [
-    { name: 'headless', testIgnore: 'focus.spec.ts' },
-    { name: 'focus', testMatch: 'focus.spec.ts', use: { headless: false } },
+    { name: 'headless', testIgnore: ['focus.spec.ts', 'multiplayerFocus.spec.ts'] },
+    { name: 'focus', testMatch: ['focus.spec.ts', 'multiplayerFocus.spec.ts'], use: { headless: false } },
   ],
 })

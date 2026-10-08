@@ -31,6 +31,8 @@ const sourceAliases = [
   })),
   // Exact matches keep the root alias from swallowing this public subpath.
   { find: /^@rstore\/connector-toolkit\/vite$/, replacement: sourceEntry('connector-toolkit', 'src/vite/index.ts') },
+  { find: /^@rstore\/directus\/schema$/, replacement: sourceEntry('directus', 'src/schema/index.ts') },
+  { find: /^@rstore\/monospace\/schema$/, replacement: sourceEntry('monospace', 'src/schema/index.ts') },
 ]
 
 /**
@@ -111,12 +113,27 @@ export default defineConfig({
         },
       },
       {
+        define: {
+          'import.meta.server': 'true',
+          'import.meta.client': 'false',
+          'import.meta.dev': 'false',
+          '__NUXT_ASYNC_CONTEXT__': 'false',
+          '__NUXT_VERSION__': JSON.stringify('test'),
+        },
         resolve: {
-          // Protocol consumers must validate against the current Shared source.
-          alias: [{ find: /^@rstore\/shared$/, replacement: sourceEntry('shared') }],
+          alias: [
+            ...sourceAliases,
+            ...testUtilsAlias,
+            // Runtime tests use Nuxt's real context without booting an HTTP app.
+            { find: /^(?:nuxt\/app|#imports)$/, replacement: sourceEntry('nuxt-directus', 'node_modules/nuxt/dist/app/nuxt.js') },
+            { find: /^#build\/nuxt.config.mjs$/, replacement: sourceEntry('nuxt-multiplayer', 'test/fixtures/nuxtRuntimeConfig.ts') },
+            { find: /^#build\/\$rstore-directus-config.js$/, replacement: sourceEntry('nuxt-directus', 'test/fixtures/runtimeConfig.ts') },
+            { find: /^#build\/\$rstore-monospace-config.js$/, replacement: sourceEntry('nuxt-monospace', 'test/fixtures/runtimeConfig.ts') },
+          ],
         },
         test: {
           name: 'nuxt',
+          server: { deps: { inline: ['nuxt'] } },
           include: ['packages/nuxt*/test/**/*.{test,spec}.ts'],
           exclude: [
             ...configDefaults.exclude,

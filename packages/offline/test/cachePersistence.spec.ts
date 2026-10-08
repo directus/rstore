@@ -170,7 +170,9 @@ describe('offline cache persistence', () => {
       db.stores.set('Todos', new Map([
         ['b', { id: 'b' }],
         ['c', { id: 'c' }],
+        ['keep', { id: 'keep', text: 'unrelated' }],
       ]))
+      db.stores.set('Notes', new Map([['b', { id: 'b', text: 'other collection' }]]))
 
       await hooks.callHook('afterManyMutation', {
         meta: {},
@@ -180,7 +182,35 @@ describe('offline cache persistence', () => {
         getResult: () => [],
       } as any)
 
-      expect(db.stores.get('Todos')!.size).toBe(0)
+      expect(db.stores.get('Todos')).toEqual(new Map([['keep', { id: 'keep', text: 'unrelated' }]]))
+      expect(db.stores.get('Notes')).toEqual(new Map([['b', { id: 'b', text: 'other collection' }]]))
+    })
+
+    it('merges every sparse updateMany result with its own cached row', async () => {
+      db.stores.set('Todos', new Map([
+        ['b', { id: 'b', text: 'Bread', done: false }],
+        ['c', { id: 'c', text: 'Call Sam', done: true }],
+        ['keep', { id: 'keep', text: 'Unchanged', done: false }],
+      ]))
+
+      // Many handlers may return changed fields only. Input order differs
+      // from storage order, so indexing every result against item zero fails.
+      await hooks.callHook('afterManyMutation', {
+        meta: {},
+        collection,
+        mutation: 'update',
+        items: [
+          { key: 'c', item: { id: 'c', text: 'Call Alex' } },
+          { key: 'b', item: { id: 'b', done: true } },
+        ],
+        getResult: () => [{ text: 'Call Alex' }, { done: true }],
+      } as any)
+
+      expect(db.stores.get('Todos')).toEqual(new Map([
+        ['b', { id: 'b', text: 'Bread', done: true }],
+        ['c', { id: 'c', text: 'Call Alex', done: true }],
+        ['keep', { id: 'keep', text: 'Unchanged', done: false }],
+      ]))
     })
 
     it('skips afterManyMutation when core already emitted per-item hooks', async () => {

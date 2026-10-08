@@ -1,3 +1,4 @@
+import type { RstoreDrizzleItemPatchAfterHookPayload } from '../src/runtime/server/utils/hooks'
 import { and, eq } from 'drizzle-orm'
 import { SQLiteSyncDialect } from 'drizzle-orm/sqlite-core'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -36,8 +37,15 @@ function createMutationDb() {
   const preImagePredicates: any[] = []
   const updatePredicates: any[] = []
   const deletePredicates: any[] = []
+  const write = {
+    /** Signals that the adapter reached the DB write rather than a setup hook. */
+    entered: false,
+    /** External DB reply held by completion scenarios. */
+    completion: Promise.resolve(),
+  }
 
   return {
+    write,
     preImagePredicates,
     updatePredicates,
     deletePredicates,
@@ -54,7 +62,11 @@ function createMutationDb() {
         where: (predicate: any) => {
           updatePredicates.push(predicate)
           return {
-            returning: async () => [{ id: 1, tenantId: 'tenant-a', title: 'after' }],
+            returning: async () => {
+              write.entered = true
+              await write.completion
+              return [{ id: 1, tenantId: 'tenant-a', title: 'after' }]
+            },
           }
         },
       }),
@@ -62,6 +74,8 @@ function createMutationDb() {
     delete: () => ({
       where: async (predicate: any) => {
         deletePredicates.push(predicate)
+        write.entered = true
+        await write.completion
       },
     }),
   }
@@ -75,7 +89,7 @@ function compilePredicate(predicate: any) {
 /** Calls one keyed mutation using the shared fake database. */
 async function runMutation(operation: 'update' | 'delete') {
   if (operation === 'update') {
-    await drizzleUpdate({
+    return drizzleUpdate({
       event: {} as any,
       collection: 'todos',
       key: '1',
@@ -85,7 +99,7 @@ async function runMutation(operation: 'update' | 'delete') {
     })
   }
   else {
-    await drizzleDelete({
+    return drizzleDelete({
       event: {} as any,
       collection: 'todos',
       key: '1',
@@ -137,5 +151,47 @@ describe('mutation transforms', () => {
     ))
     expect(state.db.preImagePredicates.map(compilePredicate)).toEqual([expectedPredicate])
     expect(state.db[writeField].map(compilePredicate)).toEqual([expectedPredicate])
+  })
+
+  it.each([
+    ['update', 'item.patch.after'],
+    ['delete', 'item.delete.after'],
+  ] as const)('%s publishes its pre-image and result only after the DB write completes', async (operation, hookName) => {
+    const completion = Promise.withResolvers<void>()
+    state.db.write.completion = completion.promise
+    const published: unknown[] = []
+    rstoreDrizzleHooks.hook(hookName, (payload: RstoreDrizzleItemPatchAfterHookPayload<any>) => {
+      const snapshot: Record<string, unknown> = { result: structuredClone(payload.result) }
+      if ('previousRecord' in payload) {
+        snapshot.previousRecord = structuredClone(payload.previousRecord)
+      }
+      published.push(snapshot)
+      payload.setResult({ id: 1, title: 'hook result' })
+    })
+    let settled = false
+    const pending = runMutation(operation)
+    void pending.then(
+      () => { settled = true },
+      () => { settled = true },
+    )
+    try {
+      await expect.poll(() => state.db.write.entered, { timeout: 500, message: 'mutation reaches held DB write' }).toBe(true)
+      expect(published).toEqual([])
+      expect(settled).toBe(false)
+    }
+    finally {
+      // Always release external work, including when a premature hook assertion fails.
+      completion.resolve()
+      await expect.poll(() => settled, { timeout: 500, message: 'mutation completes after DB reply' }).toBe(true)
+      await pending
+    }
+
+    expect(published).toEqual(operation === 'update'
+      ? [{
+          result: { id: 1, tenantId: 'tenant-a', title: 'after' },
+          previousRecord: { id: 1, tenantId: 'tenant-a', title: 'before' },
+        }]
+      : [{ result: { id: 1, tenantId: 'tenant-a', title: 'before' } }])
+    expect(await pending).toEqual({ id: 1, title: 'hook result' })
   })
 })

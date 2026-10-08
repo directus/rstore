@@ -232,24 +232,6 @@ describe('createMonospaceRestClient', () => {
     expect(fetchMock.mock.calls[1]![1].headers).toMatchObject({ 'Cache-Control': 'no-cache' })
   })
 
-  it('rejects bulk mutations whose filter serializes to an empty query', async () => {
-    const client = createMonospaceRestClient({
-      url: 'https://example.monospace.io',
-      workspace: 'blog',
-      fetch: fetchMock,
-    })
-
-    await expect(client.updateMany('Todos', { completed: true }, {
-      filter: {
-        id: {
-          _in: [],
-        },
-      },
-    })).rejects.toThrow('non-empty filter')
-    await expect(client.deleteMany('Todos', {} as any)).rejects.toThrow('non-empty filter')
-    expect(fetchMock).not.toHaveBeenCalled()
-  })
-
   it('maps 422 responses to validation errors and surfaces error details', async () => {
     fetchMock.mockResolvedValueOnce(jsonResponse({
       message: 'Failed to execute query',

@@ -1,84 +1,47 @@
-import type { PluginSetupApi } from '@rstore/shared'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
-
-const fixtures = vi.hoisted(() => {
-  const clients: Array<{ id: number }> = []
-  const nuxtApps: Array<{ $monospace?: unknown }> = []
-
-  return {
-    clients,
-    nuxtApps,
-    createMonospaceRestClient: vi.fn(() => {
-      const client = { id: clients.length + 1 }
-      clients.push(client)
-      return client
-    }),
-    createMonospaceRstorePlugin: vi.fn((options: Record<string, unknown>) => {
-      return {
-        name: 'rstore-monospace',
-        category: 'remote',
-        scopeId: options.scopeId,
-        setup: vi.fn(),
-      }
-    }),
-    useNuxtApp: vi.fn(() => {
-      const nuxtApp = {}
-      nuxtApps.push(nuxtApp)
-      return nuxtApp
-    }),
-  }
-})
-
-vi.mock('#build/$rstore-monospace-config.js', () => ({
-  apiKey: 'runtime-token',
-  cacheControl: 'no-cache',
-  workspace: 'blog',
-  scopeId: 'test-scope',
-  url: 'https://example.monospace.io',
-}))
-
-vi.mock('#imports', () => ({
-  useNuxtApp: fixtures.useNuxtApp,
-}))
-
-vi.mock('@rstore/monospace', () => ({
-  createMonospaceRestClient: fixtures.createMonospaceRestClient,
-  createMonospaceRstorePlugin: fixtures.createMonospaceRstorePlugin,
-}))
-
-beforeEach(() => {
-  vi.resetModules()
-  fixtures.clients.length = 0
-  fixtures.nuxtApps.length = 0
-  fixtures.createMonospaceRestClient.mockClear()
-  fixtures.createMonospaceRstorePlugin.mockClear()
-  fixtures.useNuxtApp.mockClear()
-})
+import { findMany } from '@rstore/core'
+import { createNuxtApp } from 'nuxt/app'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import { createSSRApp } from 'vue'
+import { createCoreStore } from '../../../test/utils/store/realCacheStore'
+import { jsonResponse } from '../../monospace/test/utils/http'
+import plugin from '../src/runtime/plugin'
 
 describe('runtime plugin', () => {
-  it('creates a fresh Monospace client for each setup call', async () => {
-    const plugin = (await import('../src/runtime/plugin')).default
-    const setupApi = {
-      addCollectionDefaults: vi.fn(),
-      hook: vi.fn(),
-    } as unknown as PluginSetupApi
-
-    plugin.setup(setupApi)
-    plugin.setup(setupApi)
-
-    expect(fixtures.createMonospaceRestClient).toHaveBeenCalledTimes(2)
-    expect(fixtures.createMonospaceRestClient).toHaveBeenCalledWith({
-      apiKey: 'runtime-token',
-      cacheControl: 'no-cache',
-      workspace: 'blog',
-      url: 'https://example.monospace.io',
-    })
-    expect(fixtures.createMonospaceRstorePlugin).toHaveBeenCalledTimes(2)
-    expect(fixtures.createMonospaceRstorePlugin).toHaveBeenNthCalledWith(1, {
-      client: fixtures.clients[0],
-      scopeId: 'test-scope',
-    })
-    expect(fixtures.nuxtApps[0]?.$monospace).toBe(fixtures.clients[0])
-    expect(fixtures.nuxtApps[1]?.$monospace).toBe(fixtures.clients[1])
+  it('gives each Nuxt app its own REST client and correctly configured scoped requests', async () => {
+    const applications = []
+    for (let index = 0; index < 2; index++) {
+      // Each client captures its own external fetch dependency at creation.
+      const fetch = vi.fn(async () => jsonResponse({ data: index === 0
+        ? [{ id: 1, title: 'First app' }, { id: 2, title: 'First peer' }]
+        : [{ id: 7, title: 'Second app' }, { id: 8, title: 'Second peer' }] }))
+      vi.stubGlobal('fetch', fetch)
+      onTestFinished(() => {
+        vi.unstubAllGlobals()
+      })
+      const nuxt = createNuxtApp({
+        vueApp: createSSRApp({}),
+        ssrContext: { url: '/', payload: {}, runtimeConfig: { public: {}, app: {} } } as any,
+      })
+      onTestFinished(() => nuxt._scope.stop())
+      const stack = await nuxt.runWithContext(() => createCoreStore({
+        schema: [{ name: 'Todos', scopeId: 'test-scope', meta: { monospace: { collection: 'Todos' } }, getKey: (item: any) => item.id }],
+        plugins: [plugin],
+        syncImmediately: false,
+        tombstoneGc: false,
+      }))
+      onTestFinished(stack.dispose)
+      applications.push({ nuxt, stack, fetch })
+    }
+    expect(applications[0]!.nuxt.$monospace).not.toBe(applications[1]!.nuxt.$monospace)
+    for (const [index, { stack, fetch }] of applications.entries()) {
+      const { result } = await findMany({ store: stack.store, collection: stack.store.$collections[0]!, findOptions: { fetchPolicy: 'fetch-only' } })
+      expect(result).toEqual(index === 0
+        ? [{ id: 1, title: 'First app' }, { id: 2, title: 'First peer' }]
+        : [{ id: 7, title: 'Second app' }, { id: 8, title: 'Second peer' }])
+      expect(fetch).toHaveBeenCalledExactlyOnceWith('https://example.monospace.io/api/blog/items/Todos?fields=*', {
+        method: 'GET',
+        headers: { 'Accept': 'application/json', 'Authorization': 'Bearer runtime-token', 'Cache-Control': 'no-cache' },
+      })
+    }
   })
 })

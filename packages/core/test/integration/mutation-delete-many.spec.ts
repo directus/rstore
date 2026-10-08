@@ -1,7 +1,7 @@
 import { createCoreStack } from '#test-utils/store/coreStack'
-import { deleteMany } from '@rstore/core'
+import { createMany, deleteMany, updateMany } from '@rstore/core'
 import { describe, expect, it, vi } from 'vitest'
-import { cachedKeys, holdPreventingCreate, loadManyMutationRows, setupManyMutationStack, silenceLayerError } from './utils/manyMutation'
+import { cachedKeys, cachedTitles, loadManyMutationRows, setupManyMutationStack, silenceLayerError } from './utils/manyMutation'
 
 const setup = setupManyMutationStack
 const load = loadManyMutationRows
@@ -23,27 +23,50 @@ describe('deleteMany', () => {
     expect(stack.remote.callCount('deleteItem')).toBe(2)
   })
 
-  it('hides the items optimistically until the remote answers', async () => {
+  it.each([
+    { name: 'hides items optimistically until remote answers', options: {}, before: ['3'], after: ['3'] },
+    { name: 'keeps cached items throughout skipCache deletion', options: { skipCache: true }, before: ['1', '2', '3'], after: ['1', '2', '3'] },
+    { name: 'waits for remote before hiding items with optimistic:false', options: { optimistic: false }, before: ['1', '2', '3'], after: ['3'] },
+  ])('$name', async ({ options, before, after }) => {
     const stack = await setup([{ id: '1' }, { id: '2' }, { id: '3' }])
     await load(stack)
     const release = stack.remote.holdNext('deleteMany')
-    const pending = deleteMany({
-      store: stack.store,
-      collection: stack.collection('todos'),
-      keys: ['1', '2'],
-    })
-    await vi.waitFor(() => expect(stack.remote.callCount('deleteMany')).toBe(1))
-
-    expect(cachedKeys(stack)).toEqual(['3'])
-    expect(stack.remote.rows('todos').map(row => row.id)).toEqual(['1', '2', '3'])
-
-    release()
-    await pending
-    expect(cachedKeys(stack)).toEqual(['3'])
+    let settled = false
+    let pending: Promise<void> | undefined
+    try {
+      pending = deleteMany({
+        store: stack.store,
+        collection: stack.collection('todos'),
+        keys: ['1', '2'],
+        ...options,
+      })
+      void pending.then(() => {
+        settled = true
+      }, () => {
+        settled = true
+      })
+      await vi.waitFor(() => expect(stack.remote.callCount('deleteMany')).toBe(1))
+      expect(settled, 'held deleteMany must remain pending').toBe(false)
+      expect(cachedKeys(stack)).toEqual(before)
+      expect(stack.remote.rows('todos').map(row => row.id)).toEqual(['1', '2', '3'])
+    }
+    finally {
+      release()
+      if (pending) {
+        await vi.waitFor(() => expect(settled, 'released deleteMany must settle').toBe(true))
+        await pending
+      }
+    }
+    expect(cachedKeys(stack)).toEqual(after)
+    expect(stack.remote.rows('todos').map(row => row.id)).toEqual(['3'])
   })
 
-  it('keeps the items visible when the remote fails, and leaves no layer behind', async () => {
-    const stack = await setup([{ id: '1' }, { id: '2' }, { id: '3' }])
+  it('restores every failed deletion, and lets later edits publish without a stale layer', async () => {
+    const stack = await setup([
+      { id: '1', title: 'One' },
+      { id: '2', title: 'Two' },
+      { id: '3', title: 'Unrelated' },
+    ])
     await load(stack)
     stack.remote.failNext('deleteMany')
 
@@ -54,44 +77,27 @@ describe('deleteMany', () => {
     })).rejects.toThrow('fake-remote: deleteMany failed')
 
     expect(cachedKeys(stack)).toEqual(['1', '2', '3'])
-    expect(stack.remote.rows('todos').map(row => row.id)).toEqual(['1', '2', '3'])
-  })
+    expect(cachedTitles(stack)).toEqual({ 1: 'One', 2: 'Two', 3: 'Unrelated' })
+    expect(stack.remote.rows('todos')).toEqual([
+      { id: '1', title: 'One' },
+      { id: '2', title: 'Two' },
+      { id: '3', title: 'Unrelated' },
+    ])
+    expect(stack.store.$mutationHistory).toEqual([])
 
-  it('adds no layer and keeps the cached items with skipCache', async () => {
-    const stack = await setup([{ id: '1' }, { id: '2' }, { id: '3' }])
-    await load(stack)
-    const release = stack.remote.holdNext('deleteMany')
-    const pending = deleteMany({
+    await updateMany({
       store: stack.store,
       collection: stack.collection('todos'),
-      keys: ['1', '2'],
-      skipCache: true,
+      items: [{ id: '1', title: 'First recovered' }, { id: '2', title: 'Second recovered' }],
     })
-    await vi.waitFor(() => expect(stack.remote.callCount('deleteMany')).toBe(1))
 
-    release()
-    await pending
-    expect(cachedKeys(stack)).toEqual(['1', '2', '3'])
-    expect(stack.remote.rows('todos').map(row => row.id)).toEqual(['3'])
-  })
-
-  it('does not hide the items before the remote answers when optimistic is false', async () => {
-    const stack = await setup([{ id: '1' }, { id: '2' }, { id: '3' }])
-    await load(stack)
-    const release = stack.remote.holdNext('deleteMany')
-    const pending = deleteMany({
-      store: stack.store,
-      collection: stack.collection('todos'),
-      keys: ['1', '2'],
-      optimistic: false,
-    })
-    await vi.waitFor(() => expect(stack.remote.callCount('deleteMany')).toBe(1))
-
-    expect(cachedKeys(stack)).toEqual(['1', '2', '3'])
-
-    release()
-    await pending
-    expect(cachedKeys(stack)).toEqual(['3'])
+    expect(cachedTitles(stack)).toEqual({ 1: 'First recovered', 2: 'Second recovered', 3: 'Unrelated' })
+    expect(stack.remote.rows('todos')).toEqual([
+      { id: '1', title: 'First recovered' },
+      { id: '2', title: 'Second recovered' },
+      { id: '3', title: 'Unrelated' },
+    ])
+    expect(stack.store.$mutationHistory.map(entry => [entry.operation, entry.keys])).toEqual([['update', ['1', '2']]])
   })
 
   it('refuses the whole batch when any key is held by a preventing layer', async () => {
@@ -100,19 +106,34 @@ describe('deleteMany', () => {
     await load(stack)
     // The layer sits on the *second* key, so this also proves every key is
     // checked, not only the first.
-    const finish = await holdPreventingCreate(stack, [{ id: '2', title: 'Held' }])
+    const release = stack.remote.holdNext('createMany')
+    let settled = false
+    let pending: ReturnType<typeof createMany> | undefined
+    try {
+      pending = createMany({ store: stack.store, collection: stack.collection('todos'), items: [{ id: '2', title: 'Held' }] })
+      void pending.then(() => {
+        settled = true
+      }, () => {
+        settled = true
+      })
+      await vi.waitFor(() => expect(stack.remote.callCount('createMany')).toBe(1))
+      await expect(deleteMany({
+        store: stack.store,
+        collection: stack.collection('todos'),
+        keys: ['1', '2'],
+      })).rejects.toThrow(/^Item deletion prevented by the layer: /)
 
-    await expect(deleteMany({
-      store: stack.store,
-      collection: stack.collection('todos'),
-      keys: ['1', '2'],
-    })).rejects.toThrow(/^Item deletion prevented by the layer: /)
-
-    // Not even the key checked before the held one was deleted.
-    expect(stack.remote.rows('todos').map(row => row.id)).toEqual(['1', '2'])
-    expect(stack.read('todos', '1')).toMatchObject({ title: 'One' })
-
-    await finish()
+      // Not even the key checked before the held one was deleted.
+      expect(stack.remote.rows('todos').map(row => row.id)).toEqual(['1', '2'])
+      expect(stack.read('todos', '1')).toMatchObject({ title: 'One' })
+    }
+    finally {
+      release()
+      if (pending) {
+        await vi.waitFor(() => expect(settled, 'released preventing createMany must settle').toBe(true))
+        await pending
+      }
+    }
   })
 
   it('records one delete entry in $mutationHistory, with the deleted keys', async () => {

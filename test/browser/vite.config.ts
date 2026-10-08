@@ -4,6 +4,8 @@ import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
 import { runtimeSourceAliases, sourceEntry } from '../utils/sourceAliases'
+import { multiplayerNuxtDefines, multiplayerNuxtRuntime } from './multiplayerNuxtRuntime'
+import { multiplayerRelay } from './multiplayerRelay'
 
 /** Browser fixtures and production packages share one repository root. */
 const root = fileURLToPath(new URL('../../', import.meta.url))
@@ -12,13 +14,27 @@ const artifacts = process.env.RSTORE_BROWSER_ARTIFACT_DIR ?? resolve(tmpdir(), `
 
 export default defineConfig({
   root,
+  plugins: [multiplayerRelay(), multiplayerNuxtRuntime()],
+  define: {
+    ...multiplayerNuxtDefines,
+    __VUE_OPTIONS_API__: true,
+    __VUE_PROD_DEVTOOLS__: false,
+    __VUE_PROD_HYDRATION_MISMATCH_DETAILS__: false,
+  },
   cacheDir: resolve(artifacts, 'vite'),
   // Dynamic scenario imports must not trigger dependency discovery and reload an active test.
-  optimizeDeps: { noDiscovery: true, include: ['vue', '@vueuse/core', 'klona', 'fast-equals'] },
+  optimizeDeps: {
+    noDiscovery: true,
+    include: ['vue', '@vueuse/core', 'klona', 'fast-equals'],
+    // Nuxt runtime needs the same client build switches as fixture modules.
+    exclude: ['nuxt/app'],
+  },
   resolve: {
     alias: {
       ...runtimeSourceAliases,
       '@rstore/offline': sourceEntry('offline'),
+      'nuxt/app': resolve(root, 'packages/nuxt-multiplayer/node_modules/nuxt/dist/app/nuxt.js'),
+      '#build/nuxt.config.mjs': resolve(root, 'packages/nuxt-multiplayer/test/fixtures/nuxtRuntimeConfig.ts'),
     },
     dedupe: ['vue'],
   },

@@ -1,3 +1,4 @@
+import { createDeferred } from '#test-utils/deferred'
 import { describe, expect, it, vi } from 'vitest'
 import { createHookable } from '../../src'
 
@@ -103,16 +104,33 @@ describe('hookable dispatch order', () => {
   it('should await each async callback before starting the next one', async () => {
     const hooks = createHookable<{ test: () => Promise<void> }>()
     const log: string[] = []
+    const gate = createDeferred<void>()
 
     for (const name of ['a', 'b', 'c']) {
       hooks.hook('test', async () => {
         log.push(`${name}:start`)
-        await new Promise(resolve => setTimeout(resolve, 5))
+        await gate.promise
         log.push(`${name}:end`)
       })
     }
 
-    await hooks.callHook('test')
+    let settled = false
+    const pending = hooks.callHook('test')
+    void pending.then(() => {
+      settled = true
+    }, () => {
+      settled = true
+    })
+    try {
+      await vi.waitFor(() => expect(log).toContain('a:start'))
+      expect([...log]).toEqual(['a:start'])
+      expect(settled, 'dispatch must await its held callback').toBe(false)
+    }
+    finally {
+      gate.resolve()
+      await vi.waitFor(() => expect(settled, 'released hook dispatch must settle').toBe(true))
+      await pending
+    }
 
     // Concurrent dispatch would interleave the starts; the batch scheduler and
     // `core/src/sync.ts` both rely on strict sequencing.

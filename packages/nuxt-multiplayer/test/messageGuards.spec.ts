@@ -57,7 +57,7 @@ describe('validateMultiplayerMessage', () => {
   })
 
   it('does not warn for invalid input outside development structural validation', () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn')
 
     expect(validateMultiplayerMessage(42)).toBeNull()
     expect(validateMultiplayerMessage('{invalid')).toBeNull()
@@ -67,7 +67,7 @@ describe('validateMultiplayerMessage', () => {
 
   it('warns when a JSON frame fails structural validation in development', () => {
     vi.stubEnv('NODE_ENV', 'development')
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const warn = vi.spyOn(console, 'warn')
     const invalidFrame = { type: 'unknown' }
 
     expect(validateMultiplayerMessage(JSON.stringify(invalidFrame))).toBeNull()
