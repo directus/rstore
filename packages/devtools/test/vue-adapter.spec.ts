@@ -74,8 +74,8 @@ describe('optional Vue devtools adapter', () => {
     }
   })
 
-  // Real Vue cache/runtime subscription: public layer edits change visible rows,
-  // so subscribers must receive invalidation until their lease is released.
+  // Real Vue cache/runtime subscription: borrowed layer edits update diagnostic rows
+  // independently from application memoization, until subscription release.
   it('invalidates live cache subscribers after reactive layer edits and deletions, then releases observation', async () => {
     const fixture = await createCoreStore({ schema: [{ name: 'todos' }], tombstoneGc: false })
     fixture.cache.addLayer(reactive({ id: 'pending', collectionName: 'todos', state: { one: { id: 'one', title: 'before' }, two: { id: 'two', title: 'retained' } }, deletedItems: new Set<string | number>() }))
@@ -96,13 +96,17 @@ describe('optional Vue devtools adapter', () => {
       layer.deletedItems.add('one')
       await nextTick()
       await Promise.resolve()
-      expect(fixture.cache.readItem({ collection: fixture.store.$collections[0]!, key: 'one' })).toBeUndefined()
-      expect(fixture.cache.readItem({ collection: fixture.store.$collections[0]!, key: 'two' })).toMatchObject({ title: 'retained' })
+      const rows = Array.from(fixture.cache.inspect!().collections[0]!.effectiveRows())
+      expect(rows.map(row => [row.key, (row.value as any).title])).toEqual([['two', 'retained']])
+      // App reads preserve pre-migration memo until cache-owned invalidation.
+      expect(fixture.cache.readItem({ collection: fixture.store.$collections[0]!, key: 'one' })).toMatchObject({ title: 'after' })
       expect(changes, 'inspector must refresh deleted layer row').toEqual(['cache', 'cache'])
       stop()
       layer.state.two.title = 'after release'
       await nextTick()
       expect(changes).toEqual(['cache', 'cache'])
+      fixture.cache.removeLayer('pending')
+      expect(fixture.cache.readItem({ collection: fixture.store.$collections[0]!, key: 'one' })).toBeUndefined()
     }
     finally {
       stop()

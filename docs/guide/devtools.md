@@ -225,6 +225,8 @@ finally {
 
 `@rstore/nuxt` automatically registers browser store and captures SSR requests during development. It hosts inspector/relay and adds rstore tab to Nuxt DevTools. No extra store plugin, Vite plugin, or inspector process is needed.
 
+Browser diagnostics attach after store creation and hydration. Optional bootstrap never delays application startup and stops after five seconds or app teardown. Inspection starts from current store state; operations completed before attachment are absent from history.
+
 ```ts [nuxt.config.ts]
 export default defineNuxtConfig({
   modules: ['@rstore/nuxt'],

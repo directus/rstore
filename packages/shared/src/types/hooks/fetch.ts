@@ -22,7 +22,7 @@ export interface FetchHookDefinitions<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
 > {
-  /** Observe a failed fetch without changing its original rejection. */
+  /** Observe a failed fetch; returned promises are not awaited and observer errors are ignored. */
   fetchError: <TCollection extends Collection>(payload: {
     /** Opaque identity shared only by one Core invocation. @internal */
     operation?: object

@@ -47,13 +47,16 @@ function* readLayers(ctx: CacheRuntime): Iterable<CacheInspectionLayer> {
 
 /** Expose cache-owned diagnostics with borrowed values and live lazy readers. */
 export function inspectCache(ctx: CacheRuntime): CacheInspection {
+  // Existing rows resolve their scalar identity lazily when pulled. Only future
+  // writes retain exact override-key forms after diagnostics explicitly opt in.
+  ctx.publicKeys ??= new Map()
   return {
     collections: ctx.getStore().$collections.map(collection => ({
       name: collection.name,
       get count() {
         return countRows(ctx.state.collections[collection.name]?.value ?? {})
       },
-      rows: () => readRows(collection, ctx.state.collections[collection.name]?.value ?? {}, ctx.publicKeys.get(collection.name)),
+      rows: () => readRows(collection, ctx.state.collections[collection.name]?.value ?? {}, ctx.publicKeys?.get(collection.name)),
       get effectiveCount() {
         return countEffectiveRows(ctx, collection.name)
       },

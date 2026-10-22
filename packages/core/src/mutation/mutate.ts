@@ -27,7 +27,7 @@ export async function mutate<
       : mutateSingle(store, { ...options, meta }, callback, execution, operation))
   }
   catch (error) {
-    await reportOperationError(store.$hooks, 'mutationError', {
+    reportOperationError(store.$hooks, 'mutationError', {
       operation,
       store: store as unknown as GlobalStoreType,
       meta,

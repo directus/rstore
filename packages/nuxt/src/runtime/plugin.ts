@@ -22,21 +22,9 @@ export default defineNuxtPlugin({
     let plugins = Object.values({ ..._plugins }) as Plugin[]
     const schema = _schema as StoreSchema
 
-    let browserDevtools: { dispose: () => void } | undefined
     let ssrDevtools: import('./devtools/request').SSRRequestHandle | undefined
     if (import.meta.dev && devtoolsOptions) {
-      if (import.meta.client) {
-        try {
-          const { createNuxtBrowserDevtools } = await import('./devtools/browser')
-          const handle = await createNuxtBrowserDevtools(devtoolsOptions, nuxtApp.$config.app.baseURL)
-          browserDevtools = handle
-          plugins = [...plugins, handle.plugin]
-        }
-        catch (error) {
-          console.warn('rstore devtools unavailable:', error)
-        }
-      }
-      else if (import.meta.server) {
+      if (import.meta.server) {
         const { beginRstoreSSR } = await import('./devtools/server')
         ssrDevtools = beginRstoreSSR(nuxtApp, nuxtApp.ssrContext?.runtimeConfig?.rstoreDevtoolsSSR)
         if (ssrDevtools)
@@ -53,10 +41,8 @@ export default defineNuxtPlugin({
         ...options,
       })
       ssrDevtools?.bindStore(store)
-      nuxtApp.vueApp.onUnmount(() => browserDevtools?.dispose())
     }
     catch (error) {
-      browserDevtools?.dispose()
       ssrDevtools?.finalize('error', error)
       throw error
     }
@@ -74,6 +60,32 @@ export default defineNuxtPlugin({
     nuxtApp.vueApp.use(RstorePlugin, {
       store,
     })
+
+    if (import.meta.dev && import.meta.client && devtoolsOptions) {
+      const controller = new AbortController()
+      let browserDevtools: { dispose: () => void } | undefined
+      /** End optional discovery and instrumentation with this plugin lifetime. */
+      const dispose = () => {
+        controller.abort()
+        browserDevtools?.dispose()
+      }
+      nuxtApp.vueApp.onUnmount(dispose)
+      if (import.meta.hot)
+        import.meta.hot.dispose(dispose)
+      // Optional HTTP discovery cannot delay store creation, hydration or provision.
+      void import('./devtools/browser').then(async ({ createNuxtBrowserDevtools }) => {
+        if (controller.signal.aborted)
+          return
+        const handle = await createNuxtBrowserDevtools(devtoolsOptions, store, nuxtApp.$config.app.baseURL, controller.signal)
+        if (controller.signal.aborted)
+          handle.dispose()
+        else
+          browserDevtools = handle
+      }).catch((error) => {
+        if (!controller.signal.aborted)
+          console.warn('rstore devtools unavailable:', error)
+      })
+    }
 
     // Inject $rstore
     return {

@@ -188,7 +188,7 @@ async function _findFirst<
           }
         }
         catch (error) {
-          await reportError(error)
+          reportError(error)
           throw error
         }
       }
@@ -238,7 +238,7 @@ async function _findFirst<
     }
   }
   catch (error) {
-    await reportError(error)
+    reportError(error)
     throw error
   }
 }

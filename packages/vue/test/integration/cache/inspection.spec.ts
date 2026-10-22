@@ -1,7 +1,8 @@
 import { createCoreStore } from '#test-utils/store/realCacheStore'
 import { waitForTombstoneSweeps } from '#test-utils/tombstoneSweeps'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import { computed, reactive } from 'vue'
+import { computed, nextTick, reactive } from 'vue'
+import { createVueDevtoolsAdapter } from '../../../../devtools/src/vue/adapter'
 
 /** Real factory and real cache; no instrumentation/cache doubles. */
 async function createFixture(options: Parameters<typeof createCoreStore>[0] = { schema: [{ name: 'items' }] }) {
@@ -85,26 +86,43 @@ describe('public cache inspection', () => {
     expect(cache.getState()).toEqual({ ...before, modules: { 'counter:one': { stats: { value: 8 } } } })
   })
 
-  it('refreshes direct and reactive cache readers when public layer skip changes', async () => {
+  // Ordinary reads keep the pre-Devframe memo until cache-owned invalidation.
+  // Diagnostics track borrowed reactive layers independently, with or without observation.
+  it.each([false, true])('keeps application layer memo independent of diagnostics (observed=%s)', async (observed) => {
     const { store, cache } = await createFixture()
     const collection = store.$collections[0]!
-    const layer = reactive({ id: 'toggle', collectionName: 'items', state: { 1: { id: 1, name: 'visible' } }, deletedItems: new Set<string | number>(), skip: false })
+    cache.writeItem({ collection, key: 1, item: { id: 1, name: 'base' } })
+    const layer = reactive({ id: 'toggle', collectionName: 'items', state: { 1: { id: 1, name: 'overlay' } }, deletedItems: new Set<string | number>(), skip: false })
     cache.addLayer(layer)
+    const changes: string[] = []
+    const stop = observed ? createVueDevtoolsAdapter().observe!(store, view => changes.push(view ?? 'modules')) : () => {}
+    onTestFinished(stop)
     const visible = computed(() => cache.readItem({ collection, key: 1 })?.name)
-    expect(visible.value).toBe('visible')
-    expect(Array.from(cache.inspect!().collections[0]!.effectiveRows(), row => row.key)).toEqual([1])
-    cache.getLayer('toggle')!.skip = true
-    expect(cache.readItem({ collection, key: 1 })).toBeUndefined()
-    expect(visible.value).toBeUndefined()
-    expect(Array.from(cache.inspect!().collections[0]!.effectiveRows())).toEqual([])
-    cache.getLayer('toggle')!.skip = false
-    expect(visible.value).toBe('visible')
-    expect(Array.from(cache.inspect!().collections[0]!.effectiveRows(), row => row.key)).toEqual([1])
+    expect(visible.value).toBe('overlay')
+    const inspection = cache.inspect!().collections[0]!
+    expect(Array.from(inspection.effectiveRows(), row => (row.value as any).name)).toEqual(['overlay'])
+    layer.skip = true
+    await nextTick()
+    expect(Array.from(inspection.effectiveRows(), row => (row.value as any).name)).toEqual(['base'])
+    expect(cache.readItem({ collection, key: 1 })?.name).toBe('overlay')
+    expect(visible.value).toBe('overlay')
+    expect(changes).toEqual(observed ? ['cache'] : [])
+
+    // Public layer invalidation still publishes application updates synchronously.
+    cache.removeLayer('toggle')
+    expect(cache.readItem({ collection, key: 1 })?.name).toBe('base')
+    expect(visible.value).toBe('base')
+    layer.skip = false
+    cache.addLayer(layer)
+    expect(cache.readItem({ collection, key: 1 })?.name).toBe('overlay')
+    expect(visible.value).toBe('overlay')
   })
 
   it('keeps committed override address types through queues, deletes, and hydration', async () => {
     const { store, cache } = await createFixture()
     const collection = store.$collections[0]!
+    // Exact write-address breadcrumbs belong to explicitly activated diagnostics.
+    cache.inspect!()
     cache.writeItem({ collection, key: 9, item: { id: 'other', $overrideKey: 9, name: 'numeric override' } })
     const rows = () => Array.from(cache.inspect!().collections[0]!.rows(), row => [row.key, (row.value as any).name])
     expect(rows()).toEqual([[9, 'numeric override']])

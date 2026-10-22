@@ -177,7 +177,7 @@ async function _findMany<
           }
         }
         catch (error) {
-          await reportError(error)
+          reportError(error)
           throw error
         }
       }
@@ -226,7 +226,7 @@ async function _findMany<
     }
   }
   catch (error) {
-    await reportError(error)
+    reportError(error)
     throw error
   }
 }

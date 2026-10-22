@@ -178,7 +178,7 @@ export async function updateItem<
     return result as NonNullable<typeof result>
   }
   catch (error) {
-    await reportOperationError(store.$hooks, 'mutationError', {
+    reportOperationError(store.$hooks, 'mutationError', {
       operation,
       store: store as unknown as GlobalStoreType,
       meta,

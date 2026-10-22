@@ -17,7 +17,6 @@ export function createCacheRuntime<
   const runtime: CacheRuntime<TSchema, TCollectionDefaults> = {
     getStore,
     cacheStaggering,
-    publicKeys: new Map(),
     state: {
       markers: {},
       collections: {},

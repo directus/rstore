@@ -166,3 +166,10 @@ Do not stage, commit, or push without separate user instruction.
 - Regression-first fixes cover descriptor-safe bounded effective cache inspection, reactive overlay invalidation, Core-compatible CRUD capability detection, component-owned connection completion and loading retirement, stable invocation history, effective fetch-error targets, SSR fault containment, and bounded snapshot metadata.
 - Tests execute real Core/Vue/cache/runtime paths. Controlled external backend/HTTP/transport responses provide mutation and lifecycle ordering; renderless Vue tests prove lifecycle ownership without claiming browser presentation.
 - Independent reviewers check final fixes before commit. Final serial repository hooks provide build, documentation, test, and type gates; installed-consumer checks still require their explicit external fixtures.
+
+## Runtime isolation follow-up: 2026-10-22
+
+- Preserve pre-migration application cache behavior: ordinary write/delete/reset calls return `undefined`, collection overlays use original plain memo, and diagnostic key hints activate only on explicit inspection. Receipt completion tracking is opt-in and constant-time.
+- Diagnostic error hooks run independently of original query/mutation rejection; pending or rejected observers cannot delay rejection or starve other observers. Existing invocation identity and target reporting remain.
+- Nuxt browser diagnostics attach asynchronously after application store creation and hydration. Bootstrap fetch/body has one five-second deadline and aborts on teardown or module replacement. Initialization operations before attachment are intentionally absent from browser history; ordinary application startup has priority. SSR instrumentation remains request-owned.
+- Regression tests execute real Core/Vue/cache/Nuxt entry and lifecycle paths. External HTTP/backend replies are controlled; renderless lifecycle tests do not claim browser rendering. Reuse one shared Vue lifecycle renderer across Inspector and Nuxt tests.

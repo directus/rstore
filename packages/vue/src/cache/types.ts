@@ -1,18 +1,22 @@
 import type { TombstoneStore } from '@rstore/core'
 import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
-import type { ComputedRef, Ref } from 'vue'
+import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from '../item'
 
 /** Cache operations delayed while the cache is paused or write staggering is active. */
-export type QueuedOperation
-  = | { type: 'writeItem', params: Parameters<Cache['writeItem']>[0] }
-    | { type: 'writeItems', params: Parameters<Cache['writeItems']>[0], index: number, batch: CacheWriteBatch }
-    | { type: 'deleteItem', params: Parameters<Cache['deleteItem']>[0] }
-    | { type: 'addLayer', layer: Parameters<Cache['addLayer']>[0] }
-    | { type: 'removeLayer', layerId: Parameters<Cache['removeLayer']>[0] }
-    | { type: 'setState', state: CustomCacheState }
-    | { type: 'clear' }
-    | { type: 'prune', params: CachePruneParams }
+export type QueuedOperation = {
+  /** Opt-in completion flag; ordinary cache operations allocate no tracker. */
+  completion?: { completed: boolean }
+} & (
+  | { type: 'writeItem', params: Parameters<Cache['writeItem']>[0] }
+  | { type: 'writeItems', params: Parameters<Cache['writeItems']>[0], index: number, batch: CacheWriteBatch }
+  | { type: 'deleteItem', params: Parameters<Cache['deleteItem']>[0] }
+  | { type: 'addLayer', layer: Parameters<Cache['addLayer']>[0] }
+  | { type: 'removeLayer', layerId: Parameters<Cache['removeLayer']>[0] }
+  | { type: 'setState', state: CustomCacheState }
+  | { type: 'clear' }
+  | { type: 'prune', params: CachePruneParams }
+)
 
 /** Deletion of every item of some collections except the ones a refreshed query still holds. */
 export interface CachePruneParams {
@@ -91,8 +95,8 @@ export interface CacheRuntime<
   cacheStaggering: number
   /** Internal reactive cache state. */
   state: InternalCacheState
-  /** Committed public key form by collection and canonical address; no row values. */
-  publicKeys: Map<string, Map<string, string | number>>
+  /** Diagnostic key hints allocated only after inspection first activates. */
+  publicKeys?: Map<string, Map<string, string | number>>
   /** Stop the tombstone GC timer, when one is active. */
   stopTombstoneGc?: () => void
   /** Optimistic/cache layers by collection name. */
@@ -105,8 +109,8 @@ export interface CacheRuntime<
   wrappedItemsMetadata: Map<string, WrappedItemMetadata<Collection, TCollectionDefaults, TSchema>>
   /** Wrap keys created for each layer. */
   wrappedItemKeysPerLayer: Map<string, Set<string>>
-  /** Lazy overlay values tracking reactive layer flags without active watchers. */
-  collectionStateCache: Map<string, ComputedRef<Record<string | number, any>>>
+  /** Memoized overlay values, invalidated by ordinary cache publication. */
+  collectionStateCache: Map<string, Record<string | number, any>>
   /** Reactivity markers for cached overlay states. */
   collectionStateCacheReactivityMarker: Map<string, Ref<number>>
   /** Whether queued operations are currently being flushed. */

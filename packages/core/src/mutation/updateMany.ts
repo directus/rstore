@@ -215,7 +215,7 @@ export async function updateMany<
     return result
   }
   catch (error) {
-    await reportOperationError(store.$hooks, 'mutationError', {
+    reportOperationError(store.$hooks, 'mutationError', {
       operation,
       store: store as unknown as GlobalStoreType,
       meta,

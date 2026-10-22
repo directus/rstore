@@ -8,7 +8,7 @@ import { createServer } from 'vite'
 import { expect, it, vi } from 'vitest'
 import { ssrContextKey } from 'vue'
 import { createDeferred } from '../../../test/utils/deferred'
-import { createLifecycleRenderer } from './utils/lifecycle-renderer'
+import { createLifecycleRenderer } from '../../../test/utils/vue/lifecycleRenderer'
 
 it('ignores old discovery after real App unmount and preserves replacement connection', async () => {
   // Actual SFC setup and Vue mount/unmount execute. Render is omitted because

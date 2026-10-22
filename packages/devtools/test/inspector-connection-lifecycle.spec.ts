@@ -2,9 +2,9 @@ import type { InspectorTransport } from '../app/transport/types'
 import { describe, expect, it } from 'vitest'
 import { defineComponent, h } from 'vue'
 import { createDeferred } from '../../../test/utils/deferred'
+import { createLifecycleRenderer } from '../../../test/utils/vue/lifecycleRenderer'
 import { Inspector } from '../app/stores/connection'
 import { useConnectionOwner } from '../app/stores/connection-owner'
-import { createLifecycleRenderer } from './utils/lifecycle-renderer'
 
 /** Real Vue lifecycle, without browser rendering or presentation assertions. */
 function mountOwner(state: Inspector) {

@@ -13,14 +13,19 @@ interface CompletedOperation {
 }
 
 /** Enqueue an operation and flush it immediately when the cache is active. */
-export function enqueueOperation(ctx: CacheRuntime, operation: QueuedOperation): CacheOperationResult {
+export function enqueueOperation(ctx: CacheRuntime, operation: QueuedOperation): void {
   ctx.state.queue.push(operation)
   if (!ctx.state.paused) {
     flushQueuedOperations(ctx)
   }
-  // Older operations can drain or enqueue more work during flush. Only this
-  // operation's queue membership proves whether its own dispatch completed.
-  return { status: ctx.state.queue.includes(operation) ? 'queued' : 'completed' }
+}
+
+/** Track completion only for an explicitly requested diagnostic receipt. */
+export function enqueueOperationWithReceipt(ctx: CacheRuntime, operation: QueuedOperation): CacheOperationResult {
+  const completion = { completed: false }
+  operation.completion = completion
+  enqueueOperation(ctx, operation)
+  return { status: completion.completed ? 'completed' : 'queued' }
 }
 
 /** Enqueue a collection write batch with its publication state. */
@@ -59,6 +64,9 @@ export function flushQueuedOperations(ctx: CacheRuntime) {
         return
       }
       ctx.state.queue.shift()
+      if (operation.completion) {
+        operation.completion.completed = true
+      }
       if (result !== true) {
         deferredErrors.push(...result.settlementErrors)
       }

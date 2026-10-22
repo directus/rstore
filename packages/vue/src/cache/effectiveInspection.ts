@@ -109,7 +109,7 @@ function mergeValues(values: unknown[], layer: CacheLayer): { value: object, tru
 /** Resolve pulled rows only; bounded overlay descriptors explicitly report omitted fields. */
 export function* readEffectiveRows(ctx: CacheRuntime, collection: ResolvedCollection): Iterable<CacheInspectionRow> {
   const input = sources(ctx, collection.name)
-  const keys = ctx.publicKeys.get(collection.name)
+  const keys = ctx.publicKeys?.get(collection.name)
   for (const address of effectiveAddresses(input)) {
     const values = Object.hasOwn(input.states[0]!, address) ? [input.states[0]![address]] : []
     let topLayer: CacheLayer | undefined

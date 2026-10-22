@@ -91,12 +91,17 @@ describe('bounded public inspection', () => {
     await nextTick()
     await Promise.resolve()
     expect(views).toEqual(['cache'])
-    expect(stack.read('todos', 'row'), 'application cache read must agree with effective inspection').toBeUndefined()
+    // Borrowed reactive flags update diagnostics without changing the pre-migration app memo.
+    expect(stack.read('todos', 'row')).toMatchObject({ id: 'row', title: 'Visible' })
     expect(runtime.read({ method: 'rstore:get-cache', target, collection: 'todos' }).data.rows).toEqual([])
     release()
     layer.skip = false
     await nextTick()
     expect(views).toEqual(['cache'])
+    // Cache-owned invalidation still removes the overlay from ordinary app reads.
+    stack.cache.removeLayer('visible')
+    expect(stack.read('todos', 'row')).toBeUndefined()
+    expect(runtime.read({ method: 'rstore:get-cache', target, collection: 'todos' }).data.rows).toEqual([])
   })
 
   it('visits at most 10,000 actual cache candidates and reports incomplete matching totals', async () => {

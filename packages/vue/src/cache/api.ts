@@ -8,7 +8,7 @@ import { inspectCache } from './inspection'
 import { ensureLayersForCollection, getStateForCollection } from './layers'
 import { applyMutationToCache } from './mutations'
 import { clearQueryStateForCollection } from './queryState'
-import { enqueueOperation, enqueueWriteItems, flushQueuedOperations } from './queue'
+import { enqueueOperation, enqueueOperationWithReceipt, enqueueWriteItems, flushQueuedOperations } from './queue'
 import { resolveRelationWriteParams } from './relationWrite'
 import { garbageCollectItem, getWrappedItem } from './wrapped'
 
@@ -17,12 +17,12 @@ export function createCacheApi<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
 >(ctx: CacheRuntime<TSchema, TCollectionDefaults>): Cache & VueCachePrivate {
-  // Both public surfaces share dispatch functions. Legacy callers keep void
-  // signatures, while diagnostics explicitly opt into operation receipts.
+  // Legacy calls keep their undefined runtime results. Diagnostics explicitly
+  // opt into completion tracking while using the same queue and publication.
   const receipts: CacheOperationReceipts = {
-    writeItem: params => enqueueOperation(ctx, { type: 'writeItem', params }),
-    deleteItem: params => enqueueOperation(ctx, { type: 'deleteItem', params }),
-    clear: () => enqueueOperation(ctx, { type: 'clear' }),
+    writeItem: params => enqueueOperationWithReceipt(ctx, { type: 'writeItem', params }),
+    deleteItem: params => enqueueOperationWithReceipt(ctx, { type: 'deleteItem', params }),
+    clear: () => enqueueOperationWithReceipt(ctx, { type: 'clear' }),
   }
   return {
     receipts,
@@ -36,7 +36,9 @@ export function createCacheApi<
     readItems(params) {
       return readItems(ctx, params)
     },
-    writeItem: receipts.writeItem,
+    writeItem(params) {
+      enqueueOperation(ctx, { type: 'writeItem', params })
+    },
     writeItems(params) {
       enqueueWriteItems(ctx, params)
     },
@@ -46,7 +48,9 @@ export function createCacheApi<
     applyMutation(params) {
       return applyMutationToCache(ctx, params)
     },
-    deleteItem: receipts.deleteItem,
+    deleteItem(params) {
+      enqueueOperation(ctx, { type: 'deleteItem', params })
+    },
     readFieldTimestamps({ collectionName, key }) {
       return ctx.state.fieldTimestamps.get(collectionName)?.get(key)
     },
@@ -71,7 +75,9 @@ export function createCacheApi<
     setState(state) {
       enqueueOperation(ctx, { type: 'setState', state })
     },
-    clear: receipts.clear,
+    clear() {
+      enqueueOperation(ctx, { type: 'clear' })
+    },
     clearCollection({ collection }) {
       clearCollection(ctx, collection)
     },

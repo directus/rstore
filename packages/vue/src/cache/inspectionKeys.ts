@@ -27,6 +27,8 @@ export function resolveInspectionKey(_collection: ResolvedCollection | undefined
 
 /** Keep only committed address representation, never another copy of row data. */
 export function rememberInspectionKey(ctx: CacheRuntime, name: string, key: string | number): void {
+  if (!ctx.publicKeys)
+    return
   let keys = ctx.publicKeys.get(name)
   if (!keys) {
     keys = new Map()
@@ -37,15 +39,17 @@ export function rememberInspectionKey(ctx: CacheRuntime, name: string, key: stri
 
 /** Forget a deleted address so subsequent writes cannot inherit stale identity. */
 export function forgetInspectionKey(ctx: CacheRuntime, name: string, key: string | number): void {
-  const keys = ctx.publicKeys.get(name)
+  const keys = ctx.publicKeys?.get(name)
   keys?.delete(String(key))
   if (keys?.size === 0) {
-    ctx.publicKeys.delete(name)
+    ctx.publicKeys?.delete(name)
   }
 }
 
 /** Rebuild address hints after hydration without adding serialized metadata. */
 export function rebuildInspectionKeys(ctx: CacheRuntime): void {
+  if (!ctx.publicKeys)
+    return
   ctx.publicKeys.clear()
   for (const name in ctx.state.collections) {
     const collection = ctx.getStore().$collections.find(candidate => candidate.name === name)

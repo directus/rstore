@@ -166,7 +166,7 @@ export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
 /** Clear all cache data immediately. */
 export function clearNow(ctx: CacheRuntime) {
   ctx.state.markers = {}
-  ctx.publicKeys.clear()
+  ctx.publicKeys?.clear()
   for (const collectionName in ctx.state.collections) {
     ctx.state.collections[collectionName]!.value = {}
   }

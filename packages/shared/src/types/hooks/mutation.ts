@@ -11,7 +11,7 @@ export interface MutationHookDefinitions<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
 > {
-  /** Observe a failed mutation without changing its original rejection. */
+  /** Observe a failed mutation; returned promises are not awaited and observer errors are ignored. */
   mutationError: <TCollection extends Collection>(payload: {
     /** Opaque identity shared only by one Core invocation. @internal */
     operation?: object
