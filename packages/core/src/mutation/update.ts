@@ -3,6 +3,7 @@ import { pickNonSpecialProps, set } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
 import { isKeyDefined } from '../key'
 import { peekFirst } from '../query'
+import { reportOperationError } from '../utils/operationError'
 import { finalizeMutation } from './finalizeMutation'
 import { assertMutationAllowed, createOptimisticLayerLifecycle, prepareMutationItem, replaceTransportItem } from './optimistic'
 
@@ -12,6 +13,8 @@ export interface UpdateOptions<
   TSchema extends StoreSchema,
 > {
   store: StoreCore<TSchema, TCollectionDefaults>
+  /** Metadata shared by all hooks belonging to this mutation. */
+  meta?: CustomHookMeta
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
   item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   key?: string | number | null
@@ -36,12 +39,14 @@ export interface UpdateOptions<
   batch?: BatchCallConfig
 }
 
+/** Update one target through connector hooks and optimistic cache lifecycle. */
 export async function updateItem<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 >({
   store,
+  meta = {},
   collection,
   item: inputItem,
   key,
@@ -50,123 +55,140 @@ export async function updateItem<
   formOperations,
   batch,
 }: UpdateOptions<TCollection, TCollectionDefaults, TSchema>): Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> {
-  const meta: CustomHookMeta = {}
-
-  let preparedItem = prepareMutationItem(store, collection, inputItem)
-  let optimisticItem = preparedItem.optimisticItem
-  const transportItem = preparedItem.transportItem
-
-  key ??= collection.getKey(transportItem)
-
-  if (!isKeyDefined(key)) {
-    throw new Error('Item update failed: key is not defined')
-  }
-
-  assertMutationAllowed(store, collection, key, 'update')
-
-  await store.$hooks.callHook('beforeMutation', {
-    store: store as unknown as GlobalStoreType,
-    meta,
-    collection,
-    mutation: 'update',
-    key,
-    item: transportItem,
-    modifyItem: (path: any, value: any) => {
-      set(optimisticItem, path, value)
-      preparedItem = prepareMutationItem(store, collection, optimisticItem)
-      replaceTransportItem(transportItem, preparedItem.transportItem)
-    },
-    setItem: (newItem) => {
-      const prepared = prepareMutationItem(store, collection, newItem as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>, preparedItem)
-      preparedItem = prepared
-      optimisticItem = prepared.optimisticItem
-      replaceTransportItem(transportItem, prepared.transportItem)
-    },
-    formOperations: formOperations as FormOperation[],
-  })
-
-  let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null = skipCache
-    ? null
-    : peekFirst({
-      store: store as unknown as GlobalStoreType,
-      meta,
-      collection,
-      findOptions: {
-        key,
-      },
-    }).result
-
-  if (result) {
-    result = pickNonSpecialProps(result) as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
-  }
-
-  const optimisticLayer = createOptimisticLayerLifecycle(store)
-
-  if (!skipCache && optimistic) {
-    const layer: CacheLayer = {
-      id: crypto.randomUUID(),
-      collectionName: collection.name,
-      state: {
-        [key]: {
-          ...optimisticItem,
-          ...typeof optimistic === 'object' ? optimistic : {},
-          $overrideKey: key,
-        },
-      },
-      deletedItems: new Set(),
-      optimistic: true,
-    }
-
-    optimisticLayer.add(layer)
-  }
-
+  const operation = {}
   try {
-    // Batching: enqueue into batch scheduler if eligible
-    const batchCall = resolveBatchCall(batch)
-    if (store.$batch?.options.mutations && batchCall.enabled) {
-      result = await store.$batch.enqueueUpdate(collection, key, transportItem, meta, batchCall.group, formOperations as FormOperation[]) as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
-    }
-    else {
-      const abort = store.$hooks.withAbort({ explicit: true })
-      await store.$hooks.callHook('updateItem', {
-        store: store as unknown as GlobalStoreType,
-        meta,
-        collection,
-        key,
-        item: transportItem,
-        getResult: () => result ?? undefined,
-        setResult: (newResult, options) => {
-          result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
-          if (result && options?.abort !== false) {
-            abort()
-          }
-        },
-        abort,
-        formOperations: formOperations as FormOperation[],
-      }, abort)
+    let preparedItem = prepareMutationItem(store, collection, inputItem)
+    let optimisticItem = preparedItem.optimisticItem
+    const transportItem = preparedItem.transportItem
+
+    key ??= collection.getKey(transportItem)
+
+    if (!isKeyDefined(key)) {
+      throw new Error('Item update failed: key is not defined')
     }
 
-    const commitResult = await finalizeMutation(store, {
+    assertMutationAllowed(store, collection, key, 'update')
+
+    await store.$hooks.callHook('beforeMutation', {
+      operation,
+      store: store as unknown as GlobalStoreType,
       meta,
       collection,
       mutation: 'update',
       key,
       item: transportItem,
-      result: result ?? undefined,
-      skipCache,
+      modifyItem: (path: any, value: any) => {
+        set(optimisticItem, path, value)
+        preparedItem = prepareMutationItem(store, collection, optimisticItem)
+        replaceTransportItem(transportItem, preparedItem.transportItem)
+      },
+      setItem: (newItem) => {
+        const prepared = prepareMutationItem(store, collection, newItem as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>, preparedItem)
+        preparedItem = prepared
+        optimisticItem = prepared.optimisticItem
+        replaceTransportItem(transportItem, prepared.transportItem)
+      },
       formOperations: formOperations as FormOperation[],
-    }, {
-      requireResultError: 'Item update failed: result is nullish',
-      onBeforeApplyCache: optimisticLayer.remove,
     })
 
-    result = commitResult.result as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+    let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null = skipCache
+      ? null
+      : peekFirst({
+        store: store as unknown as GlobalStoreType,
+        meta,
+        collection,
+        findOptions: {
+          key,
+        },
+      }).result
+
+    if (result) {
+      result = pickNonSpecialProps(result) as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+    }
+
+    const optimisticLayer = createOptimisticLayerLifecycle(store)
+
+    if (!skipCache && optimistic) {
+      const layer: CacheLayer = {
+        id: crypto.randomUUID(),
+        collectionName: collection.name,
+        state: {
+          [key]: {
+            ...optimisticItem,
+            ...typeof optimistic === 'object' ? optimistic : {},
+            $overrideKey: key,
+          },
+        },
+        deletedItems: new Set(),
+        optimistic: true,
+      }
+
+      optimisticLayer.add(layer)
+    }
+
+    try {
+      // Batching: enqueue into batch scheduler if eligible
+      const batchCall = resolveBatchCall(batch)
+      if (store.$batch?.options.mutations && batchCall.enabled) {
+        result = await store.$batch.enqueueUpdate(collection, key, transportItem, meta, batchCall.group, formOperations as FormOperation[]) as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+      }
+      else {
+        const abort = store.$hooks.withAbort({ explicit: true })
+        await store.$hooks.callHook('updateItem', {
+          store: store as unknown as GlobalStoreType,
+          meta,
+          collection,
+          key,
+          item: transportItem,
+          getResult: () => result ?? undefined,
+          setResult: (newResult, options) => {
+            result = newResult as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+            if (result && options?.abort !== false) {
+              abort()
+            }
+          },
+          abort,
+          formOperations: formOperations as FormOperation[],
+        }, abort)
+      }
+
+      const commitResult = await finalizeMutation(store, {
+        operation,
+        meta,
+        collection,
+        mutation: 'update',
+        key,
+        item: transportItem,
+        result: result ?? undefined,
+        skipCache,
+        formOperations: formOperations as FormOperation[],
+      }, {
+        requireResultError: 'Item update failed: result is nullish',
+        onBeforeApplyCache: optimisticLayer.remove,
+      })
+
+      result = commitResult.result as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+    }
+    catch (error) {
+      // Rollback optimistic layer in case of error
+      optimisticLayer.remove()
+      throw error
+    }
+
+    return result as NonNullable<typeof result>
   }
   catch (error) {
-    // Rollback optimistic layer in case of error
-    optimisticLayer.remove()
+    await reportOperationError(store.$hooks, 'mutationError', {
+      operation,
+      store: store as unknown as GlobalStoreType,
+      meta,
+      collection,
+      mutation: 'update',
+      many: false,
+      key: key ?? undefined,
+      item: inputItem,
+      error,
+    })
     throw error
   }
-
-  return result as NonNullable<typeof result>
 }

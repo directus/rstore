@@ -5,13 +5,17 @@ import { configDefaults, defineConfig } from 'vitest/config'
 import { runtimeSourceAliases, sourceEntry } from './test/utils/sourceAliases'
 
 /**
- * The three tests that boot a full Nuxt app via `@nuxt/test-utils/e2e` —
+ * Tests that boot a full Nuxt app via `@nuxt/test-utils/e2e` —
  * minute-scale each, so they get their own serialized project below.
  */
 const nuxtBootTests = [
   'packages/nuxt-directus/test/basic.test.ts',
   'packages/nuxt-drizzle/test/basic.test.ts',
   'packages/nuxt-monospace/test/basic.test.ts',
+  'packages/nuxt/test/nuxt-boot/devtools.spec.ts',
+  'packages/nuxt/test/nuxt-boot/devtools-ssr.spec.ts',
+  'packages/nuxt/test/nuxt-boot/devtools-disabled.spec.ts',
+  'packages/nuxt/test/nuxt-boot/devtools-production.spec.ts',
 ]
 
 /**
@@ -157,7 +161,7 @@ export default defineConfig({
             },
           },
           // Nuxt build + start per file: generous timeouts, and a single fork
-          // so the three memory-heavy builds don't race each other.
+          // so memory-heavy builds don't race each other.
           testTimeout: 120_000,
           hookTimeout: 300_000,
           maxWorkers: 1,

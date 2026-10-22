@@ -5,6 +5,7 @@ import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '
 import { unwrapItem } from '../item'
 import { isKeyDefined } from '../key'
 import { stringifyFindOptions } from '../utils/findOptions'
+import { createOperationErrorReporter } from '../utils/operationError'
 import { dedupeQuery } from './dedupe'
 import { peekFirst } from './peekFirst'
 
@@ -55,6 +56,7 @@ export async function findFirst<
   }))
 }
 
+/** Execute one item query with one terminal failure observation. */
 async function _findFirst<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -65,151 +67,178 @@ async function _findFirst<
   collection,
   findOptions,
 }: FindFirstParams<TCollection, TCollectionDefaults, TSchema> & { findOptions: FindFirstOptions<TCollection, TCollectionDefaults, TSchema>, meta: CustomHookMeta }): Promise<QueryResult<WrappedItem<TCollection, TCollectionDefaults, TSchema> | null>> {
-  const fetchPolicy = findOptions.fetchPolicy
+  const operation = {}
+  const reportError = createOperationErrorReporter(store.$hooks, 'fetchError', {
+    operation,
+    store: store as unknown as GlobalStoreType,
+    meta,
+    collection,
+    findOptions,
+    many: false,
+    /** Resolve supported beforeFetch target rewrites when failure occurs. */
+    get key() {
+      return findOptions.key
+    },
+  })
+  try {
+    const fetchPolicy = findOptions.fetchPolicy
 
-  let result: any
-  let marker: string | undefined
-  let fetchPromise: Promise<void> | undefined
+    let result: any
+    let marker: string | undefined
+    let fetchPromise: Promise<void> | undefined
 
-  if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
-    const peekResult = peekFirst({
-      store,
-      meta,
-      collection,
-      findOptions,
-    })
-    result = peekResult.result
-    marker = peekResult.marker
-  }
-
-  if (!result && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
-    const fetch = async () => {
-      if (!marker) {
-        marker = defaultMarker(collection, findOptions)
-      }
-
-      await store.$hooks.callHook('beforeFetch', {
-        store: store as unknown as GlobalStoreType,
+    if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
+      const peekResult = peekFirst({
+        store,
         meta,
         collection,
-        key: findOptions.key,
         findOptions,
-        many: false,
-        updateFindOptions: (value) => {
-          Object.assign(findOptions, value)
-        },
       })
+      result = peekResult.result
+      marker = peekResult.marker
+    }
 
-      // Batching: enqueue into batch scheduler if eligible.
-      // Only key-based findFirst calls can be batched (filter-only queries cannot).
-      // beforeFetch/afterFetch still run so plugins (e.g. query tracking) see the op.
-      const batchCall = resolveBatchCall(findOptions.batch)
-      if (store.$batch?.options.fetch && findOptions.key != null && batchCall.enabled) {
-        const batched = await store.$batch.enqueueFetchFirst(collection, findOptions.key, findOptions, meta, batchCall.group) as { item: any, marker: string | undefined }
-        result = batched.item
-        if (batched.marker) {
-          marker = batched.marker
-        }
-      }
-      else {
-        const abort = store.$hooks.withAbort({ explicit: true })
-        await store.$hooks.callHook('fetchFirst', {
-          store: store as unknown as GlobalStoreType,
-          meta,
-          collection,
-          key: findOptions.key,
-          findOptions,
-          getResult: () => result,
-          setResult: (value, options) => {
-            result = value
-            if (result && options?.abort !== false) {
-              abort()
+    if (!result && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
+      const fetch = async () => {
+        try {
+          if (!marker) {
+            marker = defaultMarker(collection, findOptions)
+          }
+
+          await store.$hooks.callHook('beforeFetch', {
+            operation,
+            store: store as unknown as GlobalStoreType,
+            meta,
+            collection,
+            key: findOptions.key,
+            findOptions,
+            many: false,
+            updateFindOptions: (value) => {
+              Object.assign(findOptions, value)
+            },
+          })
+
+          // Batching: enqueue into batch scheduler if eligible.
+          // Only key-based findFirst calls can be batched (filter-only queries cannot).
+          // beforeFetch/afterFetch still run so plugins (e.g. query tracking) see the op.
+          const batchCall = resolveBatchCall(findOptions.batch)
+          if (store.$batch?.options.fetch && findOptions.key != null && batchCall.enabled) {
+            const batched = await store.$batch.enqueueFetchFirst(collection, findOptions.key, findOptions, meta, batchCall.group) as { item: any, marker: string | undefined }
+            result = batched.item
+            if (batched.marker) {
+              marker = batched.marker
             }
-          },
-          setMarker: (value) => {
-            marker = value
-          },
-          abort,
-        }, abort)
-      }
-
-      await store.$hooks.callHook('afterFetch', {
-        store: store as unknown as GlobalStoreType,
-        meta,
-        collection,
-        key: findOptions.key,
-        findOptions,
-        many: false,
-        getResult: () => result,
-        setResult: (value) => {
-          result = value
-        },
-      })
-
-      if (result) {
-        result = unwrapItem(result)
-
-        store.$processItemParsing(collection, result)
-
-        if (fetchPolicy !== 'no-cache' && meta.$canPublishQuery?.() !== false) {
-          const key = collection.getKey(result)
-          if (!isKeyDefined(key)) {
-            console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
           }
           else {
-            store.$cache.writeItem({
-              collection,
-              key,
-              item: result,
-              marker: getMarker('first', marker),
+            const abort = store.$hooks.withAbort({ explicit: true })
+            await store.$hooks.callHook('fetchFirst', {
+              store: store as unknown as GlobalStoreType,
               meta,
-            })
+              collection,
+              key: findOptions.key,
+              findOptions,
+              getResult: () => result,
+              setResult: (value, options) => {
+                result = value
+                if (result && options?.abort !== false) {
+                  abort()
+                }
+              },
+              setMarker: (value) => {
+                marker = value
+              },
+              abort,
+            }, abort)
+          }
+
+          await store.$hooks.callHook('afterFetch', {
+            operation,
+            store: store as unknown as GlobalStoreType,
+            meta,
+            collection,
+            key: findOptions.key,
+            findOptions,
+            many: false,
+            getResult: () => result,
+            setResult: (value) => {
+              result = value
+            },
+          })
+
+          if (result) {
+            result = unwrapItem(result)
+
+            store.$processItemParsing(collection, result)
+
+            if (fetchPolicy !== 'no-cache' && meta.$canPublishQuery?.() !== false) {
+              const key = collection.getKey(result)
+              if (!isKeyDefined(key)) {
+                console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
+              }
+              else {
+                store.$cache.writeItem({
+                  collection,
+                  key,
+                  item: result,
+                  marker: getMarker('first', marker),
+                  meta,
+                })
+              }
+            }
           }
         }
+        catch (error) {
+          await reportError(error)
+          throw error
+        }
+      }
+
+      fetchPromise = fetch()
+
+      if (fetchPolicy !== 'cache-and-fetch') {
+        await fetchPromise
+      }
+      else {
+        // Background fetch: callers may observe `fetchPromise` but are not required to.
+        // Attaching a handler marks the rejection as handled so an ignored failure doesn't
+        // become an unhandled rejection - the returned promise still rejects when awaited.
+        fetchPromise.catch(() => {})
       }
     }
-
-    fetchPromise = fetch()
-
-    if (fetchPolicy !== 'cache-and-fetch') {
-      await fetchPromise
+    else if (meta.$queryTracking) {
+      meta.$queryTracking.skipped = true
     }
-    else {
-      // Background fetch: callers may observe `fetchPromise` but are not required to.
-      // Attaching a handler marks the rejection as handled so an ignored failure doesn't
-      // become an unhandled rejection - the returned promise still rejects when awaited.
-      fetchPromise.catch(() => {})
+
+    if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy) && meta.$canPublishQuery?.() !== false) {
+      const abort = store.$hooks.withAbort({ explicit: true })
+      await store.$hooks.callHook('fetchRelations', {
+        store: store as unknown as GlobalStoreType,
+        meta,
+        collection,
+        key: findOptions.key,
+        findOptions: findOptions as FindOptions<TCollection, TCollectionDefaults, TSchema> & { include: NonNullable<FindOptions<TCollection, TCollectionDefaults, TSchema>['include']> },
+        many: false,
+        getResult: () => result,
+        abort,
+      }, abort)
+    }
+
+    if (result) {
+      result = store.$cache.wrapItem({ collection, item: result, noCache: fetchPolicy === 'no-cache' || meta.$canPublishQuery?.() === false })
+    }
+
+    return {
+      // A miss is `null`, never `undefined`: the batched branch and a `no-cache`
+      // read both leave `result` unassigned, while `peekFirst` reports a miss as
+      // `null`. Normalising here keeps every path inside the declared
+      // `QueryResult<WrappedItem | null>`.
+      result: result ?? null,
+      marker,
+      fetchPromise,
     }
   }
-  else if (meta.$queryTracking) {
-    meta.$queryTracking.skipped = true
-  }
-
-  if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy) && meta.$canPublishQuery?.() !== false) {
-    const abort = store.$hooks.withAbort({ explicit: true })
-    await store.$hooks.callHook('fetchRelations', {
-      store: store as unknown as GlobalStoreType,
-      meta,
-      collection,
-      key: findOptions.key,
-      findOptions: findOptions as FindOptions<TCollection, TCollectionDefaults, TSchema> & { include: NonNullable<FindOptions<TCollection, TCollectionDefaults, TSchema>['include']> },
-      many: false,
-      getResult: () => result,
-      abort,
-    }, abort)
-  }
-
-  if (result) {
-    result = store.$cache.wrapItem({ collection, item: result, noCache: fetchPolicy === 'no-cache' || meta.$canPublishQuery?.() === false })
-  }
-
-  return {
-    // A miss is `null`, never `undefined`: the batched branch and a `no-cache`
-    // read both leave `result` unassigned, while `peekFirst` reports a miss as
-    // `null`. Normalising here keeps every path inside the declared
-    // `QueryResult<WrappedItem | null>`.
-    result: result ?? null,
-    marker,
-    fetchPromise,
+  catch (error) {
+    await reportError(error)
+    throw error
   }
 }

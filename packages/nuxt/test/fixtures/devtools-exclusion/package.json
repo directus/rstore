@@ -1,0 +1,5 @@
+{
+  "name": "rstore-devtools-exclusion-fixture",
+  "type": "module",
+  "private": true
+}

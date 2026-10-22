@@ -11,6 +11,12 @@ export interface LifecycleHookDefinitions<
   _TSchema extends StoreSchema,
   _TCollectionDefaults extends CollectionDefaults,
 > {
+  /** Synchronous lifetime notification emitted once by an owning cache on disposal. */
+  dispose: (payload: {
+    /** Store whose cache resources are being released. */
+    store: GlobalStoreType
+  }) => void
+
   init: (
     payload: {
       store: GlobalStoreType

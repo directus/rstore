@@ -79,6 +79,8 @@ export interface StoreCore<
    * @private
    */
   $registeredModules: Map<string, ResolvedModule<any, any>>
+  /** Inspect resolved modules without exposing the mutable registration map. */
+  $getModules: () => ReadonlyArray<ResolvedModule<any, any>>
   /**
    * @private
    */

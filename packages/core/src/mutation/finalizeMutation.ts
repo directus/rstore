@@ -70,6 +70,7 @@ async function finalizeManyMutation<
   }
 
   await store.$hooks.callHook('afterManyMutation', {
+    operation: options.operation,
     store: store as unknown as GlobalStoreType,
     meta,
     collection: options.collection,

@@ -1,8 +1,10 @@
 import type { CreateStoreOptions } from '@rstore/vue'
+import type { RstoreNuxtDevtoolsOptions } from './runtime/devtools/options'
 import fs from 'node:fs'
 import { addImports, addPlugin, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, resolveFiles } from '@nuxt/kit'
 import serialize from 'serialize-javascript'
 import { setupDevToolsUI } from './devtools'
+import { resolveDevtoolsOptions } from './runtime/devtools/options'
 
 declare module '@nuxt/schema' {
   export interface NuxtConfig {
@@ -35,6 +37,8 @@ export interface ModuleStoreOptions extends Pick<
 > {}
 
 export interface ModuleOptions {
+  /** Portable devtools, enabled by default only during development. */
+  devtools?: boolean | RstoreNuxtDevtoolsOptions
   /**
    * Directories to scan for store files
    *
@@ -176,6 +180,14 @@ export default [
     nuxt.options.alias['#rstore-collection'] = collectionTemplate.dst
     nuxt.options.alias['#rstore-plugins'] = pluginsTemplate.dst
 
+    const devtoolsOptions = resolveDevtoolsOptions(options.devtools, nuxt.options.dev)
+    const devtoolsTemplate = addTemplate({
+      filename: '$rstore-devtools.ts',
+      getContents: () => `export default ${serialize(devtoolsOptions)}`,
+      write: true,
+    })
+    nuxt.options.alias['#rstore-devtools'] = devtoolsTemplate.dst
+
     addTypeTemplate({
       filename: 'types/rstore.d.ts',
       getContents: () => `import type { Store } from '#imports'
@@ -188,6 +200,7 @@ export {}`,
 
     addPlugin(resolve('./runtime/plugin'))
 
-    setupDevToolsUI(nuxt, resolver)
+    if (devtoolsOptions)
+      await setupDevToolsUI(nuxt, resolver, devtoolsOptions)
   },
 })

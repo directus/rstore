@@ -1,22 +1,31 @@
 import type { CacheLayer } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { CacheRuntime } from './types'
-import { shallowRef } from 'vue'
+import { computed, shallowRef } from 'vue'
 import { ensureCollectionRef, ensureCollectionStateCacheReactivityMarker, invalidateCollectionStateCache } from './context'
 import { updateItemIndexes } from './indexes'
 
 /** Read a collection state with active non-skipped layers applied. */
 export function getStateForCollection(ctx: CacheRuntime, collectionName: string) {
-  const collectionState = ensureCollectionRef(ctx, collectionName).value
-
+  // Batch publication triggers this ref after mutating raw rows. Subscribe the
+  // caller directly: an unchanged computed result identity suppresses delivery.
+  // eslint-disable-next-line ts/no-unused-expressions
+  ensureCollectionRef(ctx, collectionName).value
   // eslint-disable-next-line ts/no-unused-expressions
   ensureCollectionStateCacheReactivityMarker(ctx, collectionName).value
-
-  const cached = ctx.collectionStateCache.get(collectionName)
-  if (cached) {
-    return cached
+  let cached = ctx.collectionStateCache.get(collectionName)
+  if (!cached) {
+    // A plain memo hides later reactive layer.skip reads from both direct and
+    // computed consumers. Lazy computed tracks them without owning a watcher.
+    cached = computed(() => resolveCollectionState(ctx, collectionName))
+    ctx.collectionStateCache.set(collectionName, cached)
   }
+  return cached.value
+}
 
+/** Apply cache-owned overlays while tracking their reactive flags and contents. */
+function resolveCollectionState(ctx: CacheRuntime, collectionName: string) {
+  const collectionState = ensureCollectionRef(ctx, collectionName).value
   let copied = false
   let result = collectionState
   const collectionLayersRef = ctx.layers[collectionName]
@@ -54,7 +63,6 @@ export function getStateForCollection(ctx: CacheRuntime, collectionName: string)
     }
   }
 
-  ctx.collectionStateCache.set(collectionName, result)
   return result
 }
 

@@ -42,6 +42,7 @@ export async function emitAfterMutationHook<
 ) {
   let result = entry.result
   await store.$hooks.callHook('afterMutation', {
+    operation: options.operation,
     store: store as unknown as GlobalStoreType,
     meta,
     collection: options.collection,

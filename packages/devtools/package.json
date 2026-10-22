@@ -2,7 +2,7 @@
   "name": "@rstore/devtools",
   "type": "module",
   "version": "0.8.4",
-  "description": "Nuxt app and iframe component for rstore devtools",
+  "description": "Portable rstore inspection, Devframe integration, and development tooling",
   "repository": {
     "url": "https://github.com/Akryum/rstore.git",
     "type": "git",
@@ -14,51 +14,79 @@
   },
   "exports": {
     ".": {
-      "import": {
-        "types": "./dist/index.d.ts",
-        "default": "./dist/index.mjs"
-      },
-      "default": "./dist/index.mjs"
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs"
+    },
+    "./browser": {
+      "types": "./dist/browser/index.d.mts",
+      "import": "./dist/browser/index.mjs"
+    },
+    "./vue": {
+      "types": "./dist/vue/index.d.mts",
+      "import": "./dist/vue/index.mjs"
+    },
+    "./node": {
+      "types": "./dist/node/index.d.mts",
+      "import": "./dist/node/index.mjs"
     },
     "./vite": {
-      "import": {
-        "types": "./dist/vite.d.ts",
-        "default": "./dist/vite.mjs"
-      }
-    }
+      "types": "./dist/vite.d.mts",
+      "import": "./dist/vite.mjs"
+    },
+    "./protocol": {
+      "types": "./dist/protocol/index.d.mts",
+      "import": "./dist/protocol/index.mjs"
+    },
+    "./package.json": "./package.json"
   },
   "main": "./dist/index.mjs",
   "module": "./dist/index.mjs",
-  "types": "./dist/index.d.ts",
+  "types": "./dist/index.d.mts",
+  "bin": {
+    "rstore-devtools": "./dist/cli/index.mjs"
+  },
   "files": [
     "dist"
   ],
+  "engines": {
+    "node": ">=26.0.0"
+  },
   "scripts": {
-    "build": "unbuild && nuxi generate",
-    "dev": "nuxi dev --port 3300",
-    "dev:prepare": "nuxi prepare && unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs && printf \"export * from '../src/vite'\" > ./dist/vite.mjs",
-    "test:types": "nuxi prepare && vue-tsc --noEmit -p tsconfig.nuxt.json",
-    "prepare": "nuxt prepare"
+    "build": "unbuild && vite build",
+    "dev": "vite --host 127.0.0.1",
+    "dev:prepare": "unbuild --stub",
+    "test:types": "tsc --noEmit -p tsconfig.json && vue-tsc --noEmit -p tsconfig.client.json"
   },
   "peerDependencies": {
+    "vite": "^8.2.2",
     "vue": "^3.5.21"
   },
+  "peerDependenciesMeta": {
+    "vite": {
+      "optional": true
+    },
+    "vue": {
+      "optional": true
+    }
+  },
   "dependencies": {
-    "sirv": "^3.0.1",
-    "vue-virtual-scroller": "^2.0.0-beta.10"
+    "@devframes/agentic": "catalog:",
+    "@rstore/core": "workspace:^",
+    "@rstore/shared": "workspace:^",
+    "cac": "catalog:",
+    "devframe": "catalog:",
+    "valibot": "catalog:"
   },
   "devDependencies": {
-    "@nuxt/devtools-kit": "catalog:",
+    "@modelcontextprotocol/sdk": "catalog:",
     "@nuxt/ui": "catalog:",
-    "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
     "@types/node": "catalog:",
-    "@vueuse/core": "catalog:",
-    "@vueuse/nuxt": "catalog:",
-    "nuxt": "catalog:",
-    "shiki": "catalog:",
+    "@vitejs/plugin-vue": "catalog:",
+    "pinia": "catalog:",
     "typescript": "catalog:",
     "unbuild": "catalog:",
+    "vite": "catalog:",
     "vue": "catalog:",
     "vue-tsc": "catalog:"
   }

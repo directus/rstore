@@ -1,8 +1,7 @@
-import type { Cache, Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions, WrappedItemUpdateOptions } from '@rstore/shared'
+import type { Cache, Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WrappedItem, WrappedItemBase, WrappedItemUpdateFormOptions, WrappedItemUpdateOptions } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { VueCollectionApi } from './api'
 import type { VueCachePrivate } from './cache'
-import type { VueStore } from './store'
 import { isKeyDefined } from '@rstore/core'
 import { cloneInfo } from '@rstore/shared'
 import { markRaw, toRaw } from 'vue'
@@ -12,7 +11,7 @@ export interface WrapItemOptions<
   TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > {
-  store: VueStore<TSchema, TCollectionDefaults>
+  store: StoreCore<TSchema, TCollectionDefaults>
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
   item: Ref<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   metadata: WrappedItemMetadata<TCollection, TCollectionDefaults, TSchema>

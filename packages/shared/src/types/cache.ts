@@ -1,3 +1,4 @@
+import type { CacheInspection } from './cacheInspection'
 import type { Collection, CollectionDefaults, CollectionRelation, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from './collection'
 import type { FieldTimestamps, FieldTimestampValue } from './crdt'
 import type { CustomHookMeta } from './hooks'
@@ -24,6 +25,29 @@ export interface CacheTombstones {
   entries: () => IterableIterator<[string, CacheTombstone]>
   size: () => number
 }
+
+/** Immediate receipt for one submitted cache operation, independent of other queued work. */
+export interface CacheOperationResult {
+  /** Completed means this operation left the queue; queued means its work remains pending. */
+  status: 'completed' | 'queued'
+}
+
+/** Optional completion-aware entry points; ordinary cache methods retain void compatibility. */
+// Receipts describe operations on an already owned cache. Method input variance
+// preserves StoreCore's existing widening from collection-specific defaults.
+/* eslint-disable ts/method-signature-style */
+export interface CacheOperationReceipts<
+  TSchema extends StoreSchema = StoreSchema,
+  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
+> {
+  /** Submit one write and report whether this operation completed synchronously. */
+  writeItem(...params: Parameters<Cache<TSchema, TCollectionDefaults>['writeItem']>): CacheOperationResult
+  /** Submit one deletion and report whether this operation completed synchronously. */
+  deleteItem(...params: Parameters<Cache<TSchema, TCollectionDefaults>['deleteItem']>): CacheOperationResult
+  /** Submit a reset and report whether this operation completed synchronously. */
+  clear(): CacheOperationResult
+}
+/* eslint-enable ts/method-signature-style */
 
 /*
 
@@ -60,11 +84,18 @@ export interface Cache<
   TSchema extends StoreSchema = StoreSchema,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > {
+  /** Optional cache-owned diagnostic readers. Values are borrowed, not snapshots. */
+  inspect?: () => CacheInspection
+
+  /** Optional operation receipts; absence means completion cannot be established by callers. */
+  receipts?: CacheOperationReceipts<TSchema, TCollectionDefaults>
+
   readItem: <TCollection extends Collection = Collection>(params: {
     collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
     key: string | number
   }) => WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined
 
+  /** Submit one write; use optional receipts to establish synchronous completion. */
   writeItem: <TCollection extends Collection = Collection>(params: {
     collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
     key: string | number
@@ -80,6 +111,7 @@ export interface Cache<
     fieldTimestamps?: FieldTimestamps
   }) => void
 
+  /** Submit one deletion; use optional receipts to establish synchronous completion. */
   deleteItem: <TCollection extends Collection = Collection>(params: {
     collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
     key: string | number
@@ -168,6 +200,7 @@ export interface Cache<
 
   setState: (state: CustomCacheState) => void
 
+  /** Submit a reset; use optional receipts to establish synchronous completion. */
   clear: () => void
 
   clearCollection: (params: {

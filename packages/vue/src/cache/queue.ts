@@ -1,3 +1,4 @@
+import type { CacheOperationResult } from '@rstore/shared'
 import type { CacheRuntime, CacheWriteBatch, QueuedOperation } from './types'
 import { triggerRef } from 'vue'
 import { ensureCollectionRef, evictCollectionStateCache, mark } from './context'
@@ -12,11 +13,14 @@ interface CompletedOperation {
 }
 
 /** Enqueue an operation and flush it immediately when the cache is active. */
-export function enqueueOperation(ctx: CacheRuntime, operation: QueuedOperation) {
+export function enqueueOperation(ctx: CacheRuntime, operation: QueuedOperation): CacheOperationResult {
   ctx.state.queue.push(operation)
   if (!ctx.state.paused) {
     flushQueuedOperations(ctx)
   }
+  // Older operations can drain or enqueue more work during flush. Only this
+  // operation's queue membership proves whether its own dispatch completed.
+  return { status: ctx.state.queue.includes(operation) ? 'queued' : 'completed' }
 }
 
 /** Enqueue a collection write batch with its publication state. */

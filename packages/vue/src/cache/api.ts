@@ -1,9 +1,10 @@
-import type { Cache, CollectionDefaults, CustomCacheState, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Cache, CacheOperationReceipts, CollectionDefaults, CustomCacheState, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CacheRuntime, VueCachePrivate } from './types'
 import { gcTombstones } from '@rstore/core'
 import { ref, toRaw, toValue } from 'vue'
 import { getCollectionIndex, invalidateCollectionStateCache } from './context'
 import { rebuildIndexes } from './indexes'
+import { inspectCache } from './inspection'
 import { ensureLayersForCollection, getStateForCollection } from './layers'
 import { applyMutationToCache } from './mutations'
 import { clearQueryStateForCollection } from './queryState'
@@ -16,7 +17,16 @@ export function createCacheApi<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
 >(ctx: CacheRuntime<TSchema, TCollectionDefaults>): Cache & VueCachePrivate {
+  // Both public surfaces share dispatch functions. Legacy callers keep void
+  // signatures, while diagnostics explicitly opt into operation receipts.
+  const receipts: CacheOperationReceipts = {
+    writeItem: params => enqueueOperation(ctx, { type: 'writeItem', params }),
+    deleteItem: params => enqueueOperation(ctx, { type: 'deleteItem', params }),
+    clear: () => enqueueOperation(ctx, { type: 'clear' }),
+  }
   return {
+    receipts,
+    inspect: () => inspectCache(ctx),
     wrapItem({ collection, item, noCache }) {
       return getWrappedItem(ctx, collection, item, noCache)!
     },
@@ -26,9 +36,7 @@ export function createCacheApi<
     readItems(params) {
       return readItems(ctx, params)
     },
-    writeItem(params) {
-      enqueueOperation(ctx, { type: 'writeItem', params })
-    },
+    writeItem: receipts.writeItem,
     writeItems(params) {
       enqueueWriteItems(ctx, params)
     },
@@ -38,9 +46,7 @@ export function createCacheApi<
     applyMutation(params) {
       return applyMutationToCache(ctx, params)
     },
-    deleteItem(params) {
-      enqueueOperation(ctx, { type: 'deleteItem', params })
-    },
+    deleteItem: receipts.deleteItem,
     readFieldTimestamps({ collectionName, key }) {
       return ctx.state.fieldTimestamps.get(collectionName)?.get(key)
     },
@@ -65,9 +71,7 @@ export function createCacheApi<
     setState(state) {
       enqueueOperation(ctx, { type: 'setState', state })
     },
-    clear() {
-      enqueueOperation(ctx, { type: 'clear' })
-    },
+    clear: receipts.clear,
     clearCollection({ collection }) {
       clearCollection(ctx, collection)
     },
@@ -106,8 +110,40 @@ export function createCacheApi<
       flushQueuedOperations(ctx)
     },
     dispose() {
-      ctx.stopTombstoneGc?.()
-      ctx.stopTombstoneGc = undefined
+      if (ctx.disposed) {
+        return
+      }
+      ctx.disposed = true
+      try {
+        const store = ctx.getStore()
+        // Construction can fail before the cache receives its owning store.
+        if (store) {
+          store.$hooks.callHookWith('dispose', (hooks) => {
+            let firstError: unknown
+            let failed = false
+            // Every owner gets a release notification even when another observer
+            // fails. Preserve the first failure after all resources can release.
+            for (const { callback } of hooks) {
+              try {
+                callback({ store })
+              }
+              catch (error) {
+                if (!failed) {
+                  failed = true
+                  firstError = error
+                }
+              }
+            }
+            if (failed) {
+              throw firstError
+            }
+          })
+        }
+      }
+      finally {
+        ctx.stopTombstoneGc?.()
+        ctx.stopTombstoneGc = undefined
+      }
     },
     _private: {
       state: ctx.state,

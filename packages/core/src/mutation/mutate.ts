@@ -1,6 +1,7 @@
 import type { Collection, CollectionDefaults, CollectionMutationType, GlobalStoreType, MutateCallback, MutateOptions, ResolvedCollectionItemBase, StoreCore, StoreSchema } from '@rstore/shared'
 import { getMutationItemKey, isMutationItemEntry, pickNonSpecialProps, set, unwrapMutationItem } from '@rstore/shared'
 import { isKeyDefined } from '../key'
+import { reportOperationError } from '../utils/operationError'
 import { finalizeMutation } from './finalizeMutation'
 
 /** Run custom remote work through rstore's collection mutation lifecycle. */
@@ -14,11 +15,36 @@ export async function mutate<
   options: MutateOptions<TCollection, TCollectionDefaults, TSchema>,
   callback: MutateCallback<TCollection, TCollectionDefaults, TSchema, TResult>,
 ): Promise<TResult> {
-  return isManyMutation(options)
-    ? mutateMany(store, options, callback)
-    : mutateSingle(store, options, callback)
+  const operation = {}
+  const meta = options.meta ?? {}
+  const many = isManyMutation(options)
+  // Execution updates this detached context after item preparation/hooks, so
+  // errors name the same effective target supplied to custom remote work.
+  const execution = { key: options.key }
+  try {
+    return await (many
+      ? mutateMany(store, { ...options, meta }, callback, operation)
+      : mutateSingle(store, { ...options, meta }, callback, execution, operation))
+  }
+  catch (error) {
+    await reportOperationError(store.$hooks, 'mutationError', {
+      operation,
+      store: store as unknown as GlobalStoreType,
+      meta,
+      collection: options.collection,
+      mutation: options.mutation,
+      many,
+      key: execution.key,
+      item: options.item,
+      keys: options.keys,
+      items: options.items,
+      error,
+    })
+    throw error
+  }
 }
 
+/** Run one custom mutation while preserving its effective error target. */
 async function mutateSingle<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -28,12 +54,16 @@ async function mutateSingle<
   store: StoreCore<TSchema, TCollectionDefaults>,
   options: MutateOptions<TCollection, TCollectionDefaults, TSchema>,
   callback: MutateCallback<TCollection, TCollectionDefaults, TSchema, TResult>,
+  execution: { key: string | number | undefined },
+  operation: object,
 ): Promise<TResult> {
   const meta = options.meta ?? {}
   let item = prepareSingleItem(store, options)
   let key = options.key ?? getItemKey(options, item)
+  execution.key = normalizeKey(key)
 
   await store.$hooks.callHook('beforeMutation', {
+    operation,
     store: store as unknown as GlobalStoreType,
     meta,
     collection: options.collection,
@@ -51,6 +81,7 @@ async function mutateSingle<
   })
 
   key = options.key ?? getItemKey(options, item)
+  execution.key = normalizeKey(key)
 
   const callbackResult = await callback({
     store: store as unknown as GlobalStoreType,
@@ -63,6 +94,7 @@ async function mutateSingle<
 
   const finalizeResult = await finalizeMutation(store, {
     ...options,
+    operation,
     meta,
     key: normalizeKey(key),
     item,
@@ -81,11 +113,13 @@ async function mutateMany<
   store: StoreCore<TSchema, TCollectionDefaults>,
   options: MutateOptions<TCollection, TCollectionDefaults, TSchema>,
   callback: MutateCallback<TCollection, TCollectionDefaults, TSchema, TResult>,
+  operation: object,
 ): Promise<TResult> {
   const meta = options.meta ?? {}
   let items = options.items?.map(item => prepareManyItem(store, options, item))
 
   await store.$hooks.callHook('beforeManyMutation', {
+    operation,
     store: store as unknown as GlobalStoreType,
     meta,
     collection: options.collection,
@@ -110,6 +144,7 @@ async function mutateMany<
 
   const finalizeResult = await finalizeMutation(store, {
     ...options,
+    operation,
     meta,
     keys,
     items,

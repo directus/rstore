@@ -1,0 +1,58 @@
+import { expect, test } from '@playwright/test'
+import { callDevtools, createInspectorPanel, selectInspectorStore } from './devtoolsDriver'
+
+test.beforeEach(async ({ page }) => {
+  await page.goto('/test/browser/fixtures/index.html')
+  await callDevtools(page, 'initialize', { rich: true })
+})
+test.afterEach(async ({ page }) => {
+  await callDevtools(page, 'dispose')
+})
+
+test('built inspector reads six views through real parent producer and updates Vue module values', async ({ page }) => {
+  const frame = await createInspectorPanel(page)
+  await expect(frame.getByRole('heading', { name: 'todos', exact: true })).toBeVisible()
+  await expect(frame.getByText('author', { exact: true })).toBeVisible()
+  await frame.getByRole('button', { name: 'Cache', exact: true }).click()
+  await expect(frame.getByText('"core row"', { exact: true })).toBeVisible()
+  await frame.getByRole('button', { name: 'History', exact: true }).click()
+  await expect(frame.getByRole('button', { name: 'Clear history', exact: true })).toBeVisible()
+  await expect(frame.getByText(/Fixture fetch failed/).first()).toBeVisible()
+  await frame.getByRole('button', { name: 'Subscriptions', exact: true }).click()
+  await expect(frame.getByText('sub-core', { exact: true })).toBeVisible()
+  await frame.getByRole('button', { name: 'Plugins', exact: true }).click()
+  await expect(frame.getByRole('heading', { name: 'fake-remote', exact: true })).toBeVisible()
+  await selectInspectorStore(frame, 'vue')
+  await frame.getByRole('button', { name: 'Modules', exact: true }).click()
+  await expect(frame.getByRole('heading', { name: 'counter', exact: true })).toBeVisible()
+  await frame.locator('dt').filter({ hasText: /^state$/ }).locator('..').locator('dd > details > summary').click()
+  await expect(frame.locator('dt').filter({ hasText: /^count$/ }).locator('..').getByText('1', { exact: true })).toBeVisible()
+  await callDevtools(page, 'changeModule', 17)
+  await expect(frame.locator('dt').filter({ hasText: /^count$/ }).locator('..').getByText('17', { exact: true })).toBeVisible()
+  await frame.getByRole('button', { name: 'Cache', exact: true }).click()
+  await expect(frame.getByText('"vue row"', { exact: true })).toBeVisible()
+  await expect(frame.getByText('"core row"', { exact: true })).toHaveCount(0)
+  await page.locator('#inspector').evaluate((element) => {
+    element.setAttribute('width', '1100')
+    element.setAttribute('height', '750')
+  })
+  await page.locator('#inspector').screenshot({ path: '/tmp/rstore-devtools-inspector.png' })
+})
+
+test('two inspector viewers converge after cache write and selected generation invalidates stale viewer', async ({ page }) => {
+  const first = await createInspectorPanel(page, 'first-inspector')
+  const second = await createInspectorPanel(page, 'second-inspector')
+  await first.getByRole('button', { name: 'Cache', exact: true }).click()
+  await second.getByRole('button', { name: 'Cache', exact: true }).click()
+  await first.getByRole('button', { name: 'Write item', exact: true }).click()
+  await first.getByRole('textbox', { name: 'JSON item', exact: true }).fill('{"id":0,"title":"Shared write"}')
+  await first.getByRole('button', { name: 'Submit', exact: true }).click()
+  await expect(first.locator('article').filter({ hasText: 'number: 0' }).getByText('"Shared write"', { exact: true })).toBeVisible()
+  await expect(second.getByText('"Shared write"', { exact: true })).toBeVisible()
+  await page.locator('#first-inspector').evaluate(element => element.remove())
+  await callDevtools(page, 'replaceCore')
+  await expect(second.getByText('Selected store unavailable', { exact: true }).last()).toBeVisible()
+  await expect(second.getByText('"Shared write"', { exact: true })).toHaveCount(0)
+  await selectInspectorStore(second, 'core')
+  await expect(second.getByText('"Shared write"', { exact: true })).toBeVisible()
+})

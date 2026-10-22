@@ -3,6 +3,7 @@ import { resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
 import { defineConfig } from 'vite'
+import { rstoreDevtools } from '../../packages/devtools/src/vite'
 import { runtimeSourceAliases, sourceEntry } from '../utils/sourceAliases'
 import { multiplayerNuxtDefines, multiplayerNuxtRuntime } from './multiplayerNuxtRuntime'
 import { multiplayerRelay } from './multiplayerRelay'
@@ -14,7 +15,11 @@ const artifacts = process.env.RSTORE_BROWSER_ARTIFACT_DIR ?? resolve(tmpdir(), `
 
 export default defineConfig({
   root,
-  plugins: [multiplayerRelay(), multiplayerNuxtRuntime()],
+  plugins: [
+    multiplayerRelay(),
+    multiplayerNuxtRuntime(),
+    rstoreDevtools({ clientDir: resolve(root, 'packages/devtools/dist/client') }),
+  ],
   define: {
     ...multiplayerNuxtDefines,
     __VUE_OPTIONS_API__: true,
@@ -25,7 +30,7 @@ export default defineConfig({
   // Dynamic scenario imports must not trigger dependency discovery and reload an active test.
   optimizeDeps: {
     noDiscovery: true,
-    include: ['vue', '@vueuse/core', 'klona', 'fast-equals'],
+    include: ['vue', '@vueuse/core', 'klona', 'fast-equals', 'devframe/in-page-channel'],
     // Nuxt runtime needs the same client build switches as fixture modules.
     exclude: ['nuxt/app'],
   },

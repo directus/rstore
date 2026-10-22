@@ -48,13 +48,11 @@
     "prepack": "node ../../scripts/sync-dep-skills.mjs ."
   },
   "dependencies": {
-    "@nuxt/devtools-kit": "^2.2.1",
     "@nuxt/kit": "^4.0.0",
     "@rstore/devtools": "workspace:^",
     "@rstore/shared": "workspace:^",
     "@rstore/vue": "workspace:^",
-    "serialize-javascript": "^6.0.2",
-    "sirv": "^3.0.1"
+    "serialize-javascript": "^6.0.2"
   },
   "devDependencies": {
     "@iconify-json/lucide": "catalog:",

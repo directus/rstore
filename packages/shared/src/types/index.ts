@@ -1,5 +1,6 @@
 export * from './batch.js'
 export * from './cache.js'
+export * from './cacheInspection.js'
 export * from './collection.js'
 export * from './collectionHooks.js'
 export * from './crdt.js'

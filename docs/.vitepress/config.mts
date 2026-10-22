@@ -74,6 +74,7 @@ export default defineConfig({
         {
           text: 'Migration',
           items: [
+            { text: 'Devtools', link: '/guide/devtools-migration' },
             { text: 'From 0.6 to 0.7', link: '/guide/migration/v0_7' },
             { text: 'From 0.7 to 0.8', link: '/guide/migration/v0_8' },
           ],

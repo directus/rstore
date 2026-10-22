@@ -146,6 +146,7 @@ export async function createStoreCore<
     $isServer: options.isServer ?? false,
     $dedupePromises: new Map(),
     $registeredModules: new Map(),
+    $getModules: () => [...store.$registeredModules.values()],
     $wrapMutation: mutation => mutation as typeof mutation & MutationSpecialProps,
     $sync: createSync(() => store),
     $syncState: {

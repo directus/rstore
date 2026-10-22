@@ -7,6 +7,7 @@ import { markRaw, ref, shallowRef } from 'vue'
 import { ensureCollectionRef, getItemWrapKey, invalidateCollectionStateCache, mark, removeFieldTimestampsForItem } from './context'
 import { restoreCausality } from './hydration'
 import { removeItemIndexes, updateItemIndexes } from './indexes'
+import { forgetInspectionKey, rebuildInspectionKeys, rememberInspectionKey } from './inspectionKeys'
 import { clearAllQueryState } from './queryState'
 import { resolveRelationWriteParams } from './relationWrite'
 import { invalidateCollectionWrite, setCollectionItem } from './writePublication'
@@ -26,6 +27,7 @@ export function deleteItemNow<TCollection extends Collection>(
   removeItemIndexes(ctx, collection, key, item)
   invalidateCollectionStateCache(ctx, collection.name)
   delete collectionState[key]
+  forgetInspectionKey(ctx, collection.name, key)
   invalidateCollectionStateCache(ctx, collection.name)
   removeFieldTimestampsForItem(ctx, collection.name, key)
 
@@ -80,6 +82,7 @@ export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeI
   else {
     writeMutableItem(ctx, params, collectionState)
   }
+  rememberInspectionKey(ctx, collection.name, key)
   invalidateCollectionWrite(ctx, collection.name, params.batch)
 
   if (marker) {
@@ -138,7 +141,7 @@ export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
     }
   }
   ctx.state.collections = newCollectionsState
-
+  rebuildInspectionKeys(ctx)
   const newModulesState: Record<string, ReturnType<typeof ref<any>>> = {}
   for (const moduleKey in value.modules) {
     newModulesState[moduleKey] = ref(value.modules[moduleKey])
@@ -163,6 +166,7 @@ export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
 /** Clear all cache data immediately. */
 export function clearNow(ctx: CacheRuntime) {
   ctx.state.markers = {}
+  ctx.publicKeys.clear()
   for (const collectionName in ctx.state.collections) {
     ctx.state.collections[collectionName]!.value = {}
   }

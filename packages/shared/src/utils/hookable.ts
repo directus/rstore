@@ -69,8 +69,9 @@ function splitAbortHandle(args: any[]): { args: any[], signal: AbortSignal | und
     : { args, signal: undefined }
 }
 
+/** Typed callback registry; named hook interfaces need no arbitrary string index. */
 export class Hookable<
-  HooksT extends Record<string, HookCallback<any, any>> = Record<string, HookCallback<any, any>>,
+  HooksT extends { [Key in keyof HooksT]: HookCallback<any, any> } = Record<string, HookCallback<any, any>>,
   HookNameT extends HookKeys<HooksT> = HookKeys<HooksT>,
 > {
   public _hooks: { [key: string]: StoredHookCallback<any, any>[] } = {}
@@ -193,6 +194,6 @@ export class Hookable<
  * Use this for custom hook systems; for store hooks prefer the typed
  * `createHooks` from `./hooks.js` which binds the rstore hook definitions.
  */
-export function createHookable<T extends Record<string, any>>(): Hookable<T> {
+export function createHookable<T extends { [Key in keyof T]: HookCallback<any, any> }>(): Hookable<T> {
   return new Hookable<T>()
 }

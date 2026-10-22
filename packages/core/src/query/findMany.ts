@@ -4,6 +4,7 @@ import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '
 import { unwrapItem } from '../item'
 import { isKeyDefined } from '../key'
 import { stringifyFindOptions } from '../utils/findOptions'
+import { createOperationErrorReporter } from '../utils/operationError'
 import { dedupeQuery } from './dedupe'
 import { peekMany } from './peekMany'
 
@@ -53,6 +54,7 @@ export async function findMany<
   }))
 }
 
+/** Execute multiple items query with one terminal failure observation. */
 async function _findMany<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -63,145 +65,168 @@ async function _findMany<
   collection,
   findOptions,
 }: FindManyParams<TCollection, TCollectionDefaults, TSchema> & { findOptions: FindManyOptions<TCollection, TCollectionDefaults, TSchema>, meta: CustomHookMeta }): Promise<QueryResult<Array<WrappedItem<TCollection, TCollectionDefaults, TSchema>>>> {
-  const fetchPolicy = findOptions.fetchPolicy
+  const operation = {}
+  const reportError = createOperationErrorReporter(store.$hooks, 'fetchError', {
+    operation,
+    store: store as unknown as GlobalStoreType,
+    meta,
+    collection,
+    findOptions,
+    many: true,
+  })
+  try {
+    const fetchPolicy = findOptions.fetchPolicy
 
-  let result: any[] | undefined
-  let marker: string | undefined
-  let fetchPromise: Promise<void> | undefined
+    let result: any[] | undefined
+    let marker: string | undefined
+    let fetchPromise: Promise<void> | undefined
 
-  if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
-    const peekManyResult = peekMany({
-      store,
-      meta,
-      collection,
-      findOptions,
-    })
-    result = peekManyResult.result
-    marker = peekManyResult.marker
-  }
+    if (shouldReadCacheFromFetchPolicy(fetchPolicy)) {
+      const peekManyResult = peekMany({
+        store,
+        meta,
+        collection,
+        findOptions,
+      })
+      result = peekManyResult.result
+      marker = peekManyResult.marker
+    }
 
-  if (!result?.length && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
-    const fetch = async () => {
-      if (!marker) {
-        marker = defaultMarker(collection, findOptions)
+    if (!result?.length && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
+      const fetch = async () => {
+        try {
+          if (!marker) {
+            marker = defaultMarker(collection, findOptions)
+          }
+
+          await store.$hooks.callHook('beforeFetch', {
+            operation,
+            store: store as unknown as GlobalStoreType,
+            meta,
+            collection,
+            findOptions,
+            many: true,
+            updateFindOptions: (value) => {
+              Object.assign(findOptions, value)
+            },
+          })
+
+          const abort = store.$hooks.withAbort({ explicit: true })
+          await store.$hooks.callHook('fetchMany', {
+            store: store as unknown as GlobalStoreType,
+            meta,
+            collection,
+            findOptions,
+            getResult: () => result ?? [],
+            setResult: (value, options) => {
+              result = value
+              if (result?.length && options?.abort !== false) {
+                abort()
+              }
+            },
+            setMarker: (value) => {
+              marker = value
+            },
+            abort,
+          }, abort)
+
+          await store.$hooks.callHook('afterFetch', {
+            operation,
+            store: store as unknown as GlobalStoreType,
+            meta,
+            collection,
+            findOptions,
+            many: true,
+            getResult: () => result,
+            setResult: (value) => {
+              result = value
+            },
+          })
+
+          if (result) {
+            const newResult = [] as typeof result
+
+            for (const item of result) {
+              const unwrappedItem = unwrapItem(item)
+              store.$processItemParsing(collection, unwrappedItem)
+              newResult.push(unwrappedItem)
+            }
+
+            result = newResult
+
+            if (fetchPolicy !== 'no-cache' && meta.$canPublishQuery?.() !== false) {
+              const items = result
+              const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
+              for (const item of items) {
+                const key = collection.getKey(item)
+                if (!isKeyDefined(key)) {
+                  console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
+                  continue
+                }
+                writes.push({ key, value: item })
+              }
+              if (writes.length) {
+                store.$cache.writeItems<TCollection>({
+                  collection,
+                  items: writes,
+                  marker: getMarker('many', marker),
+                  meta,
+                })
+              }
+            }
+          }
+        }
+        catch (error) {
+          await reportError(error)
+          throw error
+        }
       }
 
-      await store.$hooks.callHook('beforeFetch', {
-        store: store as unknown as GlobalStoreType,
-        meta,
-        collection,
-        findOptions,
-        many: true,
-        updateFindOptions: (value) => {
-          Object.assign(findOptions, value)
-        },
-      })
+      fetchPromise = fetch()
 
+      if (fetchPolicy !== 'cache-and-fetch') {
+        await fetchPromise
+      }
+      else {
+        // Background fetch: callers may observe `fetchPromise` but are not required to.
+        // Attaching a handler marks the rejection as handled so an ignored failure doesn't
+        // become an unhandled rejection - the returned promise still rejects when awaited.
+        fetchPromise.catch(() => {})
+      }
+    }
+    else if (meta.$queryTracking) {
+      meta.$queryTracking.skipped = true
+    }
+
+    if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy) && meta.$canPublishQuery?.() !== false) {
       const abort = store.$hooks.withAbort({ explicit: true })
-      await store.$hooks.callHook('fetchMany', {
+      await store.$hooks.callHook('fetchRelations', {
         store: store as unknown as GlobalStoreType,
         meta,
         collection,
-        findOptions,
-        getResult: () => result ?? [],
-        setResult: (value, options) => {
-          result = value
-          if (result?.length && options?.abort !== false) {
-            abort()
-          }
-        },
-        setMarker: (value) => {
-          marker = value
-        },
-        abort,
-      }, abort)
-
-      await store.$hooks.callHook('afterFetch', {
-        store: store as unknown as GlobalStoreType,
-        meta,
-        collection,
-        findOptions,
+        findOptions: findOptions as FindOptions<TCollection, TCollectionDefaults, TSchema> & { include: NonNullable<FindOptions<TCollection, TCollectionDefaults, TSchema>['include']> },
         many: true,
         getResult: () => result,
-        setResult: (value) => {
-          result = value
-        },
-      })
-
-      if (result) {
-        const newResult = [] as typeof result
-
-        for (const item of result) {
-          const unwrappedItem = unwrapItem(item)
-          store.$processItemParsing(collection, unwrappedItem)
-          newResult.push(unwrappedItem)
-        }
-
-        result = newResult
-
-        if (fetchPolicy !== 'no-cache' && meta.$canPublishQuery?.() !== false) {
-          const items = result
-          const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
-          for (const item of items) {
-            const key = collection.getKey(item)
-            if (!isKeyDefined(key)) {
-              console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
-              continue
-            }
-            writes.push({ key, value: item })
-          }
-          if (writes.length) {
-            store.$cache.writeItems<TCollection>({
-              collection,
-              items: writes,
-              marker: getMarker('many', marker),
-              meta,
-            })
-          }
-        }
-      }
+        abort,
+      }, abort)
     }
 
-    fetchPromise = fetch()
-
-    if (fetchPolicy !== 'cache-and-fetch') {
-      await fetchPromise
+    if (result?.length) {
+      result = result.map((item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => store.$cache.wrapItem({
+        collection,
+        item,
+        noCache: fetchPolicy === 'no-cache' || meta.$canPublishQuery?.() === false,
+      }))
     }
-    else {
-      // Background fetch: callers may observe `fetchPromise` but are not required to.
-      // Attaching a handler marks the rejection as handled so an ignored failure doesn't
-      // become an unhandled rejection - the returned promise still rejects when awaited.
-      fetchPromise.catch(() => {})
+
+    return {
+      result: result ?? [],
+      marker,
+      fetchPromise,
     }
   }
-  else if (meta.$queryTracking) {
-    meta.$queryTracking.skipped = true
-  }
-
-  if (findOptions.include && shouldFetchDataFromFetchPolicy(fetchPolicy) && meta.$canPublishQuery?.() !== false) {
-    const abort = store.$hooks.withAbort({ explicit: true })
-    await store.$hooks.callHook('fetchRelations', {
-      store: store as unknown as GlobalStoreType,
-      meta,
-      collection,
-      findOptions: findOptions as FindOptions<TCollection, TCollectionDefaults, TSchema> & { include: NonNullable<FindOptions<TCollection, TCollectionDefaults, TSchema>['include']> },
-      many: true,
-      getResult: () => result,
-      abort,
-    }, abort)
-  }
-
-  if (result?.length) {
-    result = result.map((item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => store.$cache.wrapItem({
-      collection,
-      item,
-      noCache: fetchPolicy === 'no-cache' || meta.$canPublishQuery?.() === false,
-    }))
-  }
-
-  return {
-    result: result ?? [],
-    marker,
-    fetchPromise,
+  catch (error) {
+    await reportError(error)
+    throw error
   }
 }

@@ -11,6 +11,8 @@ export interface HookMetaQueryTracking {
 // @TODO type generics
 export interface CustomHookMeta {
   $queryTracking?: HookMetaQueryTracking
+  /** A durable local queue accepted this mutation; remote commit remains pending. */
+  mutationStatus?: 'queued'
   /**
    * Whether a reactive request still has a consumer allowed to publish it.
    * Core combines these checks for deduped consumers; caches recheck before

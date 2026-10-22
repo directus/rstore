@@ -1,65 +1,67 @@
 import type { Resolver } from '@nuxt/kit'
 import type { Nuxt } from 'nuxt/schema'
-import { existsSync } from 'node:fs'
-import { createRequire } from 'node:module'
-import { dirname, resolve } from 'node:path'
+import type { ResolvedNuxtDevtoolsOptions } from './runtime/devtools/options'
+import { randomBytes } from 'node:crypto'
+import { addServerPlugin, runWithNuxtContext, updateRuntimeConfig } from '@nuxt/kit'
 
-const DEVTOOLS_UI_ROUTE = '/__rstore'
-const DEVTOOLS_UI_IFRAME_SRC = `${DEVTOOLS_UI_ROUTE}/`
-const DEVTOOLS_UI_LOCAL_PORT = 3300
-const devtoolsRequire = createRequire(import.meta.url)
-
-function resolveDevtoolsClientPath() {
-  try {
-    const entryPath = devtoolsRequire.resolve('@rstore/devtools')
-    return resolve(dirname(entryPath), 'client')
+/** Mount shared host once and keep private SSR authority outside browser config. */
+export async function setupDevToolsUI(nuxt: Nuxt, resolver: Resolver, options: ResolvedNuxtDevtoolsOptions): Promise<void> {
+  const { configureDevtoolsServer } = await import('@rstore/devtools/vite')
+  const authToken = randomBytes(32).toString('hex')
+  const privateConfig = { baseURL: '', authToken }
+  nuxt.options.runtimeConfig.rstoreDevtoolsSSR = privateConfig
+  addServerPlugin(resolver.resolve('./runtime/devtools/nitro'))
+  const appBase = nuxt.options.app.baseURL
+  const base = `/${[...appBase.split('/'), ...options.base.split('/')].filter(Boolean).join('/')}/`
+  let publicOrigin = ''
+  let cleanup: (() => Promise<void>) | undefined
+  // Nitro clones runtime config before the listener hook in programmatic boots.
+  nuxt.hook('nitro:config', (config) => {
+    config.runtimeConfig ||= {}
+    config.runtimeConfig.rstoreDevtoolsSSR = privateConfig
+  })
+  /** Publish late listening address to Nitro's actual resolved config/worker. */
+  async function publishPrivateConfig() {
+    nuxt.options.runtimeConfig.rstoreDevtoolsSSR = { ...privateConfig }
+    // Nitro's updateConfig replaces its normalized config; preserve app/public keys.
+    const runtimeConfig = {
+      ...nuxt.options.nitro.runtimeConfig,
+      ...nuxt.options.runtimeConfig,
+      rstoreDevtoolsSSR: { ...privateConfig },
+    }
+    await runWithNuxtContext(nuxt, () => updateRuntimeConfig(runtimeConfig))
   }
-  catch {
-    return null
-  }
-}
-
-export function setupDevToolsUI(nuxt: Nuxt, _resolver: Resolver) {
-  const clientPath = resolveDevtoolsClientPath()
-  const isProductionBuild = !!clientPath && existsSync(clientPath)
-
-  // Serve production-built client (used when package is published)
-  if (isProductionBuild && clientPath) {
-    nuxt.hook('vite:serverCreated', async (server) => {
-      const sirv = await import('sirv').then(r => r.default || r)
-      server.middlewares.use(
-        DEVTOOLS_UI_ROUTE,
-        sirv(clientPath, { dev: true, single: true }),
-      )
-    })
-  }
-  // In local development, start a separate Nuxt Server and proxy to serve the client
-  else {
-    nuxt.hook('vite:extend', ({ config }) => {
-      config.server = config.server || {}
-      config.server.proxy = config.server.proxy || {}
-      config.server.proxy[DEVTOOLS_UI_ROUTE] = {
-        target: `http://localhost:${DEVTOOLS_UI_LOCAL_PORT}${DEVTOOLS_UI_IFRAME_SRC}`,
-        changeOrigin: true,
-        followRedirects: true,
-        rewrite: path => path.replace(DEVTOOLS_UI_ROUTE, ''),
-      }
-    })
-  }
-
-  nuxt.hook('devtools:customTabs' as any, (tabs: any[]) => {
-    tabs.push({
-      // unique identifier
-      name: 'rstore',
-      // title to display in the tab
-      title: 'rstore',
-      // any icon from Iconify, or a URL to an image
-      icon: `${DEVTOOLS_UI_ROUTE}/logo.png`,
-      // iframe view
-      view: {
-        type: 'iframe',
-        src: DEVTOOLS_UI_IFRAME_SRC,
+  /** Resolve dynamic listening port without configuration guesses. */
+  nuxt.hook('listen', async (server, listener) => {
+    const address = server.address()
+    if (address && typeof address !== 'string') {
+      const scheme = String(listener.url ?? '').startsWith('https:') ? 'https' : 'http'
+      publicOrigin = `${scheme}://127.0.0.1:${address.port}`
+      privateConfig.baseURL = `${publicOrigin}${base}`
+      await publishPrivateConfig()
+    }
+  })
+  nuxt.hook('vite:serverCreated', async (server, environment) => {
+    if (!environment.isClient || cleanup)
+      return
+    cleanup = await configureDevtoolsServer(server, {
+      base: options.base,
+      applicationBase: appBase,
+      // Nitro owns frontend upgrades; middleware-mode Vite uses official sidecar.
+      origin: () => publicOrigin,
+      ssrAuthTokens: [authToken],
+      onReady(info) {
+        if (info.baseURL !== privateConfig.baseURL) {
+          privateConfig.baseURL = info.baseURL
+          void publishPrivateConfig()
+        }
       },
     })
+  })
+  nuxt.hook('close', async () => {
+    await cleanup?.()
+  })
+  nuxt.hook('devtools:customTabs' as any, (tabs: any[]) => {
+    tabs.push({ name: 'rstore', title: 'rstore', icon: `${base}logo.png`, view: { type: 'iframe', src: base } })
   })
 }

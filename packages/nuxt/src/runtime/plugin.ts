@@ -4,6 +4,8 @@ import { defineNuxtPlugin } from '#imports'
 // @ts-expect-error virtual file
 import _schema from '#rstore-collection'
 // @ts-expect-error virtual file
+import devtoolsOptions from '#rstore-devtools'
+// @ts-expect-error virtual file
 import options from '#rstore-options'
 // @ts-expect-error virtual file
 import * as _plugins from '#rstore-plugins'
@@ -20,21 +22,44 @@ export default defineNuxtPlugin({
     let plugins = Object.values({ ..._plugins }) as Plugin[]
     const schema = _schema as StoreSchema
 
-    // Devtools
-    if (import.meta.dev) {
-      const { devtoolsPlugin } = await import('./devtools')
-      plugins = [
-        ...plugins,
-        devtoolsPlugin,
-      ]
+    let browserDevtools: { dispose: () => void } | undefined
+    let ssrDevtools: import('./devtools/request').SSRRequestHandle | undefined
+    if (import.meta.dev && devtoolsOptions) {
+      if (import.meta.client) {
+        try {
+          const { createNuxtBrowserDevtools } = await import('./devtools/browser')
+          const handle = await createNuxtBrowserDevtools(devtoolsOptions, nuxtApp.$config.app.baseURL)
+          browserDevtools = handle
+          plugins = [...plugins, handle.plugin]
+        }
+        catch (error) {
+          console.warn('rstore devtools unavailable:', error)
+        }
+      }
+      else if (import.meta.server) {
+        const { beginRstoreSSR } = await import('./devtools/server')
+        ssrDevtools = beginRstoreSSR(nuxtApp, nuxtApp.ssrContext?.runtimeConfig?.rstoreDevtoolsSSR)
+        if (ssrDevtools)
+          plugins = [...plugins, ssrDevtools.plugin]
+      }
     }
 
-    const store = await createStore({
-      plugins,
-      schema,
-      isServer: !!import.meta.server,
-      ...options,
-    })
+    let store: Awaited<ReturnType<typeof createStore>>
+    try {
+      store = await createStore({
+        plugins,
+        schema,
+        isServer: !!import.meta.server,
+        ...options,
+      })
+      ssrDevtools?.bindStore(store)
+      nuxtApp.vueApp.onUnmount(() => browserDevtools?.dispose())
+    }
+    catch (error) {
+      browserDevtools?.dispose()
+      ssrDevtools?.finalize('error', error)
+      throw error
+    }
 
     const cacheKey = '$srstore'
 

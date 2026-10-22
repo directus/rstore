@@ -1,8 +1,7 @@
 import type { TombstoneStore } from '@rstore/core'
-import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
-import type { Ref } from 'vue'
+import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { ComputedRef, Ref } from 'vue'
 import type { WrappedItemMetadata } from '../item'
-import type { VueStore } from '../store'
 
 /** Cache operations delayed while the cache is paused or write staggering is active. */
 export type QueuedOperation
@@ -64,8 +63,8 @@ export interface CreateCacheOptions<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
 > {
-  /** Resolve the owning Vue store. */
-  getStore: () => VueStore<TSchema, TCollectionDefaults>
+  /** Resolve the owning Core-compatible store. */
+  getStore: () => StoreCore<TSchema, TCollectionDefaults>
   /** Maximum number of queued writes processed per 10ms. */
   cacheStaggering?: number
   /** Auto-GC settings for the per-cache tombstone store. */
@@ -84,12 +83,16 @@ export interface CacheRuntime<
   TSchema extends StoreSchema = StoreSchema,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > {
-  /** Resolve the owning Vue store. */
-  getStore: () => VueStore<TSchema, TCollectionDefaults>
+  /** Resolve the owning Core-compatible store. */
+  getStore: () => StoreCore<TSchema, TCollectionDefaults>
+  /** Whether disposal notification has already been emitted. */
+  disposed?: boolean
   /** Write staggering budget. */
   cacheStaggering: number
   /** Internal reactive cache state. */
   state: InternalCacheState
+  /** Committed public key form by collection and canonical address; no row values. */
+  publicKeys: Map<string, Map<string, string | number>>
   /** Stop the tombstone GC timer, when one is active. */
   stopTombstoneGc?: () => void
   /** Optimistic/cache layers by collection name. */
@@ -102,8 +105,8 @@ export interface CacheRuntime<
   wrappedItemsMetadata: Map<string, WrappedItemMetadata<Collection, TCollectionDefaults, TSchema>>
   /** Wrap keys created for each layer. */
   wrappedItemKeysPerLayer: Map<string, Set<string>>
-  /** Cached overlay collection states. */
-  collectionStateCache: Map<string, Record<string | number, any>>
+  /** Lazy overlay values tracking reactive layer flags without active watchers. */
+  collectionStateCache: Map<string, ComputedRef<Record<string | number, any>>>
   /** Reactivity markers for cached overlay states. */
   collectionStateCacheReactivityMarker: Map<string, Ref<number>>
   /** Whether queued operations are currently being flushed. */

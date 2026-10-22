@@ -22,6 +22,26 @@ export interface FetchHookDefinitions<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
 > {
+  /** Observe a failed fetch without changing its original rejection. */
+  fetchError: <TCollection extends Collection>(payload: {
+    /** Opaque identity shared only by one Core invocation. @internal */
+    operation?: object
+    /** Store owning the operation. */
+    store: GlobalStoreType
+    /** Same metadata identity used by the fetch lifecycle. */
+    meta: CustomHookMeta
+    /** Collection being fetched. */
+    collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+    /** Requested single-item key, when present. */
+    key?: string | number
+    /** Resolved options used by the failed fetch. */
+    findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
+    /** Whether the operation fetches multiple items. */
+    many: boolean
+    /** Original application error, including non-Error thrown values. */
+    error: unknown
+  }) => Awaitable<void>
+
   resolveFindOptions: <
     TCollection extends Collection,
   > (
@@ -44,6 +64,8 @@ export interface FetchHookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
+      /** Opaque identity shared only by one Core invocation. @internal */
+      operation?: object
       store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
@@ -58,6 +80,8 @@ export interface FetchHookDefinitions<
     TCollection extends Collection,
   > (
     payload: {
+      /** Opaque identity shared only by one Core invocation. @internal */
+      operation?: object
       store: GlobalStoreType
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>

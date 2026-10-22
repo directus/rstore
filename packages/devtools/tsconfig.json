@@ -2,7 +2,24 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
+    "paths": {
+      "@rstore/shared": [
+        "../shared/src/index.ts"
+      ],
+      "@rstore/core": [
+        "../core/src/index.ts"
+      ],
+      "@rstore/vue": [
+        "../vue/src/index.ts"
+      ],
+      "#test-utils/*": [
+        "../../test/utils/*"
+      ]
+    },
+    "types": [
+      "node"
+    ],
     "strict": true,
     "noImplicitOverride": true,
     "noImplicitThis": true,

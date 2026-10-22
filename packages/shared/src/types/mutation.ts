@@ -67,6 +67,8 @@ export interface FinalizeMutationOptions<
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
   TSchema extends StoreSchema = StoreSchema,
 > extends ApplyMutationOptions<TCollection, TCollectionDefaults, TSchema> {
+  /** Opaque identity propagated to mutation completion hooks. @internal */
+  operation?: object
   skipCache?: boolean
   formOperations?: FormOperation[]
 }
@@ -75,7 +77,7 @@ export interface MutateOptions<
   TCollection extends Collection = Collection,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
   TSchema extends StoreSchema = StoreSchema,
-> extends Omit<FinalizeMutationOptions<TCollection, TCollectionDefaults, TSchema>, 'result' | 'results'> {
+> extends Omit<FinalizeMutationOptions<TCollection, TCollectionDefaults, TSchema>, 'result' | 'results' | 'operation'> {
   many?: boolean
 }
 
