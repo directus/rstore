@@ -32,7 +32,8 @@ describe('query', () => {
 
       await until((): number => query.data.value.length).toBe(1)
 
-      await Promise.resolve()
+      // Cache writes can precede page metadata; wait for public revalidation completion.
+      await query.background.promise
 
       expect((query.meta.value as any).meow).toBe('waf')
     })

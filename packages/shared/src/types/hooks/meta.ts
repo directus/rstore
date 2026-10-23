@@ -30,6 +30,14 @@ export interface CustomHookMeta {
   $canPublishQuery?: () => boolean
 }
 
+/**
+ * Hook metadata without the `$`-prefixed fields rstore reserves for its own
+ * bookkeeping, such as `$resultVersion` or `$queryTracking`.
+ */
+export type PublicHookMeta = {
+  [K in keyof CustomHookMeta as K extends `$${string}` ? never : K]: CustomHookMeta[K]
+}
+
 export interface AbortableOptions {
   /**
    * If true, the remaining hooks in the queue will not be called.

@@ -1,5 +1,5 @@
 import type { TombstoneStore } from '@rstore/core'
-import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, QueryResultMode, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from '../item'
 
@@ -39,6 +39,39 @@ export interface CacheWriteBatch {
   deferredAfterCacheWrites: AfterCacheWritePayload[]
 }
 
+/** Saved response identities or absence, with confirmation for a query page. */
+export type CachedPageRefs = (
+  | {
+    /** A single cached row. */
+    type: 'ref'
+    /** Primary key of the row. */
+    key: string | number
+  }
+  | {
+    /** Cached rows in response order. */
+    type: 'refs'
+    /** Primary keys of the rows. */
+    keys: Array<string | number>
+  }
+  | {
+    /** A cached first-query miss, which has no row identity. */
+    type: 'data'
+    /** Absence returned by the server or cache read. */
+    value: null
+    /** Key whose absence was returned; omitted for an unkeyed first query. */
+    key?: string | number
+    /** Membership mode under which absence was published. */
+    resultMode?: QueryResultMode
+    /** A later cache write released absence while preserving option confirmation. */
+    invalidated?: boolean
+  }
+) & {
+  /** Whether these identities came from a server fetch or accepted push. */
+  confirmed: boolean
+  /** Serializable effective options (function values dropped), including page and refresh overrides. */
+  effectiveOptions?: unknown
+}
+
 /** Reactive state owned by the Vue cache implementation. */
 export interface InternalCacheState {
   /** Query markers used to know whether list results were fetched before. */
@@ -52,7 +85,7 @@ export interface InternalCacheState {
   /** Last hook metadata for query ids. */
   queryMeta: Record<string, CustomHookMeta>
   /** Saved page references for query pagination. */
-  pageRefs: Map<string, { type: 'ref', key: string | number } | { type: 'refs', keys: Array<string | number> }>
+  pageRefs: Map<string, CachedPageRefs>
   /** Whether writes should be queued instead of applied immediately. */
   paused: boolean
   /** Pending cache operations. */

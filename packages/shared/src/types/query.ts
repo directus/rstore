@@ -57,6 +57,24 @@ export type FetchPolicy = 'cache-first' | 'cache-and-fetch' | 'fetch-only' | 'ca
 
 export type QueryResultMode = 'computed' | 'responseRefs'
 
+/** Find options for the main page plus controls for a reactive query refresh. */
+export type QueryRefreshOptions<TOptions> = Partial<TOptions> & {
+  /**
+   * Indexes of the pages to reload. Defaults to every page the query holds, `[0]` reloads the page
+   * at index 0 only, and `[]` reloads none. A page left out keeps its data and its fetch state -
+   * nothing is reset for a page that is not loaded again.
+   */
+  pages?: number[]
+  /**
+   * Once every reloaded page fetched successfully, delete from the cache every item of the query
+   * collection and of the collections reached through `include` that the refreshed result does not
+   * hold. Rows of the pages left out by `pages` are kept. Works without garbage collection, and
+   * ignores other queries: an item they still display is deleted too. Nothing is deleted when no
+   * page is reloaded, when a reloaded page fails or is superseded, or for a `no-cache` query.
+   */
+  prune?: boolean
+}
+
 export type QueryAutoRefresh = 'manual' | 'windowFocus'
 
 export interface QueryFetchOptions {

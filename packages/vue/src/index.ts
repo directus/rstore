@@ -2,6 +2,7 @@ import './types'
 
 export type {
   LiveQueryBuilder,
+  LiveQueryOptions,
   LiveQueryResult,
   QueryBuilder,
   QueryFirstOptions,
@@ -12,6 +13,10 @@ export type {
   SubscriptionQueryBuilder,
   VueCollectionApi,
 } from './api'
+
+export type {
+  CachedPageRefs,
+} from './cache'
 
 export {
   cacheWriteEventHook,
@@ -122,9 +127,13 @@ export type {
   HybridPromise,
   Module,
   NormalizedRelation,
+  PublicHookMeta,
   ResolvedCollection,
   ResolvedCollectionItem,
   ResolvedCollectionItemBase,
+  SetResultOptions,
+  SetResultOutcome,
+  SetSubscriptionResult,
   StandardSchemaV1,
   StoreCore,
   StoreSchema,

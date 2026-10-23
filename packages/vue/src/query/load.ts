@@ -1,11 +1,15 @@
 import type { CustomHookMeta, FindOptions } from '@rstore/shared'
 import type { PruneRun } from './prune'
 import type { VueQueryPage } from './types'
-import { pickNonSpecialProps } from '@rstore/shared'
-import { nextTick } from 'vue'
 import { createTrackingObject } from '../trackingRelations'
-import { isCurrentPageRequest, setPageResult } from './page'
+import { rememberPageAbsence } from './absence'
+import { capturePageConfirmation, getMatchingPageRefs, preparePageConfirmation, readFetchConfirmation } from './confirmation'
+import { isCurrentPageRequest, markPagesAsComputed, setPageResult } from './page'
 import { recordPrunedFetch } from './prune'
+import { beginPagePublication } from './publicationOwnership'
+import { collectUnreconciledTracking, getTrackingResult, isStalePageResult, reconcilePageTracking, releaseDiscardedPageOwnership, updateQueryMeta } from './result'
+import { startPageFetch } from './state'
+import { readFetchVersion } from './version'
 
 /**
  * Load a query page from cache or fetcher.
@@ -21,13 +25,13 @@ export async function loadPage(
   forceFetch: boolean,
   pruneRun?: PruneRun,
 ) {
+  preparePageConfirmation(ctx, page)
   page._foreground.markIncomplete()
   if (ctx.isDisabled()) {
     return { page }
   }
 
-  ctx.foreground.start()
-  page._foreground.start()
+  const finish = startPageFetch(ctx, page)
   // A new blocking load is authoritative, so it also drops any stale background failure.
   ctx.background.clearError()
   page._background.clearError()
@@ -35,12 +39,13 @@ export async function loadPage(
   const savedPageRequestId = page.requestId
   const newQueryTracking = ctx.queryTracking?.createTrackingObject()
   let caughtError: Error | null = null
+  let published = false
 
   try {
     const finalOptions = await resolvePageOptions(ctx, page, forceFetch, savedPageRequestId)
     // Even a cache hit must not acquire ownership after the consumer stops.
     if (finalOptions && isCurrentPageRequest(ctx, page, savedPageRequestId)) {
-      await fetchPage(ctx, page, savedPageRequestId, finalOptions, newQueryTracking, pruneRun)
+      published = await fetchPage(ctx, page, savedPageRequestId, finalOptions, newQueryTracking, pruneRun)
     }
   }
   catch (e: any) {
@@ -48,8 +53,7 @@ export async function loadPage(
   }
   finally {
     const current = isCurrentPageRequest(ctx, page, savedPageRequestId)
-    ctx.foreground.settle({ error: caughtError, current })
-    page._foreground.settle({ error: caughtError, current })
+    finish({ error: caughtError, current, published })
     if (caughtError && current) {
       console.error(caughtError)
     }
@@ -93,15 +97,31 @@ async function fetchPage(
   // own them nor be represented by them.
   const uncachedPage = finalOptions.fetchPolicy === 'no-cache'
   const tracksPage = ctx.queryTrackingEnabled && ctx.queryTracking && newQueryTracking && !uncachedPage
-  if (!uncachedPage && finalOptions.fetchPolicy !== 'fetch-only' && ctx.cache._private.state.pageRefs.has(page.id)) {
-    page.rawData = ctx.cache._private.state.pageRefs.get(page.id)!
+  const cached = !uncachedPage && finalOptions.fetchPolicy !== 'fetch-only' ? getMatchingPageRefs(ctx, page) : undefined
+  const ownsCachePublication = beginPagePublication(page, () => isCurrentPageRequest(ctx, page, savedPageRequestId))
+  if (cached) {
+    page._confirmed ||= finalOptions.fetchPolicy !== 'cache-only' && cached.confirmed === true
+    if (!ownsCachePublication())
+      return false
+  }
+  // A local write changes computed membership, not whether these options were
+  // confirmed. Read current cache data while retaining the saved confirmation.
+  if (cached && (cached.type !== 'data' || !cached.invalidated)) {
+    page.rawData = cached
+    if (!ownsCachePublication())
+      return false
+    rememberPageAbsence(ctx, page)
     page._fetchPolicy = finalOptions.fetchPolicy ?? null
-    if (tracksPage) {
+    if (!ownsCachePublication())
+      return false
+    markPagesAsComputed(ctx, ownsCachePublication)
+    if (tracksPage && ownsCachePublication()) {
       newQueryTracking.skipped = true
       ctx.queryTracking.handleQueryTracking(page.id, newQueryTracking, page.data, finalOptions.include, true)
-      releaseDiscardedPageOwnership(ctx)
+      if (ownsCachePublication())
+        releaseDiscardedPageOwnership(ctx)
     }
-    return
+    return ownsCachePublication()
   }
 
   // Pruning needs the written identities even without ownership. That payload
@@ -109,28 +129,27 @@ async function fetchPage(
   const hookTracking = tracksPage ? newQueryTracking : pruneRun && !uncachedPage ? createTrackingObject() : undefined
   const fetchMeta: CustomHookMeta = {
     ...ctx.meta.value,
-    $canPublishQuery: () => isCurrentPageRequest(ctx, page, savedPageRequestId),
+    $canPublishQuery: () => isCurrentPageRequest(ctx, page, savedPageRequestId) && !isStalePageResult(page, readFetchVersion(fetchMeta), savedPageRequestId),
     $queryTracking: hookTracking,
   }
+  const confirmationOptions = capturePageConfirmation(ctx, page)
   const pageResult = await ctx.fetchMethod(finalOptions, fetchMeta)
-  const { valid } = await setPageResult(ctx, page, savedPageRequestId, pageResult, finalOptions.fetchPolicy)
-  if (!valid) {
+  const { isCurrent } = await setPageResult(ctx, page, savedPageRequestId, pageResult, finalOptions.fetchPolicy, readFetchVersion(fetchMeta), readFetchConfirmation(fetchMeta) ?? finalOptions.fetchPolicy !== 'cache-only', confirmationOptions)
+  if (!isCurrent()) {
     collectUnreconciledTracking(ctx, newQueryTracking)
-    return
+    return false
   }
-  updateQueryMeta(ctx, page, fetchMeta)
+  updateQueryMeta(ctx, page, fetchMeta, isCurrent)
+  if (!isCurrent()) {
+    collectUnreconciledTracking(ctx, newQueryTracking)
+    return false
+  }
   // A no-cache result says nothing about the cache: left unrecorded, it cancels the prune.
   if (pruneRun && !uncachedPage) {
-    recordPrunedFetch(pruneRun, hookTracking, pageResult, finalOptions.include, tracksPage)
+    recordPrunedFetch(pruneRun, hookTracking, pageResult, finalOptions.include, tracksPage, isCurrent)
   }
-  if (tracksPage) {
-    ctx.queryTracking.handleQueryTracking(page.id, newQueryTracking, getTrackingResult(page, pageResult), finalOptions.include, true)
-    releaseDiscardedPageOwnership(ctx)
-  }
-  else if (uncachedPage) {
-    // The page may have owned cached rows before this load turned it uncached.
-    ctx.queryTracking?.releasePage(page.id, { collect: true })
-  }
+  reconcilePageTracking(ctx, page, tracksPage ? getTrackingResult(page, pageResult) : undefined, finalOptions, tracksPage ? newQueryTracking : undefined, isCurrent)
+  return isCurrent()
 }
 
 /**
@@ -145,21 +164,19 @@ function fetchCacheAndFetchBackground(
   const newQueryTracking = ctx.queryTrackingEnabled ? ctx.queryTracking?.createTrackingObject() : undefined
   const fetchMeta: CustomHookMeta = {
     ...ctx.meta.value,
-    $canPublishQuery: () => isCurrentPageRequest(ctx, page, savedPageRequestId),
+    $canPublishQuery: () => isCurrentPageRequest(ctx, page, savedPageRequestId) && !isStalePageResult(page, readFetchVersion(fetchMeta), savedPageRequestId),
     $queryTracking: newQueryTracking,
   }
 
-  ctx.background.start()
-  page._background.start()
+  const settle = startPageFetch(ctx, page, true)
 
   /**
    * Publish the outcome on the background lane only, so a failed silent refresh stays
    * distinguishable from a failed blocking load.
    */
-  function finish(error: Error | null) {
+  function finish(error: Error | null, published = false) {
     const current = isCurrentPageRequest(ctx, page, savedPageRequestId)
-    ctx.background.settle({ error, current })
-    page._background.settle({ error, current })
+    settle({ error, current, published })
     if (error && current) {
       console.error(error)
     }
@@ -169,80 +186,19 @@ function fetchCacheAndFetchBackground(
   // from the result handling (`setPageResult`, `updateQueryMeta`) are both handled below.
   // `then(onFulfilled, onRejected)` keeps the chain from ever rejecting.
   void (async () => {
+    const confirmationOptions = capturePageConfirmation(ctx, page)
     const backgroundResult = await ctx.fetchMethod({ ...finalOptions, fetchPolicy: 'fetch-only' }, fetchMeta)
-    const { valid } = await setPageResult(ctx, page, savedPageRequestId, backgroundResult, 'fetch-only')
-    if (!valid) {
+    const { isCurrent } = await setPageResult(ctx, page, savedPageRequestId, backgroundResult, 'fetch-only', readFetchVersion(fetchMeta), true, confirmationOptions)
+    if (!isCurrent()) {
       collectUnreconciledTracking(ctx, newQueryTracking)
-      return
+      return false
     }
-    updateQueryMeta(ctx, page, fetchMeta)
-    if (ctx.queryTracking && newQueryTracking) {
-      ctx.queryTracking.handleQueryTracking(page.id, newQueryTracking, getTrackingResult(page, backgroundResult), finalOptions.include, true)
-      releaseDiscardedPageOwnership(ctx)
+    updateQueryMeta(ctx, page, fetchMeta, isCurrent)
+    if (!isCurrent()) {
+      collectUnreconciledTracking(ctx, newQueryTracking)
+      return false
     }
-  })().then(() => finish(null), (e: any) => finish(e))
-}
-
-/**
- * Store hook metadata for the main page.
- */
-function updateQueryMeta(ctx: any, page: VueQueryPage<any, any, any, any, any>, newMeta: CustomHookMeta) {
-  if (page.main) {
-    ctx.cache._private.state.queryMeta[ctx.queryId.value] = pickNonSpecialProps(newMeta)
-  }
-  // The publication check belongs to this fetch and its queued cache writes,
-  // not to metadata a consumer may later reuse for an unrelated mutation.
-  const publishedMeta = { ...newMeta }
-  delete publishedMeta.$canPublishQuery
-  ctx.meta.value = publishedMeta
-}
-
-/**
- * Release pages discarded by an option change only after a replacement page
- * owns its visible rows. This prevents an intervening Vue tick from evicting
- * a cache-hit result before skipped metadata can seed ownership.
- */
-function releaseDiscardedPageOwnership(ctx: any): void {
-  for (const pageId of ctx.pendingTrackingPageIds.splice(0)) {
-    // Function-only option changes can reuse the serialized page id. Its
-    // replacement already reconciled ownership, so only release absent pages.
-    if (ctx.pages.value.some((page: VueQueryPage<any, any, any, any, any> | undefined) => page?.id === pageId)) {
-      continue
-    }
-    ctx.queryTracking?.releasePage(pageId, { collect: true })
-  }
-}
-
-/**
- * Preserve an authoritative empty response while computed pages still expose
- * cache slices from the previous result.
- */
-function getTrackingResult(page: VueQueryPage<any, any, any, any, any>, result: unknown): any {
-  return Array.isArray(result) && result.length === 0 ? result : page.data
-}
-
-/**
- * Sweep rows written by a stale request that never reached page reconciliation.
- *
- * Another live query may have adopted a row before this turn, so the public
- * collector remains the authority for whether an unowned row can disappear.
- */
-function collectUnreconciledTracking(ctx: any, tracking: any): void {
-  if (!tracking) {
-    return
-  }
-  nextTick(() => {
-    for (const [collectionName, keys] of Object.entries(tracking.items) as Array<[string, Set<string | number>]>) {
-      const collection = ctx.store.$collections.find((candidate: any) => candidate.name === collectionName)
-      if (!collection) {
-        continue
-      }
-      for (const key of keys) {
-        const item = ctx.store.$cache.readItem({ collection, key })
-        if (item) {
-          ctx.store.$cache.garbageCollectItem({ collection, item })
-        }
-      }
-    }
-  })
+    reconcilePageTracking(ctx, page, newQueryTracking ? getTrackingResult(page, backgroundResult) : undefined, finalOptions, newQueryTracking, isCurrent)
+    return isCurrent()
+  })().then(published => finish(null, published), (e: any) => finish(e))
 }

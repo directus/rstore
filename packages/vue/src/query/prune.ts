@@ -9,6 +9,8 @@ type Include = FindOptionsInclude<Collection, CollectionDefaults, StoreSchema>
 
 /** What one page contributes to the kept keys of a prune. */
 interface PruneRecord {
+  /** Whether the accepted publication still owns its later prune side effects. */
+  isCurrent?: () => boolean
   /** Identities written to the cache by the page fetch. */
   tracking: HookMetaQueryTracking
   /** Result exposed by the page, traversed for its included relations. */
@@ -48,8 +50,8 @@ export function addPrunedLoad(run: PruneRun | undefined, page: VueQueryPage<any,
  * adopts the visible page rows, which a cache-computed page still mixes with
  * stale ones, so the written identities are captured before that happens.
  */
-export function recordPrunedFetch(run: PruneRun, tracking: HookMetaQueryTracking, result: unknown, include: Include | undefined, shared: boolean): void {
-  run.records.push({ tracking: shared ? copyTracking(tracking) : tracking, result, include })
+export function recordPrunedFetch(run: PruneRun, tracking: HookMetaQueryTracking, result: unknown, include: Include | undefined, shared: boolean, isCurrent: () => boolean): void {
+  run.records.push({ tracking: shared ? copyTracking(tracking) : tracking, result, include, isCurrent })
   run.fetched++
 }
 
@@ -88,7 +90,8 @@ export function applyPrune(ctx: any, run: PruneRun | undefined): void {
   ctx.cache._private.prune({
     collections: Array.from(collections),
     // A later load of a page supersedes this refresh, whose result is then no longer the reference.
-    canApply: () => run.loads.every(({ page, requestId }) => isCurrentPageRequest(ctx, page, requestId)),
+    canApply: () => run.loads.every(({ page, requestId }) => isCurrentPageRequest(ctx, page, requestId))
+      && run.records.every(record => record.isCurrent?.() !== false),
     getKeptKeys: () => getKeptKeys(store, run.records),
   })
 }

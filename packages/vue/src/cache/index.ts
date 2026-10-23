@@ -3,7 +3,7 @@ import type { CreateCacheOptions } from './types'
 import { createCacheApi } from './api'
 import { createCacheRuntime } from './context'
 
-export type { CreateCacheOptions, VueCachePrivate } from './types'
+export type { CachedPageRefs, CreateCacheOptions, VueCachePrivate } from './types'
 
 /** Create a Vue-backed rstore cache. */
 export function createCache<

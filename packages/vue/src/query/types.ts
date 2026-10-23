@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FetchPolicy, FindOptions, HybridPromise, ResolvedCollection, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FetchPolicy, FieldTimestampValue, FindOptions, HybridPromise, QueryRefreshOptions, ResolvedCollection, SetResultOutcome, StoreSchema } from '@rstore/shared'
 import type { MaybeRefOrGetter, Raw, Ref, ShallowRef } from 'vue'
 import type { VueStore } from '../store'
 
@@ -44,29 +44,18 @@ export interface FetchStateController {
   start: () => void
   /** Mark a fetch of this lane as settled. `current` is false for superseded requests. */
   settle: (options: { error?: Error | null, current: boolean }) => void
+  /** Record an accepted response whose fetch slot was already released by a push. */
+  recordSuccess: () => void
   /** Clear the lane error without starting a fetch. */
   clearError: () => void
   /** Reset `completed` without starting a fetch. */
   markIncomplete: () => void
+  /** Mark a pushed result, retaining an optional failure belonging to another page. */
+  completeFromPush: (retainedError?: Error | null) => void
 }
 
 /** Options of {@link VueQueryReturn.refresh}: find options for the main page, plus which pages to reload. */
-export type VueQueryRefreshOptions<TOptions> = Partial<TOptions> & {
-  /**
-   * Indexes of the pages to reload. Defaults to every page the query holds, `[0]` reloads the page
-   * at index 0 only, and `[]` reloads none. A page left out keeps its data and its fetch state -
-   * nothing is reset for a page that is not loaded again.
-   */
-  pages?: number[]
-  /**
-   * Once every reloaded page fetched successfully, delete from the cache every item of the query
-   * collection and of the collections reached through `include` that the refreshed result does not
-   * hold. Rows of the pages left out by `pages` are kept. Works without garbage collection, and
-   * ignores other queries: an item they still display is deleted too. Nothing is deleted when no
-   * page is reloaded, when a reloaded page fails or is superseded, or for a `no-cache` query.
-   */
-  prune?: boolean
-}
+export type VueQueryRefreshOptions<TOptions> = QueryRefreshOptions<TOptions>
 
 export interface VueQueryReturn<
   TCollection extends Collection,
@@ -75,6 +64,8 @@ export interface VueQueryReturn<
   TOptions extends FindOptions<TCollection, TCollectionDefaults, TSchema>,
   TResult,
 > {
+  /** Whether every existing page has a server-confirmed result for its current options. */
+  confirmed: Readonly<Ref<boolean>>
   data: Ref<TResult>
   /** Whether the user is waiting on data: a blocking fetch is running, or a background fetch is running and there is nothing to display. */
   loading: Ref<boolean>
@@ -97,6 +88,13 @@ export interface VueQueryReturn<
   meta: Ref<CustomHookMeta>
   /** @private */
   _result: Ref<TResult>
+  /**
+   * Publishes a parsed result through the live subscription adapter.
+   * @private
+   */
+  _setPageResult: (page: VueQueryPage<any, any, any, any, any>, result: unknown, meta?: CustomHookMeta, version?: FieldTimestampValue) => SetResultOutcome
+  /** Reloads a followed page without redirecting its find options to the main page. @private */
+  _refreshPage: (page: VueQueryPage<any, any, any, any, any>, options?: VueQueryRefreshOptions<TOptions>) => HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
 }
 
 export interface VueCreateQueryOptions<
@@ -135,6 +133,10 @@ export interface VueQueryPage<
   readonly loading: boolean
   /** Whether the latest page fetch completed. Alias of `foreground.completed`. */
   readonly completed: boolean
+  /** Whether this page has a server-confirmed result for its current options. */
+  readonly confirmed: boolean
+  /** Mutable backing value for the readonly confirmation getter. @private */
+  _confirmed: boolean
   /** Latest page error, the foreground one taking precedence. */
   readonly error: Error | null
   /** State of blocking fetches for this page. */
@@ -145,7 +147,15 @@ export interface VueQueryPage<
   _foreground: FetchStateController
   /** @private */
   _background: FetchStateController
+  /** Options identifying the page (`pageIndex`, cursor params), merged over base options. */
   options: VueQueryPageOptions<TOptions>
+  /**
+   * Find overrides retained from the latest `refresh`. They shape loads and
+   * pushes but never identify the page or its live subscription.
+   *
+   * @private
+   */
+  _refreshOptions: VueQueryPageOptions<TOptions>
   /**
    * Fetch policy resolved for the load that produced `rawData`, or `null` while
    * the page has never been loaded. A `no-cache` page holds rows the cache does
@@ -154,6 +164,8 @@ export interface VueQueryPage<
    * @private
    */
   _fetchPolicy: FetchPolicy | null
+  /** Server snapshot of the last applied result; absent for unversioned results. @private */
+  _resultVersion?: FieldTimestampValue
   rawData: VueQueryRawData<TResult>
   data: TResult
 }

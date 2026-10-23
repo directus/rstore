@@ -6,6 +6,7 @@ import { markRaw, shallowRef } from 'vue'
 import { ensureCollectionRef, getItemWrapKey, invalidateCollectionStateCache, mark, removeFieldTimestampsForItem } from './context'
 import { removeItemIndexes, updateItemIndexes } from './indexes'
 import { forgetInspectionKey, rememberInspectionKey } from './inspectionKeys'
+import { invalidateMissingPageRefsForItem } from './queryState'
 import { resolveRelationWriteParams } from './relationWrite'
 import { invalidateCollectionWrite, setCollectionItem } from './writePublication'
 
@@ -80,6 +81,7 @@ export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeI
     writeMutableItem(ctx, params, collectionState)
   }
   rememberInspectionKey(ctx, collection.name, key)
+  invalidateMissingPageRefsForItem(ctx, collection.name, key)
   invalidateCollectionWrite(ctx, collection.name, params.batch)
 
   if (marker) {

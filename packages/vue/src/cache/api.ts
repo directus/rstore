@@ -7,7 +7,7 @@ import { rebuildIndexes } from './indexes'
 import { inspectCache } from './inspection'
 import { ensureLayersForCollection, getStateForCollection } from './layers'
 import { applyMutationToCache } from './mutations'
-import { clearQueryStateForCollection } from './queryState'
+import { clearQueryStateForCollection, clonePageRefs } from './queryState'
 import { enqueueOperation, enqueueOperationWithReceipt, enqueueWriteItems, flushQueuedOperations } from './queue'
 import { resolveRelationWriteParams } from './relationWrite'
 import { garbageCollectItem, getWrappedItem } from './wrapped'
@@ -202,6 +202,7 @@ function getState(ctx: CacheRuntime): CustomCacheState {
     markers: toValue(ctx.state.markers),
     modules: {},
     queryMeta: ctx.state.queryMeta,
+    pageRefs: Object.fromEntries(clonePageRefs(ctx.state.pageRefs)),
     fieldTimestamps: {},
     // Serialized as a list: `TombstoneStore` is a Map behind an interface, and
     // the payload has to survive JSON/devalue.

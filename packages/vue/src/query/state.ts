@@ -1,4 +1,4 @@
-import type { FetchStateController, VueQueryFetchState, VueQueryPageFetchState } from './types'
+import type { FetchStateController, VueQueryFetchState, VueQueryPage, VueQueryPageFetchState } from './types'
 import { computed, shallowRef } from 'vue'
 
 /**
@@ -17,6 +17,7 @@ export function createFetchState(): FetchStateController {
   // A current result can settle before the superseded request sharing its lane.
   let hasCurrentSettlement = false
 
+  /** Acquire one in-flight lane slot. */
   function start() {
     hasCurrentSettlement = false
     if (count.value === 0) {
@@ -29,6 +30,7 @@ export function createFetchState(): FetchStateController {
     error.value = null
   }
 
+  /** Release one slot; superseded work cannot publish completion or errors. */
   function settle({ error: fetchError, current }: { error?: Error | null, current: boolean }) {
     // The counter is decremented first and unconditionally: `loading` must already read `false`
     // when watchers react to the `error` write, and a superseded request still has to give its
@@ -62,8 +64,19 @@ export function createFetchState(): FetchStateController {
     promise,
     start,
     settle,
+    recordSuccess: () => {
+      hasCurrentSettlement = true
+      lastUpdated.value = Date.now()
+      completed.value = count.value === 0
+    },
     clearError: () => {
       error.value = null
+    },
+    completeFromPush: (retainedError: Error | null = null) => {
+      hasCurrentSettlement = true
+      error.value = retainedError
+      lastUpdated.value = Date.now()
+      completed.value = count.value === 0
     },
     markIncomplete: () => {
       hasCurrentSettlement = false
@@ -147,4 +160,98 @@ export function getFetchStateError(
   background: FetchStateController,
 ): Error | null {
   return foreground.error.value ?? background.error.value
+}
+
+/** Settlement fields shared by foreground and background loads. */
+type FetchSettlement = Parameters<FetchStateController['settle']>[0] & {
+  /** Whether the transport response actually published an accepted page result. */
+  published?: boolean
+}
+
+/** Active lane slots per page; detached transport work can finish later. */
+const pageFetches = new WeakMap<object, Set<() => void>>()
+
+/** Page that published the latest aggregate lane failure. */
+interface FetchErrorOwner {
+  /** Owning page, independent of whether providers reuse Error objects. */
+  page: VueQueryPage<any, any, any, any, any>
+  /** Published error, used only to detect unrelated manual replacement. */
+  error: Error
+}
+
+/** Query lane ownership follows error publication without retaining dead queries. */
+const fetchErrorOwners = new WeakMap<FetchStateController, FetchErrorOwner>()
+
+/** Start a page load with an idempotent settlement that a push can supersede. */
+export function startPageFetch(ctx: any, page: VueQueryPage<any, any, any, any, any>, background = false) {
+  const queryLane = background ? ctx.background : ctx.foreground
+  const pageLane = background ? page._background : page._foreground
+  const pending = pageFetches.get(page) ?? new Set()
+  pageFetches.set(page, pending)
+  fetchErrorOwners.delete(queryLane)
+  queryLane.start()
+  pageLane.start()
+  let finished = false
+  /** Release loading once, without discarding a versioned response's later success. */
+  function detach(): void {
+    if (!pending.delete(detach))
+      return
+    queryLane.settle({ current: false })
+    pageLane.settle({ current: false })
+  }
+  /** Settle transport once; a detached accepted response updates freshness only. */
+  function finish(outcome: FetchSettlement): void {
+    if (finished)
+      return
+    finished = true
+    if (!pending.delete(detach)) {
+      if (outcome.current && outcome.published && !outcome.error) {
+        queryLane.recordSuccess()
+        pageLane.recordSuccess()
+      }
+      return
+    }
+    if (outcome.current && outcome.error)
+      fetchErrorOwners.set(queryLane, { page, error: outcome.error })
+    queryLane.settle(outcome)
+    pageLane.settle(outcome)
+  }
+  pending.add(detach)
+  return finish
+}
+
+/** Snapshot only work that existed before publishing reactive page data. */
+export function capturePageFetches(page: VueQueryPage<any, any, any, any, any>): Array<() => void> {
+  return [...pageFetches.get(page) ?? []]
+}
+
+/** Complete the push without settling fetches started by synchronous observers. */
+export function completePageFromPush(ctx: any, page: VueQueryPage<any, any, any, any, any>, fetches: Array<() => void>, isCurrent: () => boolean): void {
+  const foregroundError = getRetainedPageError(ctx, page, 'foreground')
+  const backgroundError = getRetainedPageError(ctx, page, 'background')
+  for (const detach of fetches) {
+    detach()
+    if (!isCurrent())
+      return
+  }
+  if (!foregroundError)
+    fetchErrorOwners.delete(ctx.foreground)
+  if (!backgroundError)
+    fetchErrorOwners.delete(ctx.background)
+  ctx.background.error.value = backgroundError
+  if (!isCurrent())
+    return
+  page._background.clearError()
+  if (!isCurrent())
+    return
+  ctx.foreground.completeFromPush(foregroundError)
+  if (isCurrent())
+    page._foreground.completeFromPush()
+}
+
+/** Preserve another page's failure without reviving explicitly dismissed errors. */
+function getRetainedPageError(ctx: any, page: VueQueryPage<any, any, any, any, any>, lane: 'foreground' | 'background'): Error | null {
+  const error = ctx[lane].error.value
+  const owner = fetchErrorOwners.get(ctx[lane])
+  return owner?.page === page && owner.error === error ? null : error
 }

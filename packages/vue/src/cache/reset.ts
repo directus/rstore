@@ -5,7 +5,7 @@ import { ref, shallowRef } from 'vue'
 import { restoreCausality } from './hydration'
 import { updateItemIndexes } from './indexes'
 import { rebuildInspectionKeys } from './inspectionKeys'
-import { clearAllQueryState } from './queryState'
+import { clearAllQueryState, clonePageRefs } from './queryState'
 
 /** Replace the entire cache state immediately. */
 export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
@@ -46,7 +46,7 @@ export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
   ctx.wrappedItems.clear()
   ctx.wrappedItemsMetadata.clear()
   ctx.collectionStateCache.clear()
-  ctx.state.pageRefs.clear()
+  ctx.state.pageRefs = new Map(clonePageRefs(Object.entries(value.pageRefs ?? {})))
   ctx.state.queryMeta = value.queryMeta || {}
 
   const store = ctx.getStore()

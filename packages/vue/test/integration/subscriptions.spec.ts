@@ -229,4 +229,21 @@ describe('realtime subscriptions', () => {
 
     expect(remote.subscriptions()).toEqual([])
   })
+
+  it('does not subscribe disabled live queries until they are enabled', async () => {
+    const { store, remote, scope } = await setup()
+    const enabled = ref(false)
+
+    scope(() => store.todos.liveQuery((q: any) => q.many({ enabled: enabled.value })))
+    await nextTick()
+
+    enabled.value = true
+    await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(1))
+    // Only the enabled options subscribed.
+    expect(remote.callCount('subscribe')).toBe(1)
+    expect(remote.lastRequest('subscribe')).toMatchObject({ findOptions: { enabled: true } })
+
+    enabled.value = false
+    await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(0))
+  })
 })

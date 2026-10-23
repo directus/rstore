@@ -1,9 +1,15 @@
 import type { CreateManyOptions, CreateOptions, DeleteManyOptions, DeleteOptions, UpdateManyOptions, UpdateOptions } from '@rstore/core'
 import type { Collection, CollectionDefaults, CollectionMutateCallback, CollectionMutateOptions, CustomHookMeta, FindFirstOptions, FindManyOptions, FindOptions, HybridPromise, ResolvedCollection, ResolvedCollectionItem, ResolvedCollectionItemBase, StandardSchemaV1, StoreSchema, WrappedItem } from '@rstore/shared'
-import type { Ref } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { CreateFormObjectOptions, VueCreateFormObject, VueUpdateFormObject } from '../form'
 import type { VueQueryReturn } from '../query'
 import type { VueStore } from '../store'
+
+/** Controls which existing pages a live query follows. */
+export interface LiveQueryOptions {
+  /** Defaults to the main page; arrays skip indexes until their pages exist. */
+  pages?: 'main' | 'all' | MaybeRefOrGetter<number[]>
+}
 
 export type QueryType = 'first' | 'many'
 
@@ -90,6 +96,7 @@ export interface VueCollectionApi<
   /** Create a reactive live query and subscribe to updates. */
   liveQuery: <TOptions extends FindOptions<TCollection, TCollectionDefaults, TSchema> & { '~type': QueryType }> (
     optionsGetter: (queryBuilder: LiveQueryBuilder<TCollection, TCollectionDefaults, TSchema>) => TOptions,
+    options?: LiveQueryOptions,
   ) => LiveQueryResult<TCollection, TCollectionDefaults, TSchema, TItem, TOptions>
   /** Start a realtime subscription for an item or query. */
   subscribe: <TOptions extends string | number | FindOptions<TCollection, TCollectionDefaults, TSchema> | undefined = undefined> (

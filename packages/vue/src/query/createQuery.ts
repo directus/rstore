@@ -1,14 +1,18 @@
-import type { Cache, Collection, CollectionDefaults, FindOptions, HybridPromise, StoreSchema } from '@rstore/shared'
+import type { Cache, Collection, CollectionDefaults, CustomHookMeta, FieldTimestampValue, FindOptions, HybridPromise, StoreSchema } from '@rstore/shared'
 import type { VueCachePrivate } from '../cache'
 import type { VueCreateQueryOptions, VueQueryRefreshOptions, VueQueryReturn } from './types'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { computed, getCurrentInstance, onServerPrefetch, ref, shallowRef, toValue, watch } from 'vue'
 import { onWindowFocus } from '../swr'
 import { useQueryTracking } from '../tracking'
+import { installConfirmationResets } from './confirmation'
 import { loadPage } from './load'
 import { watchQueryOptions } from './options'
-import { createPage, getPageId, getPageOptions, hasUncachedPage } from './page'
+import { createPage, getPageId, getPageOptions, readCachedResult } from './page'
 import { addPrunedLoad, applyPrune, createPruneRun, recordKeptPage } from './prune'
+import { loadMainPageForPublication } from './publication'
+import { publishPageResult } from './push'
+import { getMainPageRefreshOptions, refreshSecondaryPage } from './refresh'
 import { createFetchState, getFetchStateError, isFetchStateLoading, toQueryFetchState } from './state'
 
 /**
@@ -49,6 +53,7 @@ export function createQuery<
   })
   const returnObject = ctx.returnObject = {
     data,
+    confirmed: computed(() => ctx.pages.value.every(page => !page || page.confirmed)),
     loading,
     error,
     foreground: toQueryFetchState(ctx.foreground),
@@ -60,12 +65,15 @@ export function createQuery<
     getPage,
     meta: ctx.meta,
     _result: ctx.result,
+    _setPageResult: (page: any, result: unknown, meta?: CustomHookMeta, version?: FieldTimestampValue) => publishPageResult(ctx, page, result, meta, version),
+    _refreshPage: (page: any, options?: VueQueryRefreshOptions<TOptions>) => page.main ? refresh(getMainPageRefreshOptions<TOptions>(page, options)) : refreshSecondaryPage(ctx, page, options),
   }
 
   installAutoRefresh(ctx, refresh)
-  const queryOptions = watchQueryOptions(() => toValue(ctx.options), () => {
+  const queryOptions = watchQueryOptions(() => toValue(ctx.options), (reset) => {
     ctx.updateQueryTrackingMode()
-    loadMainPage()
+    // Function-only changes reload in place: pages and live subscriptions survive.
+    loadMainPage(false, undefined, reset)
   })
   let promise = loadMainPage() as unknown as HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
   Object.assign(promise, returnObject)
@@ -80,6 +88,8 @@ export function createQuery<
       ? []
       : ctx.pages.value.filter(page => page && page !== ctx.mainPage)
     if (resetPages) {
+      // Main page identity is reused across options changes; its snapshot is not.
+      ctx.mainPage._resultVersion = undefined
       for (const page of previousPages) {
         if (!ctx.pendingTrackingPageIds.includes(page.id)) {
           ctx.pendingTrackingPageIds.push(page.id)
@@ -104,15 +114,14 @@ export function createQuery<
     if (shouldLoad(index)) {
       ctx.mainPage.requestId = crypto.randomUUID()
       addPrunedLoad(pruneRun, ctx.mainPage)
-      // Kept as the main page promise even when it is not reloaded: `setPageResult` awaits it so the
-      // main page result always lands first, and the previous one has already settled.
-      ctx.mainPagePromise = loadPage(ctx, ctx.mainPage, forceFetch, pruneRun)
-      promises.push(ctx.mainPagePromise)
+      // Preserve transport completion for callers; secondary pages only wait
+      // until a fetched or pushed main result satisfies publication ordering.
+      promises.push(loadMainPageForPublication(ctx, forceFetch, pruneRun))
     }
     else {
       recordKeptPage(ctx, pruneRun, ctx.mainPage)
     }
-    // Started after `mainPagePromise` is assigned, for the same reason.
+    // Start secondary pages after the main publication barrier exists.
     for (const page of otherPages) {
       // The main page may have moved onto this slot, and it owns it.
       if (ctx.pages.value[page.index]) {
@@ -164,9 +173,10 @@ export function createQuery<
   }
 
   function refresh(options?: VueQueryRefreshOptions<TOptions>) {
-    // `pages` and `prune` shape the refresh; the rest is the main page's find options.
-    const { pages, prune, ...optionsExtension } = options ?? {}
-    ctx.mainPage.options = optionsExtension
+    // Only `pageIndex` moves the main window; other overrides shape loads only.
+    const { pages, prune, pageIndex, ...overrides } = options ?? {}
+    ctx.mainPage.options = pageIndex == null ? {} : { pageIndex }
+    ctx.mainPage._refreshOptions = overrides
     const mainPageIndex = getPageOptions(ctx, ctx.mainPage).pageIndex ?? 0
     const includesMainPage = pages == null || pages.includes(mainPageIndex)
     const changedOptions = includesMainPage && queryOptions.consume()
@@ -178,7 +188,7 @@ export function createQuery<
     return promise
   }
 
-  ctx.store.$onCacheReset(() => refresh())
+  installConfirmationResets(ctx, refresh)
   const vm = getCurrentInstance()
   if (vm && ctx.store.$isServer) {
     onServerPrefetch(() => promise)
@@ -233,7 +243,6 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     foreground: createFetchState(),
     background: createFetchState(),
     mainPage: null as any,
-    mainPagePromise: null as Promise<unknown> | null,
     result: null as any,
     /** Plain cache read of the query options, the source of computed pages. */
     cacheRead: null as any,
@@ -271,20 +280,6 @@ function mergePages(ctx: any) {
     }
   }
   return result
-}
-
-/**
- * Read current cache data for the query when policy allows it.
- *
- * The rows of a page fetched with `no-cache` are not in the cache, so a query
- * holding such a page aggregates its pages instead: reading the cache alone
- * would drop them from the result.
- */
-function readCachedResult(ctx: any) {
-  if (ctx.fetchPolicy !== 'no-cache' && ctx.resultMode !== 'responseRefs' && !hasUncachedPage(ctx)) {
-    return ctx.cacheRead.value
-  }
-  return ctx.result.value
 }
 
 /**

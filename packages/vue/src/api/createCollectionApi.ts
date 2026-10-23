@@ -24,7 +24,7 @@ export function createCollectionApi<
     peekMany: findOptions => peekMany({ store, collection: getCollection(), findOptions, force: true }).result,
     findMany: findOptions => findMany({ store, collection: getCollection(), findOptions }).then(r => r.result),
     query: optionsGetter => runApiQuery(runtime, optionsGetter, false) as ReturnType<Api['query']>,
-    liveQuery: optionsGetter => runApiQuery(runtime, optionsGetter, true) as ReturnType<Api['liveQuery']>,
+    liveQuery: (optionsGetter, options) => runApiQuery(runtime, optionsGetter, true, options) as ReturnType<Api['liveQuery']>,
     // Pass a getter (not a snapshot) so the subscription tracks reactive options.
     subscribe: optionsGetter => subscribeToApiQuery(runtime, optionsGetter ? () => optionsGetter(c => c) : undefined),
     create: (item, options) => createItem({ ...options, store, collection: getCollection(), item }),

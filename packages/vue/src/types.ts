@@ -1,10 +1,13 @@
 import type { UpdateOptions } from '@rstore/core'
 import type { Collection, CollectionDefaults, CustomHookMeta, ResolvedCollectionItem, StandardSchemaV1, StoreSchema } from '@rstore/shared'
+import type { CachedPageRefs } from './cache/types'
 import type { VueUpdateFormObject } from './form'
 import type { WrappedItemMetadata } from './item'
 
 declare module '@rstore/shared' {
   export interface CustomCacheState {
+    /** Page references with their server confirmation, restored across SSR hydration. */
+    pageRefs?: Record<string, CachedPageRefs>
     markers: Record<string, boolean>
     collections: Record<string, Record<string | number, any>>
     modules: Record<string, any>
