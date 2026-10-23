@@ -1,28 +1,13 @@
-import type { VueStackOptions } from '#test-utils/store/vueStack'
-import { createVueStack } from '#test-utils/store/vueStack'
 import { describe, expect, it, vi } from 'vitest'
+import { setupTodos } from '../utils/live-query'
 
 // Fetch policies are unit-tested against stubbed collection hooks. Here they
 // run against a real backend through the plugin pipeline, so the request
 // count and the resulting cache state are both observable.
 
-/** Store with a `todos` collection and two seeded rows. */
-function setup(options: Partial<VueStackOptions> = {}) {
-  return createVueStack({
-    schema: [{ name: 'todos' }],
-    data: {
-      todos: [
-        { id: '1', title: 'One' },
-        { id: '2', title: 'Two' },
-      ],
-    },
-    ...options,
-  })
-}
-
 describe('cache-first', () => {
   it('fetches once, then serves the second query from cache', async () => {
-    const { store, run, remote } = await setup()
+    const { store, run, remote } = await setupTodos()
 
     await run(() => store.todos.query((q: any) => q.many({ fetchPolicy: 'cache-first' })))
     const second = await run(() => store.todos.query((q: any) => q.many({ fetchPolicy: 'cache-first' })))
@@ -34,7 +19,7 @@ describe('cache-first', () => {
 
 describe('cache-and-fetch', () => {
   it('serves the cache and revalidates in the background', async () => {
-    const { store, run, remote } = await setup()
+    const { store, run, remote } = await setupTodos()
     await run(() => store.todos.query((q: any) => q.many()))
     remote.seed('todos', [
       { id: '1', title: 'Fresh' },
@@ -54,7 +39,7 @@ describe('cache-and-fetch', () => {
   })
 
   it('reports a failed background refresh without dropping the displayed data', async () => {
-    const { store, run, remote } = await setup()
+    const { store, run, remote } = await setupTodos()
     await run(() => store.todos.query((q: any) => q.many()))
     const error = new Error('offline')
     remote.failNext('fetchMany', error)
@@ -69,7 +54,7 @@ describe('cache-and-fetch', () => {
 
 describe('fetch-only', () => {
   it('fetches every time and still writes to the cache', async () => {
-    const { store, remote } = await setup()
+    const { store, remote } = await setupTodos()
 
     await store.todos.findMany({ fetchPolicy: 'fetch-only' })
     await store.todos.findMany({ fetchPolicy: 'fetch-only' })
@@ -81,7 +66,7 @@ describe('fetch-only', () => {
 
 describe('cache-only', () => {
   it('never reaches the backend', async () => {
-    const { store, remote } = await setup()
+    const { store, remote } = await setupTodos()
 
     const empty = await store.todos.findMany({ fetchPolicy: 'cache-only' })
 
@@ -90,7 +75,7 @@ describe('cache-only', () => {
   })
 
   it('serves items fetched under another fetch policy', async () => {
-    const { store, remote } = await setup()
+    const { store, remote } = await setupTodos()
     await store.todos.findMany({ fetchPolicy: 'cache-first' })
 
     const cached = await store.todos.findMany({ fetchPolicy: 'cache-only' })
@@ -106,7 +91,7 @@ describe('cache-only', () => {
 describe('no-cache', () => {
   describe.each(['first', 'many'] as const)('%s reactive query', (method) => {
     it.each(['explicit', 'default', 'hook'] as const)('retains response values with policy from %s', async (source) => {
-      const { store, run, remote } = await setup({
+      const { store, run, remote } = await setupTodos({
         findDefaults: source === 'default' ? { fetchPolicy: 'no-cache' } : undefined,
         plugins: source === 'hook'
           ? [{
@@ -144,7 +129,7 @@ describe('no-cache', () => {
   })
 
   it('fetches without populating the cache', async () => {
-    const { store, remote } = await setup()
+    const { store, remote } = await setupTodos()
 
     const result = await store.todos.findMany({ fetchPolicy: 'no-cache' })
 
@@ -156,7 +141,7 @@ describe('no-cache', () => {
 
 describe('foreground state', () => {
   it('tracks a blocking refresh from start to finish', async () => {
-    const { store, run, remote } = await setup()
+    const { store, run, remote } = await setupTodos()
     const query = await run(() => store.todos.query((q: any) => q.many()))
 
     const release = remote.holdNext('fetchMany')
