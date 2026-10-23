@@ -62,24 +62,11 @@ function getPageQueryId(pageId: string) {
 
 /**
  * Check whether a serialized query id belongs to the given collection.
+ *
+ * Query ids are `JSON.stringify([source, options])`, so the serialized source
+ * is an exact prefix. This avoids parsing the whole id, options included.
  */
 function isQueryStateKeyForCollection(queryId: string, collectionName: string) {
-  const querySource = readQuerySource(queryId)
-  return querySource === `${collectionName}-first` || querySource === `${collectionName}-many`
-}
-
-/**
- * Read the query source from a serialized query id.
- */
-function readQuerySource(queryId: string) {
-  try {
-    const parsed = JSON.parse(queryId)
-    if (Array.isArray(parsed) && typeof parsed[0] === 'string') {
-      return parsed[0]
-    }
-  }
-  catch {
-    // Ignore malformed internal query ids. They cannot be matched safely.
-  }
-  return undefined
+  return queryId.startsWith(`[${JSON.stringify(`${collectionName}-first`)},`)
+    || queryId.startsWith(`[${JSON.stringify(`${collectionName}-many`)},`)
 }
