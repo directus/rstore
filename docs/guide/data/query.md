@@ -33,6 +33,8 @@ The `query` and `liveQuery` composables return an object with the following prop
 
 - `data`: a ref that contains the data.
 
+- `confirmed`: a readonly ref indicating whether every existing page has a server-confirmed result for its current options.
+
 - `loading`: a ref that indicates whether the user is waiting on data <Badge text="Changed in v0.9" type="warning" />. It is `true` while a blocking fetch is running, and also while a background refresh is running if there is nothing to display yet. See [Foreground and background fetch state](#foreground-and-background-fetch-state).
 
 - `error`: a ref that contains the error if the data could not be fetched. A blocking failure takes precedence over a background one.
@@ -43,7 +45,7 @@ The `query` and `liveQuery` composables return an object with the following prop
 
 - `pages`: a ref containing the query pages.
 
-- `mainPage`: the main page of the query.
+- `mainPage`: the main page of the query. `refresh(options)` overrides shape the reloads without being stored on `mainPage.options`, which only keeps a `pageIndex` passed to `refresh` <Badge text="Changed in v0.9" type="warning" />.
 
 - `fetchMore`: a function that fetches an additional page.
 
@@ -60,6 +62,21 @@ const store = useStore()
 const { data: todos } = await store.Todo.query(q => q.many())
 </script>
 ```
+
+### Confirmed results
+
+Use `query.confirmed.value` before showing an empty state, "not found", or a server-confirmed count. Each page exposes a readonly boolean `page.confirmed`; the query is confirmed only when every existing page is confirmed. Holes in the pages array do not count, but a page created with `getPage()` starts unconfirmed until loaded.
+
+A successful server fetch or published live `setResult` push confirms its page, including empty lists and missing items. A cache-only read, a cache-first hit without saved confirmation, and the cache half of `cache-and-fetch` stay unconfirmed. Fetch failures do not confirm a page. `loading` and `completed` describe fetch progress; they do not prove server confirmation.
+
+```ts
+const query = store.todos.query(q => q.many({ fetchPolicy: 'cache-and-fetch' }))
+const showEmpty = computed(() => query.confirmed.value && query.data.value.length === 0)
+```
+
+Confirmation survives ordinary cache writes and refreshes with unchanged options. Changing effective options clears it immediately, before the reload starts. Resetting the cache, or clearing the query's collection with `$cache.clearCollection`, clears it until another server result lands; `clearCollection` does not refetch, and `no-cache` pages keep their confirmation. Saved page references retain their confirmation across remounts within the cache lifetime and SSR hydration. Confirmation compares serializable options only, like the query id: function-valued options such as `filter` are local cache-read callbacks, so a new inline callback after a re-render, remount or SSR hydration keeps confirmation. A function-only change reloads pages in place without unconfirming them; if a callback changes what the server should return, also change a serializable option such as `params`. Older payloads without saved page confirmation stay unconfirmed until fetched or pushed. `no-cache` values are not retained in the cache or SSR payload.
+
+A confirmed `computed` page still follows local cache membership, so confirmation means the server confirmed these options, not that later local writes cannot change the displayed rows or count. Use `resultMode: 'responseRefs'` when server-controlled membership is needed.
 
 ### Foreground and background fetch state <Badge text="New in v0.9" />
 
@@ -300,6 +317,10 @@ The `fetchMore` method returns an "hybrid promise", meaning you can use the resu
 
 #### Distinct Pages
 
+For live pagination, use `liveQuery(builder, { pages: () => [currentPageIndex.value] })` to follow only the displayed existing page, or `{ pages: 'all' }` to follow every existing page. The default follows only the main page. Each subscription's `refresh` and `setResult` target its page. See [following selected pages](./live.md#follow-selected-pages).
+
+Offset pages update independently: inserts and deletes can shift rows across windows and create gaps or duplicates when several pages are displayed together. Keeping several displayed pages consistent with each other, for example with pinned cursor windows, is not supported yet.
+
 In case you want to implement pagination in the listing view as well, you can use the `pages` ref returned by the query composable. It allows to display only one page at a time.
 
 When `fetchMore` is called, the fetched page is stored in the `pages` ref at the index corresponding to the `pageIndex` used in the fetch (or at the end of `pages` if not provided). This way, you can keep track of all the fetched pages and display them accordingly.
@@ -354,7 +375,7 @@ You can then access some useful properties of the `currentPage`:
 ::: info
 `refresh()` reloads those pages too, so a page keeps reporting its `error` until its own re-attempt settles <Badge text="Changed in v0.9" type="warning" />. Pass `pages` to narrow it down — `refresh({ pages: [0, pageIndex] })` reloads the first page and the displayed one, and a page left out keeps both its data and its fetch state, since nothing is reset for a page that is not loaded again.
 
-Changing the query options is a different query instead: the pages of the previous one are dropped, and the main page is loaded again from scratch.
+Changing the query options is a different query instead: the pages of the previous one are dropped, and the main page is loaded again from scratch. Function-valued options, such as `filter`, are local cache callbacks and do not identify the query or its pages <Badge text="Changed in v0.9" type="warning" />: when only a function changes, for example an inline callback rebuilt on re-render, the pages are kept and reloaded in place.
 :::
 
 ```vue

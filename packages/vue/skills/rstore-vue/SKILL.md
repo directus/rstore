@@ -84,12 +84,16 @@ Notes:
 - Form objects expose `$opLog` for undo/redo and optimized form operations.
 - Use `$rebase`, `$conflicts`, and `$resolveConflict` for collaborative editing flows.
 - `$save()` and `$onSaved()` are deprecated compatibility aliases. Prefer `$submit()` and `$onSuccess()`.
+- Query `confirmed` is a readonly ref: all existing pages must have server-confirmed results for current options. Each page exposes readonly `confirmed`. Fetches and published pushes confirm; cache guesses do not. Option changes, cache resets and `$cache.clearCollection` clear it; local writes preserve it. Saved refs retain confirmation across remounts and SSR hydration. See [api-query](./references/api-query.md).
+- Function-valued options (such as `filter`) do not identify a query, page or subscription: function-only changes reload pages in place and never resubscribe.
 
 ## Modules and plugins
 
 - `defineModule(name, cb)` caches module instances in `store.$modulesCache`.
 - `defineModule` requires injection context or an explicit/active store.
 - `definePlugin({ name, category, scopeId?, setup })` is the extension point for fetch/cache/mutation/subscription/sync hooks.
+- For live pagination, use `liveQuery(builder, { pages: () => [current.value] })` for displayed pages or `{ pages: 'all' }` for every existing page. Default follows the main page. Offset windows can shift relative to each other; keeping several displayed pages consistent is not supported yet.
+- Connectors order snapshots with fetch `meta.$resultVersion` and push `setResult(rows, { version })` (`FieldTimestampValue`, finite number or serialized HLC; `setResult` throws for other formats). A versioned push drops an unversioned fetch already in flight. `setResult` returns `'applied'` when accepted (non-main pages queue it and can still drop it), `'stale'` or `'inactive'`; its `meta` excludes reserved `$` fields. Older page versions are rejected; equal versions apply. Refresh retains versions; base option changes reset them. Item `fieldTimestamps` remain required for connector cache writes.
 - `realtimeReconnectEventHook` should be triggered by realtime plugins only after transport recovery; `liveQuery` refreshes automatically when it fires.
 - `addCollectionDefaults(...)` is the right place for shared field parsing/default behavior.
 - Keep plugin behavior keyed by store/scope instead of global mutable state.

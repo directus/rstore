@@ -19,6 +19,7 @@ nuxtApp.payload.state.$srstore = store.$cache.getState()
 
 - Server writes cache state on `app:rendered`.
 - Client restores cache state during plugin setup when payload key exists.
+- The state carries query page refs with their effective options and server confirmation; hydrated queries with matching effective options reuse them, confirmed, without a client fetch.
 
 ## Requirements
 

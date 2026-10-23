@@ -16,6 +16,8 @@ const state = store.$cache.getState()
 store.$cache.setState(state)
 ```
 
+The state also carries the response identities of query pages (`pageRefs`), with the effective options that produced them and whether the server confirmed them <Badge text="Changed in v0.9" type="warning" />. `setState` restores them, so a hydrated query with the same effective options shows the server-rendered page, [confirmed](./query.md#confirmed-results), without a client fetch. Saved identities are ignored for different options, and states saved without them are still accepted.
+
 ## Clear cache
 
 Clearing the cache is useful when you want to remove all items from the cache. This can be used for example to reset the store to its initial state after the user logs out.

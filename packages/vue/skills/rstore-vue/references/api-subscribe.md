@@ -18,7 +18,8 @@ await sub.unsubscribe()
 ## Behavior
 
 - Returns `{ unsubscribe, meta }`.
-- Handles option-driven subscribe/unsubscribe lifecycle.
+- Plain subscription hooks receive neither `refresh` nor `setResult`; these belong to followed `liveQuery` pages.
+- Handles option-driven subscribe/unsubscribe lifecycle. Function-valued options are ignored when comparing options, so a rebuilt inline callback does not resubscribe.
 
 ## Requirements
 
