@@ -1,14 +1,11 @@
-import type { Cache, Collection, CollectionDefaults, CustomCacheState, ResolvedCollection, StoreSchema } from '@rstore/shared'
-import type { Ref } from 'vue'
+import type { Cache, Collection, CollectionDefaults, ResolvedCollection, StoreSchema } from '@rstore/shared'
 import type { CacheRuntime, CacheWriteBatch } from './types'
 import { mergeItemFields, shouldResurrect } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
-import { markRaw, ref, shallowRef } from 'vue'
+import { markRaw, shallowRef } from 'vue'
 import { ensureCollectionRef, getItemWrapKey, invalidateCollectionStateCache, mark, removeFieldTimestampsForItem } from './context'
-import { restoreCausality } from './hydration'
 import { removeItemIndexes, updateItemIndexes } from './indexes'
-import { forgetInspectionKey, rebuildInspectionKeys, rememberInspectionKey } from './inspectionKeys'
-import { clearAllQueryState } from './queryState'
+import { forgetInspectionKey, rememberInspectionKey } from './inspectionKeys'
 import { resolveRelationWriteParams } from './relationWrite'
 import { invalidateCollectionWrite, setCollectionItem } from './writePublication'
 
@@ -112,83 +109,6 @@ export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeI
       store.$hooks.callHookSync('afterCacheWrite', payload)
     }
   }
-}
-
-/** Replace the entire cache state immediately. */
-export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
-  ctx.state.markers = value.markers || {}
-
-  // Replacing the state means replacing everything derived from it. Indexes
-  // are rebuilt below from the incoming items; leaving the old buckets in
-  // place made a relation read return items the payload no longer had.
-  ctx.state.collectionIndexes.clear()
-
-  const newCollectionsState: Record<string, Ref<Record<string | number, any>>> = {}
-  for (const collectionName in value.collections) {
-    const collection = ctx.getStore().$collections.find(c => c.name === collectionName)
-    if (!collection) {
-      continue
-    }
-    const incomingCollectionState = value.collections[collectionName as keyof typeof value.collections] as Record<string | number, any>
-    const collectionState = newCollectionsState[collectionName] = ref<Record<string | number, any>>({})
-    for (const key in incomingCollectionState) {
-      const item = incomingCollectionState[key]
-      if (item) {
-        const existing = collectionState.value[key]
-        collectionState.value[key] = Object.isFrozen(item) ? item : shallowRef(item)
-        updateItemIndexes(ctx, collection, key, existing, item)
-      }
-    }
-  }
-  ctx.state.collections = newCollectionsState
-  rebuildInspectionKeys(ctx)
-  const newModulesState: Record<string, ReturnType<typeof ref<any>>> = {}
-  for (const moduleKey in value.modules) {
-    newModulesState[moduleKey] = ref(value.modules[moduleKey])
-  }
-  ctx.state.modules = newModulesState
-
-  restoreCausality(ctx, value)
-
-  ctx.wrappedItems.clear()
-  ctx.wrappedItemsMetadata.clear()
-  ctx.collectionStateCache.clear()
-  ctx.state.pageRefs.clear()
-  ctx.state.queryMeta = value.queryMeta || {}
-
-  const store = ctx.getStore()
-  store.$hooks.callHookSync('afterCacheReset', {
-    store,
-    meta: {},
-  })
-}
-
-/** Clear all cache data immediately. */
-export function clearNow(ctx: CacheRuntime) {
-  ctx.state.markers = {}
-  ctx.publicKeys?.clear()
-  for (const collectionName in ctx.state.collections) {
-    ctx.state.collections[collectionName]!.value = {}
-  }
-  for (const moduleKey in ctx.state.modules) {
-    ctx.state.modules[moduleKey]!.value = {}
-  }
-  ctx.wrappedItems.clear()
-  ctx.wrappedItemsMetadata.clear()
-  ctx.collectionStateCache.clear()
-  ctx.state.collectionIndexes.clear()
-  ctx.state.fieldTimestamps.clear()
-  clearAllQueryState(ctx)
-  const tombIds = Array.from(ctx.state.tombstones.entries(), ([, t]) => t)
-  for (const t of tombIds) {
-    ctx.state.tombstones.clear(t.collection, t.key)
-  }
-
-  const store = ctx.getStore()
-  store.$hooks.callHookSync('afterCacheReset', {
-    store,
-    meta: {},
-  })
 }
 
 function writeMutableItem(ctx: CacheRuntime, params: Parameters<Cache['writeItem']>[0] & { batch?: CacheWriteBatch }, collectionState: Record<string | number, any>) {

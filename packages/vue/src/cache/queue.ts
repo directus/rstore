@@ -4,7 +4,8 @@ import { triggerRef } from 'vue'
 import { ensureCollectionRef, evictCollectionStateCache, mark } from './context'
 import { addLayerNow, removeLayer } from './layers'
 import { pruneNow } from './prune'
-import { clearNow, deleteItemNow, setStateNow, writeItemNow } from './writes'
+import { clearNow, setStateNow } from './reset'
+import { deleteItemNow, writeItemNow } from './writes'
 
 /** Completed queue entry whose observer errors must not replay the write. */
 interface CompletedOperation {
