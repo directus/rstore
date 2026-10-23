@@ -25,9 +25,13 @@ export interface CustomHookMeta {
    * Whether a reactive request still has a consumer allowed to publish it.
    * Core combines these checks for deduped consumers; caches recheck before
    * applying deferred writes. Absent for ordinary imperative fetches.
+   *
+   * `responseMeta` is the metadata the hooks answering the request write into.
+   * A deduped consumer receives the shared request's metadata, not its own, so
+   * it can read response fields such as `$resultVersion` before completion.
    * @internal
    */
-  $canPublishQuery?: () => boolean
+  $canPublishQuery?: (responseMeta?: CustomHookMeta) => boolean
 }
 
 /**

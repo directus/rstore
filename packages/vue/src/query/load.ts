@@ -129,7 +129,7 @@ async function fetchPage(
   const hookTracking = tracksPage ? newQueryTracking : pruneRun && !uncachedPage ? createTrackingObject() : undefined
   const fetchMeta: CustomHookMeta = {
     ...ctx.meta.value,
-    $canPublishQuery: () => isCurrentPageRequest(ctx, page, savedPageRequestId) && !isStalePageResult(page, readFetchVersion(fetchMeta), savedPageRequestId),
+    $canPublishQuery: responseMeta => isCurrentPageRequest(ctx, page, savedPageRequestId) && !isStalePageResult(page, readFetchVersion(responseMeta ?? fetchMeta), savedPageRequestId),
     $queryTracking: hookTracking,
   }
   const confirmationOptions = capturePageConfirmation(ctx, page)
@@ -164,7 +164,7 @@ function fetchCacheAndFetchBackground(
   const newQueryTracking = ctx.queryTrackingEnabled ? ctx.queryTracking?.createTrackingObject() : undefined
   const fetchMeta: CustomHookMeta = {
     ...ctx.meta.value,
-    $canPublishQuery: () => isCurrentPageRequest(ctx, page, savedPageRequestId) && !isStalePageResult(page, readFetchVersion(fetchMeta), savedPageRequestId),
+    $canPublishQuery: responseMeta => isCurrentPageRequest(ctx, page, savedPageRequestId) && !isStalePageResult(page, readFetchVersion(responseMeta ?? fetchMeta), savedPageRequestId),
     $queryTracking: newQueryTracking,
   }
 

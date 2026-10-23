@@ -9,15 +9,10 @@ interface QueryConsumers {
   checks: Set<CustomHookMeta['$canPublishQuery']>
   /** Combined check installed on the request metadata. */
   canPublish: () => boolean
-  /** Detach response-version links before completion reaches any caller. */
-  releaseVersions: Set<() => void>
 }
 
 /** Weak ownership keeps completed requests from retaining their consumers. */
 const consumers = new WeakMap<Promise<unknown>, QueryConsumers>()
-
-/** Current borrowed-version link for each caller-owned metadata object. */
-const versionLinks = new WeakMap<CustomHookMeta, () => void>()
 
 /**
  * Share a fetch without tying its cache writes to only the first consumer.
@@ -37,18 +32,19 @@ export function dedupeQuery<TResult extends QueryResult<unknown>>(
     if (group && meta.$canPublishQuery !== group.canPublish) {
       group.checks.add(meta.$canPublishQuery)
     }
-    return group && group.meta !== meta ? shareQueryMetadata(pending, group, meta) : pending
+    return group && group.meta !== meta ? shareQueryMetadata(pending, group.meta, meta) : pending
   }
   const checks = new Set([meta.$canPublishQuery] as Array<CustomHookMeta['$canPublishQuery']>)
-  const canPublish = () => [...checks].some(check => !check || check())
+  // Checks run while cache writes happen, before followers' own metadata gets
+  // response fields: hand them the shared request metadata to read instead.
+  const canPublish = () => [...checks].some(check => !check || check(meta))
   // Preserve the metadata object: plugins publish response metadata into it.
   if (meta.$canPublishQuery) {
     meta.$canPublishQuery = canPublish
   }
-  const group: QueryConsumers = { meta, checks, canPublish, releaseVersions: new Set() }
   const promise = fetch(meta)
   promises.set(key, promise)
-  consumers.set(promise, group)
+  consumers.set(promise, { meta, checks, canPublish })
   // A background query returns its cached result before the request finishes.
   // Keep that immediately available result shared until its fetch also settles.
   promise.then((result) => {
@@ -63,8 +59,6 @@ export function dedupeQuery<TResult extends QueryResult<unknown>>(
 
   /** Release this request before callers retry or read the newly populated cache. */
   function release(): void {
-    for (const detach of group.releaseVersions)
-      detach()
     if (promises.get(key) === promise) {
       promises.delete(key)
     }
@@ -74,70 +68,25 @@ export function dedupeQuery<TResult extends QueryResult<unknown>>(
 /** Share hook results without copying another consumer's private tracking state. */
 async function shareQueryMetadata<TResult extends QueryResult<unknown>>(
   pending: Promise<TResult>,
-  group: QueryConsumers,
+  source: CustomHookMeta,
   target: CustomHookMeta,
 ): Promise<TResult> {
-  const source = group.meta
-  // Caller metadata may take opposite roles in simultaneous request groups.
-  // A source must own its current value before another object points to it;
-  // otherwise installing the reverse link creates circular accessors.
-  versionLinks.get(source)?.()
-  versionLinks.get(target)?.()
-  /** Read this request's version while its hooks can still publish cache writes. */
-  const readVersion = () => source.$resultVersion
-  // Cache publication can run before the shared promise resolves. Every
-  // consumer's guard must see the hook's version while those writes run.
-  Object.defineProperty(target, '$resultVersion', {
-    configurable: true,
-    enumerable: true,
-    get: readVersion,
-    /** Detach the shared version when this consumer's response completes. */
-    set(value: CustomHookMeta['$resultVersion']) {
-      Object.defineProperty(target, '$resultVersion', { configurable: true, enumerable: true, writable: true, value })
-      releaseLink()
-    },
-  })
-  /** Remove only this request's registration when metadata ownership changes. */
-  function releaseLink(): void {
-    group.releaseVersions.delete(detachVersion)
-    if (versionLinks.get(target) === detachVersion)
-      versionLinks.delete(target)
-  }
-  /** A prior completion must not detach a newer request's metadata link. */
-  function detachVersion(): void {
-    if (Object.getOwnPropertyDescriptor(target, '$resultVersion')?.get === readVersion)
-      target.$resultVersion = source.$resultVersion
-    releaseLink()
-  }
-  group.releaseVersions.add(detachVersion)
-  versionLinks.set(target, detachVersion)
   /** Copy ordinary response fields; publication guards and ownership stay local. */
-  function publish(complete = false): void {
+  function publish(): void {
     Object.assign(target, pickNonSpecialProps(source))
-    if (complete)
-      detachVersion()
+    // `$` fields are private, but the result version describes the shared
+    // response itself, so every consumer orders its result with it.
+    if (source.$resultVersion !== undefined)
+      target.$resultVersion = source.$resultVersion
   }
-  /** Failed responses must also release metadata links before callers retry. */
-  function reject(error: unknown): never {
-    detachVersion()
-    throw error
-  }
-  // Leaving a failed follower linked to its source creates circular getters
-  // when those caller-owned metadata objects start the next request in reverse.
-  let result: TResult
-  try {
-    result = await pending
-  }
-  catch (error) {
-    reject(error)
-  }
-  publish(!result.fetchPromise)
+  const result = await pending
+  publish()
   if (!result.fetchPromise) {
     return result
   }
   // Core cache-and-fetch resolves the outer result before hooks finish.
   // Its background completion must also deliver response metadata.
-  const fetchPromise = result.fetchPromise.then(() => publish(true), reject)
+  const fetchPromise = result.fetchPromise.then(publish)
   fetchPromise.catch(() => {})
   return { ...result, fetchPromise }
 }

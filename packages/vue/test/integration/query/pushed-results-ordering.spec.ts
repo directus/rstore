@@ -182,6 +182,39 @@ describe('page result versions reject older server state', () => {
     expect(store.todos.peekFirst('1')?.title).toBe('Pushed one')
   })
 
+  // The follower's refresh starts after the push, so only the shared response
+  // version can tell its guard that this request predates the push.
+  it('rejects stale cache writes for a consumer that joins an older request after a push', async () => {
+    const { store, run, remote, payloads } = await setupLiveTodos({
+      on: { fetchMany: (ctx: any) => {
+        ctx.payload.meta.$resultVersion = 4
+        return ctx.next()
+      } },
+    })
+    const first = run(() => store.todos.liveQuery((q: any) => q.many({ resultMode: 'responseRefs' })))
+    const second = run(() => store.todos.liveQuery((q: any) => q.many({ resultMode: 'responseRefs' })))
+    await Promise.all([first, second])
+    await subscription(payloads, 1)
+    const release = remote.holdNext('fetchMany')
+    const leading = first.refresh()
+    let following: Promise<unknown> | undefined
+    try {
+      await vi.waitFor(() => expect(remote.callCount('fetchMany')).toBe(2))
+      writeRows(store, [{ id: '1', title: 'Pushed one' }])
+      for (const payload of payloads)
+        expect(payload.setResult!([{ id: '1', title: 'Pushed one' }], { version: 5 })).toBe('applied')
+      following = second.refresh()
+    }
+    finally {
+      release()
+      await Promise.all([leading, following])
+    }
+    expect(remote.callCount('fetchMany')).toBe(2)
+    for (const query of [first, second])
+      expect(query.data.value.map((row: any) => row.title)).toEqual(['Pushed one'])
+    expect(store.todos.peekFirst('1')?.title).toBe('Pushed one')
+  })
+
   it.each([false, true])('shares fetch versions with deduped consumers (background: %s)', async (background) => {
     const { store, run, remote, payloads } = await setupLiveTodos({
       on: { fetchMany: (ctx: any) => {
