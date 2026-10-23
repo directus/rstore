@@ -1,3 +1,5 @@
+import type { FieldTimestampValue } from '../crdt'
+
 /**
  * Query tracking metadata attached to hook payloads.
  */
@@ -10,6 +12,12 @@ export interface HookMetaQueryTracking {
 
 // @TODO type generics
 export interface CustomHookMeta {
+  /**
+   * Server snapshot version of this fetch result. Fetch hooks may set it on the
+   * metadata they receive; rstore reads it to order page results and removes it
+   * from the published query metadata.
+   */
+  $resultVersion?: FieldTimestampValue
   $queryTracking?: HookMetaQueryTracking
   /** A durable local queue accepted this mutation; remote commit remains pending. */
   mutationStatus?: 'queued'
