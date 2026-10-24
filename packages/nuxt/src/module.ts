@@ -33,7 +33,7 @@ declare module 'nuxt/schema' {
 // Module options TypeScript interface definition
 export interface ModuleStoreOptions extends Pick<
   CreateStoreOptions,
-  'collectionDefaults' | 'findDefaults' | 'syncImmediately' | 'experimentalGarbageCollection' | 'cacheStaggering' | 'batching'
+  'collectionDefaults' | 'findDefaults' | 'syncImmediately' | 'experimentalGarbageCollection' | 'cacheStaggering' | 'batching' | 'mutationHistory' | 'queryStateRetention' | 'tombstoneGc'
 > {}
 
 export interface ModuleOptions {
