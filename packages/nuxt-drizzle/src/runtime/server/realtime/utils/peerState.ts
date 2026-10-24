@@ -12,6 +12,11 @@ export interface PeerState {
   rejected: boolean
   /** Active subscriptions keyed by subscription id. */
   subscriptions: Map<string, SubscriptionMessage>
+  /**
+   * Token of the subscribe attempt still awaiting `realtime.authorize`, keyed
+   * by subscription id. An unsubscribe deletes it so the attempt is dropped.
+   */
+  pendingSubscriptions: Map<string, symbol>
   /** Teardown for the shared pubsub subscription. */
   off?: () => void
   /** Pending outbound updates. */
@@ -32,6 +37,7 @@ export function getPeerState(peer: any): PeerState {
       initAckSent: false,
       rejected: false,
       subscriptions: new Map(),
+      pendingSubscriptions: new Map(),
       pendingUpdates: [],
       flushScheduled: false,
     }
@@ -40,9 +46,27 @@ export function getPeerState(peer: any): PeerState {
   return state
 }
 
+/**
+ * Detach a peer for good: drop its pending authorization tokens so those
+ * attempts bail, drop its pubsub listener and stop tracking it.
+ *
+ * @param state State of the peer being closed.
+ */
+export function disposePeerState(state: PeerState) {
+  state.pendingSubscriptions.clear()
+  state.off?.()
+  state.off = undefined
+  if (peerStates.get(state.peer?.id) === state) {
+    peerStates.delete(state.peer.id)
+  }
+}
+
 /** Close every tracked peer during Nitro shutdown. */
 export function closeAllRstoreDrizzlePeers() {
-  for (const state of peerStates.values()) {
+  for (const state of [...peerStates.values()]) {
+    // The crossws `close` hook may run after this loop (or never, for a
+    // terminated socket), so release the listener here rather than rely on it.
+    disposePeerState(state)
     const peer = state.peer
     try {
       if (typeof peer?.terminate === 'function') {
@@ -56,5 +80,4 @@ export function closeAllRstoreDrizzlePeers() {
       console.error('[ws] failed to close peer on shutdown', error)
     }
   }
-  peerStates.clear()
 }

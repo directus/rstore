@@ -1,5 +1,5 @@
 import type { FieldTimestampValue } from '@rstore/shared'
-import type { InitAckMessage, InitErrorMessage, SubscriptionMessage, SubscriptionRejectedMessage, SubscriptionUpdateMessage } from './utils/realtime'
+import type { InitAckMessage, InitErrorMessage, SubscriptionRejectedMessage, SubscriptionUpdateMessage } from './utils/realtime'
 // @ts-expect-error virtual module
 import { scopeId as drizzleScopeId, wsAutoReconnect, wsClientEndpoint, wsHeartbeatInterval } from '#build/$rstore-drizzle-config.js'
 import { compareHLC } from '@rstore/core'
@@ -7,9 +7,10 @@ import { definePlugin, realtimeReconnectEventHook } from '@rstore/vue'
 import { useWebSocket } from '@vueuse/core'
 import { watch } from 'vue'
 import { getRstoreDrizzleClientId } from './utils/client-id'
-import { getSubscriptionId, RSTORE_DRIZZLE_PROTOCOL_VERSION } from './utils/realtime'
+import { RSTORE_DRIZZLE_PROTOCOL_VERSION } from './utils/realtime'
 import { createRealtimeReadyGate } from './utils/realtime-ready'
 import { maxPayloadStamp, stampToDate } from './utils/realtime-stamps'
+import { createRealtimeSubscriptions } from './utils/realtime-subscriptions'
 
 export default definePlugin({
   name: 'rstore-drizzle-realtime',
@@ -22,12 +23,6 @@ export default definePlugin({
     if (import.meta.client) {
       const clientId = getRstoreDrizzleClientId()
 
-      // Local ref-count per subscription id — a given (collection, key, where)
-      // is only sent to the server once, regardless of how many components
-      // subscribe to it locally. The matching `unsubscribe` is only emitted
-      // when the last subscriber is torn down.
-      const countPerTopic: Record<string, number> = {}
-      const messages = new Map<string, SubscriptionMessage>()
       // Highest HLC seen per collection. Used as `lastUpdatedAt` for the
       // `syncCollection` hook on reconnect so only missed rows flow back.
       const lastStampPerCollection = new Map<string, FieldTimestampValue>()
@@ -64,48 +59,20 @@ export default definePlugin({
         await readyGate.wait()
       })
 
+      // Ref-counted: one wire subscription per topic, however many local
+      // subscribers share it.
+      const subscriptions = createRealtimeSubscriptions((message) => {
+        ws.send(JSON.stringify({
+          subscription: message,
+        }), false)
+      })
+
       hook('subscribe', ({ collection, key, findOptions }) => {
-        const where = findOptions?.where
-        const message: SubscriptionMessage = {
-          action: 'subscribe',
-          collection: collection.name,
-          key,
-          where,
-        }
-        const subscriptionId = getSubscriptionId(message)
-        countPerTopic[subscriptionId] ??= 0
-        if (countPerTopic[subscriptionId] === 0) {
-          ws.send(JSON.stringify({
-            subscription: message,
-          }), false)
-          messages.set(subscriptionId, message)
-        }
-        countPerTopic[subscriptionId]++
+        subscriptions.subscribe({ collection: collection.name, key, where: findOptions?.where })
       })
 
       hook('unsubscribe', ({ collection, key, findOptions }) => {
-        const where = findOptions?.where
-        const message: SubscriptionMessage = {
-          action: 'unsubscribe',
-          collection: collection.name,
-          key,
-          where,
-        }
-        const subscriptionId = getSubscriptionId(message)
-        const current = countPerTopic[subscriptionId] ?? 0
-        // Guard against decrementing below zero — a stray unsubscribe without
-        // a matching subscribe would otherwise send a spurious unsubscribe
-        // frame and corrupt the counter.
-        if (current <= 0) {
-          return
-        }
-        countPerTopic[subscriptionId] = current - 1
-        if (countPerTopic[subscriptionId] === 0) {
-          ws.send(JSON.stringify({
-            subscription: message,
-          }), false)
-          messages.delete(subscriptionId)
-        }
+        subscriptions.unsubscribe({ collection: collection.name, key, where: findOptions?.where })
       })
 
       let storeRef: any = null
@@ -228,7 +195,7 @@ export default definePlugin({
           return
         }
         const seen = new Set<string>()
-        for (const [, msg] of messages) {
+        for (const msg of subscriptions.active.values()) {
           if (seen.has(msg.collection)) {
             continue
           }
@@ -286,7 +253,7 @@ export default definePlugin({
         // Resubscribe to all active topics. On first open this replays
         // subscriptions issued while CONNECTING; on reconnect it restores
         // subscriptions across a transient disconnect.
-        for (const [, message] of messages) {
+        for (const message of subscriptions.active.values()) {
           ws.send(JSON.stringify({
             subscription: message,
           }), false)

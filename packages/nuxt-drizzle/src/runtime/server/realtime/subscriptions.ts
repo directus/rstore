@@ -20,6 +20,15 @@ export async function handleSubscription(peer: any, state: PeerState, subscripti
   }
 }
 
+/**
+ * Authorize then register one subscription, attaching the peer's shared pubsub
+ * listener on its first subscription.
+ *
+ * @param peer Subscribing crossws peer.
+ * @param state Tracked state of that peer.
+ * @param subscriptionId Stable id of `subscription`.
+ * @param subscription Normalized subscribe frame.
+ */
 async function subscribePeer(peer: any, state: PeerState, subscriptionId: string, subscription: SubscriptionMessage) {
   if (state.subscriptions.has(subscriptionId)) {
     return
@@ -31,7 +40,18 @@ async function subscribePeer(peer: any, state: PeerState, subscriptionId: string
     sendRejectedSubscription(peer, subscription, 'collection-not-allowed')
     return
   }
+  // `realtime.authorize` is async: the peer may unsubscribe, re-subscribe or
+  // disconnect meanwhile. The token lets only the latest still-wanted attempt
+  // of a live peer proceed (unsubscribe and `disposePeerState` both drop it);
+  // anything else would attach a listener nobody removes (the close hook
+  // already ran) or resurrect a dropped subscription.
+  const token = Symbol(subscriptionId)
+  state.pendingSubscriptions.set(subscriptionId, token)
   const rejectedReason = await authorizeSubscription(peer, subscription)
+  if (state.pendingSubscriptions.get(subscriptionId) !== token) {
+    return
+  }
+  state.pendingSubscriptions.delete(subscriptionId)
   if (rejectedReason) {
     sendRejectedSubscription(peer, subscription, rejectedReason)
     return
@@ -43,7 +63,15 @@ async function subscribePeer(peer: any, state: PeerState, subscriptionId: string
   }
 }
 
+/**
+ * Drop one subscription (pending or active), detaching the shared pubsub
+ * listener once the peer has none left.
+ *
+ * @param state Tracked state of the peer.
+ * @param subscriptionId Id of the subscription to drop.
+ */
 function unsubscribePeer(state: PeerState, subscriptionId: string) {
+  state.pendingSubscriptions.delete(subscriptionId)
   state.subscriptions.delete(subscriptionId)
   if (state.subscriptions.size === 0 && state.off) {
     state.off()

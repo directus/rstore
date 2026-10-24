@@ -2,7 +2,7 @@ import type { ClientInitMessage, SubscriptionMessage } from '../../utils/realtim
 import { defineWebSocketHandler } from 'h3'
 import { normalizeSubscriptionKey } from '../../utils/realtime'
 import { handleSubscription } from './subscriptions'
-import { getPeerState, peerStates } from './utils/peerState'
+import { disposePeerState, getPeerState, peerStates } from './utils/peerState'
 import { CLIENT_ID_HEADER, isSupportedClientVersion, rejectPeerVersion, sendInitAck } from './utils/protocol'
 
 export { closeAllRstoreDrizzlePeers } from './utils/peerState'
@@ -59,10 +59,9 @@ export default defineWebSocketHandler({
 
   close(peer) {
     const state = peerStates.get(peer.id)
-    if (state?.off) {
-      state.off()
+    if (state) {
+      disposePeerState(state)
     }
-    peerStates.delete(peer.id)
   },
 
   error(peer, error) {
