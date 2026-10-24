@@ -8,6 +8,9 @@ import { promisify } from 'node:util'
 
 const execFileAsync = promisify(execFile)
 
+/** Repository root owning the shared Vite config, independent of the caller's cwd. */
+const repositoryRoot = resolve(import.meta.dirname, '../../..')
+
 /** Configuration for one benchmark worker process. */
 export interface WorkerProcessOptions<TResult> {
   /** Environment inherited by the worker before its result path is added. */
@@ -24,7 +27,7 @@ export interface WorkerProcessOptions<TResult> {
   validateResult: (result: TResult) => void
   /** Absolute path of the Vite Node worker entrypoint. */
   workerPath: string
-  /** Working directory used for Vite config resolution and child execution. */
+  /** Working directory used for Vite config resolution and child execution; defaults to the repository root. */
   workingDirectory?: string
 }
 
@@ -61,7 +64,7 @@ export async function runIsolatedWorkerProcess<TResult>(
   options: WorkerProcessOptions<TResult>,
   actions: WorkerProcessActions = defaultWorkerProcessActions,
 ): Promise<TResult> {
-  const workingDirectory = options.workingDirectory ?? process.cwd()
+  const workingDirectory = options.workingDirectory ?? repositoryRoot
   const outputDirectory = await actions.createOutputDirectory(options.resultPrefix)
   const outputPath = join(outputDirectory, 'result.json')
   try {

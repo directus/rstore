@@ -47,6 +47,30 @@ describe('benchmark worker process', () => {
     expect(controller.removeOutputDirectory).toHaveBeenCalledWith('/tmp/rstore-worker-output')
   })
 
+  it('resolves the repository Vite config regardless of the current directory', async () => {
+    const controller = createController()
+    const repositoryRoot = join(import.meta.dirname, '../../..')
+    const cwd = vi.spyOn(process, 'cwd').mockReturnValue(join(repositoryRoot, 'packages/vue'))
+
+    try {
+      await runIsolatedWorkerProcess<WorkerResult>({
+        environment: {},
+        maxBuffer: 1024,
+        request: {},
+        resultPrefix: 'rstore-payload-worker-',
+        validateResult: () => {},
+        workerPath: join(repositoryRoot, 'packages/vue/benchmark/payload/worker-entry.ts'),
+      }, controller.actions)
+    }
+    finally {
+      cwd.mockRestore()
+    }
+
+    const [, args, options] = controller.execute.mock.calls[0]!
+    expect(args[args.indexOf('--config') + 1]).toBe(join(repositoryRoot, 'vitest.config.ts'))
+    expect(options.cwd).toBe(repositoryRoot)
+  })
+
   it('keeps payload worker 8 MiB output buffer', async () => {
     const controller = createController()
 
