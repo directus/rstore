@@ -31,6 +31,7 @@ export function reservePageResult(page: VueQueryPage<any, any, any, any, any>, v
 export function updateQueryMeta(ctx: any, page: VueQueryPage<any, any, any, any, any>, newMeta: CustomHookMeta, isCurrent: () => boolean = () => true) {
   if (page.main) {
     ctx.cache._private.state.queryMeta[ctx.queryId.value] = pickNonSpecialProps(newMeta)
+    ctx.cache._private.holdQueryState(ctx.queryId.value, ctx)
   }
   if (!isCurrent())
     return

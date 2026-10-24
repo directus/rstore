@@ -2,6 +2,7 @@ import type { Ref } from 'vue'
 import type { CachedPageRefs, CacheRuntime } from './types'
 import { klona } from 'klona'
 import { ref } from 'vue'
+import { forgetQueryStateHolders, isQueryStateHeld } from './queryHolders'
 
 /** Accepted collection writes, observed only for unkeyed absence decisions. */
 const collectionWrites = new WeakMap<CacheRuntime['state'], Map<string, number>>()
@@ -72,6 +73,7 @@ export function clearQueryStateForCollection(ctx: CacheRuntime, collectionName: 
   for (const queryId of Object.keys(ctx.state.queryMeta)) {
     if (isQueryStateKeyForCollection(queryId, collectionName)) {
       delete ctx.state.queryMeta[queryId]
+      forgetQueryStateBookkeeping(ctx, queryId)
     }
   }
 
@@ -79,8 +81,10 @@ export function clearQueryStateForCollection(ctx: CacheRuntime, collectionName: 
     const queryId = getPageQueryId(pageId)
     if (queryId && isQueryStateKeyForCollection(queryId, collectionName)) {
       ctx.state.pageRefs.delete(pageId)
+      forgetQueryStateBookkeeping(ctx, queryId)
     }
   }
+  itemWrites.get(ctx.state)?.delete(collectionName)
 }
 
 /**
@@ -89,6 +93,19 @@ export function clearQueryStateForCollection(ctx: CacheRuntime, collectionName: 
 export function clearAllQueryState(ctx: CacheRuntime) {
   ctx.state.queryMeta = {}
   ctx.state.pageRefs.clear()
+  ctx.queryStateUsedAt.clear()
+  forgetQueryStateHolders(ctx.state)
+  resetItemWrites(ctx)
+}
+
+/**
+ * Forget every key's write generation when the cache rows are replaced.
+ *
+ * A live absence that captured a non-zero generation reads as released
+ * afterwards, which then shows the replaced cache view instead of a miss.
+ */
+export function resetItemWrites(ctx: CacheRuntime) {
+  itemWrites.delete(ctx.state)
 }
 
 /** Release computed absence when a later write can change its membership. */
@@ -113,10 +130,11 @@ export function invalidateMissingPageRefsForItem(ctx: CacheRuntime, collectionNa
 }
 
 /**
- * Drop response references to one evicted item without disturbing other pages
- * or query metadata.
+ * Drop response references to one evicted item without disturbing other
+ * pages, then the metadata of queries left with no saved page or consumer.
  */
 export function invalidatePageRefsForItem(ctx: CacheRuntime, collectionName: string, key: string | number): void {
+  const evicted = new Set<string>()
   for (const [pageId, ref] of ctx.state.pageRefs) {
     const queryId = getPageQueryId(pageId)
     if (!queryId || !isQueryStateKeyForCollection(queryId, collectionName)) {
@@ -128,14 +146,49 @@ export function invalidatePageRefsForItem(ctx: CacheRuntime, collectionName: str
     const keys = ref.type === 'ref' ? [ref.key] : ref.keys
     if (keys.some(candidate => String(candidate) === String(key))) {
       ctx.state.pageRefs.delete(pageId)
+      evicted.add(queryId)
     }
   }
+  for (const queryId of evicted) {
+    releaseQueryMeta(ctx, queryId)
+  }
+}
+
+/** Drop metadata of a query left without saved pages or a live consumer. */
+function releaseQueryMeta(ctx: CacheRuntime, queryId: string, savedQueryIds?: Set<string>) {
+  if (!(queryId in ctx.state.queryMeta) || isQueryStateHeld(ctx.state, queryId)) {
+    return
+  }
+  if (savedQueryIds ? savedQueryIds.has(queryId) : hasSavedPage(ctx, queryId)) {
+    return
+  }
+  delete ctx.state.queryMeta[queryId]
+  forgetQueryStateBookkeeping(ctx, queryId)
+}
+
+/**
+ * Forget retention timestamps and consumers of a query id whose saved state
+ * is gone, so these side tables never outgrow the state they describe.
+ */
+function forgetQueryStateBookkeeping(ctx: CacheRuntime, queryId: string) {
+  ctx.queryStateUsedAt.delete(queryId)
+  forgetQueryStateHolders(ctx.state, queryId)
+}
+
+/** Whether any page of a query still has saved refs. */
+function hasSavedPage(ctx: CacheRuntime, queryId: string) {
+  for (const pageId of ctx.state.pageRefs.keys()) {
+    if (getPageQueryId(pageId) === queryId) {
+      return true
+    }
+  }
+  return false
 }
 
 /**
  * Extract the serialized query id from a page id.
  */
-function getPageQueryId(pageId: string) {
+export function getPageQueryId(pageId: string) {
   const pageSeparatorIndex = pageId.lastIndexOf('#')
   if (pageSeparatorIndex === -1) {
     return undefined
@@ -158,4 +211,52 @@ function getPageQueryId(pageId: string) {
 function isQueryStateKeyForCollection(queryId: string, collectionName: string) {
   return queryId.startsWith(`[${JSON.stringify(`${collectionName}-first`)},`)
     || queryId.startsWith(`[${JSON.stringify(`${collectionName}-many`)},`)
+}
+
+/** Forget every saved page and the metadata of one query id. */
+export function deleteQueryState(ctx: CacheRuntime, queryId: string): void {
+  for (const pageId of ctx.state.pageRefs.keys()) {
+    if (getPageQueryId(pageId) === queryId) {
+      ctx.state.pageRefs.delete(pageId)
+    }
+  }
+  delete ctx.state.queryMeta[queryId]
+  forgetQueryStateBookkeeping(ctx, queryId)
+}
+
+/**
+ * Forget write generations no saved miss reads anymore.
+ *
+ * A key's generation only serves absence decisions of its saved misses, so
+ * it can go once those misses are evicted.
+ */
+export function pruneItemWrites(ctx: CacheRuntime): void {
+  const collections = itemWrites.get(ctx.state)
+  if (!collections) {
+    return
+  }
+  /** Keys of saved misses, by collection. */
+  const missedKeys = new Map<string, Set<string>>()
+  const collectionNames = [...collections.keys()]
+  for (const [pageId, saved] of ctx.state.pageRefs) {
+    const queryId = getPageQueryId(pageId)
+    const collectionName = queryId && collectionNames.find(name => isQueryStateKeyForCollection(queryId, name))
+    if (!collectionName || saved.type !== 'data' || saved.key == null) {
+      continue
+    }
+    let keys = missedKeys.get(collectionName)
+    if (!keys) {
+      keys = new Set()
+      missedKeys.set(collectionName, keys)
+    }
+    keys.add(String(saved.key))
+  }
+  for (const [collectionName, versions] of collections) {
+    const kept = missedKeys.get(collectionName)
+    for (const key of versions.keys()) {
+      if (!kept?.has(key)) {
+        versions.delete(key)
+      }
+    }
+  }
 }

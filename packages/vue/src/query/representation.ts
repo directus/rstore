@@ -29,6 +29,9 @@ export function setPageRepresentation(ctx: any, page: VueQueryPage<any, any, any
   if (!isCurrent())
     return
 
+  // Saved refs are a response cache for remounts. Garbage collection may only
+  // drop the ones no live consumer still represents.
+  ctx.cache._private.holdQueryState(ctx.queryId.value, ctx)
   if (!uncached && page.rawData.type === 'data' && page.rawData.value === null) {
     // A confirmed not-found result has no keys but still survives SSR/remounts.
     const options = ctx.store.$resolveFindOptions(ctx.getCollection(), ctx.getPageOptions(page), ctx.many, { ...ctx.meta.value })

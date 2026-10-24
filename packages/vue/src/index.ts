@@ -16,6 +16,7 @@ export type {
 
 export type {
   CachedPageRefs,
+  TombstoneGcOptions,
 } from './cache'
 
 export {
@@ -131,6 +132,7 @@ export type {
   ResolvedCollection,
   ResolvedCollectionItem,
   ResolvedCollectionItemBase,
+  RetentionOptions,
   SetResultOptions,
   SetResultOutcome,
   SetSubscriptionResult,

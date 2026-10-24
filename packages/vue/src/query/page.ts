@@ -20,6 +20,10 @@ export function createPage(
   const index = optionsExtension.pageIndex != null ? optionsExtension.pageIndex : ctx.pages.value.length
   const id = getPageId(ctx, index)
   const cached = getMatchingPageRefs(ctx, { id, options: optionsExtension })
+  if (cached) {
+    // Hydrated or remembered results now have a live consumer, see `load.ts`.
+    ctx.cache._private.holdQueryState(ctx.queryId.value, ctx)
+  }
   const foreground = createFetchState()
   const background = createFetchState()
   const page = shallowReactive({

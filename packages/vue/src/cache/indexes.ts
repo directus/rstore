@@ -1,4 +1,5 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, StoreSchema } from '@rstore/shared'
+import type { Ref } from 'vue'
 import type { CacheRuntime, CacheWriteBatch } from './types'
 import { isKeyDefined } from '@rstore/core'
 import { ref, toRaw, toValue } from 'vue'
@@ -40,10 +41,28 @@ export function removeItemIndexes<TCollection extends Collection>(
   for (const [indexKey, indexFields] of collection.indexes) {
     const index = getCollectionIndex(ctx, collection.name, indexKey)
     const previousValue = indexFields.map(f => item[f]).join(':')
-    const existingKeys = index.get(previousValue)
-    if (existingKeys) {
-      existingKeys.value.delete(String(key))
-    }
+    removeKeyFromBucket(index, previousValue, key)
+  }
+}
+
+/**
+ * Remove a key from an index bucket, dropping the bucket once it is empty.
+ *
+ * Every distinct join value gets its own bucket, so empty ones would pile up.
+ * Dropping them is safe for reactive readers: `readItems` reads a missing
+ * bucket as empty and also tracks the collection publication, which every
+ * write that recreates a bucket triggers.
+ */
+function removeKeyFromBucket(index: Map<any, Ref<Set<string | number>>>, value: string, key: string | number, batch?: CacheWriteBatch) {
+  const existingKeys = index.get(value)
+  if (!existingKeys) {
+    return
+  }
+  // A batch publishes once at settlement, so it edits the raw set silently.
+  const keys = batch ? toRaw(existingKeys.value) : existingKeys.value
+  keys.delete(String(key))
+  if (keys.size === 0) {
+    index.delete(value)
   }
 }
 
@@ -65,12 +84,7 @@ export function updateItemIndexes<TCollection extends Collection>(
     if (previousData) {
       const values = indexFields.map(f => previousData?.[f])
       if (values.every(v => v != null)) {
-        const previousValue = values.join(':')
-        const existingKeys = index.get(previousValue)
-        if (existingKeys) {
-          const keys = batch ? toRaw(existingKeys.value) : existingKeys.value
-          keys.delete(String(key))
-        }
+        removeKeyFromBucket(index, values.join(':'), key, batch)
       }
     }
 

@@ -2,9 +2,9 @@ import type { Cache, Collection, CollectionDefaults, CustomHookMeta, FieldTimest
 import type { VueCachePrivate } from '../cache'
 import type { VueCreateQueryOptions, VueQueryRefreshOptions, VueQueryReturn } from './types'
 import { tryOnScopeDispose } from '@vueuse/core'
-import { computed, getCurrentInstance, onServerPrefetch, ref, shallowRef, toValue, watch } from 'vue'
-import { onWindowFocus } from '../swr'
+import { computed, getCurrentInstance, getCurrentScope, onServerPrefetch, ref, shallowRef, toValue } from 'vue'
 import { useQueryTracking } from '../tracking'
+import { installAutoRefresh } from './autoRefresh'
 import { installConfirmationResets } from './confirmation'
 import { loadPage } from './load'
 import { watchQueryOptions } from './options'
@@ -15,9 +15,7 @@ import { publishPageResult } from './push'
 import { getMainPageRefreshOptions, refreshSecondaryPage } from './refresh'
 import { createFetchState, getFetchStateError, isFetchStateLoading, toQueryFetchState } from './state'
 
-/**
- * Create a reactive query object.
- */
+/** Create a reactive query object. */
 export function createQuery<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -30,6 +28,8 @@ export function createQuery<
   // must never publish a page or reacquire ownership for this dead consumer.
   tryOnScopeDispose(() => {
     ctx.disposed = true
+    // Its saved results now age and count toward the retention size limit.
+    ctx.cache._private.releaseQueryState(ctx)
   })
   ctx.mainPage = createPage(ctx, {}, true)
   ctx.result = computed(() => mergePages(ctx))
@@ -43,6 +43,19 @@ export function createQuery<
   // `data` is read by the `loading` aggregate, so it has to exist first.
   const data = ctx.queryTracking?.filteredCached ?? ctx.cached
   const loading = computed(() => isFetchStateLoading(ctx.foreground, ctx.background, () => data.value))
+  // Vue 3.6 computeds stay subscribed to their dependencies without
+  // subscribers, and one first read with no active effect (a click handler,
+  // async code) binds to no scope: cached records would retain this query.
+  // Reading every cache-derived computed now binds it to this scope, whose
+  // disposal unlinks it. `data` reads `cacheRead` exactly when
+  // `readCachedResult` uses it. Reading it otherwise (no-cache, responseRefs)
+  // would scan the cache through read hooks for nothing on every mount; a
+  // later first read from `cached` links it to that bound computed instead.
+  if (getCurrentScope()) {
+    void ctx.result.value
+    void data.value
+    void loading.value
+  }
   // Writable so `query.error.value = null` keeps dismissing the error like it used to.
   const error = computed({
     get: () => getFetchStateError(ctx.foreground, ctx.background),
@@ -280,16 +293,4 @@ function mergePages(ctx: any) {
     }
   }
   return result
-}
-
-/**
- * Install window-focus auto refresh.
- */
-function installAutoRefresh(ctx: any, refresh: () => unknown) {
-  let stopAutoRefresh: (() => void) | undefined
-  watch(ctx.getAutoRefresh, (autoRefresh) => {
-    stopAutoRefresh?.()
-    stopAutoRefresh = autoRefresh === 'windowFocus' ? onWindowFocus(() => refresh()) : undefined
-  }, { immediate: true })
-  tryOnScopeDispose(() => stopAutoRefresh?.())
 }

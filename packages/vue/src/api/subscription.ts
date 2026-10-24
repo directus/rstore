@@ -4,7 +4,8 @@ import type { CollectionApiRuntime } from './query'
 import { subscribe, unsubscribe } from '@rstore/core'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { klona } from 'klona'
-import { ref, toValue, watch } from 'vue'
+import { effectScope, onScopeDispose, ref, toValue, watch } from 'vue'
+import { releaseWithStore } from '../events'
 import { equalFindOptions } from '../query/options'
 
 /** Callbacks supplied when a subscription belongs to a live query. */
@@ -158,28 +159,52 @@ export function subscribeToApiQuery(
     return enqueue(() => subNow(optionsValue, force, expectedRevision))
   }
 
-  let watchedOptions: unknown
-  let initialized = false
-  watch(() => toValue(keyOrFindOptions), (value) => {
-    if (initialized && equalFindOptions(value, watchedOptions))
-      return
-    initialized = true
-    watchedOptions = klona(value)
-    // Invalidate old callbacks before serialized unsubscribe reaches the transport.
-    revision++
-    void sub(klona(value))
-  }, { immediate: true, deep: true, flush: 'sync' })
-  tryOnScopeDispose(() => {
+  // Option and collection followers live in a detached scope so an explicit
+  // `unsubscribe()` stops them as well: otherwise a later option change would
+  // reopen a remote subscription, and without a caller scope the watcher would
+  // retain this subscription for as long as its reactive sources live.
+  const followers = effectScope(true)
+  /** Forgets the store disposal callback once this subscription ended. */
+  let releaseStore: (() => void) | undefined
+
+  /** End this subscription for good: stop following options, close the transport. */
+  function dispose() {
     disposed = true
-    void unsub()
-  })
-  if (runtime.onInvalidate) {
-    // Force: the collection may have changed even though options are equal.
-    const { off } = runtime.onInvalidate(() => {
-      revision++
-      return sub(klona(toValue(keyOrFindOptions)), true)
-    })
-    tryOnScopeDispose(() => off())
+    followers.stop()
+    releaseStore?.()
+    return unsub()
   }
-  return { unsubscribe: unsub, meta }
+
+  followers.run(() => {
+    let watchedOptions: unknown
+    let initialized = false
+    watch(() => toValue(keyOrFindOptions), (value) => {
+      if (initialized && equalFindOptions(value, watchedOptions))
+        return
+      initialized = true
+      watchedOptions = klona(value)
+      // Invalidate old callbacks before serialized unsubscribe reaches the transport.
+      revision++
+      void sub(klona(value))
+    }, { immediate: true, deep: true, flush: 'sync' })
+    if (runtime.onInvalidate) {
+      // Force: the collection may have changed even though options are equal.
+      const { off } = runtime.onInvalidate(() => {
+        revision++
+        return sub(klona(toValue(keyOrFindOptions)), true)
+      })
+      onScopeDispose(off)
+    }
+  })
+  // Without a caller scope, long-lived reactive options would retain the
+  // followers, and through them the store: its disposal ends them too.
+  // Registered after setup: an already disposed store ends them at once.
+  releaseStore = releaseWithStore(runtime.store, () => {
+    if (!disposed)
+      void dispose()
+  })
+  tryOnScopeDispose(() => {
+    void dispose()
+  })
+  return { unsubscribe: dispose, meta }
 }

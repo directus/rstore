@@ -2,9 +2,8 @@ import type { FindOptions } from '@rstore/shared'
 import type { MaybeRefOrGetter } from 'vue'
 import type { LiveQueryOptions, QueryManyOptions, QueryType } from './types'
 import { findFirst, findMany, peekFirst, peekMany } from '@rstore/core'
-import { tryOnScopeDispose } from '@vueuse/core'
-import { ref, toValue } from 'vue'
-import { realtimeReconnectEventHook } from '../events'
+import { onScopeDispose, ref, toValue } from 'vue'
+import { realtimeReconnectEventHook, runWithStoreLifetime } from '../events'
 import { createQuery } from '../query'
 import { markFetchConfirmation } from '../query/confirmation'
 import { subscribeToLivePages } from './livePages'
@@ -23,6 +22,10 @@ export interface CollectionApiRuntime {
 
 /**
  * Create and run a collection query or live query.
+ *
+ * Its watchers, live pages and listeners run in a scope ending with the
+ * caller scope or the store, whichever ends first: a scope-less query (a
+ * plugin, code after an `await`) is released by the store's disposal.
  */
 export function runApiQuery(
   runtime: CollectionApiRuntime,
@@ -30,23 +33,25 @@ export function runApiQuery(
   isLive: boolean,
   liveOptions?: LiveQueryOptions,
 ) {
-  const { boundOptionsGetter, type } = bindQueryOptionsGetter(optionsGetter)
-  const query = createApiQuery(runtime, boundOptionsGetter, type)
-  if (isLive) {
-    subscribeToLivePages(runtime, query, boundOptionsGetter, toValue(type) === 'many', liveOptions)
-  }
-  if (isLive && !runtime.store.$isServer) {
-    // `realtimeReconnectEventHook` is module-level: skip registration on the
-    // server (server scopes are never disposed, so every SSR request would
-    // leak the query graph) and detach the listener on scope dispose.
-    const { off } = realtimeReconnectEventHook.on(() => query.refresh())
-    tryOnScopeDispose(off)
-  }
-  if (runtime.onInvalidate) {
-    const { off } = runtime.onInvalidate(() => query.refresh())
-    tryOnScopeDispose(() => off())
-  }
-  return query
+  return runWithStoreLifetime(runtime.store, () => {
+    const { boundOptionsGetter, type } = bindQueryOptionsGetter(optionsGetter)
+    const query = createApiQuery(runtime, boundOptionsGetter, type)
+    if (isLive) {
+      subscribeToLivePages(runtime, query, boundOptionsGetter, toValue(type) === 'many', liveOptions)
+    }
+    if (isLive && !runtime.store.$isServer) {
+      // `realtimeReconnectEventHook` is module-level: skip registration on the
+      // server (server scopes are never disposed, so every SSR request would
+      // leak the query graph) and detach the listener with the query scope.
+      const { off } = realtimeReconnectEventHook.on(() => query.refresh())
+      onScopeDispose(off)
+    }
+    if (runtime.onInvalidate) {
+      const { off } = runtime.onInvalidate(() => query.refresh())
+      onScopeDispose(off)
+    }
+    return query
+  })
 }
 
 /**

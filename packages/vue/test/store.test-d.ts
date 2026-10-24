@@ -1,5 +1,5 @@
 import type { CollectionDefaults } from '@rstore/shared'
-import type { VueStore } from '../src'
+import type { CreateStoreOptions, RetentionOptions, TombstoneGcOptions, VueStore } from '../src'
 import { describe, expectTypeOf, test } from 'vitest'
 import { addCollections } from '../src'
 
@@ -20,5 +20,12 @@ describe('store typing', () => {
     expectTypeOf(mutation(1)).toEqualTypeOf<string>()
     // @ts-expect-error mutation wrappers only accept callable values
     store.$wrapMutation(1)
+  })
+
+  test('retention options are importable and accepted by createStore', () => {
+    const retention: RetentionOptions = { ttlMs: 1_000, maxSize: 10 }
+    const tombstones: TombstoneGcOptions = { ...retention, intervalMs: 5_000 }
+
+    expectTypeOf({ queryStateRetention: retention, mutationHistory: false, tombstoneGc: tombstones } as const).toMatchTypeOf<Partial<CreateStoreOptions<[], CollectionDefaults>>>()
   })
 })

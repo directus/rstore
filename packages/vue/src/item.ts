@@ -35,7 +35,11 @@ export function wrapItem<
 
   const isFrozen = Object.isFrozen(item.value)
 
-  const proxy = new Proxy(item.value, {
+  // Every trap reads `item.value`, so a detached target keeps the proxy from
+  // pinning the row version (or raw fetch response) it was created with.
+  // Frozen rows stay the target: proxy invariants require their non-configurable
+  // properties to be reported by the target itself.
+  const proxy = new Proxy(isFrozen ? item.value : {} as typeof item.value, {
     get: (proxyTarget, key) => {
       switch (key) {
         case '$collection':
@@ -193,6 +197,15 @@ export function wrapItem<
 
     deleteProperty: () => {
       throw new Error('Items are read-only. Use `item.$delete()` to delete the item.')
+    },
+
+    // A non-extensible empty target would contradict `ownKeys`. Frozen rows
+    // are their own target, so freezing their wrapper stays valid.
+    preventExtensions: (target) => {
+      if (!isFrozen) {
+        throw new Error('Items are read-only. They cannot be frozen or sealed.')
+      }
+      return Reflect.preventExtensions(target)
     },
   })
 

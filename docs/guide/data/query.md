@@ -271,6 +271,27 @@ Once every reloaded page fetched successfully, each item of the query collection
 - Nothing is deleted if no page is reloaded (`pages: []`), if a reloaded page fails or is superseded by a newer load, or for a `no-cache` query, whose result is not in the cache.
 - Items with a pending optimistic mutation are kept.
 
+#### Saved results
+
+Each query saves its result shape, "not found" and empty lists included, so a query mounted again with the same options reads it cache-first. Every distinct set of options saves one entry. Entries of mounted queries are always kept. Entries of queries no longer mounted are dropped 30 minutes after their last use, and only the 500 most recently used are kept. They are checked every minute, as soon as the size limit is exceeded, and on `store.$cache.garbageCollect()`.
+
+Change these bounds with the `queryStateRetention` store option, or pass `false` to keep them forever:
+
+```ts
+const store = await createStore({
+  schema,
+  plugins,
+  queryStateRetention: {
+    ttlMs: 5 * 60_000, // drop after 5 minutes unused
+    maxSize: 100, // keep at most 100 unused entries
+  },
+})
+```
+
+::: tip
+The cache also bounds its deletion tombstones: `tombstoneGc` defaults to `{ intervalMs: 60_000, ttlMs: 86_400_000, maxSize: 10_000 }`.
+:::
+
 ### Pagination <Badge text="New in v0.8.2" />
 
 #### Fetch more

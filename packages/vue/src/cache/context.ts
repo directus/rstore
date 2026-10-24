@@ -1,7 +1,8 @@
 import type { CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
 import type { CacheRuntime, CreateCacheOptions } from './types'
-import { createTombstoneStore, isKeyDefined, scheduleTombstoneGc } from '@rstore/core'
+import { createTombstoneStore, isKeyDefined, resolveRetention, scheduleTombstoneGc } from '@rstore/core'
 import { ref } from 'vue'
+import { defaultQueryStateRetention, scheduleQueryStateSweeps } from './queryRetention'
 
 /** Create the mutable runtime shared by all cache modules. */
 export function createCacheRuntime<
@@ -12,11 +13,15 @@ export function createCacheRuntime<
   cacheStaggering: rawCacheStaggering = 0,
   tombstoneGc = {},
   isServer = (import.meta as unknown as { server?: boolean }).server === true,
+  queryStateRetention: rawQueryStateRetention,
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): CacheRuntime<TSchema, TCollectionDefaults> {
   const cacheStaggering = Math.max(0, Math.floor(rawCacheStaggering))
   const runtime: CacheRuntime<TSchema, TCollectionDefaults> = {
     getStore,
     cacheStaggering,
+    queryStateRetention: resolveRetention(rawQueryStateRetention, defaultQueryStateRetention),
+    queryStateUsedAt: new Map(),
+    queryStateHeldCount: 0,
     state: {
       markers: {},
       collections: {},
@@ -40,11 +45,17 @@ export function createCacheRuntime<
     staggeringBudget: cacheStaggering,
   }
 
+  // Server stores live for one request: the size limit is enough there.
+  if (!isServer) {
+    runtime.stopQueryStateSweeps = scheduleQueryStateSweeps(runtime, runtime.queryStateRetention)
+  }
+
   const canScheduleTombstoneGc = !isServer && typeof setInterval !== 'undefined'
   if (tombstoneGc !== false && canScheduleTombstoneGc) {
     runtime.stopTombstoneGc = scheduleTombstoneGc(runtime.state.tombstones, {
       intervalMs: tombstoneGc.intervalMs ?? 60_000,
       ttlMs: tombstoneGc.ttlMs ?? 24 * 60 * 60 * 1000,
+      maxSize: tombstoneGc.maxSize ?? 10_000,
     })
   }
 
@@ -97,6 +108,28 @@ export function addWrappedItemKeyToLayer(ctx: CacheRuntime, layer: { id: string 
     ctx.wrappedItemKeysPerLayer.set(layer.id, keys)
   }
   keys.add(wrapKey)
+}
+
+/**
+ * Forget the wrapper registered for a row that is not in committed state.
+ *
+ * Fetches wrap their response rows right away, even when the cache write is
+ * still queued (paused cache, staggering). If that write is then dropped or
+ * rejected, nothing else would ever remove the wrapper and the raw row it
+ * falls back to. Wrappers still owned by a query are kept, so their ownership
+ * survives until the row lands.
+ */
+export function releaseUnwrittenItem(ctx: CacheRuntime, collection: ResolvedCollection<any, any, any>, key: string | number) {
+  if (ctx.state.collections[collection.name]?.value[key]) {
+    return
+  }
+  const wrapKey = getItemWrapKey(collection, key, undefined)
+  const metadata = ctx.wrappedItemsMetadata.get(wrapKey)
+  if (metadata && (metadata.queries.size || metadata.dirtyQueries.size)) {
+    return
+  }
+  ctx.wrappedItems.delete(wrapKey)
+  ctx.wrappedItemsMetadata.delete(wrapKey)
 }
 
 /** Ensure a collection state ref exists. */

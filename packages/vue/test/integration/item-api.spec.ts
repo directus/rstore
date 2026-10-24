@@ -21,6 +21,9 @@ describe('wrapped item API', () => {
     expect(() => {
       item.title = 'Changed directly'
     }).toThrow('Items are read-only. Use `item.$updateForm()` to update the item.')
+    // The proxy target is detached from the row: freezing must fail clearly,
+    // not with a proxy invariant error (nor freeze the cached row).
+    expect(() => Object.freeze(item)).toThrow('Items are read-only.')
   })
 
   it('updates and deletes through backend and cache boundaries', async () => {

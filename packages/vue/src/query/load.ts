@@ -108,6 +108,9 @@ async function fetchPage(
   // confirmed. Read current cache data while retaining the saved confirmation.
   if (cached && (cached.type !== 'data' || !cached.invalidated)) {
     page.rawData = cached
+    // Serving saved results makes this query their live consumer: retention
+    // must not evict them while it stays mounted.
+    ctx.cache._private.holdQueryState(ctx.queryId.value, ctx)
     if (!ownsCachePublication())
       return false
     rememberPageAbsence(ctx, page)

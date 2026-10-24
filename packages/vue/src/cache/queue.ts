@@ -1,7 +1,7 @@
 import type { CacheOperationResult } from '@rstore/shared'
 import type { CacheRuntime, CacheWriteBatch, QueuedOperation } from './types'
 import { triggerRef } from 'vue'
-import { ensureCollectionRef, evictCollectionStateCache, mark } from './context'
+import { ensureCollectionRef, evictCollectionStateCache, mark, releaseUnwrittenItem } from './context'
 import { addLayerNow, removeLayer } from './layers'
 import { pruneNow } from './prune'
 import { clearNow, setStateNow } from './reset'
@@ -109,6 +109,7 @@ function processQueuedOperation(ctx: CacheRuntime, operation: QueuedOperation) {
 function processQueuedWriteItem(ctx: CacheRuntime, operation: Extract<QueuedOperation, { type: 'writeItem' }>) {
   // A paused or staggered write can outlive the query that queued it.
   if (operation.params.meta?.$canPublishQuery?.() === false) {
+    releaseUnwrittenItem(ctx, operation.params.collection, operation.params.key)
     return true
   }
   if (!canProcessQueuedWrite(ctx)) {
@@ -124,6 +125,10 @@ function processQueuedWriteItems(ctx: CacheRuntime, operation: Extract<QueuedOpe
   // Once a staggered slice wrote raw state, settle it so readers and nested
   // hooks cannot remain behind the cache. The marker and outer hook stay stale.
   if (operation.params.meta?.$canPublishQuery?.() === false) {
+    // The fetch already wrapped the rows this dropped page will never write.
+    for (const { key } of operation.params.items.slice(operation.index)) {
+      releaseUnwrittenItem(ctx, operation.params.collection, key)
+    }
     return operation.index === 0
       ? true
       : { settlementErrors: settleWriteBatch(ctx, operation.batch) }

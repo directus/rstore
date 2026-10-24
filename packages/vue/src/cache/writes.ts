@@ -3,7 +3,7 @@ import type { CacheRuntime, CacheWriteBatch } from './types'
 import { mergeItemFields, shouldResurrect } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { markRaw, shallowRef } from 'vue'
-import { ensureCollectionRef, getItemWrapKey, invalidateCollectionStateCache, mark, removeFieldTimestampsForItem } from './context'
+import { ensureCollectionRef, getItemWrapKey, invalidateCollectionStateCache, mark, releaseUnwrittenItem, removeFieldTimestampsForItem } from './context'
 import { removeItemIndexes, updateItemIndexes } from './indexes'
 import { forgetInspectionKey, rememberInspectionKey } from './inspectionKeys'
 import { invalidateMissingPageRefsForItem } from './queryState'
@@ -66,6 +66,8 @@ export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeI
   const tomb = ctx.state.tombstones.get(collection.name, key)
   if (tomb) {
     if (params.fieldTimestamps && !shouldResurrect(tomb, params.fieldTimestamps)) {
+      // A queued fetch may already have wrapped the rejected row.
+      releaseUnwrittenItem(ctx, collection, key)
       return
     }
     ctx.state.tombstones.clear(collection.name, key)

@@ -1,7 +1,8 @@
-import type { TombstoneStore } from '@rstore/core'
-import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, QueryResultMode, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { ResolvedRetention, TombstoneStore } from '@rstore/core'
+import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, QueryResultMode, ResolvedCollection, ResolvedCollectionItem, RetentionOptions, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from '../item'
+import type { QueryStateHolder } from './queryHolders'
 
 /** Cache operations delayed while the cache is paused or write staggering is active. */
 export type QueuedOperation = {
@@ -96,6 +97,12 @@ export interface InternalCacheState {
   tombstones: TombstoneStore
 }
 
+/** Tombstone collector settings: deletes expire by age and count. */
+export interface TombstoneGcOptions extends RetentionOptions {
+  /** Sweep interval in ms. Defaults to 60_000. */
+  intervalMs?: number
+}
+
 export interface CreateCacheOptions<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
@@ -105,14 +112,11 @@ export interface CreateCacheOptions<
   /** Maximum number of queued writes processed per 10ms. */
   cacheStaggering?: number
   /** Auto-GC settings for the per-cache tombstone store. */
-  tombstoneGc?: false | {
-    /** Sweep interval in ms. Defaults to 60_000. */
-    intervalMs?: number
-    /** Drop tombstones older than this many ms. Defaults to 86_400_000. */
-    ttlMs?: number
-  }
+  tombstoneGc?: false | TombstoneGcOptions
   /** Whether this cache belongs to a server-side store instance. */
   isServer?: boolean
+  /** Bounds for saved results of unmounted queries; `false` keeps them forever. */
+  queryStateRetention?: false | RetentionOptions
 }
 
 /** Mutable runtime shared by cache helper modules. */
@@ -126,6 +130,16 @@ export interface CacheRuntime<
   disposed?: boolean
   /** Write staggering budget. */
   cacheStaggering: number
+  /** Resolved bounds for saved results of unmounted queries. */
+  queryStateRetention: ResolvedRetention | false
+  /** Last use (ms) of each saved query id, for retention. */
+  queryStateUsedAt: Map<string, number>
+  /** Mounted entries found by the last sweep, minus unmounts since. */
+  queryStateHeldCount: number
+  /** Whether a size-limit sweep is already queued for this task. */
+  queryStateSweepQueued?: boolean
+  /** Stop the saved-results expiration timer, when one is active. */
+  stopQueryStateSweeps?: () => void
   /** Internal reactive cache state. */
   state: InternalCacheState
   /** Diagnostic key hints allocated only after inspection first activates. */
@@ -170,5 +184,11 @@ export interface VueCachePrivate {
     rebuildIndexes: () => void
     /** Queue a prune, so it runs after the writes already queued by the same refresh. */
     prune: (params: CachePruneParams) => void
+    /** Record that a live query saved results under `queryId`, for retention. */
+    holdQueryState: (queryId: string, holder: QueryStateHolder) => void
+    /** Record that a query stopped using the results it last saved. */
+    releaseQueryState: (holder: QueryStateHolder) => void
+    /** Whether `dispose()` already ran. */
+    isDisposed: () => boolean
   }
 }

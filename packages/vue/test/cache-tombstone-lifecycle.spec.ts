@@ -14,6 +14,8 @@ async function createTestStore(options: Record<string, any> = {}) {
     schema: [{ name: 'TestCollection' }],
     plugins: [],
     tombstoneGc: false,
+    // Its own sweep timer would be counted as a tombstone collector.
+    queryStateRetention: false,
     ...options,
   })
 }
@@ -104,6 +106,23 @@ describe('vue tombstone lifecycle', () => {
       store.$cache.deleteItem({ collection, key: 2, deletedAt: hlc(now - 1_000) })
       await vi.waitFor(() => {
         expect(store.$cache.tombstones.get('TestCollection', 1), 'custom TTL must expire eligible deletion').toBeUndefined()
+      }, { timeout: 1_000, interval: 5 })
+      expect(store.$cache.tombstones.get('TestCollection', 2)?.deletedAt).toBe(hlc(now - 1_000))
+    }
+    finally {
+      store.$cache.dispose()
+    }
+  })
+
+  it('keeps only the newest deletions within the configured size', async () => {
+    const store = await createTestStore({ tombstoneGc: { intervalMs: 5, maxSize: 1 } })
+    try {
+      const collection = store.$collections[0]!
+      const now = Date.now()
+      store.$cache.deleteItem({ collection, key: 1, deletedAt: hlc(now - 2_000) })
+      store.$cache.deleteItem({ collection, key: 2, deletedAt: hlc(now - 1_000) })
+      await vi.waitFor(() => {
+        expect(store.$cache.tombstones.size(), 'size limit must drop the oldest deletion').toBe(1)
       }, { timeout: 1_000, interval: 5 })
       expect(store.$cache.tombstones.get('TestCollection', 2)?.deletedAt).toBe(hlc(now - 1_000))
     }

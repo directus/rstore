@@ -3,7 +3,7 @@ import { withInjectionContext } from '#test-utils/store/vueApp'
 import { createVueStack } from '#test-utils/store/vueStack'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
-import { addCollection, cacheWriteEventHook, removeCollection, setActiveStore, useStore } from '../../src'
+import { addCollection, cacheWriteEventHook, createStore, definePlugin, removeCollection, setActiveStore, useStore } from '../../src'
 
 // Store installation, runtime schema changes, mutation telemetry and the
 // devtools cache-write event are all public API that only runs inside a Vue
@@ -157,7 +157,37 @@ describe('runtime schema changes', () => {
   })
 })
 
+describe('store creation failure', () => {
+  it('stops the cache timers of a store whose creation failed', async () => {
+    const intervals = vi.spyOn(globalThis, 'setInterval')
+    const cleared = vi.spyOn(globalThis, 'clearInterval')
+    onTestFinished(() => {
+      intervals.mockRestore()
+      cleared.mockRestore()
+    })
+    const failing = definePlugin({ name: 'failing', setup: ({ hook }) => {
+      hook('init', () => {
+        throw new Error('init failed')
+      })
+    } })
+
+    await expect(createStore({ schema, plugins: [failing] })).rejects.toThrow('init failed')
+
+    expect(intervals.mock.results.length).toBeGreaterThan(0)
+    expect(new Set(cleared.mock.calls.map(([handle]) => handle))).toEqual(new Set(intervals.mock.results.map(result => result.value)))
+  })
+})
+
 describe('mutation telemetry', () => {
+  it('keeps the mutation history within the configured limit', async () => {
+    const { store } = await createVueStack({ schema, data: { todos: [] }, mutationHistory: { maxSize: 2 } })
+
+    for (const id of ['a', 'b', 'c'])
+      await store.todos.create({ id, title: id })
+
+    expect(store.$mutationHistory.map((entry: any) => entry.payload.id)).toEqual(['b', 'c'])
+  })
+
   it('flips $loading around an async mutation and records its duration', async () => {
     const { store, remote } = await setup()
     const save = store.$wrapMutation((title: string) => store.todos.create({ id: 'x', title }))

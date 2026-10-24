@@ -1,7 +1,8 @@
-import type { BatchingConfig, Cache, Collection, CollectionDefaults, CollectionsFromStoreSchema, FindOptions, Plugin, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Cache, Collection, CollectionDefaults, CollectionsFromStoreSchema, ResolvedModule, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueCollectionApi } from './api'
 import type { VueCachePrivate } from './cache/types'
+import type { CreateStoreOptions } from './storeOptions'
 import { createStoreCore, normalizeCollectionRelations, resolveCollection, resolveCollectionOppositeRelations } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createEventHook, tryOnScopeDispose } from '@vueuse/core'
@@ -11,66 +12,7 @@ import { createCache } from './cache'
 import { cacheWriteEventHook } from './events'
 import { wrapMutation } from './wrapMutation'
 
-export interface CreateStoreOptions<
-  TSchema extends StoreSchema = StoreSchema,
-  TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
-> {
-  /**
-   * The schema of the store with collections and relations.
-   */
-  schema: TSchema
-  /**
-   * Default options for collections.
-   */
-  collectionDefaults?: TCollectionDefaults
-  /**
-   * Plugins to extend the store functionality and handle multiple collections and data sources.
-   */
-  plugins: Array<Plugin>
-  /**
-   * Default options for find queries.
-   */
-  findDefaults?: Partial<FindOptions<any, any, any>>
-  /**
-   * Indicates whether the store is running on the server side.
-   */
-  isServer?: boolean
-  /**
-   * Start a sync immediately after store creation.
-   */
-  syncImmediately?: boolean
-  /**
-   * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
-   */
-  experimentalGarbageCollection?: boolean
-  /**
-   * Maximum number of items written to the cache every 10ms.
-   *
-   * Set to `0` to disable staggering.
-   *
-   * @default 0
-   */
-  cacheStaggering?: number
-
-  /**
-   * Enable operation batching. Multiple findFirst/mutation calls in the same tick
-   * will be combined into batch operations.
-   *
-   * Set to `true` for default options, or provide a `BatchOptions` object for fine-grained control.
-   */
-  batching?: BatchingConfig
-
-  /**
-   * Configuration for the per-cache tombstone garbage collector.
-   * Defaults to a 60s sweep with a 24h TTL — long enough for most
-   * intermittent connectivity gaps while still bounding the working
-   * set. Pass `false` to disable (e.g. on the server).
-   */
-  tombstoneGc?: false | {
-    intervalMs?: number
-    ttlMs?: number
-  }
-}
+export type { CreateStoreOptions } from './storeOptions'
 
 export type VueStoreCollectionApiProxy<
   TSchema extends StoreSchema,
@@ -101,21 +43,27 @@ export async function createStore<
 
   const modulesCache = new WeakMap<(...args: any[]) => ResolvedModule<any, any>, ResolvedModule<any, any>>()
 
+  // The cache starts its timers right away: a store that fails to build
+  // (invalid option, plugin setup or init error) must still stop them.
+  const cache = createCache({
+    getStore: () => storeProxy,
+    cacheStaggering: options.cacheStaggering,
+    tombstoneGc: options.tombstoneGc,
+    isServer: options.isServer,
+    queryStateRetention: options.queryStateRetention,
+  })
+
   return createStoreCore<TSchema, TCollectionDefaults>({
     schema: options.schema,
     collectionDefaults: options.collectionDefaults,
     plugins: options.plugins,
-    cache: createCache({
-      getStore: () => storeProxy,
-      cacheStaggering: options.cacheStaggering,
-      tombstoneGc: options.tombstoneGc,
-      isServer: options.isServer,
-    }),
+    cache,
     hooks: createHooks<TSchema, TCollectionDefaults>(),
     findDefaults: options.findDefaults,
     isServer: options.isServer,
     syncImmediately: options.syncImmediately,
     batching: options.batching,
+    mutationHistory: options.mutationHistory,
     transformStore: (store) => {
       const privateStore = store as unknown as PrivateVueStore
 
@@ -208,6 +156,15 @@ export async function createStore<
 
       return storeProxy
     },
+  }).catch((error) => {
+    try {
+      // Stops the timers even when the half-built store's dispose hooks fail.
+      cache.dispose()
+    }
+    catch {
+      // The construction error is the actionable one.
+    }
+    throw error
   }) as Promise<VueStore<TSchema, TCollectionDefaults>>
 }
 

@@ -2,6 +2,7 @@ import type { Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryT
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { VueStore } from './store'
 import { computed, nextTick, ref, toValue, watch } from 'vue'
+import { DirtyQueryMemberships } from './trackingDirtyMemberships'
 import { addToQueryTracking, createTrackingObject, populateTracking } from './trackingRelations'
 
 /** Options needed to reconcile one query's page ownership. */
@@ -38,6 +39,8 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
   const trackingQueryId = crypto.randomUUID()
   const pageTrackings = new Map<string, HookMetaQueryTracking>()
   const relationWatchers = new Map<string, () => void>()
+  // Historical exclusions can outlive page membership while a peer owns rows.
+  const dirtyMetadata = new DirtyQueryMemberships(trackingQueryId)
   const enabled = ref(false)
   const dataKey = ref(0)
 
@@ -59,7 +62,7 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
   function retain(tracking: HookMetaQueryTracking): void {
     forEachTrackedItem(store, tracking, (item) => {
       item.$meta.queries.add(trackingQueryId)
-      item.$meta.dirtyQueries.delete(trackingQueryId)
+      dirtyMetadata.delete(item.$meta)
     })
   }
 
@@ -77,10 +80,10 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       }
       item.$meta.queries.delete(trackingQueryId)
       if (!collect) {
-        item.$meta.dirtyQueries.delete(trackingQueryId)
+        dirtyMetadata.delete(item.$meta)
         return
       }
-      item.$meta.dirtyQueries.add(trackingQueryId)
+      dirtyMetadata.add(item.$meta)
       changed = true
       nextTick(() => store.$cache.garbageCollectItem({ collection: collection!, item: item as any }))
     })
@@ -163,6 +166,8 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       for (const pageId of Array.from(pageTrackings.keys())) {
         controller.releasePage(pageId, { collect })
       }
+      // With no pages left, no read can need this query's historical exclusions.
+      dirtyMetadata.clear()
     },
 
     setEnabled(nextEnabled) {

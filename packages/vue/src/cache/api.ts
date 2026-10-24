@@ -7,10 +7,11 @@ import { rebuildIndexes } from './indexes'
 import { inspectCache } from './inspection'
 import { ensureLayersForCollection, getStateForCollection } from './layers'
 import { applyMutationToCache } from './mutations'
+import { holdRetainedQueryState, releaseRetainedQueryState, sweepQueryState } from './queryRetention'
 import { clearQueryStateForCollection, clonePageRefs } from './queryState'
 import { enqueueOperation, enqueueOperationWithReceipt, enqueueWriteItems, flushQueuedOperations } from './queue'
 import { resolveRelationWriteParams } from './relationWrite'
-import { garbageCollectItem, getWrappedItem } from './wrapped'
+import { garbageCollectItem, getWrappedItem, releaseUnwrittenItems } from './wrapped'
 
 /** Create the public Cache implementation from a cache runtime. */
 export function createCacheApi<
@@ -149,6 +150,8 @@ export function createCacheApi<
       finally {
         ctx.stopTombstoneGc?.()
         ctx.stopTombstoneGc = undefined
+        ctx.stopQueryStateSweeps?.()
+        ctx.stopQueryStateSweeps = undefined
       }
     },
     _private: {
@@ -160,6 +163,9 @@ export function createCacheApi<
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
       rebuildIndexes: () => rebuildIndexes(ctx, collectionName => getStateForCollection(ctx, collectionName)),
       prune: params => enqueueOperation(ctx, { type: 'prune', params }),
+      holdQueryState: (queryId, holder) => holdRetainedQueryState(ctx, queryId, holder),
+      releaseQueryState: holder => releaseRetainedQueryState(ctx, holder),
+      isDisposed: () => ctx.disposed === true,
     },
   } satisfies Cache & VueCachePrivate as any
 }
@@ -276,4 +282,7 @@ function garbageCollect(ctx: CacheRuntime) {
       }
     }
   }
+  // Rows whose queued write was dropped or rejected are only reachable here.
+  releaseUnwrittenItems(ctx)
+  sweepQueryState(ctx)
 }

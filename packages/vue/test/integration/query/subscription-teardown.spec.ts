@@ -8,6 +8,21 @@ import { setupLiveTodos, subscription } from '../../utils/live-query'
 // blocks cleanup of healthy subscriptions; exact active identities, current
 // page rows and callback rejection expose leaks and stale ownership.
 describe('failed subscription teardown is retried without reviving old callbacks', () => {
+  it('stops following reactive options after an explicit unsubscribe', async () => {
+    const { store, scope, remote } = await setupLiveTodos()
+    const key = ref('1')
+    const { unsubscribe } = scope(() => store.todos.subscribe((s: any) => s(key.value))).result
+    await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(1))
+    await unsubscribe()
+
+    key.value = '2'
+    // The fake transport records calls synchronously: one task drains the queue.
+    await new Promise(resolve => setTimeout(resolve, 0))
+
+    expect(remote.callCount('subscribe')).toBe(1)
+    expect(remote.subscriptions()).toEqual([])
+  })
+
   it('retries the failed subscription while preserving another active subscription', async () => {
     const { store, scope, remote } = await setupLiveTodos()
     const first = scope(() => store.todos.subscribe((s: any) => s('1'))).result
