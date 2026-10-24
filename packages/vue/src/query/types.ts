@@ -50,8 +50,8 @@ export interface FetchStateController {
   clearError: () => void
   /** Reset `completed` without starting a fetch. */
   markIncomplete: () => void
-  /** Mark a pushed result, retaining an optional failure belonging to another page. */
-  completeFromPush: (retainedError?: Error | null) => void
+  /** Mark a pushed result at `at` (default now), retaining an optional failure belonging to another page. */
+  completeFromPush: (retainedError?: Error | null, at?: number) => void
 }
 
 /** Options of {@link VueQueryReturn.refresh}: find options for the main page, plus which pages to reload. */

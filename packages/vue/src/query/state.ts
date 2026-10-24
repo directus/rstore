@@ -72,10 +72,10 @@ export function createFetchState(): FetchStateController {
     clearError: () => {
       error.value = null
     },
-    completeFromPush: (retainedError: Error | null = null) => {
+    completeFromPush: (retainedError: Error | null = null, at = Date.now()) => {
       hasCurrentSettlement = true
       error.value = retainedError
-      lastUpdated.value = Date.now()
+      lastUpdated.value = at
       completed.value = count.value === 0
     },
     markIncomplete: () => {
@@ -244,9 +244,12 @@ export function completePageFromPush(ctx: any, page: VueQueryPage<any, any, any,
   page._background.clearError()
   if (!isCurrent())
     return
-  ctx.foreground.completeFromPush(foregroundError)
+  // One stamp for both lanes: a clock tick in between would make the query
+  // and its page disagree on when the push landed.
+  const pushedAt = Date.now()
+  ctx.foreground.completeFromPush(foregroundError, pushedAt)
   if (isCurrent())
-    page._foreground.completeFromPush()
+    page._foreground.completeFromPush(null, pushedAt)
 }
 
 /** Preserve another page's failure without reviving explicitly dismissed errors. */

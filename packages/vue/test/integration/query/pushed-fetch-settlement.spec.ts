@@ -85,4 +85,21 @@ describe('fetch settlement after a push records only accepted snapshots', () => 
     expect(query.mainPage.foreground.lastUpdated).toBe(pushedAt!)
     expect(query.error.value).toBeNull()
   })
+
+  // The clock ticks between any two reads here, like a millisecond boundary
+  // falling inside one push: the query and its page must share one stamp.
+  it('stamps the query and its page with one push time', async () => {
+    const { store, run, payloads } = await setupLiveTodos({})
+    const query = await run(() => store.todos.liveQuery((q: any) => q.many()))
+    const main = await subscription(payloads)
+    let now = Date.now()
+    const clock = vi.spyOn(Date, 'now').mockImplementation(() => ++now)
+    onTestFinished(() => {
+      clock.mockRestore()
+    })
+
+    expect(main.setResult!([{ id: '1', title: 'Push' }], { version: 5 })).toBe('applied')
+
+    expect(query.mainPage.foreground.lastUpdated).toBe(query.foreground.lastUpdated.value)
+  })
 })
