@@ -1,7 +1,6 @@
-import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from './itemMetadata'
-import type { VueStore } from './store'
 import { createPlainItemHandler } from './plainItemHandler'
 import { createRichItemHandler } from './richItemHandler'
 
@@ -15,7 +14,7 @@ export interface WrapItemOptions<
   TCollectionDefaults extends CollectionDefaults,
   TSchema extends StoreSchema,
 > {
-  /** Owning Vue store. */
+  /** Owning store. */
   store: StoreCore<TSchema, TCollectionDefaults>
   /** Resolved item collection. */
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>

@@ -1,6 +1,6 @@
+import type { StoreCore, StoreSchema } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from './itemMetadata'
-import type { VueStore } from './store'
 import { isKeyDefined } from '@rstore/core'
 import { markRaw, toRaw } from 'vue'
 
@@ -12,8 +12,8 @@ export interface PlainItemHandlerOptions {
   item: Ref<any>
   /** Stable wrapper metadata. */
   metadata: WrappedItemMetadata
-  /** Owning Vue store. */
-  store: VueStore
+  /** Owning store. */
+  store: StoreCore<StoreSchema>
 }
 
 /** Build a prototype-backed handler for schema-plain item wrappers. */
@@ -28,7 +28,7 @@ class PlainItemHandler implements ProxyHandler<any> {
     private readonly collection: any,
     private readonly item: Ref<any>,
     private readonly metadata: WrappedItemMetadata,
-    private readonly store: VueStore,
+    private readonly store: StoreCore<StoreSchema>,
   ) {}
 
   /** Resolve fields and public wrapper helpers from current raw state. */
@@ -98,9 +98,17 @@ class PlainItemHandler implements ProxyHandler<any> {
     throw new Error('Items are read-only. Use `item.$delete()` to delete the item.')
   }
 
+  /**
+   * Reject freezing and sealing. The facade target is extensible and empty, so
+   * a non-extensible target would contradict `ownKeys`.
+   */
+  preventExtensions(): never {
+    throw new Error('Items are read-only. They cannot be frozen or sealed.')
+  }
+
   /** Resolve collection mutation API without wrapper-specific closures. */
   private getApi(): any {
-    return this.store[this.collection.name as keyof VueStore]
+    return (this.store as Record<string, any>)[this.collection.name]
   }
 
   /** Resolve and validate current item key. */

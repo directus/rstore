@@ -1,8 +1,7 @@
-import type { Cache, ResolvedCollection } from '@rstore/shared'
+import type { Cache, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { VueCachePrivate } from './cache'
 import type { WrappedItemMetadata } from './itemMetadata'
-import type { VueStore } from './store'
 import { isKeyDefined } from '@rstore/core'
 import { cloneInfo } from '@rstore/shared'
 import { markRaw, toRaw } from 'vue'
@@ -10,8 +9,8 @@ import { createItemRelationReader } from './itemRelations'
 
 /** Inputs used to create one rich wrapped-item proxy handler. */
 export interface RichItemHandlerOptions {
-  /** Owning Vue store. */
-  store: VueStore
+  /** Owning store. */
+  store: StoreCore<StoreSchema>
   /** Resolved collection owning raw values. */
   collection: ResolvedCollection<any, any, any>
   /** Hot-swappable item source. */
@@ -36,7 +35,7 @@ export class RichItemHandler implements ProxyHandler<any> {
 
   /** Create one compact rich handler instance. */
   constructor(
-    private readonly store: VueStore,
+    private readonly store: StoreCore<StoreSchema>,
     private readonly collection: ResolvedCollection<any, any, any>,
     private readonly item: Ref<any>,
     private readonly metadata: WrappedItemMetadata,
@@ -134,9 +133,17 @@ export class RichItemHandler implements ProxyHandler<any> {
     throw new Error('Items are read-only. Use `item.$delete()` to delete the item.')
   }
 
+  /**
+   * Reject freezing and sealing. The facade target is extensible and empty, so
+   * a non-extensible target would contradict `ownKeys`.
+   */
+  preventExtensions(): never {
+    throw new Error('Items are read-only. They cannot be frozen or sealed.')
+  }
+
   /** Resolve collection mutation API without wrapper-specific closures. */
   private getApi(): any {
-    return this.store[this.collection.name as keyof VueStore]
+    return (this.store as Record<string, any>)[this.collection.name]
   }
 
   /** Resolve and validate current item key. */

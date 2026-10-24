@@ -42,7 +42,7 @@ export function createCacheRuntime(
   const store: any = {
     $collections: collections,
     $getCollection: (_item: any, names: string[]) => collections.find(collection => names.includes(collection.name)),
-    $hooks: { callHookSync: onHook },
+    $hooks: { callHookSync: onHook, callHookWith: () => {} },
   }
   const cache = implementation.create({ getStore: () => store, isServer: false, tombstoneGc: false })
   store.$cache = cache

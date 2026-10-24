@@ -9,6 +9,7 @@ export type {
   EngineStateChangeSink,
   EngineWriteCommitPayload,
   ObserverCallback,
+  PruneParams,
   ResolveKeysParams,
   StoreEngine,
   TombstoneGcOptions,

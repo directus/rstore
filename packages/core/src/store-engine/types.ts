@@ -1,6 +1,8 @@
 import type {
   CacheIndexValue,
+  CacheInspection,
   CacheLayer,
+  CacheOperationResult,
   CacheStateInput,
   CollectionDefaults,
   CollectionRelation,
@@ -11,6 +13,7 @@ import type {
   FieldTimestampValue,
   ResolvedCollection,
   ResolvedCollectionItemBase,
+  RetentionOptions,
   StoreSchema,
 } from '@rstore/shared'
 import type { TombstoneStore } from '../tombstone.js'
@@ -40,6 +43,8 @@ export interface EngineResetPayload {
   source: 'clear' | 'setState' | 'clearCollection'
   /** Collection reset by `clearCollection`; omitted for whole-cache resets. */
   collection?: ResolvedCollection<any, any, any>
+  /** Original `setState` input, so adapters can restore their own snapshot fields. */
+  snapshot?: CacheStateInput
 }
 
 /** Callbacks injected by an embedding framework. */
@@ -52,6 +57,12 @@ export interface EngineCallbacks {
   stateChangeSink?: EngineStateChangeSink
   /** Allocation-light write callback for embedding adapters. */
   onWriteCommitted?: (payload: EngineWriteCommitPayload) => void
+  /**
+   * Fired when a write is dropped (stale query publication) or rejected (older
+   * than a tombstone) without committing, so adapters can release state they
+   * prepared for it.
+   */
+  onWriteDropped?: (collection: ResolvedCollection<any, any, any>, key: string | number) => void
   /** Fired when a CRDT merge reports field conflicts. */
   onConflict?: (payload: EngineConflictPayload) => void
   /** Fired after an optimistic layer commits. */
@@ -64,12 +75,22 @@ export interface EngineCallbacks {
   wrapModuleState?: (value: any) => any
 }
 
-/** Tombstone auto-GC configuration. `false` disables background sweeps. */
-export type TombstoneGcOptions = false | {
-  /** Sweep interval in milliseconds. */
+/** Tombstone auto-GC configuration: deletes expire by age and count. */
+export interface TombstoneGcOptions extends RetentionOptions {
+  /** Sweep interval in milliseconds. Defaults to 60_000. */
   intervalMs?: number
-  /** Drop tombstones older than this duration in milliseconds. */
-  ttlMs?: number
+}
+
+/** Deletion of every item of some collections except the ones still held. */
+export interface PruneParams {
+  /** Names of the collections to prune. */
+  collections: string[]
+  /** Keys to keep per collection name, as strings. Called once, when the operation runs. */
+  getKeptKeys: () => Map<string, Set<string>>
+  /** Whether the request is still current when the queued operation runs. */
+  canApply: () => boolean
+  /** Called for each pruned item after its deletion committed. */
+  onPruned?: (collection: ResolvedCollection<any, any, any>, key: string | number) => void
 }
 
 /** Options for {@link createStoreEngine}. */
@@ -78,8 +99,8 @@ export interface EngineOptions {
   callbacks: EngineCallbacks
   /** Maximum writes per 10ms window; zero disables staggering. */
   cacheStaggering?: number
-  /** Tombstone auto-GC settings. */
-  tombstoneGc?: TombstoneGcOptions
+  /** Tombstone auto-GC settings; `false` disables background sweeps. */
+  tombstoneGc?: false | TombstoneGcOptions
   /** Server engines skip background GC timers. */
   isServer?: boolean
 }
@@ -161,6 +182,8 @@ export interface StoreEngine<
 > {
   /** Read one resolved raw item. */
   readItemRaw: (params: { collection: ResolvedCollection<any, any, any>, key: string | number }) => any | undefined
+  /** Read one committed raw item, ignoring optimistic layers. */
+  readBaseItemRaw: (params: { collection: ResolvedCollection<any, any, any>, key: string | number }) => any | undefined
   /** Resolve visible, explicit, or indexed candidate keys. */
   resolveKeys: (params: ResolveKeysParams) => Array<string | number>
   /**
@@ -200,6 +223,15 @@ export interface StoreEngine<
   clear: () => void
   /** Queue one collection clear. */
   clearCollection: (params: { collection: ResolvedCollection<any, any, any> }) => void
+  /**
+   * Queue deletion of every unkept base item of some collections, after the
+   * operations already queued. Layered keys are spared and no tombstone is left.
+   */
+  prune: (params: PruneParams) => void
+  /** Run one submission and report whether the operation it queued already completed. */
+  withReceipt: (submit: () => void) => CacheOperationResult
+  /** Lazy diagnostic view over committed rows, overlays, and metadata of the given collections. */
+  inspect: (collections: readonly ResolvedCollection<any, any, any>[]) => CacheInspection
   /** Immediately evict one unused base item. */
   garbageCollectKey: (collection: ResolvedCollection<any, any, any>, key: string | number) => boolean
   /** Iterate current base keys. */

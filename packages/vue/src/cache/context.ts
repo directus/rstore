@@ -1,11 +1,13 @@
 import type { EngineCallbacks, EngineConflictPayload, EngineResetPayload, EngineStateChangeSink, EngineWriteCommitPayload } from '@rstore/core'
 import type { CacheLayer, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
-import type { CacheRuntime, CreateCacheOptions, QueryPageRef } from './types'
-import { createStoreEngine, isKeyDefined } from '@rstore/core'
+import type { CachedPageRefs, CacheRuntime, CreateCacheOptions } from './types'
+import { createStoreEngine, isKeyDefined, resolveRetention } from '@rstore/core'
 import { reactive, shallowRef } from 'vue'
 import { createCacheChangeInterestRegistry } from './changeInterest'
 import { createIndexResultCache } from './indexResultCache'
 import { createItemCellRegistry } from './itemCells'
+import { invalidatePageRefsForWrite, restoreSnapshotPageRefs } from './pageRefSync'
+import { defaultQueryStateRetention, scheduleQueryStateSweeps } from './queryRetention'
 import { clearAllQueryState, clearQueryStateForCollection } from './queryState'
 import { createSignalRegistry } from './signals'
 import { createCacheStateSink } from './stateSink'
@@ -13,6 +15,7 @@ import { synchronizeBridgeIndex } from './stateSinkIndex'
 import { synchronizeBridgeItem } from './stateSinkItem'
 import { appendSyncError, runSyncTask, throwSyncErrors } from './syncErrors'
 import { createCacheVersionRegistry } from './versions'
+import { releaseUnwrittenItem } from './wrapped'
 import { createWrappedItemRegistry } from './wrappedRegistry'
 
 /** Create mutable runtime shared by all Vue cache modules. */
@@ -28,7 +31,7 @@ export function createCacheRuntime<
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): CacheRuntime<TSchema, TCollectionDefaults> {
   let runtime: CacheRuntime<TSchema, TCollectionDefaults>
   let sinkImplementation: EngineStateChangeSink
-  const pageRefs = new Map<string, QueryPageRef>()
+  const pageRefs = new Map<string, CachedPageRefs>()
   const changeInterest = createCacheChangeInterestRegistry()
   const stateChangeSink: EngineStateChangeSink = {
     getInterest: () => changeInterest.value,
@@ -50,6 +53,7 @@ export function createCacheRuntime<
     wrapModuleState: value => value && typeof value === 'object' ? reactive(value) : value,
     stateChangeSink,
     onWriteCommitted: payload => handleAfterWrite(runtime, payload),
+    onWriteDropped: (collection, key) => releaseUnwrittenItem(runtime, collection, key),
     onConflict: payload => handleConflict(getStore, payload),
     onLayerAdd: layer => handleLayerAdd(runtime, layer),
     onLayerRemove: layer => handleLayerRemove(runtime, layer),
@@ -61,6 +65,9 @@ export function createCacheRuntime<
   const signals = createSignalRegistry({ isServer, interest: changeInterest })
   runtime = {
     getStore,
+    queryStateRetention: resolveRetention(rawQueryStateRetention, defaultQueryStateRetention),
+    queryStateUsedAt: new Map(),
+    queryStateHeldCount: 0,
     engine,
     changeInterest,
     state: {
@@ -93,6 +100,10 @@ export function createCacheRuntime<
     flushItem: (collection, key, value, keyForm) => synchronizeBridgeItem(runtime, collection, key, value, keyForm),
     flushIndex: dependency => synchronizeBridgeIndex(runtime, dependency),
   })
+  // Server stores live for one request: the size limit is enough there.
+  if (!isServer) {
+    runtime.stopQueryStateSweeps = scheduleQueryStateSweeps(runtime, runtime.queryStateRetention)
+  }
   return runtime
 }
 
@@ -210,6 +221,8 @@ function handleAfterWrite(ctx: CacheRuntime, payload: EngineWriteCommitPayload):
     ctx.wrappedItems.deleteBase(payload.collection.name, payload.key!)
   else if (payload.keyFormChanged && payload.previousKey !== undefined)
     ctx.wrappedItems.deleteBase(payload.collection.name, payload.previousKey)
+  if (payload.operation === 'write')
+    invalidatePageRefsForWrite(ctx, payload)
   const store = ctx.getStore()
   store.$hooks.callHookSync('afterCacheWrite', {
     store,
@@ -271,7 +284,12 @@ function handleReset(ctx: CacheRuntime, payload: EngineResetPayload): void {
     ctx.visibleListCache.clear()
     ctx.indexResultCache.reset()
     ctx.wrappedItems.clear()
-    clearAllQueryState(ctx)
+    // Hydration replaces saved pages with the snapshot's own; live consumers
+    // and their retention bookkeeping stay.
+    if (payload.source === 'setState')
+      restoreSnapshotPageRefs(ctx, payload.snapshot)
+    else
+      clearAllQueryState(ctx)
   }
   refreshLayerMirrors(ctx)
   ctx.signals.reset()

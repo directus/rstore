@@ -64,6 +64,7 @@
     "@types/node": "catalog:",
     "@vueuse/core": "catalog:",
     "@vueuse/nuxt": "catalog:",
+    "h3": "^1.15.11",
     "nuxt": "catalog:",
     "shiki": "catalog:",
     "typescript": "catalog:",

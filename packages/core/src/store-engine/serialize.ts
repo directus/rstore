@@ -1,4 +1,4 @@
-import type { CustomCacheState, FieldTimestamps, ResolvedCollection } from '@rstore/shared'
+import type { CacheStateInput, CustomCacheState, FieldTimestamps, ResolvedCollection } from '@rstore/shared'
 import type { ChangeRecorder } from './change-recorder.js'
 import type { EngineCollectionState, EngineContext, EngineEffect, NormalizedCacheSnapshot, NormalizedCollectionRows } from './internal-types.js'
 import { recordCollectionReset } from './change-recorder.js'
@@ -65,7 +65,12 @@ function serializeFieldTimestamps(ctx: EngineContext): Record<string, Record<str
 }
 
 /** Hydrate a staged snapshot while preserving active layers and identities. */
-export function setStateNow(ctx: EngineContext, changes: ChangeRecorder | undefined, snapshot: NormalizedCacheSnapshot): EngineEffect[] {
+export function setStateNow(
+  ctx: EngineContext,
+  changes: ChangeRecorder | undefined,
+  snapshot: NormalizedCacheSnapshot,
+  input?: CacheStateInput,
+): EngineEffect[] {
   // Every throwable collection key derivation, index rebuild, module kind
   // check, and new module wrapper runs before the live state swap.
   const collections = stageCollections(ctx, snapshot.collections)
@@ -78,7 +83,7 @@ export function setStateNow(ctx: EngineContext, changes: ChangeRecorder | undefi
   restoreTombstones(ctx, snapshot)
   applyModuleHydration(ctx, modules)
   replaceQueryMeta(ctx, snapshot.queryMeta)
-  return [{ type: 'reset', payload: { source: 'setState' } }]
+  return [{ type: 'reset', payload: { source: 'setState', snapshot: input } }]
 }
 
 /** Stage causal stamps from collection identities derived before commit. */

@@ -26,6 +26,8 @@ export interface WrappedItemRegistry<
   set: (collection: string, key: string | number, layerId: string | undefined, entry: WrappedItemEntry<TCollectionDefaults, TSchema>) => void
   /** Remove one base wrapper. */
   deleteBase: (collection: string, key: string | number) => void
+  /** Visit every base wrapper with its canonical id; visitors may delete the visited entry. */
+  forEachBase: (visit: (collection: string, id: string, entry: WrappedItemEntry<TCollectionDefaults, TSchema>) => void) => void
   /** Remove every wrapper for one exact collection/layer tuple. */
   deleteLayer: (collection: string, layerId: string) => void
   /** Remove every wrapper owned by a collection. */
@@ -82,6 +84,12 @@ export function createWrappedItemRegistry<
       state?.base.get(id)?.cell.detach()
       state?.base.delete(id)
       pruneCollection(collection, state)
+    },
+    forEachBase(visit) {
+      // Snapshot: a visitor can delete entries and prune their collection.
+      for (const [collection, state] of Array.from(collections)) {
+        for (const [id, entry] of Array.from(state.base)) visit(collection, id, entry)
+      }
     },
     deleteLayer(collection, layerId) {
       const state = collections.get(collection)

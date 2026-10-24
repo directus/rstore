@@ -1,9 +1,12 @@
-import type { Cache, CollectionDefaults, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Cache, CacheOperationReceipts, CollectionDefaults, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CacheRuntime, VueCachePrivate } from './types'
 import { reactive, toRaw } from 'vue'
 import { ensureLayersForCollection, readRawCacheItem } from './context'
+import { disposeCache } from './dispose'
 import { applyMutationToCache } from './mutations'
-import { garbageCollectItem, getWrappedItem } from './wrapped'
+import { holdRetainedQueryState, releaseRetainedQueryState, sweepQueryState } from './queryRetention'
+import { clonePageRefs, invalidatePageRefsForItem } from './queryState'
+import { garbageCollectItem, getWrappedItem, releaseUnwrittenItems } from './wrapped'
 
 type VisibleListResult = Array<WrappedItem<any, any, any>> & { marker?: string }
 
@@ -15,13 +18,13 @@ export function createCacheApi<
   // Legacy calls keep their undefined runtime results. Diagnostics explicitly
   // opt into completion tracking while using the same queue and publication.
   const receipts: CacheOperationReceipts = {
-    writeItem: params => enqueueOperationWithReceipt(ctx, { type: 'writeItem', params }),
-    deleteItem: params => enqueueOperationWithReceipt(ctx, { type: 'deleteItem', params }),
-    clear: () => enqueueOperationWithReceipt(ctx, { type: 'clear' }),
+    writeItem: params => ctx.engine.withReceipt(() => ctx.engine.writeItem(params)),
+    deleteItem: params => ctx.engine.withReceipt(() => ctx.engine.deleteItem(params)),
+    clear: () => ctx.engine.withReceipt(() => ctx.engine.clear()),
   }
   return {
     receipts,
-    inspect: () => inspectCache(ctx),
+    inspect: () => ctx.engine.inspect(ctx.getStore().$collections),
     wrapItem({ collection, item, noCache }) {
       return getWrappedItem(ctx, collection, item, noCache)!
     },
@@ -76,6 +79,7 @@ export function createCacheApi<
           ...module,
           state: toRaw(module.state),
         })),
+        pageRefs: Object.fromEntries(clonePageRefs(ctx.state.pageRefs)),
       }
     },
     setState(state) {
@@ -117,7 +121,7 @@ export function createCacheApi<
       ctx.engine.resume()
     },
     dispose() {
-      disposeCacheRuntime(ctx)
+      disposeCache(ctx)
     },
     _private: {
       state: ctx.state,
@@ -125,28 +129,16 @@ export function createCacheApi<
       layers: ctx.layers,
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
       rebuildIndexes: () => ctx.engine.rebuildIndexes(),
+      readCommittedItem: (collection, key) => ctx.engine.readBaseItemRaw({ collection, key }),
+      prune: params => ctx.engine.prune({
+        ...params,
+        onPruned: (collection, key) => invalidatePageRefsForItem(ctx, collection.name, key),
+      }),
+      holdQueryState: (queryId, holder) => holdRetainedQueryState(ctx, queryId, holder),
+      releaseQueryState: holder => releaseRetainedQueryState(ctx, holder),
+      isDisposed: () => ctx.disposed === true,
     },
   } satisfies Cache & VueCachePrivate as any
-}
-
-/** Release every bridge-owned registry without invoking reset hooks. */
-function disposeCacheRuntime(ctx: CacheRuntime): void {
-  ctx.engine.dispose()
-  ctx.signals.dispose()
-  ctx.versions.dispose()
-  ctx.visibleListCache.clear()
-  ctx.indexResultCache.dispose()
-  ctx.itemCells.dispose()
-  ctx.changeInterest.dispose()
-  ctx.wrappedItems.clear()
-  ctx.state.pageRefs.clear()
-  for (const key of Object.keys(ctx.state.queryMeta)) {
-    delete ctx.state.queryMeta[key]
-  }
-  for (const collectionName of Object.keys(ctx.layers)) {
-    ctx.layers[collectionName]!.value = []
-    delete ctx.layers[collectionName]
-  }
 }
 
 function readItems(ctx: CacheRuntime, params: Parameters<Cache['readItems']>[0]) {
