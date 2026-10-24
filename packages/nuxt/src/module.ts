@@ -4,7 +4,6 @@ import fs from 'node:fs'
 import { addImports, addPlugin, addTemplate, addTypeTemplate, createResolver, defineNuxtModule, resolveFiles } from '@nuxt/kit'
 import serialize from 'serialize-javascript'
 import { setupDevToolsUI } from './devtools'
-import { resolveDevtoolsOptions } from './runtime/devtools/options'
 
 declare module '@nuxt/schema' {
   export interface NuxtConfig {
@@ -180,7 +179,11 @@ export default [
     nuxt.options.alias['#rstore-collection'] = collectionTemplate.dst
     nuxt.options.alias['#rstore-plugins'] = pluginsTemplate.dst
 
-    const devtoolsOptions = resolveDevtoolsOptions(options.devtools, nuxt.options.dev)
+    // `nuxi prepare` only generates types. Devtools load the devtools package
+    // and its workspace dependencies, which are not built at install time.
+    const devtoolsOptions = nuxt.options._prepare
+      ? false
+      : (await import('./runtime/devtools/options')).resolveDevtoolsOptions(options.devtools, nuxt.options.dev)
     const devtoolsTemplate = addTemplate({
       filename: '$rstore-devtools.ts',
       getContents: () => `export default ${serialize(devtoolsOptions)}`,
