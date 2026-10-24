@@ -22,7 +22,9 @@ export function createRegistration(
   let active = true
   let observationCount = 0
   let stopObservation: (() => void) | undefined
-  let uninstall: () => void
+  // Reaches the store through the Core plugin `hook` closure: dropped on dispose,
+  // since stop handles returned by `observe()` keep this scope alive.
+  let uninstall: (() => void) | undefined
   const revisions = createRevisions()
   const invalidator = createInvalidator(revisions, (view, revision) => publish({ target: { ...target }, view, revision }))
   const history = createHistory({ limit: runtimeOptions.historyLimit, maxBytes: runtimeOptions.historyBytes, unwrap: options.adapter?.unwrap, onChange: () => invalidator.invalidate('history') })
@@ -105,7 +107,9 @@ export function createRegistration(
       active = false
       invalidator.dispose()
       stop()
-      uninstall()
+      const release = uninstall
+      uninstall = undefined
+      release?.()
       releaseActionRegistration(registration)
       registration.subscriptions.clear()
       history.clear()

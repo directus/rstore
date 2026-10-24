@@ -72,20 +72,39 @@ export function createRstoreDevtools(options: RuntimeOptions = {}): RstoreDevtoo
       category: 'processing',
       meta: { description: 'Portable rstore development instrumentation' },
       setup({ hook }) {
-        let attached = false
+        let settled = false
         let registration: StoreRegistration | undefined
         const uninstall = installInstrumentation(hook, () => registration)
-        pluginCleanups.add(uninstall)
-        const unhook = hook('init', ({ store }) => {
-          if (!active || attached)
+        const unhooks: Array<() => void> = []
+        /**
+         * End the pre-attach phase exactly once. Until then the runtime owns
+         * hooks reaching the store, so a failed `attach`, a store disposed
+         * before `init`, or runtime disposal must all release them here;
+         * otherwise `pluginCleanups` retains the store until `runtime.dispose()`.
+         */
+        function settle() {
+          if (settled)
             return
-          attached = true
-          unhook()
-          pluginCleanups.delete(unhook)
-          registration = attach(store as unknown as InspectableStore, registrationOptions, uninstall)
-          pluginCleanups.delete(uninstall)
-        })
-        pluginCleanups.add(unhook)
+          settled = true
+          pluginCleanups.delete(settle)
+          for (const unhook of unhooks.splice(0))
+            unhook()
+          // A live registration now owns the instrumentation and uninstalls it on dispose.
+          if (!registration)
+            uninstall()
+        }
+        pluginCleanups.add(settle)
+        unhooks.push(hook('init', ({ store }) => {
+          if (!active || settled)
+            return
+          try {
+            registration = attach(store as unknown as InspectableStore, registrationOptions, uninstall)
+          }
+          finally {
+            settle()
+          }
+        }))
+        unhooks.push(hook('dispose', settle))
       },
     }
   }
