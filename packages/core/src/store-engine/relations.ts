@@ -70,6 +70,7 @@ function planWrite(
         data[field] = rawData[field]
         continue
       }
+      recordIncludedRelation(params, field)
       const relationValue = rawData[field]
       if (relationValue == null) {
         continue
@@ -92,6 +93,26 @@ function planWrite(
   finally {
     path.delete(params.item)
   }
+}
+
+/**
+ * Record a relation branch included by a tracked fetch. An included empty
+ * relation is authoritative too: cached children absent from the response
+ * must not stay retained while query ownership reconciles.
+ */
+export function recordIncludedRelation(params: WriteItemParams, field: string): void {
+  const tracking = params.meta?.$queryTracking
+  if (!tracking) {
+    return
+  }
+  const relations = tracking.includedRelations ??= {}
+  const items = relations[params.collection.name] ??= new Map()
+  let fields = items.get(params.key)
+  if (!fields) {
+    fields = new Set<string>()
+    items.set(params.key, fields)
+  }
+  fields.add(field)
 }
 
 /** Validate key and item shape before relation planning or mutation. */

@@ -108,8 +108,8 @@ export {
 } from '@rstore/core'
 
 export type {
-  CacheLayer,
   CacheIndexValue,
+  CacheLayer,
   CacheModuleSnapshot,
   CacheStateInput,
   Collection,

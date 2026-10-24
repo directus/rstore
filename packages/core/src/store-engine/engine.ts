@@ -7,6 +7,7 @@ import { getFieldTimestamps, setFieldTimestamps } from './crdt-state.js'
 import { getPublicKey, toKeyId } from './identity.js'
 import { cacheIndexDependencyId } from './index-dependencies.js'
 import { getIndexBucket, getIndexBucketIds, getIndexObserverId, getIndexRead, rebuildIndexes } from './indexes.js'
+import { inspectEngine } from './inspection.js'
 import { getLayerNow } from './layers.js'
 import { getModuleState } from './modules.js'
 import { createObserverRegistry } from './observers.js'
@@ -42,12 +43,17 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     stopTombstoneGc = scheduleTombstoneGc(tombstones, {
       intervalMs: tombstoneGc.intervalMs ?? 60_000,
       ttlMs: tombstoneGc.ttlMs ?? 24 * 60 * 60 * 1000,
+      maxSize: tombstoneGc.maxSize ?? 10_000,
     })
   }
 
   const engine: StoreEngine = {
     readItemRaw({ collection, key }) {
       return resolveItem(ctx, collection.name, key)
+    },
+
+    readBaseItemRaw({ collection, key }) {
+      return ctx.collections.get(collection.name)?.base.get(toKeyId(key))
     },
 
     resolveKeys({ collection, marker, keys, indexKey, indexValue }) {
@@ -164,7 +170,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     },
 
     setState(state) {
-      enqueueOperation(ctx, { type: 'setState', state: normalizeSnapshotInput(state) })
+      enqueueOperation(ctx, { type: 'setState', state: normalizeSnapshotInput(state), input: state })
     },
 
     clear() {
@@ -173,6 +179,26 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
 
     clearCollection({ collection }) {
       enqueueOperation(ctx, { type: 'clearCollection', collection })
+    },
+
+    prune(params) {
+      enqueueOperation(ctx, { type: 'prune', params })
+    },
+
+    withReceipt(submit) {
+      const completion = { completed: false }
+      ctx.nextCompletion = completion
+      try {
+        submit()
+      }
+      finally {
+        ctx.nextCompletion = undefined
+      }
+      return { status: completion.completed ? 'completed' : 'queued' }
+    },
+
+    inspect(collections) {
+      return inspectEngine(ctx, collections)
     },
 
     garbageCollectKey(collection, key) {

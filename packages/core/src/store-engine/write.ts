@@ -11,7 +11,7 @@ import { getCollectionMetadata } from './collection-metadata.js'
 import { getFieldTimestamps, setFieldTimestamps } from './crdt-state.js'
 import { clearKeyOverride, getPublicKey, matchesKeyId, ownsDefaultKey, readDefaultKey, registerBaseKeyValue, releaseUnusedKey, toKeyId } from './identity.js'
 import { reconcileItemIndexes } from './indexes.js'
-import { planWriteTree, resolveRelationWriteParams, validateRelationCardinality, validateWriteInput } from './relations.js'
+import { planWriteTree, recordIncludedRelation, resolveRelationWriteParams, validateRelationCardinality, validateWriteInput } from './relations.js'
 import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
 import { appendWriteEffects, createWriteEffects } from './write-effects.js'
 
@@ -115,6 +115,7 @@ function writeRelationTreeInOrder(
         data[field] = rawData[field]
         continue
       }
+      recordIncludedRelation(params, field)
       const relationValue = rawData[field]
       if (relationValue == null)
         continue
@@ -168,6 +169,7 @@ export function commitWrite(
   const tombstone = ctx.tombstones.get(collection.name, key)
   if (tombstone) {
     if (params.fieldTimestamps && !shouldResurrect(tombstone, params.fieldTimestamps)) {
+      ctx.callbacks.onWriteDropped?.(collection, key)
       return
     }
     ctx.tombstones.clear(collection.name, key)

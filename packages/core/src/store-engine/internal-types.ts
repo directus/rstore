@@ -1,4 +1,4 @@
-import type { CacheLayer, CacheTombstone, CustomHookMeta, FieldTimestamps, ResolvedCollection } from '@rstore/shared'
+import type { CacheLayer, CacheStateInput, CacheTombstone, CustomHookMeta, FieldTimestamps, ResolvedCollection } from '@rstore/shared'
 import type { TombstoneStore } from '../tombstone.js'
 import type { ChangeRecorder } from './change-recorder.js'
 import type { MutableEngineChangeSet } from './change-set.js'
@@ -9,6 +9,7 @@ import type {
   EngineResetPayload,
   EngineWriteCommitPayload,
   ObserverCallback,
+  PruneParams,
   Unsubscribe,
   WriteItemParams,
   WriteItemsParams,
@@ -170,26 +171,37 @@ export interface WriteCommitResult {
   effects: EngineEffect[]
 }
 
+/** Completion flag of an operation submitted through `withReceipt`. */
+export interface OperationCompletion {
+  /** Whether the operation left the queue. */
+  completed: boolean
+}
+
 /** FIFO engine operation. */
-export type QueuedOperation
-  = | { type: 'writeItem', params: WriteItemParams }
-    | {
-      type: 'writeItems'
-      params: WriteItemsParams
-      index: number
-      /** One recorder keeps a batch invisible to adapters until it settles. */
-      recorder?: ChangeRecorder
-      /** Nested callbacks run only after final bridge publication. */
-      effects?: EngineEffect[]
-      /** A failed nested row committed earlier children and can be retried. */
-      partialCommit?: true
-    }
-    | { type: 'deleteItem', params: DeleteItemParams }
-    | { type: 'addLayer', layer: CacheLayer }
-    | { type: 'removeLayer', layerId: string }
-    | { type: 'setState', state: NormalizedCacheSnapshot }
-    | { type: 'clearCollection', collection: ResolvedCollection<any, any, any> }
-    | { type: 'clear' }
+export type QueuedOperation = {
+  /** Opt-in completion flag; ordinary operations allocate no tracker. */
+  completion?: OperationCompletion
+} & (
+  | { type: 'writeItem', params: WriteItemParams }
+  | {
+    type: 'writeItems'
+    params: WriteItemsParams
+    index: number
+    /** Recorder of the current staggered slice, published when the batch yields. */
+    recorder?: ChangeRecorder
+    /** Nested callbacks run only after final bridge publication. */
+    effects?: EngineEffect[]
+    /** A failed nested row committed earlier children and can be retried. */
+    partialCommit?: true
+  }
+  | { type: 'deleteItem', params: DeleteItemParams }
+  | { type: 'addLayer', layer: CacheLayer }
+  | { type: 'removeLayer', layerId: string }
+  | { type: 'setState', state: NormalizedCacheSnapshot, input: CacheStateInput }
+  | { type: 'clearCollection', collection: ResolvedCollection<any, any, any> }
+  | { type: 'clear' }
+  | { type: 'prune', params: PruneParams }
+)
 
 /** Write staggering controller. */
 export interface Staggering {
@@ -233,6 +245,8 @@ export interface EngineContext {
   queueHead: number
   /** Reentrancy guard. */
   isFlushingQueue: boolean
+  /** Completion flag claimed by the next enqueued operation, set by `withReceipt`. */
+  nextCompletion?: OperationCompletion
   /** Whether disposal discarded future work. */
   disposed: boolean
   /** Framework callbacks. */

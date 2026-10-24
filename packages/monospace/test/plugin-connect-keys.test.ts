@@ -1,5 +1,4 @@
 import { beforeEach, describe, expect, it } from 'vitest'
-import { runConnectorHook as runHook } from '../../../test/utils/connectorPlugin'
 import {
   createFormOp,
   createMockClient,

@@ -1,12 +1,14 @@
 import type { CustomHookMeta } from '@rstore/shared'
 import type { ChangeRecorder, FlushChangeRecorder } from './change-recorder.js'
 import type { EngineContext, EngineEffect, QueuedOperation } from './internal-types.js'
+import type { PrunedItem } from './prune.js'
 import { prepareBatchWrite, writePreparedBatchItem } from './batch-write.js'
-import { createChangeRecorder, createFlushChangeRecorder, discardStateChangeSink, recordList } from './change-recorder.js'
+import { commitStateChangeSink, createChangeRecorder, createFlushChangeRecorder, discardStateChangeSink, recordList } from './change-recorder.js'
 import { dispatchEffects, throwCollectedErrors } from './effects.js'
 import { getPublicKey, toKeyId } from './identity.js'
 import { sweepEmptyIndexBuckets } from './index-sweep.js'
 import { addLayerNow, removeLayerNow } from './layers.js'
+import { pruneNow } from './prune.js'
 import { appendError, dispatchCommitted, dispatchFinalObservers } from './queue-dispatch.js'
 import { clearCollectionNow, clearNow, setStateNow } from './serialize.js'
 import { createWriteEffects } from './write-effects.js'
@@ -14,8 +16,20 @@ import { deleteItemFromBase, writeItemNow } from './write.js'
 
 /** Add an operation and drain immediately at pause depth zero. */
 export function enqueueOperation(ctx: EngineContext, operation: QueuedOperation): void {
+  // Only the operation submitted through `withReceipt` claims its tracker,
+  // never writes enqueued reentrantly by its hooks.
+  if (ctx.nextCompletion) {
+    operation.completion = ctx.nextCompletion
+    ctx.nextCompletion = undefined
+  }
   if (canRunDirectWrite(ctx, operation)) {
-    flushQueuedOperations(ctx, operation)
+    try {
+      flushQueuedOperations(ctx, operation)
+    }
+    finally {
+      if (operation.completion)
+        operation.completion.completed = true
+    }
     return
   }
   ctx.queue.push(operation)
@@ -102,8 +116,10 @@ function processDirectWrite(
   operation: Extract<QueuedOperation, { type: 'writeItem' }>,
   flushChanges: FlushChangeRecorder,
 ): void {
-  if (!canPublishQuery(operation.params.meta))
+  if (!canPublishQuery(operation.params.meta)) {
+    ctx.callbacks.onWriteDropped?.(operation.params.collection, operation.params.key)
     return
+  }
   const changes = createChangeRecorder(ctx, flushChanges)
   const partial = { committed: false, effects: [] }
   try {
@@ -125,6 +141,7 @@ function processOperation(
     case 'writeItem': {
       if (!canPublishQuery(operation.params.meta)) {
         advance(ctx)
+        ctx.callbacks.onWriteDropped?.(operation.params.collection, operation.params.key)
         return true
       }
       if (!ctx.staggering.canProcess())
@@ -153,7 +170,8 @@ function processOperation(
       const { collection, key, deletedAt } = operation.params
       const state = ctx.collections.get(collection.name)
       const id = toKeyId(key)
-      const publicKey = state ? getPublicKey(state, id) : key
+      // An absent row has no stored key form: the tombstone keeps the caller's.
+      const publicKey = state && (state.base.has(id) || state.layeredKeyCounts?.has(id)) ? getPublicKey(state, id) : key
       ctx.fieldTimestamps.get(collection.name)?.delete(id)
       if (deletedAt != null)
         ctx.tombstones.set({ collection: collection.name, key: publicKey, deletedAt })
@@ -173,11 +191,18 @@ function processOperation(
     case 'removeLayer':
       return processSimple(ctx, flushChanges, changes => removeLayerNow(ctx, changes, operation.layerId))
     case 'setState':
-      return processSimple(ctx, flushChanges, changes => setStateNow(ctx, changes, operation.state))
+      return processSimple(ctx, flushChanges, changes => setStateNow(ctx, changes, operation.state, operation.input))
     case 'clearCollection':
       return processSimple(ctx, flushChanges, changes => clearCollectionNow(ctx, changes, operation.collection))
     case 'clear':
       return processSimple(ctx, flushChanges, changes => clearNow(ctx, changes))
+    case 'prune': {
+      const pruned: PrunedItem[] = []
+      processSimple(ctx, flushChanges, changes => pruneNow(ctx, changes, operation.params, pruned))
+      for (const [collection, key] of pruned)
+        operation.params.onPruned?.(collection, key)
+      return true
+    }
   }
 }
 
@@ -227,13 +252,16 @@ function processBatch(
     return finishBatch(ctx, operation, flushChanges)
   }
 
-  // Keep one recorder for every slice. Adapters see only the completed batch,
-  // including when staggering yields between slices.
+  // Adapters see each staggered slice of whole items as it commits, so a long
+  // fetch fills in progressively. The marker and every hook stay deferred to
+  // the end of the batch.
   const changes = operation.recorder ??= createChangeRecorder(ctx, flushChanges)
   const effects = operation.effects ??= []
   while (operation.index < operation.params.items.length) {
-    if (!ctx.staggering.canProcess())
+    if (!ctx.staggering.canProcess()) {
+      publishBatchSlice(operation)
       return false
+    }
     const { key, value } = operation.params.items[operation.index]!
     const partial = { committed: false, effects: [] }
     try {
@@ -276,6 +304,16 @@ function processBatch(
   return finishBatch(ctx, operation, flushChanges, changes, effects)
 }
 
+/**
+ * Publish the rows a staggered batch committed before yielding. The next
+ * slice records into a fresh recorder; deferred effects stay on the operation.
+ */
+function publishBatchSlice(operation: Extract<QueuedOperation, { type: 'writeItems' }>): void {
+  const recorder = operation.recorder
+  operation.recorder = undefined
+  commitStateChangeSink(recorder)
+}
+
 /** Publish child-first progress before surfacing its later relation failure. */
 function settleFailedWrite(
   ctx: EngineContext,
@@ -304,9 +342,13 @@ function settleStaleBatch(
   const recorder = operation.recorder
   const effects = operation.effects ?? []
   advance(ctx)
+  // Rows prepared for this page will never be written.
+  for (const { key } of operation.params.items.slice(operation.index))
+    ctx.callbacks.onWriteDropped?.(operation.params.collection, key)
   operation.recorder = undefined
   operation.effects = undefined
-  if (!recorder)
+  // Earlier slices may already be published; their nested hooks still run.
+  if (!recorder && effects.length === 0)
     return true
   try {
     dispatchCommitted(ctx, recorder, effects)
@@ -370,6 +412,9 @@ function finishBatch(
 
 /** Advance past one fully processed top-level operation. */
 function advance(ctx: EngineContext): void {
+  const completion = ctx.queue[ctx.queueHead]?.completion
+  if (completion)
+    completion.completed = true
   ctx.queueHead++
 }
 
