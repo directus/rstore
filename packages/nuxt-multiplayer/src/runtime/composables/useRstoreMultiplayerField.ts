@@ -1,6 +1,7 @@
 import type { MaybeRefOrGetter } from 'vue'
 import type { RstoreMultiplayerChannel } from './useRstoreMultiplayerChannel'
-import { onUnmounted, ref, toValue } from 'vue'
+import { tryOnScopeDispose } from '@vueuse/core'
+import { ref, toValue } from 'vue'
 
 export interface UseRstoreMultiplayerFieldOptions<TField extends string> {
   field: MaybeRefOrGetter<TField>
@@ -52,7 +53,8 @@ export function useRstoreMultiplayerField<TField extends string>(
     }, 0)
   }
 
-  onUnmounted(() => {
+  // Scope disposal also releases hooks created outside a component.
+  tryOnScopeDispose(() => {
     clearPendingBlur()
     if (focusedOwners.get(options.channel) === owner)
       focusedOwners.delete(options.channel)

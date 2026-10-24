@@ -1,21 +1,11 @@
 import type { ComputedRef, Ref, ShallowRef } from 'vue'
 import type { MultiplayerLeaveMessage, MultiplayerMessage, MultiplayerPeer, MultiplayerPresenceMessage, MultiplayerTextCursor, MultiplayerUpdateMessage, MultiplayerUser } from '../types'
-import { useWebSocket } from '@vueuse/core'
+import { isClient, tryOnScopeDispose, useEventListener, useWebSocket } from '@vueuse/core'
 import { useRuntimeConfig } from 'nuxt/app'
-import { computed, onUnmounted, ref, shallowRef, triggerRef, watch } from 'vue'
+import { computed, ref, shallowRef, triggerRef, watch } from 'vue'
 import { isMultiplayerPeerStrict, validateMultiplayerMessage } from '../utils/messageGuards'
 import { areMultiplayerTextCursorsEqual, rebaseMultiplayerTextCursor } from '../utils/multiplayerTextCursor'
-
-const DEFAULT_COLORS = [
-  '#ef4444',
-  '#f97316',
-  '#eab308',
-  '#22c55e',
-  '#06b6d4',
-  '#3b82f6',
-  '#8b5cf6',
-  '#ec4899',
-] as const
+import { createMultiplayerUser } from '../utils/multiplayerUser'
 
 export interface UseRstoreMultiplayerChannelOptions {
   roomId: string
@@ -65,6 +55,10 @@ export function useRstoreMultiplayerChannel<
   const endpoint = (options.endpoint ?? runtimeConfig.public.wsEndpoint) as string | undefined
   const ws = useWebSocket(endpoint, {
     autoReconnect: true,
+    // Closing is owned by `disconnect` below. VueUse's own scope cleanup is
+    // registered first, so it would close the socket before `leave` is sent,
+    // buffering the frame and leaving a ghost presence on peers.
+    autoClose: false,
     // `onMessage` fires for every frame — unlike watching `ws.data`,
     // which skips consecutive identical payloads (Object.is) and would
     // let idle peers' heartbeats go unseen until stale cleanup evicts them.
@@ -181,17 +175,6 @@ export function useRstoreMultiplayerChannel<
     }
   }
 
-  const stalePeerTimeout = options.stalePeerTimeout ?? 15000
-  const cleanupInterval = setInterval(() => {
-    const now = Date.now()
-    for (const [id, peer] of peers.value) {
-      if (now - peer.lastSeen > stalePeerTimeout) {
-        peers.value.delete(id)
-        triggerRef(peers)
-      }
-    }
-  }, 5000)
-
   /**
    * Processes a raw incoming frame. Self-echo is filtered by `clientId`
    * (not user id) so two tabs of the same user keep seeing each other.
@@ -225,23 +208,54 @@ export function useRstoreMultiplayerChannel<
     }
   }
 
-  const heartbeatInterval = setInterval(() => {
-    if (ws.status.value === 'OPEN') {
-      sendPresence()
-    }
-  }, options.heartbeatInterval ?? 5000)
-
   watch(ws.status, (status) => {
     if (status === 'OPEN') {
       sendPresence()
     }
   })
 
-  onUnmounted(() => {
+  // Timers only make sense in the browser. Vue never unmounts server-rendered
+  // components, so on the server they would outlive every request. Same
+  // runtime check `useWebSocket` uses to skip connecting on the server.
+  if (isClient) {
+    startPresenceTimers()
+    // Replaces VueUse's `autoClose` page-unload handling.
+    useEventListener('beforeunload', disconnect, { passive: true })
+  }
+
+  /** Announce departure while the socket is still open, then close it. */
+  function disconnect() {
     leaveRoom()
-    clearInterval(cleanupInterval)
-    clearInterval(heartbeatInterval)
-  })
+    ws.close()
+  }
+
+  /** Start stale-peer eviction and heartbeat, stopped with the owning scope. */
+  function startPresenceTimers() {
+    const stalePeerTimeout = options.stalePeerTimeout ?? 15000
+    const cleanupInterval = setInterval(() => {
+      const now = Date.now()
+      for (const [id, peer] of peers.value) {
+        if (now - peer.lastSeen > stalePeerTimeout) {
+          peers.value.delete(id)
+          triggerRef(peers)
+        }
+      }
+    }, 5000)
+
+    const heartbeatInterval = setInterval(() => {
+      if (ws.status.value === 'OPEN') {
+        sendPresence()
+      }
+    }, options.heartbeatInterval ?? 5000)
+
+    // Scope disposal (not `onUnmounted`) also covers channels created in a
+    // detached `effectScope` or store setup instead of a component.
+    tryOnScopeDispose(() => {
+      disconnect()
+      clearInterval(cleanupInterval)
+      clearInterval(heartbeatInterval)
+    })
+  }
 
   const validPeers = computed(() => Array.from(peers.value.values()).filter(isMultiplayerPeerStrict<TField>))
 
@@ -272,21 +286,5 @@ export function useRstoreMultiplayerChannel<
     setTextCursor,
     rebaseTextCursor,
     clearFocus,
-  }
-}
-
-function createMultiplayerUser(
-  input: Partial<MultiplayerUser> | undefined,
-  colors: readonly string[] = DEFAULT_COLORS,
-): MultiplayerUser {
-  const id = input?.id ?? crypto.randomUUID()
-  const name = input?.name ?? `User ${id.slice(0, 4).toUpperCase()}`
-  const palette = colors.length > 0 ? colors : DEFAULT_COLORS
-  const color = input?.color ?? palette[Math.floor(Math.random() * palette.length)] ?? DEFAULT_COLORS[0]
-
-  return {
-    id,
-    name,
-    color,
   }
 }

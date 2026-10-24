@@ -1,7 +1,8 @@
 import type { MultiplayerTextCursor } from '../types'
 import type { RstoreMultiplayerChannel } from './useRstoreMultiplayerChannel'
 import { isPublicKey } from '@rstore/shared'
-import { nextTick, onUnmounted, watch } from 'vue'
+import { tryOnScopeDispose } from '@vueuse/core'
+import { nextTick, watch } from 'vue'
 import { rebaseMultiplayerTextCursor } from '../utils/multiplayerTextCursor'
 import { sanitizeMultiplayerUpdate } from '../utils/sanitizeUpdate'
 
@@ -216,7 +217,8 @@ export function useRstoreMultiplayerForm<
     broadcastCurrentState()
   }
 
-  onUnmounted(() => {
+  // Scope disposal also releases hooks created outside a component.
+  tryOnScopeDispose(() => {
     disposed = true
     if (typeof stopChange === 'function') {
       stopChange()
