@@ -1,9 +1,10 @@
-import type { Awaitable, BatchingConfig, Cache, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, Hooks, MutationSpecialProps, Plugin, QueryFetchOptions, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
+import type { Awaitable, BatchingConfig, Cache, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, Hooks, MutationSpecialProps, Plugin, QueryFetchOptions, ResolvedCollection, RetentionOptions, StoreCore, StoreSchema } from '@rstore/shared'
 import { get, set } from '@rstore/shared'
 import { createBatchScheduler } from './batch'
 import { builtinCollectionHooksPlugin } from './builtin/collectionHooks'
 import { addCollectionRelations, isCollectionRelations, normalizeCollectionRelations, resolveCollectionOppositeRelations, resolveCollections } from './collection'
 import { defaultFetchPolicy } from './fetchPolicy'
+import { resolveMutationHistoryRetention } from './mutation/history'
 import { mutate } from './mutation/mutate'
 import { setupPlugin, sortPlugins } from './plugin'
 import { applyPluginCollectionDefaults } from './pluginCollectionDefaults'
@@ -28,6 +29,13 @@ export interface CreateStoreCoreOptions<
    * same tick are collected and dispatched as a single batch operation.
    */
   batching?: BatchingConfig
+
+  /**
+   * Bounds of `store.$mutationHistory`. Each entry retains its payload.
+   * `false` keeps every entry forever; `{ maxSize: 0 }` records nothing.
+   * @default { ttlMs: 600_000, maxSize: 20 }
+   */
+  mutationHistory?: false | RetentionOptions
 }
 
 const resolvedFindOptionsMarker = Symbol('resolvedFindOptions')
@@ -56,6 +64,8 @@ export async function createStoreCore<
 
   const optionPlugins = options.plugins ?? []
   optionPlugins.unshift(builtinCollectionHooksPlugin)
+
+  let mutationHistoryRetention = resolveMutationHistoryRetention(options.mutationHistory)
 
   let store: StoreCore<TSchema, TCollectionDefaults> = {
     $cache: options.cache,
@@ -140,6 +150,13 @@ export async function createStoreCore<
       return null
     },
     $mutationHistory: [],
+    get $mutationHistoryRetention() {
+      return mutationHistoryRetention
+    },
+    // Validate runtime assignments like the store option.
+    set $mutationHistoryRetention(value) {
+      mutationHistoryRetention = resolveMutationHistoryRetention(value)
+    },
     $mutate(options, callback) {
       return mutate(store, options, callback)
     },

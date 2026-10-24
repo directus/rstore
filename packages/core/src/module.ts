@@ -1,5 +1,6 @@
 import type { Awaitable, CreateModuleApi, GlobalStoreType, Module, ModuleMutation, ResolvedModule, StoreCore, StoreSchema } from '@rstore/shared'
 import { isKeyDefined } from './key'
+import { recordMutationHistory } from './mutation/history'
 
 type ResolveCallbacks = Array<() => Awaitable<unknown>>
 
@@ -50,7 +51,7 @@ export function defineModule<
           if (!isKeyDefined(key)) {
             key = Object.keys(_exposed).find(k => _exposed[k] === mutation)
           }
-          store.$mutationHistory.push({
+          recordMutationHistory(store, {
             operation: 'module-mutation',
             module: name,
             key: key!,

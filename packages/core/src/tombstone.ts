@@ -1,5 +1,6 @@
 import type { FieldTimestampValue } from './hlc/index.js'
 import { compareHLC, stringifyHLC } from './hlc/index.js'
+import { resolveRetention } from './retention'
 
 /**
  * A tombstone records a deletion with its causal timestamp so that concurrent
@@ -138,15 +139,40 @@ export interface ScheduleTombstoneGcOptions {
   intervalMs: number
   /**
    * Tombstones older than this many milliseconds (relative to
-   * `now()`) are dropped. Pick a value comfortably larger than the
+   * `now()`) are dropped. Must be > 0; `Infinity` disables expiration. Pick a value comfortably larger than the
    * worst-case time a peer might be offline — once a tombstone is GC'd,
    * a late-arriving update for the same key may resurrect the row.
    */
   ttlMs: number
+  /**
+   * Keep at most this many tombstones, dropping the oldest deletes first.
+   * Like an expired one, a dropped tombstone no longer blocks a late update.
+   * Must be an integer >= 0. Defaults to unlimited.
+   */
+  maxSize?: number
   /** Inject a clock — defaults to `Date.now`. Useful in tests. */
   now?: () => number
   /** Called after every sweep, even when nothing was dropped. */
   onSweep?: (info: TombstoneGcSweepInfo) => void
+}
+
+/**
+ * Drop the oldest tombstones until at most `maxSize` remain.
+ *
+ * @returns Number of tombstones dropped.
+ */
+function trimTombstones(store: TombstoneStore, maxSize: number): number {
+  const excess = store.size() - maxSize
+  if (!(excess > 0)) {
+    return 0
+  }
+  const oldest = Array.from(store.entries(), ([, tombstone]) => tombstone)
+    .sort((a, b) => compareHLC(a.deletedAt, b.deletedAt))
+    .slice(0, excess)
+  for (const tombstone of oldest) {
+    store.clear(tombstone.collection, tombstone.key)
+  }
+  return oldest.length
 }
 
 /**
@@ -162,16 +188,21 @@ export function scheduleTombstoneGc(
   if (!(options.intervalMs > 0)) {
     throw new Error(`scheduleTombstoneGc: intervalMs must be > 0 (received ${options.intervalMs})`)
   }
+  // Same rules as every other retention option: a NaN or negative limit
+  // would otherwise never trim, or drop every tombstone on each sweep.
+  const { ttlMs, maxSize } = resolveRetention(options, { ttlMs: options.ttlMs, maxSize: Infinity }, 'scheduleTombstoneGc')
   const now = options.now ?? (() => Date.now())
 
   const sweep = () => {
-    const cutoffMs = now() - options.ttlMs
+    const cutoffMs = now() - ttlMs
     // Encode the cutoff into an HLC string with logical 0 and an empty
     // nodeId so it sorts strictly before any real HLC at the same physical
-    // time — keeps the boundary conservative.
-    const cutoff = stringifyHLC({ physical: cutoffMs, logical: 0, nodeId: '' })
-    const dropped = gcTombstones(store, cutoff)
-    options.onSweep?.({ droppedCount: dropped.length, cutoffMs })
+    // time — keeps the boundary conservative. An infinite TTL never expires.
+    const dropped = Number.isFinite(cutoffMs)
+      ? gcTombstones(store, stringifyHLC({ physical: cutoffMs, logical: 0, nodeId: '' })).length
+      : 0
+    const trimmed = trimTombstones(store, maxSize)
+    options.onSweep?.({ droppedCount: dropped + trimmed, cutoffMs })
   }
 
   const handle = setInterval(sweep, options.intervalMs)

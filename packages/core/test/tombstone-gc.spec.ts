@@ -48,10 +48,32 @@ describe('tombstone garbage collection', () => {
     }
   })
 
+  it('drops the oldest tombstones beyond the size limit on each sweep', async () => {
+    const store = createTombstoneStore()
+    for (const physical of [400, 100, 300, 200])
+      store.set({ collection: 'todos', key: physical, deletedAt: hlc(physical) })
+    const sweeps: TombstoneGcSweepInfo[] = []
+    const stop = scheduleTombstoneGc(store, { intervalMs: 5, ttlMs: Infinity, maxSize: 2, onSweep: sweep => sweeps.push(sweep) })
+    try {
+      await vi.waitFor(() => expect(sweeps[0]?.droppedCount).toBe(2))
+      expect([...store.entries()].map(([, tombstone]) => tombstone.key).sort()).toEqual([300, 400])
+    }
+    finally {
+      stop()
+    }
+  })
+
   it('rejects exact non-positive intervals', () => {
     const store = createTombstoneStore()
     expect(() => scheduleTombstoneGc(store, { intervalMs: 0, ttlMs: 1_000 })).toThrow('intervalMs must be > 0 (received 0)')
     expect(() => scheduleTombstoneGc(store, { intervalMs: -1, ttlMs: 1_000 })).toThrow('intervalMs must be > 0 (received -1)')
+  })
+
+  it('rejects retention limits that cannot bound anything', () => {
+    const store = createTombstoneStore()
+    expect(() => scheduleTombstoneGc(store, { intervalMs: 5, ttlMs: Number.NaN })).toThrow('scheduleTombstoneGc: ttlMs must be > 0 (received NaN)')
+    expect(() => scheduleTombstoneGc(store, { intervalMs: 5, ttlMs: 1_000, maxSize: Number.NaN })).toThrow('scheduleTombstoneGc: maxSize must be an integer >= 0 (received NaN)')
+    expect(() => scheduleTombstoneGc(store, { intervalMs: 5, ttlMs: 1_000, maxSize: -1 })).toThrow('scheduleTombstoneGc: maxSize must be an integer >= 0 (received -1)')
   })
 
   it('returns an idempotent stop function that prevents later real sweeps', async () => {

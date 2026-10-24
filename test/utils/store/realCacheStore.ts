@@ -1,4 +1,4 @@
-import type { BatchingConfig, Cache, CollectionDefaults, FindOptions, Plugin, StoreCore, StoreSchema } from '@rstore/shared'
+import type { BatchingConfig, Cache, CollectionDefaults, FindOptions, Plugin, RetentionOptions, StoreCore, StoreSchema } from '@rstore/shared'
 import { createStoreCore } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createStore } from '../../../packages/vue/src'
@@ -43,7 +43,9 @@ export interface CoreStoreOptions {
   /** Maximum number of items written to the cache every 10ms. */
   cacheStaggering?: number
   /** Tombstone garbage collection settings. `false` disables the timer. */
-  tombstoneGc?: false | { intervalMs?: number, ttlMs?: number }
+  tombstoneGc?: false | { intervalMs?: number, ttlMs?: number, maxSize?: number }
+  /** Mutation history bounds. `false` records nothing. */
+  mutationHistory?: false | RetentionOptions
 }
 
 /**
@@ -62,6 +64,7 @@ export async function createCoreStore(options: CoreStoreOptions): Promise<CoreSt
     batching: options.batching,
     cacheStaggering: options.cacheStaggering,
     tombstoneGc: options.tombstoneGc,
+    mutationHistory: options.mutationHistory,
   }
   let store: StoreCore<StoreSchema, CollectionDefaults>
   if (options.factory === 'core') {

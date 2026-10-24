@@ -1,6 +1,7 @@
 import type { Collection, CollectionDefaults, FinalizeMutationOptions, FinalizeMutationResult, GlobalStoreType, ResolvedCollectionItemBase, StoreCore, StoreSchema } from '@rstore/shared'
 import type { FinalizeMutationRuntimeOptions } from './finalize/helpers'
 import { applyCommittedMutation, createManyApplyOptions, createSingleApplyOptions, emitAfterMutationHook, emitItemAfterMutationHooks, getHookItems, getHookKeys, getInitialManyResults, getItemKey, normalizeKey, parseCommittedItem, withManyResults, withSingleResult } from './finalize/helpers'
+import { recordMutationHistory } from './history'
 
 /** Shared finalize path used after a remote mutation succeeds. */
 export async function finalizeMutation<
@@ -43,7 +44,7 @@ async function finalizeSingleMutation<
   const applyOptions = createSingleApplyOptions(options, meta, parsedResult)
   const applyResult = applyCommittedMutation(store, applyOptions, options, runtimeOptions)
 
-  store.$mutationHistory.push({
+  recordMutationHistory(store, {
     operation: options.mutation,
     collection: options.collection,
     key: normalizeKey(options.key ?? getItemKey(options, parsedResult ?? options.item)),
@@ -87,7 +88,7 @@ async function finalizeManyMutation<
   const applyOptions = createManyApplyOptions(options, meta, parsedResults)
   const applyResult = applyCommittedMutation(store, applyOptions, options, runtimeOptions)
 
-  store.$mutationHistory.push({
+  recordMutationHistory(store, {
     operation: options.mutation,
     collection: options.collection,
     keys: getHookKeys(options, parsedResults),

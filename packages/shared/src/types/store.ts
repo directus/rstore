@@ -7,6 +7,7 @@ import type { ResolvedModule } from './module'
 import type { MutateCallback, MutateOptions, MutationOperation, MutationSpecialProps } from './mutation'
 import type { RegisteredPlugin } from './plugin'
 import type { FetchPolicy, FindOptions, QueryFetchOptions, QueryResultMode } from './query'
+import type { RetentionOptions } from './retention'
 
 /**
  * Interface for the batch scheduler attached to a store.
@@ -64,7 +65,23 @@ export interface StoreCore<
    */
   $processItemSerialization: <TCollection extends Collection> (collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>, item: any) => void
   $getCollection: (item: any, collectionNames?: string[]) => ResolvedCollection<Collection, CollectionDefaults, StoreSchema> | null
+  /**
+   * Latest successful mutations, oldest first, bounded by `$mutationHistoryRetention`.
+   * Each entry keeps its payload, so older entries are evicted.
+   */
   $mutationHistory: Array<MutationOperation<any, TCollectionDefaults, TSchema>>
+  /**
+   * Bounds of `$mutationHistory`, checked whenever a mutation is recorded;
+   * `false` keeps every entry forever, `maxSize: 0` records nothing. Set by
+   * the `mutationHistory` store option, defaults to
+   * `{ ttlMs: 600_000, maxSize: 20 }`.
+   */
+  get $mutationHistoryRetention(): false | Required<RetentionOptions>
+  /**
+   * Validated like the `mutationHistory` store option (throws a `TypeError`
+   * on an invalid limit); omitted limits use the defaults.
+   */
+  set $mutationHistoryRetention(value: false | RetentionOptions)
   /** Run custom collection-shaped mutation work through rstore hooks, history, and cache. */
   $mutate: <TCollection extends Collection = Collection, TResult = unknown>(
     options: MutateOptions<TCollection, any, any>,

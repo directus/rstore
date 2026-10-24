@@ -353,3 +353,20 @@ if (todo.$isOptimistic) {
   console.log('This record is optimistic')
 }
 ```
+
+## Mutation History
+
+`store.$mutationHistory` lists the latest successful mutations (collection and module mutations), oldest first. Each entry keeps its payload, so by default only the last 20 entries of the past 10 minutes are kept, checked whenever a mutation is recorded. Change these bounds with the `mutationHistory` store option. `false` keeps every entry forever and `{ maxSize: 0 }` records nothing:
+
+```ts
+const store = await createStore({
+  schema,
+  plugins,
+  mutationHistory: {
+    ttlMs: 60_000, // drop entries older than 1 minute
+    maxSize: 100, // keep at most 100 entries
+  },
+})
+```
+
+`store.$mutationHistoryRetention` holds the resolved bounds. Assigning it at runtime validates the value like the option (an invalid limit throws a `TypeError`, omitted limits use the defaults); the new bounds apply when the next mutation is recorded.
