@@ -23,3 +23,6 @@ docs/.vitepress/.temp
 # Coverage reports (pnpm test:coverage)
 coverage
 .vitest/
+
+# npm pack tarballs (pnpm test:attw)
+*.tgz

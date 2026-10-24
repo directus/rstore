@@ -28,6 +28,7 @@ jobs:
           cache: pnpm
       - run: pnpm install
       - run: pnpm build
+      - run: pnpm test:attw
       - run: pnpm test:types
 
   unit-test:
