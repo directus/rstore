@@ -83,8 +83,12 @@ export class CacheItemCellRegistry implements ItemCellRegistry {
     if (this.disposed || cell.state !== 'dormant')
       return false
     const current = this.options.read(cell.collection, cell.id)
-    if (current !== undefined)
-      cell.update(current)
+    // Only committed rows can be synchronized. A fetch result whose write is
+    // still queued (paused or staggered cache) stays dormant on its fallback,
+    // so cache reads cannot see it before the write lands.
+    if (current === undefined)
+      return false
+    cell.update(current)
     this.register(cell)
     return true
   }
