@@ -107,11 +107,10 @@ Known limitations:
 
 - Only the displayed offset page is live; no pinned windows (S06 rejected).
 - A push not accepted within 10 s silently removes that live query's registry entry. No `kickedOut` is sent and the connection stays open; the client cannot detect that live updates ended.
-- `kickedOut` removes the client subscription; the plugin only warns. The query remains ended until remount or another subscription recreation; reconnect does not restore it. Failed session recovery schedules no reconnect or rejoin.
+- Failed session recovery schedules no transport reconnect or rejoin.
 - Token-expiry reconnect forces refresh-token rotation through session recovery and a full rejoin, even if HTTP already refreshed the cookie; existing sockets retain their original token.
-- Pushed rows carry no `fieldTimestamps` or result version. An older REST response from another query can overwrite newer pushed values. Rows are cached even for `no-cache` lists and before `setResult`, including when rstore rejects publication.
+- Pushed rows carry no `fieldTimestamps` or result version. An older REST response from another query can overwrite newer pushed values.
 - Studio's own mutations still trigger `usePaginatedQuery`'s `afterMutation`/`afterManyMutation` REST refresh on top of the push; observer E2E coverage bypasses those hooks.
-- Search typing changes base options during the cache-only throttle phase, reopening the live subscription on each keystroke rather than throttling engine joins.
 - No WebSocket `Origin` check while cookie authentication is accepted; no per-user/IP connection limit. Subscription count and shared read concurrency are the implemented bounds.
 - System-collection and schema changes do not trigger reruns: the notifier forwards workspace primitive-field changes only. Permission, policy and role changes therefore apply only at the next relevant data change (a revoke leaves the last pushed result on the client; a grant shows new rows late). Time-based rules (`$NOW`) do not rerun as time passes. A revoked API key or suspended user keeps receiving pushes until the next 60 s token re-check. A failed cluster broadcast is logged, not retried; a later relevant change or rejoin is needed to catch up.
 - A non-reading client can wedge its connection: socket writer, acknowledgements, pings and close sends have no timeout. The live-query push timeout only bounds that caller's wait; it does not cancel the socket send.
