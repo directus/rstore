@@ -138,3 +138,85 @@ Known limitations:
 
 - Sharing is replica-local. Concurrent joins/change batches can start separate epochs and conservatively perform extra reads. Different resolved permission filters (including time-dependent values) retain separate executions. Every subscriber still pays parsing, permission lookup/planning, buffering replay and serialization costs; the optimization shares the data/count execution, not permission lookup queries.
 - Buffered results stay in memory for the current epoch and replay clones rows for each subscriber. This uses no persistent query cache and has no new TTL/configuration/compatibility path. Existing external-writer, system-data notification, permission-change notification and time-based rerun limitations above remain.
+
+## Engine realtime metrics (2026-10-26)
+
+### Implementation
+
+- Reuses `monospace-tracing-setup`, global `monospace` meter, existing OTLP provider,
+  resource attributes and shutdown flush. `enable_otel_export` gates registration
+  and recording; no new configuration, dependency, transport or metrics stack.
+- `tracing-setup/src/realtime.rs` owns typed recording helpers and cancellation-safe
+  drop guards; `realtime/instruments.rs` owns registration. Engine registry startup
+  fixes the recording policy before accepting work. Guards count WebSocket receiver
+  lifetimes, registry memberships and tickets awaiting scheduler permits; removal,
+  destruction and cancellation release counts. Immediate follow-ups keep their
+  permit and are not counted as queued again.
+- Metrics (prefix `monospace.realtime.`): `connections`, `subscriptions`,
+  `rerun.queue_depth` (signed up-down counters); `rerun.duration` (histogram, `s`);
+  `rerun.skipped`, `read.shared`, `pushes`, `push.timeouts`, `slow_client.drops`,
+  `runs.failed`, `cluster.broadcasts.sent`, `cluster.broadcasts.received`,
+  `cluster.broadcasts.failed` (counters); `push.payload.size` (histogram, `By`,
+  whose sum gives total result bytes).
+- Only `rerun.duration` has a point attribute: `monospace.realtime.outcome` is
+  `pushed`, `unchanged`, `failed` or `removed`. No workspace names, user IDs, query
+  strings, topic IDs or replica IDs become metric attributes. Static attributes
+  and borrowed instrument handles add no application-side allocation per record.
+- Duration includes initial reads, shared-result replay and follow-ups, starts
+  after acquiring a permit and includes successful/failed result delivery. Query
+  failure is recorded before best-effort kick-out delivery. Stale memberships,
+  cancellation and failed delivery use `removed`; cancelled queue waits are not
+  runs. Successful pushes measure UTF-8 result bytes without transport envelope.
+- Changed-key savings count field-matched idle skips and avoided coalesced
+  follow-ups. Shared reads count successful replays, not map hits, failed attempts
+  or replacement initializers. One data/count execution group counts once.
+- Cluster success counts dispatched batches; receipt counts decoded events,
+  including self echoes. Failure counts dispatch, decoding, declaration and
+  listener failures. Existing retry/replay behavior stays as documented above.
+- Slow-client drops count only actual current-membership removal after a result timeout;
+  an overlapping leave/rejoin or a failed-run notification timeout cannot inflate drops.
+- Full semantics: `directus-next/docs/observability.md`, linked from existing
+  `crates/tracing-setup/readme.md` observability instructions.
+
+### Tests and failing-first evidence
+
+- Uses existing `opentelemetry_sdk` in-memory exporter in tracing-setup, with isolated
+  providers rather than replacing globals. Two tests cover overlapping lifetimes,
+  unpolled queued-future cancellation, balanced counts, four run outcomes, failure
+  counts, successful push totals/bytes, all event counters, units and exact bounded
+  attributes. Existing Engine realtime integration tests exercise Engine behavior;
+  metric values are asserted separately through the isolated exporter.
+- Failing first: `cargo test -p monospace-tracing-setup --lib -- realtime::` ran before
+  recording helper bodies were implemented; both tests failed because exporter had
+  no connection/run measurements (`no entry found for key`, missing duration).
+  Same two tests passed after recording was implemented.
+
+### Known limitations
+
+- Exporter tests prove recording/helper contracts; they do not independently force
+  every Engine timeout or broker failure and assert its metric. Existing integration
+  scenarios remain the behavior regression boundary. No external collector/dashboard
+  verification or additional connector matrix is claimed.
+- Metrics observe socket writes, not client acknowledgements. Queue depth includes
+  obsolete tickets until permit acquisition/cancellation. Connection counts follow
+  receiver task lifetime, including stalled close/cleanup. Push timeout still removes
+  a query without closing its connection or cancelling the underlying socket send.
+  Cluster failure totals include retry attempts, not exact lost change batches.
+
+### Verification results
+
+- `RUST_BACKTRACE=1 cargo test -p monospace-test-integration --test tests -- realtime::`
+  passed all **28 realtime tests**, none ignored, with configured PostgreSQL and
+  RabbitMQ peer services. `RUST_BACKTRACE=1 cargo test -p monospace --lib -- realtime::`
+  passed **8 affected Engine unit tests**, none ignored.
+- `RUST_BACKTRACE=1 cargo test -p monospace-tracing-setup --lib` passed all **18 tests**,
+  including both new exporter tests, none ignored.
+- `cargo clippy -p monospace -p monospace-tracing-setup --all-targets -- -D warnings`
+  passed. `cargo fmt -p monospace -p monospace-tracing-setup -- --check` passed.
+  No task-owned TOML changed; Taplo was not applicable. All Rust commands used plain
+  `cargo` through mise/mbx outside the sandbox, with task builds serialized.
+- Final repeat of the full **28-test** realtime integration command passed after
+  slow-client membership accounting and receiver-lifetime review. No tests were
+  skipped. Other connector configurations and an external OTLP collector were not
+  exercised; per-path Engine timeout/broker metric assertions remain outside this
+  exporter-helper coverage.
