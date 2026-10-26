@@ -33,6 +33,8 @@ The `query` and `liveQuery` composables return an object with the following prop
 
 - `data`: a ref that contains the data.
 
+- `live`: a readonly ref indicating that at least one existing page is followed and every followed page has completed subscription registration. False for ordinary queries, SSR, empty selection, registration, backoff and server-ended subscriptions; data can remain available while false. See [server-ended subscriptions](./live.md#server-ended-subscriptions).
+
 - `confirmed`: a readonly ref indicating whether every existing page has a server-confirmed result for its current options.
 
 - `loading`: a ref that indicates whether the user is waiting on data <Badge text="Changed in v0.9" type="warning" />. It is `true` while a blocking fetch is running, and also while a background refresh is running if there is nothing to display yet. See [Foreground and background fetch state](#foreground-and-background-fetch-state).
@@ -338,6 +340,8 @@ The `fetchMore` method returns an "hybrid promise", meaning you can use the resu
 
 #### Distinct Pages
 
+Live subscriptions compare resolved options after defaults and `resolveFindOptions` hooks. Equivalent resolved reads retain their subscriptions, including when `fetchPolicy`, `dedupe`, `experimentalGarbageCollection`, or `fetchOptions.autoRefresh` changes. `resultMode` remains part of subscription identity; metadata used by resolution hooks can change that identity. Teardown receives the original opening options and key.
+
 For live pagination, use `liveQuery(builder, { pages: () => [currentPageIndex.value] })` to follow only the displayed existing page, or `{ pages: 'all' }` to follow every existing page. The default follows only the main page. Each subscription's `refresh` and `setResult` target its page. See [following selected pages](./live.md#follow-selected-pages).
 
 Offset pages update independently: inserts and deletes can shift rows across windows and create gaps or duplicates when several pages are displayed together. Keeping several displayed pages consistent with each other, for example with pinned cursor windows, is not supported yet.
@@ -417,7 +421,9 @@ Changing the query options is a different query instead: the pages of the previo
 
 All the first consecutive pages data will be reactively computed from the cache, while other "scarce" pages will hold in memory a list of item keys instead - meaning that the list will not be reactive to added items (but it will still react to updates and deletes).
 
-A page fetched with `fetchPolicy: 'no-cache'` keeps its response in memory and breaks that consecutive cached sequence. Later cached pages retain item references, and the full query result includes the uncached page. Refresh respects each page's resolved fetch policy; switching a page to `no-cache` releases its previous cache ownership.
+A page fetched with `fetchPolicy: 'no-cache'` keeps its response in memory and breaks that consecutive cached sequence. Later cached pages retain item references, and the full query result includes the uncached page. Refresh respects each page's resolved fetch policy; switching a page to `no-cache` releases its previous cache ownership. Fetched and pushed `no-cache` rows still expose the wrapped item API, computed fields and cache-backed relations.
+
+With garbage collection enabled, cache writes that move root rows out of a filter or page slice do not release ownership held by the last fetched or pushed result. A replacement result or query disposal releases ownership; other live queries can keep shared rows. Accepted pushed cache writes also count as relevant writes for other queries' confirmed absence: a keyed `computed` miss can show that key again, and an unkeyed miss can show current matching cache data. Page versions order each page independently; they do not prevent another page's accepted item write from releasing absence.
 
 For example, if you fetch the pages 0 and 1, their respective `data` properties will be computed from the cache using `pageIndex` and `pageSize`. If you then fetch the page 3, its `data` property will also be computed from the cache, but the items will only be looked up by their keys stored in the page result and not dynamically from `pageIndex` and `pageSize`.
 

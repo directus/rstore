@@ -26,17 +26,19 @@ describe('page result versions reject older server state', () => {
       await vi.waitFor(() => expect(remote.callCount('fetchRelations')).toBe(1))
       expect(store.todos.peekFirst('4')?.title).toBe('Fetched four')
       remote.seed('todos', [{ id: '2', title: 'Pushed two' }, { id: '3', title: 'Pushed three' }])
-      writeRows(store, remote.rows('todos') as any)
-      expect(payload.setResult!(remote.rows('todos'), { version: 5, meta: { totalCount: 30 } as CustomHookMeta })).toBe('applied')
-      expect(query.loading.value).toBe(false)
-      expect(query.foreground.completed.value).toBe(true)
+      expect(payload.setResult!(remote.rows('todos'), { version: 5, meta: { totalCount: 30 } as CustomHookMeta })).toBe(version === 4 ? 'applied' : 'stale')
+      // A newer fetch already writing reserves its snapshot until publication.
+      expect(query.loading.value).toBe(version === 6)
+      expect(query.foreground.completed.value).toBe(version === 4)
     }
     finally {
       release()
       await query
     }
     await drainGarbageCollection()
-    expect(query.data.value.map((row: any) => row.id)).toEqual(version === 4 ? ['2', '3'] : ['2', '4'])
+    expect(query.data.value.map((row: any) => [row.id, row.title])).toEqual(version === 4
+      ? [['2', 'Pushed two'], ['3', 'Pushed three']]
+      : [['2', 'Fetched two'], ['4', 'Fetched four']])
     expect(query.meta.value.totalCount).toBe(version === 4 ? 30 : 40)
     expect(query.meta.value.$resultVersion).toBeUndefined()
     expect(store.todos.peekFirst(version === 4 ? '4' : '3')).toBeNull()
@@ -57,7 +59,6 @@ describe('page result versions reject older server state', () => {
     try {
       const payload = await subscription(payloads)
       await vi.waitFor(() => expect(remote.callCount('fetchMany')).toBe(1))
-      writeRows(store, [{ id: '1', title: 'Pushed one' }])
       payload.setResult!([{ id: '1', title: 'Pushed one' }], { version: 5 })
     }
     finally {
@@ -169,7 +170,6 @@ describe('page result versions reject older server state', () => {
     try {
       await subscription(payloads, 1)
       await vi.waitFor(() => expect(remote.callCount('fetchMany')).toBe(1))
-      writeRows(store, [{ id: '1', title: 'Pushed one' }])
       for (const payload of payloads)
         payload.setResult!([{ id: '1', title: 'Pushed one' }], { version: 5 })
     }
@@ -200,7 +200,6 @@ describe('page result versions reject older server state', () => {
     let following: Promise<unknown> | undefined
     try {
       await vi.waitFor(() => expect(remote.callCount('fetchMany')).toBe(2))
-      writeRows(store, [{ id: '1', title: 'Pushed one' }])
       for (const payload of payloads)
         expect(payload.setResult!([{ id: '1', title: 'Pushed one' }], { version: 5 })).toBe('applied')
       following = second.refresh()
@@ -256,7 +255,6 @@ describe('page result versions reject older server state', () => {
     const refreshing = query.refresh()
     try {
       await vi.waitFor(() => expect(remote.callCount('fetchMany')).toBe(2))
-      writeRows(store, [{ id: '3', title: 'Pushed three' }])
       expect(payload.setResult!([{ id: '3', title: 'Pushed three' }], { version: 5 })).toBe('applied')
     }
     finally {

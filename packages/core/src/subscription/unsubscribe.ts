@@ -1,5 +1,8 @@
 import type { Collection, CollectionDefaults, CustomHookMeta, FindOptions, GlobalStoreType, ResolvedCollection, StoreCore, StoreSchema } from '@rstore/shared'
 
+import { klona } from 'klona'
+
+/** Inputs for closing a subscription with its opening options. */
 export interface UnsubscribeOptions<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -13,6 +16,7 @@ export interface UnsubscribeOptions<
   meta?: CustomHookMeta
 }
 
+/** Dispatch teardown without exposing the retained options to hook mutation. */
 export async function unsubscribe<
   TCollection extends Collection,
   TCollectionDefaults extends CollectionDefaults,
@@ -33,6 +37,6 @@ export async function unsubscribe<
     collection,
     subscriptionId,
     key,
-    findOptions,
+    findOptions: klona(findOptions ?? {}),
   })
 }

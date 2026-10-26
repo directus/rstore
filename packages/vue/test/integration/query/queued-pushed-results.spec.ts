@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { nextTick, ref } from 'vue'
-import { setupLiveTodos, subscription, writeRows } from '../../utils/live-query'
+import { setupLiveTodos, subscription } from '../../utils/live-query'
 import { drainGarbageCollection } from '../garbage-collection/utils'
 
 // Real live query, page retries and cache publication; only backend replies are
@@ -25,8 +25,6 @@ describe('versioned page pushes waiting for the main page', () => {
     let retry: Promise<unknown> | undefined
     try {
       const second = await subscription(payloads, 1)
-      if (fetchPolicy !== 'no-cache')
-        writeRows(store, [{ id: '2', title: 'Push 5' }])
       expect(second.setResult!([{ id: '2', title: 'Push 5' }], { version: 5 })).toBe('applied')
       retry = query.fetchMore({ pageIndex: 1 })
       await vi.waitFor(() => expect(remote.callCount('fetchMany')).toBe(2))
@@ -93,7 +91,7 @@ describe('versioned page pushes waiting for the main page', () => {
     expect(query.data.value.some((row: any) => row.title === 'Late push')).toBe(false)
   })
 
-  it.each(['published', 'dropped'] as const)('owns the rows of a queued push until it is %s', async (outcome) => {
+  it.each(['published', 'dropped'] as const)('keeps queued raw rows unwritten until push is %s', async (outcome) => {
     const { store, run, remote, payloads } = await setupLiveTodos()
     const where = ref({})
     const release = remote.holdNext('fetchMany')
@@ -101,11 +99,10 @@ describe('versioned page pushes waiting for the main page', () => {
     const page = query.getPage({ pageIndex: 1 })
     try {
       const second = await subscription(payloads, 1)
-      writeRows(store, [{ id: '3', title: 'Pushed three' }])
       expect(second.setResult!([{ id: '3', title: 'Pushed three' }], { version: 5 })).toBe('applied')
-      // A sweep while the push waits for the main page must keep its rows.
+      // No cache ownership or pin is needed before the push publishes.
       store.$cache.garbageCollect()
-      expect(store.todos.peekFirst('3')?.title).toBe('Pushed three')
+      expect(store.todos.peekFirst('3')).toBeNull()
       if (outcome === 'dropped')
         where.value = { title: 'One' }
       await nextTick()

@@ -15,7 +15,6 @@ describe('pushed live results replace pages without refetching or reviving stale
     const payload = await subscription(payloads)
     remote.seed('todos', [{ id: '2', title: 'Pushed two' }, { id: '3', title: 'Three' }])
     const rows = remote.rows('todos')
-    writeRows(store, rows as any)
 
     expect(payload.setResult!(rows, { meta: { totalCount: 8 } as CustomHookMeta })).toBe('applied')
     expect(query.data.value.map((item: any) => [item.id, item.title])).toEqual([['2', 'Pushed two'], ['3', 'Three']])
@@ -49,7 +48,6 @@ describe('pushed live results replace pages without refetching or reviving stale
     const query = await run(() => store.todos.liveQuery((q: any) => q.many({ pageSize: 1, resultMode: 'computed' })))
     await query.fetchMore({ pageIndex: 1 })
     const payload = await subscription(payloads)
-    writeRows(store, [{ id: '3', title: 'Three' }])
     payload.setResult!([{ id: '3', title: 'Three' }], { meta: { totalCount: 3 } as CustomHookMeta })
     // A pushed membership must not turn a cache slice into responseRefs.
     expect(query.pages.value.map((page: any) => page.data.map((item: any) => item.id))).toEqual([['1'], ['2']])
@@ -67,7 +65,6 @@ describe('pushed live results replace pages without refetching or reviving stale
       await vi.waitFor(() => expect(remote.callCount('fetchMany')).toBe(1))
       expect(query.loading.value).toBe(true)
       const lanePromise = query.foreground.promise
-      writeRows(store, [{ id: '2', title: 'Pushed two' }, { id: '3', title: 'Three' }])
       payload.setResult!([{ id: '2', title: 'Pushed two' }, { id: '3', title: 'Three' }])
       expect(query.loading.value).toBe(false)
       expect(query.foreground.completed.value).toBe(true)
@@ -97,7 +94,6 @@ describe('pushed live results replace pages without refetching or reviving stale
       const payload = await subscription(payloads)
       await vi.waitFor(() => expect(remote.callCount('fetchRelations')).toBe(1))
       expect(store.todos.peekFirst('4')?.title).toBe('Stale four')
-      writeRows(store, [{ id: '2', title: 'Pushed two' }, { id: '3', title: 'Three' }])
       payload.setResult!([{ id: '2', title: 'Pushed two' }, { id: '3', title: 'Three' }])
     }
     finally {
@@ -118,7 +114,6 @@ describe('pushed live results replace pages without refetching or reviving stale
     const query = await owner.result
     const payload = await subscription(payloads)
     store.$cache.writeItem({ collection: store.$collections[0], key: 'a2', item: { id: 'a2', name: 'Bob' } })
-    store.$cache.writeItem({ collection: store.$collections[1], key: 'p2', item: { id: 'p2', authorId: 'a2' } })
     payload.setResult!([{ id: 'p2', authorId: 'a2' }])
     await drainGarbageCollection()
     cache.garbageCollect()
@@ -172,7 +167,6 @@ describe('pushed live results replace pages without refetching or reviving stale
     try {
       const payload = await subscription(payloads)
       expect(query.background.loading.value).toBe(true)
-      writeRows(store, [{ id: '2', title: 'Pushed two' }])
       payload.setResult!([{ id: '2', title: 'Pushed two' }])
       expect(query.background.loading.value).toBe(false)
       expect(query.foreground.completed.value).toBe(true)

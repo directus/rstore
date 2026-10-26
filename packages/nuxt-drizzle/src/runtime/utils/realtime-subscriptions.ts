@@ -1,15 +1,26 @@
+import type { EndSubscription } from '@rstore/shared'
 import type { SubscriptionMessage } from './realtime'
 import { getSubscriptionId } from './realtime'
 
 /** Subscription target `(collection, key, where)` without its action. */
 export type RealtimeTopic = Omit<SubscriptionMessage, 'action'>
 
+/** One rstore subscription sharing a wire topic. */
+interface LocalSubscriber {
+  /** rstore lease identity, retained until unsubscribe. */
+  id: string
+  /** Optional live-query termination callback. */
+  end?: EndSubscription
+}
+
 /** Client-side ref-counted registry of realtime subscriptions. */
 export interface RealtimeSubscriptions {
   /** Count one local subscriber; sends `subscribe` for the first one. */
-  subscribe: (topic: RealtimeTopic) => void
+  subscribe: (topic: RealtimeTopic, subscriber?: LocalSubscriber) => void
   /** Release one local subscriber; sends `unsubscribe` after the last one. */
-  unsubscribe: (topic: RealtimeTopic) => void
+  unsubscribe: (topic: RealtimeTopic, id?: string) => void
+  /** Notify live subscribers; stop replay when no plain subscriber remains. */
+  reject: (topic: RealtimeTopic, reason?: string) => void
   /** Subscribe frames of topics with local subscribers, keyed by subscription id. */
   active: ReadonlyMap<string, SubscriptionMessage>
 }
@@ -25,13 +36,16 @@ export interface RealtimeSubscriptions {
 export function createRealtimeSubscriptions(send: (message: SubscriptionMessage) => void): RealtimeSubscriptions {
   const countPerTopic = new Map<string, number>()
   const active = new Map<string, SubscriptionMessage>()
+  const subscribers = new Map<string, LocalSubscriber & { topic: string }>()
 
   /** Count one local subscriber of `topic`. */
-  function subscribe(topic: RealtimeTopic) {
+  function subscribe(topic: RealtimeTopic, subscriber?: LocalSubscriber) {
     const message: SubscriptionMessage = { action: 'subscribe', ...topic }
     const subscriptionId = getSubscriptionId(message)
     const count = countPerTopic.get(subscriptionId) ?? 0
-    if (count === 0) {
+    if (subscriber)
+      subscribers.set(subscriber.id, { ...subscriber, topic: subscriptionId })
+    if (count === 0 || !active.has(subscriptionId)) {
       send(message)
       active.set(subscriptionId, message)
     }
@@ -39,7 +53,9 @@ export function createRealtimeSubscriptions(send: (message: SubscriptionMessage)
   }
 
   /** Release one local subscriber of `topic`. */
-  function unsubscribe(topic: RealtimeTopic) {
+  function unsubscribe(topic: RealtimeTopic, id?: string) {
+    if (id)
+      subscribers.delete(id)
     const message: SubscriptionMessage = { action: 'unsubscribe', ...topic }
     const subscriptionId = getSubscriptionId(message)
     const current = countPerTopic.get(subscriptionId) ?? 0
@@ -61,5 +77,16 @@ export function createRealtimeSubscriptions(send: (message: SubscriptionMessage)
     }
   }
 
-  return { subscribe, unsubscribe, active }
+  /** Notify a snapshot: callbacks may synchronously release local subscribers. */
+  function reject(topic: RealtimeTopic, reason?: string): void {
+    const subscriptionId = getSubscriptionId({ action: 'subscribe', ...topic })
+    const matching = [...subscribers.values()].filter(subscriber => subscriber.topic === subscriptionId && subscriber.end)
+    // Plain subscribe() keeps its existing connector-managed reconnect policy.
+    if (matching.length === countPerTopic.get(subscriptionId))
+      active.delete(subscriptionId)
+    for (const subscriber of matching)
+      subscriber.end!({ reason, retry: reason === 'authorize-error' })
+  }
+
+  return { subscribe, unsubscribe, reject, active }
 }

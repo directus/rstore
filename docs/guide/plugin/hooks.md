@@ -1012,6 +1012,8 @@ export {}
 
 ## Subscriptions
 
+Subscription identity compares resolved options after store defaults and `resolveFindOptions` hooks, ignoring functions and client controls: `fetchPolicy`, `dedupe`, `experimentalGarbageCollection`, and `fetchOptions` (including `autoRefresh`). `resultMode` remains part of identity. Equivalent reads retain transport and callbacks; a metadata-driven read change reopens it. Collection changes, disabling, and page removal still close subscriptions. `unsubscribe` receives the resolved options and key captured when that subscription opened, including after equivalent client option changes.
+
 ### subscribe
 
 This hook is called when rstore needs to subscribe to a data collection.
@@ -1023,38 +1025,38 @@ hook('subscribe', (payload) => {
     payload.meta,
     payload.collection, // The current collection
     payload.subscriptionId, // The unique ID of the subscription to help track it
-    payload.key, // The key passed to the query
-    payload.findOptions, // The find options passed to the query
+    payload.key, // Target item key, including keyed live queries
+    payload.findOptions, // Resolved options, including defaults and resolveFindOptions changes
     payload.setResult, // Publishes a full pushed result; undefined for plain subscribe()
     payload.pageIndex, // Followed page index; undefined for keyed/unpaged queries
     payload.refresh, // Refetches the followed page; undefined for plain subscribe()
+    payload.end, // Reports server termination; undefined for plain subscribe()
   )
 })
 ```
 
-For `liveQuery` subscriptions, `payload.setResult(result, { meta, version })` publishes a server-computed result for the followed page without fetching. Use it for full-result pushes; use `payload.refresh(options?)` for invalidation notifications that carry no result. Plain `subscribe()` subscriptions receive neither callback.
+For `liveQuery` subscriptions, `payload.setResult(result, { meta, version, fieldTimestamps })` publishes a server-computed result for the followed page without fetching. Use it for full-result pushes; use `payload.refresh(options?)` for invalidation notifications that carry no result. `payload.end({ reason, retry })` reports server termination and immediately invalidates that subscription's callbacks. Plain `subscribe()` subscriptions receive none of these callbacks.
 
-`result` is already parsed: an item array for `many`, or an item or `null` for `first`. For cached queries, write the rows into the cache first, using `$cache.writeItem` with their `fieldTimestamps` as usual:
+With `retry: true`, rstore reopens through the query's transition queue, with three attempts at 1, 2 and 4 seconds, then refreshes the page once after reopening or final failure. Repeated server ends and registration failures share the budget until an accepted pushed result or a successful refresh confirms a healthy replacement, or server-read identity changes. Registration alone does not reset it, so immediate kickout loops stay bounded. With `retry: false`, it closes and refreshes once without reopening. Selection, server-read options, disabling and disposal cancel pending retries. `query.live.value` reflects completed registration of all selected existing pages. See [server-ended subscriptions](../data/live.md#server-ended-subscriptions) for lifetime and transport details.
+
+`payload.findOptions` is resolved when each subscription opens, using the current query metadata. It includes store defaults and `resolveFindOptions` hook changes, like fetch-hook options. Connectors can use it directly without calling `$resolveFindOptions`. A no-argument `subscribe()` also receives resolved options, including store `findDefaults` such as `pageSize`; resolution runs with `many: true`. Both subscribe and unsubscribe hook payloads always contain `findOptions`. Subscribe hooks receive a detached copy, so their mutations cannot change the opening options retained for teardown. `payload.key` is set for keyed subscriptions, including `liveQuery(q => q.first('1'))` and `subscribe(s => s('1'))`. No `rawFindOptions` field is exposed.
+
+`result` is an item array for `many`, or an item or `null` for `first`. Pass raw rows directly without pre-writing. Accepted rows and timestamps are cloned when `setResult` accepts them, then parsed and written through the fetch result pipeline, including query tracking and embedded relations:
 
 ```ts
-for (const item of pushedRows) {
-  payload.store.$cache.writeItem({
-    collection: payload.collection,
-    key: payload.collection.getKey(item)!,
-    item,
-    fieldTimestamps: timestampsByKey[item.id],
-  })
-}
 const outcome = payload.setResult?.(pushedRows, {
   meta: { totalCount },
+  fieldTimestamps: pushedRows.map(item => timestampsByKey[item.id]),
 })
 ```
 
-`setResult` does not write items or mark them deleted. Normal garbage collection can collect rows released by the page when no other query owns them. With `resultMode: 'responseRefs'`, it replaces page membership while retaining rows owned by other queries. With `fetchPolicy: 'no-cache'`, it displays the supplied values directly. Paginated `computed` pages remain cache slices. Metadata merges into query metadata, including values such as `totalCount`.
+`fieldTimestamps` accepts one field timestamp map shared by every row, or an array of maps aligned with `pushedRows` (entries may be `undefined`). The timestamp array must have exactly the same length as the rows; a mismatch logs a development warning. For `first`, pass a single map. Cache writes use the normal field-level LWW merge and tombstone checks.
+
+Stale and inactive pushes neither parse nor write rows. A non-main push waits for the main page before parsing and writing; a dropped queued push writes nothing. `fetchPolicy: 'no-cache'` parses and wraps supplied values with the item API, computed fields and relations without writing shared cache. Accepted cache writes count as relevant writes for other queries' absence state. `setResult` does not delete items. Normal garbage collection can collect rows released by the page when no other query owns them. With `resultMode: 'responseRefs'`, it replaces page membership while retaining rows owned by other queries. Paginated `computed` pages remain cache slices; local membership changes retain result ownership as for fetched pages. Metadata merges into query metadata, including values such as `totalCount`.
 
 An unversioned push supersedes any fetch of that page still in flight: its late result, metadata and error cannot overwrite the push. Published pushes complete foreground loading, advance `lastUpdated`, and mark the followed page `confirmed`. `query.confirmed.value` requires every existing page to be confirmed; see [confirmed results](../data/query.md#confirmed-results). For keyed queries, `setResult(null)` publishes `null`; the connector handles deletion from the cache.
 
-The callback returns `'applied'` when the push is accepted, `'stale'` for a version older than the page holds or has accepted, or `'inactive'` when its query is disposed or disabled, or its subscription is deselected or resubscribed with new options. The main page publishes an accepted push before `setResult` returns. Another page queues it until the main page has a result, and drops it without effects if, before it publishes, the query is disposed or disabled, the page is removed or its options change, a later unversioned push supersedes it (as does, for an unversioned push, a new fetch of the page), or a newer version lands. `'applied'` therefore means accepted, not displayed.
+The callback returns `'applied'` when the push is accepted, `'stale'` for a version older than the page holds or has accepted, or `'inactive'` when its query is disposed or disabled, or its subscription is deselected, server-ended or resubscribed with new options. The main page publishes an accepted push before `setResult` returns. Another page queues it until the main page has a result, and drops it without effects if, before it publishes, the query is disposed or disabled, the page is removed or its options change, a later unversioned push supersedes it (as does, for an unversioned push, a new fetch of the page), or a newer version lands. `'applied'` therefore means accepted, not displayed.
 
 `meta` accepts public metadata only: `$`-prefixed fields such as `$resultVersion` are reserved by rstore and excluded from its type. Pass the snapshot version as `version`.
 
@@ -1074,15 +1076,15 @@ payload.setResult?.(pushedRows, { version: snapshotVersion, meta: { totalCount }
 
 Both accept `FieldTimestampValue`: a finite number, or a string in serialized HLC format (`stringifyHLC`), such as `0000000003e8:0002:server`. Core's `compareHLC` compares physical time, logical counter, then node ID. Use comparable versions from one server snapshot domain across fetches and pushes; encode other formats, such as a Postgres LSN or a transaction id, into one of these first. `setResult` throws a `TypeError` for any other version, before changing the page. A fetch whose `$resultVersion` has another format logs a warning and is treated as unversioned.
 
-Each page drops results older than its last applied version. Equal versions apply. A fetch started before a versioned push can still publish a newer server snapshot. Stale fetches settle successfully and collect unowned tracking; their metadata is ignored. rstore removes `$resultVersion` from the published query metadata. Versions survive `refresh()` and reset on base query option changes. Unversioned results bypass comparison and clear the page's version; an unversioned push also supersedes pending fetches as before. An unversioned fetch that was already in flight when a versioned push was accepted cannot be ordered against that push, so its late result is dropped like a stale one, including its cache writes. A fetch started after the push applies normally.
+Each page drops results older than its last applied or accepted version. A versioned fetch reserves its snapshot once it starts processing rows, until page publication settles; an older push is rejected during that wait too. Equal versions apply. A fetch started before a versioned push can still publish a newer server snapshot. Stale fetches settle successfully and collect unowned tracking; their metadata is ignored. rstore removes `$resultVersion` from the published query metadata. Versions survive `refresh()` and reset on base query option changes. Unversioned results bypass comparison and clear the page's version; an unversioned push also supersedes pending fetches as before. An unversioned fetch that was already in flight when a versioned push was accepted cannot be ordered against that push, so its late result is dropped like a stale one, including its cache writes. A fetch started after the push applies normally.
 
-Page versions do not replace item `fieldTimestamps` or tombstones. Connectors still own cache writes, including stamps on pushed rows. A stale `setResult` does not undo cache writes made before the callback. See [live query ordering](../data/live.md#order-server-results).
+Page versions do not replace item `fieldTimestamps` or tombstones. Pass pushed row stamps through `setResult` so rejected pushes cannot write them. See [live query ordering](../data/live.md#order-server-results).
 
 For invalidation notifications, `payload.refresh(options?)` refetches and publishes only the followed page's result.
 
 The callback accepts query refresh options, but always uses `pages: [payload.pageIndex]` (the internal main-page index for unpaged queries). A supplied `pages` list cannot redirect it. Other pages keep their data and fetch state. Call `query.refresh({ pages: [...] })` directly to refresh several pages.
 
-A live query's [page policy](../data/live.md#follow-selected-pages) chooses which pages subscribe. Each hook receives base find options merged with the page's own options, including cursor params. Refresh overrides, such as `payload.refresh({ resultMode: 'responseRefs' })` or `query.refresh({ params })`, shape that page's loads and later pushes but never its subscription `findOptions`, so refreshing keeps the same subscription and its callbacks stay active. A page created without `pageIndex` (for example `fetchMore({ params: { after } })`) never gains one from a refresh. `pageIndex` is absent for keyed or unpaged live queries. The page policy is not part of `findOptions`. Changes to selected pages or page options reconcile subscriptions through a serialized queue; function identity alone does not reopen them. Callbacks from pages no longer followed return `'inactive'` from `setResult`, including before transport teardown finishes.
+A live query's [page policy](../data/live.md#follow-selected-pages) chooses which pages subscribe. Each hook receives resolved base find options merged with the page's own identity options, including cursor params. Refresh overrides, such as `payload.refresh({ resultMode: 'responseRefs' })` or `query.refresh({ params })`, shape that page's loads and later pushes but never its subscription `findOptions`, so refreshing keeps the same subscription and its callbacks stay active. A page created without `pageIndex` (for example `fetchMore({ params: { after } })`) never gains one from a refresh. `pageIndex` is absent for keyed or unpaged live queries. The page policy is not part of `findOptions`. Changes to selected pages or page options reconcile subscriptions through a serialized queue; function identity alone does not reopen them. Callbacks from pages no longer followed return `'inactive'` from `setResult`, including before transport teardown finishes.
 
 When an invalidation notification means items left a query's result without being deleted, call:
 
@@ -1095,6 +1097,8 @@ This replaces result membership with the server response while retaining rows in
 ### unsubscribe
 
 This hook is called when rstore needs to unsubscribe from a data collection.
+
+Vue subscriptions retain the resolved key and options from opening, so teardown targets the same remote topic even if defaults, resolution hooks, or query metadata have since changed.
 
 ```ts
 hook('unsubscribe', (payload) => {

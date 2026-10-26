@@ -1,4 +1,4 @@
-import type { Cache, Collection, CollectionDefaults, CustomHookMeta, FieldTimestampValue, FindOptions, HybridPromise, StoreSchema } from '@rstore/shared'
+import type { Cache, Collection, CollectionDefaults, FindOptions, HybridPromise, SetResultOptions, StoreSchema } from '@rstore/shared'
 import type { VueCachePrivate } from '../cache'
 import type { VueCreateQueryOptions, VueQueryRefreshOptions, VueQueryReturn } from './types'
 import { tryOnScopeDispose } from '@vueuse/core'
@@ -65,6 +65,7 @@ export function createQuery<
     },
   })
   const returnObject = ctx.returnObject = {
+    live: computed(() => options.live?.value ?? false),
     data,
     confirmed: computed(() => ctx.pages.value.every(page => !page || page.confirmed)),
     loading,
@@ -78,7 +79,7 @@ export function createQuery<
     getPage,
     meta: ctx.meta,
     _result: ctx.result,
-    _setPageResult: (page: any, result: unknown, meta?: CustomHookMeta, version?: FieldTimestampValue) => publishPageResult(ctx, page, result, meta, version),
+    _setPageResult: (page: any, result: unknown, options?: SetResultOptions) => publishPageResult(ctx, page, result, options),
     _refreshPage: (page: any, options?: VueQueryRefreshOptions<TOptions>) => page.main ? refresh(getMainPageRefreshOptions<TOptions>(page, options)) : refreshSecondaryPage(ctx, page, options),
   }
 
@@ -243,6 +244,8 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     ...options,
     /** Whether the owning effect scope has stopped. */
     disposed: false,
+    /** Effect scope owning watchers installed by deferred push publication. */
+    scope: getCurrentScope(),
     cache,
     queryId,
     meta,

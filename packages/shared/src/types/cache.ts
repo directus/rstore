@@ -78,6 +78,8 @@ export interface WriteItem<
 > {
   key: string | number
   value: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>
+  /** Optional LWW stamps forwarded to this row's cache write. */
+  fieldTimestamps?: FieldTimestamps
 }
 
 export interface Cache<

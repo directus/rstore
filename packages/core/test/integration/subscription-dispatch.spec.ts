@@ -54,6 +54,31 @@ async function setup() {
 }
 
 describe('subscription registration', () => {
+  it('resolves subscription options and exposes a key supplied in find options', async () => {
+    const { store, collection, remote } = await setup()
+    store.$hooks.hook('resolveFindOptions', ({ many, updateFindOptions }) => {
+      updateFindOptions({ params: { cardinality: many ? 'many' : 'first' } })
+    })
+    await subscribe({ store, collection, subscriptionId: 'keyed', findOptions: { key: '1' } })
+    expect(remote.lastRequest('subscribe')).toMatchObject({
+      key: '1',
+      findOptions: { key: '1', params: { cardinality: 'first' } },
+    })
+  })
+
+  it('preserves resolved options when adding an explicit key', async () => {
+    const { store, collection, remote } = await setup()
+    let resolutions = 0
+    store.$hooks.hook('resolveFindOptions', ({ updateFindOptions }) => {
+      updateFindOptions({ params: { resolution: ++resolutions } })
+    })
+    // eslint-disable-next-line no-restricted-syntax -- Direct Core callers can supply already-resolved options; test marker preservation.
+    const findOptions = store.$resolveFindOptions(collection, {}, false, {})
+    await subscribe({ store, collection, subscriptionId: 'resolved-key', key: 0, findOptions })
+    expect(resolutions).toBe(1)
+    expect(remote.lastRequest('subscribe')).toMatchObject({ key: 0, findOptions: { params: { resolution: 1 } } })
+  })
+
   it('opens a registration the backend holds until unsubscribe closes that same id', async () => {
     const { store, collection, remote } = await setup()
 

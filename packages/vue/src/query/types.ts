@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FetchPolicy, FieldTimestampValue, FindOptions, HybridPromise, QueryRefreshOptions, ResolvedCollection, SetResultOutcome, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FetchPolicy, FieldTimestampValue, FindOptions, HybridPromise, QueryRefreshOptions, ResolvedCollection, SetResultOptions, SetResultOutcome, StoreSchema } from '@rstore/shared'
 import type { MaybeRefOrGetter, Raw, Ref, ShallowRef } from 'vue'
 import type { VueStore } from '../store'
 
@@ -64,6 +64,8 @@ export interface VueQueryReturn<
   TOptions extends FindOptions<TCollection, TCollectionDefaults, TSchema>,
   TResult,
 > {
+  /** Whether every selected live page is subscribed; false for ordinary queries. */
+  readonly live: Readonly<Ref<boolean>>
   /** Whether every existing page has a server-confirmed result for its current options. */
   confirmed: Readonly<Ref<boolean>>
   data: Ref<TResult>
@@ -89,10 +91,10 @@ export interface VueQueryReturn<
   /** @private */
   _result: Ref<TResult>
   /**
-   * Publishes a parsed result through the live subscription adapter.
+   * Processes and publishes an accepted result through the live subscription adapter.
    * @private
    */
-  _setPageResult: (page: VueQueryPage<any, any, any, any, any>, result: unknown, meta?: CustomHookMeta, version?: FieldTimestampValue) => SetResultOutcome
+  _setPageResult: (page: VueQueryPage<any, any, any, any, any>, result: unknown, options?: SetResultOptions) => SetResultOutcome
   /** Reloads a followed page without redirecting its find options to the main page. @private */
   _refreshPage: (page: VueQueryPage<any, any, any, any, any>, options?: VueQueryRefreshOptions<TOptions>) => HybridPromise<VueQueryReturn<TCollection, TCollectionDefaults, TSchema, TOptions, TResult>>
 }
@@ -112,6 +114,8 @@ export interface VueCreateQueryOptions<
   getCollection: () => ResolvedCollection
   options?: MaybeRefOrGetter<TOptions | undefined | { enabled: boolean }>
   many: boolean
+  /** Live adapter's aggregate subscription state, when this is a live query. */
+  live?: Readonly<Ref<boolean>>
 }
 
 export type VueQueryPageOptions<TOptions> = Partial<Omit<TOptions, 'pageSize'>>

@@ -45,7 +45,7 @@ describe('realtime subscriptions', () => {
 
     scope(() => store.todos.subscribe())
     await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(1))
-    expect(remote.lastRequest('subscribe')).toMatchObject({ key: undefined, findOptions: undefined })
+    expect(remote.lastRequest('subscribe')).toMatchObject({ key: undefined, findOptions: { fetchPolicy: 'cache-first' } })
 
     // No key was given, so any key of the collection must be delivered.
     remote.emit({ type: 'created', collection: 'todos', item: { id: '5', title: 'Five' } })
@@ -100,7 +100,7 @@ describe('realtime subscriptions', () => {
     const { result: sub, stop } = scope(() => store.todos.subscribe((s: any) => s(key.value)))
 
     await vi.waitFor(() => expect(remote.subscriptions()).toHaveLength(1))
-    expect(remote.lastRequest('subscribe')).toMatchObject({ key: '1', findOptions: undefined })
+    expect(remote.lastRequest('subscribe')).toMatchObject({ key: '1', findOptions: { key: '1' } })
     const firstId = remote.lastRequest('subscribe')!.subscriptionId
 
     key.value = '2'

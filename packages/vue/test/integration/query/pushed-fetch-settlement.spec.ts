@@ -20,7 +20,6 @@ describe('fetch settlement after a push records only accepted snapshots', () => 
       await query
       const main = await subscription(payloads)
       await vi.waitFor(() => expect(remote.callCount('fetchMany')).toBe(1))
-      writeRows(store, [{ id: '1', title: 'Push' }])
       expect(main.setResult!([{ id: '1', title: 'Push' }], { version: 5 })).toBe('applied')
     }
     finally {

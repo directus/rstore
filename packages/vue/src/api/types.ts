@@ -48,9 +48,14 @@ export type SubscriptionQueryBuilder<
   TSchema extends StoreSchema,
 > = <TOptions extends string | number | FindOptions<TCollection, TCollectionDefaults, TSchema> | undefined> (options: TOptions) => TOptions
 
+/** Plain subscription lifetime and completed registration state. */
 export interface SubscribeResult {
+  /** Close transport and stop following reactive options. */
   unsubscribe: () => Promise<void>
+  /** Metadata shared with subscription hooks. */
   meta: Ref<CustomHookMeta>
+  /** Whether transport registration completed for current options. */
+  live: Readonly<Ref<boolean>>
 }
 
 export type QueryResult<

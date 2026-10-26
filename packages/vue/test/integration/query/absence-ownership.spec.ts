@@ -52,7 +52,7 @@ describe('computed absence belongs to its page and follows optimistic layers', (
     expect(query.mainPage.data).toBeNull()
   })
 
-  it.each([true, false])('keeps consumer absence independent until a relevant write (keyed: %s)', async (keyed) => {
+  it.each([true, false])('releases consumer absence for another page push and relevant local writes (keyed: %s)', async (keyed) => {
     const { store, run, payloads } = await setupLiveTodos({ experimentalGarbageCollection: false })
     /** An unkeyed first result may select any cached row after a local write. */
     const filter = () => true
@@ -64,6 +64,9 @@ describe('computed absence belongs to its page and follows optimistic layers', (
     expect(first.data.value).toBeNull()
     expect(secondPayload.setResult!({ id: '1', title: 'One' }, { version: 4 })).toBe('applied')
     expect(second.data.value?.title).toBe('One')
+    expect(first.data.value?.title).toBe('One')
+    // Re-establish absence to distinguish keyed from collection-wide writes.
+    expect(firstPayload.setResult!(null, { version: 6 })).toBe('applied')
 
     store.todos.writeItem({ id: '2', title: 'Unrelated' })
     expect(first.data.value?.title ?? null).toBe(keyed ? null : 'One')
@@ -74,7 +77,7 @@ describe('computed absence belongs to its page and follows optimistic layers', (
     expect(first.confirmed.value).toBe(true)
   })
 
-  it('releases owned absence when an accepted write reuses its frozen row', async () => {
+  it('releases owned absence when another page pushes the same frozen row', async () => {
     const { store, run, payloads } = await setupLiveTodos({ experimentalGarbageCollection: false })
     const first = await run(() => store.todos.liveQuery((q: any) => q.first('1')))
     const second = await run(() => store.todos.liveQuery((q: any) => q.first('1')))
@@ -84,10 +87,8 @@ describe('computed absence belongs to its page and follows optimistic layers', (
     store.todos.writeItem(row)
     expect(firstPayload.setResult!(null, { version: 5 })).toBe('applied')
     expect(secondPayload.setResult!(row, { version: 4 })).toBe('applied')
-    expect(first.data.value).toBeNull()
     expect(second.data.value?.title).toBe('Frozen')
-
-    store.todos.writeItem(row)
+    expect(row).toEqual({ id: '1', title: 'Frozen' })
     expect(first.data.value?.title).toBe('Frozen')
     expect(first.mainPage.data?.title).toBe('Frozen')
   })

@@ -67,12 +67,14 @@ export default definePlugin({
         }), false)
       })
 
-      hook('subscribe', ({ collection, key, findOptions }) => {
-        subscriptions.subscribe({ collection: collection.name, key, where: findOptions?.where })
+      // rstore resolves defaults and hook transforms before subscribe, then
+      // retains those options for unsubscribe so both use the same wire topic.
+      hook('subscribe', ({ collection, key, findOptions, subscriptionId, end }) => {
+        subscriptions.subscribe({ collection: collection.name, key, where: findOptions?.where }, { id: subscriptionId, end })
       })
 
-      hook('unsubscribe', ({ collection, key, findOptions }) => {
-        subscriptions.unsubscribe({ collection: collection.name, key, where: findOptions?.where })
+      hook('unsubscribe', ({ collection, key, findOptions, subscriptionId }) => {
+        subscriptions.unsubscribe({ collection: collection.name, key, where: findOptions?.where }, subscriptionId)
       })
 
       let storeRef: any = null
@@ -155,6 +157,7 @@ export default definePlugin({
               return
             }
             if (message.subscription?.action === 'rejected') {
+              subscriptions.reject(message.subscription, message.subscription.reason)
               console.warn(
                 '[Realtime] Subscription rejected by server',
                 message.subscription.collection,

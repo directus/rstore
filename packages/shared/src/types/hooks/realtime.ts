@@ -1,5 +1,5 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, StoreSchema } from '../collection'
-import type { FieldTimestampValue } from '../crdt'
+import type { FieldTimestamps, FieldTimestampValue } from '../crdt'
 import type { GlobalStoreType } from '../global'
 import type { FindOptions, QueryRefreshOptions } from '../query'
 import type { Awaitable } from '../utils'
@@ -22,8 +22,10 @@ import type { CustomHookMeta, PublicHookMeta } from './meta'
  */
 export type SetResultOutcome = 'applied' | 'stale' | 'inactive'
 
-/** Metadata accompanying a parsed live page result. */
+/** Metadata accompanying a live page result; accepted rows are parsed and written. */
 export interface SetResultOptions {
+  /** Shared field stamps, or index-aligned per-row stamps with the same length as the rows. */
+  fieldTimestamps?: FieldTimestamps | Array<FieldTimestamps | undefined>
   /**
    * Hook metadata merged into the query metadata, such as `totalCount`.
    * `$`-prefixed fields are private to rstore and excluded; pass the snapshot
@@ -34,8 +36,19 @@ export interface SetResultOptions {
   version?: FieldTimestampValue
 }
 
-/** Publish parsed rows for a live query without fetching or writing cache items. */
+/** Clone accepted raw rows and stamps, then parse, write and publish without fetching. */
 export type SetSubscriptionResult = (result: unknown, options?: SetResultOptions) => SetResultOutcome
+
+/** Server termination of one live page subscription. */
+export interface EndSubscriptionOptions {
+  /** Connector diagnostic explaining why the server stopped following. */
+  reason?: unknown
+  /** Reopen with bounded backoff, renewed by accepted results; false leaves the page ended. */
+  retry: boolean
+}
+
+/** Invalidate this subscription's callbacks and recover its followed page. */
+export type EndSubscription = (options: EndSubscriptionOptions) => void
 
 /**
  * Subscription hooks.
@@ -55,10 +68,14 @@ export interface RealtimeHookDefinitions<
       subscriptionId: string
       /** Publishes the followed page of a live query; absent for plain subscriptions. */
       setResult?: SetSubscriptionResult
+      /** Reports server termination; absent for plain subscriptions. */
+      end?: EndSubscription
       /** Followed page index; absent for keyed and unpaged live queries. */
       pageIndex?: number
+      /** Target item key for keyed plain subscriptions and live queries. */
       key?: string | number
-      findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
+      /** Base and page identity options after defaults and resolveFindOptions hooks. */
+      findOptions: FindOptions<TCollection, TCollectionDefaults, TSchema>
       /**
        * Refetches the followed page of this live query. Only set for live queries.
        *
@@ -81,8 +98,10 @@ export interface RealtimeHookDefinitions<
       meta: CustomHookMeta
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       subscriptionId: string
+      /** Item key used when opening this subscription. */
       key?: string | number
-      findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
+      /** Resolved options retained from opening this subscription. */
+      findOptions: FindOptions<TCollection, TCollectionDefaults, TSchema>
     },
   ) => Awaitable<void>
 }

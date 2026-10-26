@@ -2,7 +2,8 @@ import type { CustomHookMeta, FieldTimestampValue, FindOptions } from '@rstore/s
 import type { VueQueryPage } from './types'
 import { compareHLC } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
-import { nextTick } from 'vue'
+import { nextTick, watch } from 'vue'
+import { readFetchVersion } from './version'
 
 /** Accepted versioned push that has not yet passed the main-page barrier. */
 interface PendingPageResult {
@@ -109,6 +110,75 @@ export function reconcilePageTracking(
     ctx.queryTracking.handleQueryTracking(page.id, tracking, result, options.include, true)
     if (isCurrent())
       releaseDiscardedPageOwnership(ctx)
+  }
+}
+
+/**
+ * Observe only a push whose cache writes were deferred. Reuse its tracking
+ * object so a local filter shrink cannot release previously fetched roots.
+ * Ordinary pushes reconcile once, exactly like fetches. Relation ownership
+ * continues through the controller's existing include watcher.
+ */
+export function watchDeferredPageTracking(ctx: any, page: VueQueryPage<any, any, any, any, any>, options: FindOptions<any, any, any>, tracking: any, meta: CustomHookMeta, isCurrent: () => boolean): void {
+  const queue = ctx.cache._private.state.queue
+  const pending = queue.filter((operation: any) => operation.params?.meta === meta)
+  if (!pending.length)
+    return
+  /** Install inside the original query scope even when transport delivers later. */
+  function install(): void {
+    const stop = watch(() => {
+      void page.rawData
+      void page.requestId
+      // An envelope also observes a keyed wrapper whose identity stays stable.
+      return isCurrent() && pending.some((operation: any) => queue.includes(operation)) ? { result: page.data } : undefined
+    }, (snapshot) => {
+      if (!snapshot || !isCurrent()) {
+        stop()
+        return
+      }
+      reconcilePageTracking(ctx, page, snapshot.result, options, tracking, isCurrent)
+      // A synchronous cache notification precedes removal of its queue entry.
+      void nextTick(stopIfSettled)
+    }, { flush: 'sync' })
+    /** Release observation once its deferred cache operations leave the queue. */
+    function stopIfSettled(): void {
+      if (!isCurrent() || !pending.some((operation: any) => queue.includes(operation)))
+        stop()
+    }
+    void nextTick(stopIfSettled)
+  }
+  if (ctx.scope)
+    ctx.scope.run(install)
+  else install()
+}
+
+/**
+ * Fence fetch writes and reserve their version until page publication settles.
+ * A newer fetch may write while waiting for the main page; its reservation
+ * prevents an older queued push from overwriting those shared cache fields.
+ */
+export function createPageFetchPublication(ctx: any, page: VueQueryPage<any, any, any, any, any>, requestId: string) {
+  let release: (() => void) | undefined
+  let reservedVersion: FieldTimestampValue | undefined
+  /** Whether this request still owns the followed page. */
+  const isCurrent = () => !ctx.disposed && page.requestId === requestId && ctx.pages.value.includes(page)
+  return {
+    /** Check every queued write against both request ownership and server order. */
+    canPublish(meta: CustomHookMeta): boolean {
+      const version = readFetchVersion(meta)
+      if (!isCurrent() || isStalePageResult(page, version, requestId))
+        return false
+      if (version != null && version !== reservedVersion) {
+        release?.()
+        reservedVersion = version
+        release = reservePageResult(page, version, isCurrent)
+      }
+      return true
+    },
+    /** Release only this request's reservation, preserving a newer owner. */
+    release(): void {
+      release?.()
+    },
   }
 }
 

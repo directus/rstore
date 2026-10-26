@@ -36,7 +36,8 @@
     "test:types": "tsc --noEmit"
   },
   "dependencies": {
-    "@rstore/shared": "workspace:^"
+    "@rstore/shared": "workspace:^",
+    "klona": "^2.0.6"
   },
   "devDependencies": {
     "typescript": "catalog:",

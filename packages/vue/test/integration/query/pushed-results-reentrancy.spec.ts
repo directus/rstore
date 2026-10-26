@@ -1,7 +1,7 @@
 import type { CustomHookMeta } from '@rstore/shared'
 import { describe, expect, it, onTestFinished, vi } from 'vitest'
 import { watch } from 'vue'
-import { setupLiveTodos, subscription, writeRows } from '../../utils/live-query'
+import { setupLiveTodos, subscription } from '../../utils/live-query'
 import { drainGarbageCollection } from '../garbage-collection/utils'
 
 // Real query/watch/disposal paths execute; only transport replies are held.
@@ -100,7 +100,6 @@ describe('pushed results respect synchronous observer ownership', () => {
         owner.stop()
     }, { flush: 'sync' })
     try {
-      writeRows(store, [{ id: '3', title: 'Three' }])
       expect(main.setResult!([{ id: '3', title: 'Three' }])).toBe('applied')
       expect(main.setResult!([])).toBe('inactive')
       await drainGarbageCollection()

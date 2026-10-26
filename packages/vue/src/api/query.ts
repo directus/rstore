@@ -1,5 +1,5 @@
 import type { FindOptions } from '@rstore/shared'
-import type { MaybeRefOrGetter } from 'vue'
+import type { MaybeRefOrGetter, Ref } from 'vue'
 import type { LiveQueryOptions, QueryManyOptions, QueryType } from './types'
 import { findFirst, findMany, peekFirst, peekMany } from '@rstore/core'
 import { onScopeDispose, ref, toValue } from 'vue'
@@ -35,9 +35,10 @@ export function runApiQuery(
 ) {
   return runWithStoreLifetime(runtime.store, () => {
     const { boundOptionsGetter, type } = bindQueryOptionsGetter(optionsGetter)
-    const query = createApiQuery(runtime, boundOptionsGetter, type)
+    const live = ref(false)
+    const query = createApiQuery(runtime, boundOptionsGetter, type, live)
     if (isLive) {
-      subscribeToLivePages(runtime, query, boundOptionsGetter, toValue(type) === 'many', liveOptions)
+      subscribeToLivePages(runtime, query, boundOptionsGetter, toValue(type) === 'many', live, liveOptions)
     }
     if (isLive && !runtime.store.$isServer) {
       // `realtimeReconnectEventHook` is module-level: skip registration on the
@@ -87,8 +88,10 @@ function createApiQuery(
   runtime: CollectionApiRuntime,
   boundOptionsGetter: () => FindOptions<any, any, any>,
   type: MaybeRefOrGetter<QueryType>,
+  live: Ref<boolean>,
 ) {
   return createQuery({
+    live,
     store: runtime.store,
     fetchMethod: (options, meta) => toValue(type) === 'first'
       ? (options

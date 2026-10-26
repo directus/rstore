@@ -48,8 +48,8 @@ export async function subscription(payloads: SubscribePayload[], index = 0) {
 }
 
 /**
- * Write detached wire rows to the cache, as a connector does before publishing
- * their membership with `setResult`.
+ * Seed cache state that predates a push (for example, a background cache hit).
+ * Full-result connectors pass raw rows directly to `setResult`, which writes them.
  *
  * @param store Store owning the `todos` collection.
  * @param rows Rows to write.

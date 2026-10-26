@@ -138,8 +138,9 @@ export async function setPageResult(
 }
 
 /** Apply the same representation rules to fetched and pushed results. */
-export function applyPageResult(ctx: any, page: VueQueryPage<any, any, any, any, any>, result: any, fetchPolicy: FetchPolicy | undefined, version?: FieldTimestampValue, confirmed = true, confirmationOptions?: unknown, current: () => boolean = () => true): () => boolean {
-  const isCurrent = beginPagePublication(page, current)
+export function applyPageResult(ctx: any, page: VueQueryPage<any, any, any, any, any>, result: any, fetchPolicy: FetchPolicy | undefined, version?: FieldTimestampValue, confirmed = true, confirmationOptions?: unknown, current: () => boolean = () => true, publication?: () => boolean): () => boolean {
+  // Pushes acquire ownership before their cache writes and keep it throughout.
+  const isCurrent = publication ?? beginPagePublication(page, current)
   // A later cache read of the same options cannot undo a server confirmation.
   page._confirmed ||= confirmed
   if (!isCurrent())

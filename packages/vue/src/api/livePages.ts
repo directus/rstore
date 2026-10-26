@@ -1,11 +1,11 @@
 import type { CustomHookMeta, FindOptions } from '@rstore/shared'
-import type { EffectScope, ShallowRef } from 'vue'
+import type { ComputedRef, EffectScope, Ref } from 'vue'
+import type { SubscriptionIdentity } from '../query/options'
 import type { CollectionApiRuntime } from './query'
 import type { LiveQueryOptions } from './types'
 import { tryOnScopeDispose } from '@vueuse/core'
-import { klona } from 'klona'
-import { effectScope, reactive, shallowRef, toValue, watch } from 'vue'
-import { equalFindOptions } from '../query/options'
+import { computed, effectScope, reactive, shallowReactive, shallowRef, toValue, watch, watchEffect } from 'vue'
+import { equalSubscriptionIdentity, resolveSubscriptionIdentity } from '../query/options'
 import { getPageIdentityOptions } from '../query/page'
 import { subscribeToApiQuery } from './subscription'
 import { createSubscriptionQueue } from './subscriptionQueue'
@@ -16,10 +16,12 @@ interface FollowedPage {
   page: any
   /** Position in the query's pages array. */
   index: number
-  /** Base query identity, including options overridden by this page. */
-  baseOptions: FindOptions<any, any, any>
-  /** Base options merged with the page's identifying options, never refresh overrides. */
-  findOptions: FindOptions<any, any, any>
+  /** Base read captured before any page overrides. */
+  base: SubscriptionIdentity
+  /** Cached read shared by reconciliation, opening and callback ownership. */
+  current: ComputedRef<SubscriptionIdentity>
+  /** Read captured by this selection, used to fence obsolete callbacks. */
+  identity: SubscriptionIdentity
 }
 
 /** Active subscription scope and the descriptor its callbacks belong to. */
@@ -28,8 +30,8 @@ interface PageSubscription {
   scope: EffectScope
   /** Last selected window. */
   followed: FollowedPage
-  /** Reactive input for the reusable single-subscription unit. */
-  options: ShallowRef<FindOptions<any, any, any>>
+  /** State of the page transport, false during termination or backoff. */
+  live: Readonly<Ref<boolean>>
 }
 
 /** Keep exactly the selected query pages live through one serialized queue. */
@@ -38,6 +40,7 @@ export function subscribeToLivePages(
   query: any,
   getOptions: () => FindOptions<any, any, any>,
   many: boolean,
+  live: Ref<boolean>,
   options: LiveQueryOptions = {},
 ): void {
   if (runtime.store.$isServer)
@@ -53,33 +56,50 @@ export function subscribeToLivePages(
       query.meta.value = meta
     }
   }, { immediate: true, flush: 'sync' })
-  const subscriptions = new Map<number, PageSubscription>()
+  const subscriptions = shallowReactive(new Map<number, PageSubscription>())
   const createQueueOwner = createSubscriptionQueue()
   let disposed = false
 
-  /** Resolve selection from current pages, without observing their data/loading. */
-  function selectedPages(): FollowedPage[] {
-    const base = getOptions()
-    if (base.enabled === false)
+  // A base-read change removes secondary pages even when their overrides hide
+  // that change. Share this resolution with the ordinary main page.
+  const base = computed(() => resolveSubscriptionIdentity(runtime.store, runtime.getCollection(), getOptions(), many, meta))
+  // Weak keys release removed pages; each retained page resolves only when
+  // its options or metadata read by resolution hooks change.
+  const reads = new WeakMap<object, ComputedRef<SubscriptionIdentity>>()
+  const selectedIndexes = computed(() => {
+    if (getOptions().enabled === false)
       return []
     const policy = options.pages ?? 'main'
-    const indexes = policy === 'main'
+    return [...new Set<number>(policy === 'main'
       ? [query.mainPage.index]
       : policy === 'all'
         ? query.pages.value.flatMap((page: any, index: number) => page ? [index] : [])
-        : toValue(policy)
-    return [...new Set<number>(indexes)].flatMap((index) => {
+        : toValue(policy))]
+  })
+
+  /** Resolve each selected page through its retained computed read. */
+  function selectedPages(): FollowedPage[] {
+    return selectedIndexes.value.flatMap((index) => {
       const page = query.pages.value[index]
-      return page
-        ? [{ page, index, baseOptions: klona(base), findOptions: klona(getPageIdentityOptions({ getOptions: () => base }, page)) }]
-        : []
+      if (!page)
+        return []
+      let current = reads.get(page)
+      if (!current) {
+        current = computed(() => Object.keys(page.options).length === 0
+          ? base.value
+          : resolveSubscriptionIdentity(runtime.store, runtime.getCollection(), getPageIdentityOptions({ getOptions }, page), many, meta))
+        reads.set(page, current)
+      }
+      return [{ page, index, current, identity: current.value, base: base.value }]
     })
   }
 
-  /** Test current ownership synchronously, before queued teardown can run. */
+  /** Check only this page; never resolve other selected pages on delivery. */
   function isActive(followed: FollowedPage): boolean {
-    return !disposed && selectedPages().some(current => current.index === followed.index
-      && current.page === followed.page && equalFindOptions(current.baseOptions, followed.baseOptions) && equalFindOptions(current.findOptions, followed.findOptions))
+    return !disposed && selectedIndexes.value.includes(followed.index)
+      && query.pages.value[followed.index] === followed.page
+      && equalSubscriptionIdentity(followed.current.value, followed.identity)
+      && equalSubscriptionIdentity(base.value, followed.base)
   }
 
   // Batch loadMainPage's temporary empty/restored array writes: refreshing a
@@ -92,12 +112,8 @@ export function subscribeToLivePages(
         subscriptions.delete(index)
       }
       else {
-        const changed = !equalFindOptions(next.findOptions, subscription.followed.findOptions)
-        // Base options can change beneath an unchanged page override. Refresh
-        // ownership even when the transport still follows the same window.
+        // The single-subscription watcher consumes the same cached read.
         subscription.followed = next
-        if (changed)
-          subscription.options.value = next.findOptions
       }
     }
     for (const followed of pages) {
@@ -106,26 +122,34 @@ export function subscribeToLivePages(
       // Watcher callbacks run outside the original scope. Own each single
       // subscription explicitly and stop it on selection changes or disposal.
       const scope = effectScope(true)
-      const subscription: PageSubscription = { scope, followed, options: shallowRef(followed.findOptions) }
+      const subscription: PageSubscription = { scope, followed, live: shallowRef(false) }
       const queueOwner = createQueueOwner(followed.index)
-      scope.run(() => subscribeToApiQuery(runtime, subscription.options, {
+      subscription.live = scope.run(() => subscribeToApiQuery(runtime, undefined, {
+        identity: () => followed.current.value,
+        many,
         meta: query.meta,
         enqueue: queueOwner.enqueue,
         onTeardownFailure: queueOwner.retainTeardown,
-        pageIndex: () => {
-          const resolved = runtime.store.$resolveFindOptions(runtime.getCollection(), subscription.followed.findOptions, many, { ...query.meta.value })
+        pageIndex: (resolved) => {
           return many && (resolved.pageSize != null || resolved.pageIndex != null || !followed.page.main) ? followed.index : undefined
         },
         isActive: () => isActive(subscription.followed),
         refresh: refreshOptions => query._refreshPage(followed.page, refreshOptions),
-        setResult: (result, resultOptions) => query._setPageResult(followed.page, result, resultOptions?.meta, resultOptions?.version),
-      }))
+        setResult: (result, resultOptions) => query._setPageResult(followed.page, result, resultOptions),
+      }))!.live
       subscriptions.set(followed.index, subscription)
     }
   }, { immediate: true })
 
+  watchEffect(() => {
+    // Reconciliation batches temporary page-array writes during refresh. Track
+    // its retained subscriptions here, while ended state still publishes at once.
+    live.value = !disposed && subscriptions.size > 0 && [...subscriptions.values()].every(subscription => subscription.live.value)
+  }, { flush: 'sync' })
+
   tryOnScopeDispose(() => {
     disposed = true
+    live.value = false
     for (const subscription of subscriptions.values())
       subscription.scope.stop()
     subscriptions.clear()

@@ -1,17 +1,22 @@
-import type { CustomHookMeta, FindOptions, QueryRefreshOptions, SetSubscriptionResult } from '@rstore/shared'
+import type { CustomHookMeta, FindFirstOptions, FindOptions, QueryRefreshOptions, SetSubscriptionResult } from '@rstore/shared'
 import type { MaybeRefOrGetter, Ref } from 'vue'
+import type { SubscriptionIdentity } from '../query/options'
 import type { CollectionApiRuntime } from './query'
 import { subscribe, unsubscribe } from '@rstore/core'
 import { tryOnScopeDispose } from '@vueuse/core'
-import { klona } from 'klona'
-import { effectScope, onScopeDispose, ref, toValue, watch } from 'vue'
+import { computed, effectScope, onScopeDispose, readonly, ref, toValue, watch } from 'vue'
 import { releaseWithStore } from '../events'
-import { equalFindOptions } from '../query/options'
+import { equalSubscriptionIdentity, resolveSubscriptionIdentity } from '../query/options'
+import { createSubscriptionRecovery } from './subscriptionRecovery'
 
 /** Callbacks supplied when a subscription belongs to a live query. */
 export interface SubscribeToApiQueryOptions {
-  /** Page index carried by a paginated live subscription. */
-  pageIndex?: MaybeRefOrGetter<number | undefined>
+  /** Query cardinality, including first queries without an item key. */
+  many?: boolean
+  /** Reuse the followed page's cached resolved read. */
+  identity?: () => SubscriptionIdentity | undefined
+  /** Derive followed page index from the resolved subscription options. */
+  pageIndex?: (findOptions: FindOptions<any, any, any>) => number | undefined
   /** Query metadata shared with every followed page. */
   meta?: Ref<CustomHookMeta>
   /** Serialize transitions across all pages of one query. */
@@ -34,33 +39,48 @@ export function subscribeToApiQuery(
   keyOrFindOptions?: MaybeRefOrGetter<string | number | FindOptions<any, any, any> | undefined>,
   options: SubscribeToApiQueryOptions = {},
 ) {
+  const live = ref(false)
   if (runtime.store.$isServer) {
     return {
       unsubscribe: () => Promise.resolve(),
       meta: ref<CustomHookMeta>({}),
+      live: readonly(live),
     }
   }
 
   const meta = options.meta ?? ref<CustomHookMeta>({})
+  const identity = computed(readIdentity)
   let disposed = false
   let revision = 0
+  let watchedIdentity: SubscriptionIdentity | undefined
   let subscriptionId: string | undefined
   // Failed teardown retains transport identity while callbacks stay inactive.
   let closingSubscriptionId: string | undefined
-  let previousKey: string | number | undefined
-  let previousFindOptions: FindOptions<any, any, any> | undefined
+  // Teardown must use the resolved topic that was opened, even after equivalent changes.
+  let subscriptionKey: string | number | undefined
+  let subscriptionFindOptions: FindOptions<any, any, any> | undefined
   let previousCollection: any
 
   // All subscribe/unsubscribe work is chained on this promise so rapid
   // option changes cannot interleave their async steps and orphan a
   // server-side subscription.
   let queue: Promise<void> = Promise.resolve()
+  const recovery = createSubscriptionRecovery({
+    isCurrent: expected => !disposed && revision === expected && options.isActive?.() !== false,
+    reopen: subNow,
+    close: unsubNow,
+    refresh: () => options.refresh!(),
+    enqueue,
+  })
 
   /** Chain a task after all pending subscription work, errors included. */
   function enqueue(task: () => Promise<void>, cleanup = false): Promise<void> {
     if (options.enqueue)
       return options.enqueue(task, cleanup)
     queue = queue.then(task, task)
+    // Watchers and scope disposal have no awaiting caller. Observe failures
+    // without changing the rejection returned by explicit unsubscribe().
+    void queue.catch(() => {})
     return queue
   }
 
@@ -77,8 +97,8 @@ export function subscribeToApiQuery(
         meta: meta.value,
         collection: previousCollection ?? runtime.getCollection(),
         subscriptionId: closingId,
-        key: previousKey,
-        findOptions: previousFindOptions,
+        key: subscriptionKey,
+        findOptions: subscriptionFindOptions,
       })
     }
     catch (error) {
@@ -86,58 +106,78 @@ export function subscribeToApiQuery(
       throw error
     }
     closingSubscriptionId = undefined
-    previousKey = undefined
-    previousFindOptions = undefined
+    subscriptionKey = undefined
+    subscriptionFindOptions = undefined
     previousCollection = undefined
   }
 
   /**
    * (Re)subscribe with new options (must run inside the queue).
-   * @param optionsValue key or find options for the new subscription
-   * @param force resubscribe even when options are unchanged (e.g. the collection changed)
    * @param expectedRevision options generation captured before queueing
    */
-  async function subNow(optionsValue: string | number | FindOptions<any, any, any> | undefined, force: boolean, expectedRevision: number) {
+  async function subNow(expectedRevision: number) {
     if (disposed || expectedRevision !== revision)
       return
-    const key = typeof optionsValue === 'string' || typeof optionsValue === 'number' ? optionsValue : undefined
-    const findOptions = typeof optionsValue === 'object' && optionsValue !== null ? optionsValue : undefined
-    // The options getter may produce a new object identity on unrelated
-    // reactive updates - skip when already subscribed with equivalent options.
-    if (!force && subscriptionId && key === previousKey && equalFindOptions(findOptions, previousFindOptions)) {
-      return
-    }
     await unsubNow()
-    // A disabled query has nothing to keep live (and may not even name a
-    // collection yet): stay unsubscribed until it is enabled.
-    if (disposed || expectedRevision !== revision || findOptions?.enabled === false) {
+    if (disposed || expectedRevision !== revision)
       return
-    }
+    // Re-read the cached descriptor after teardown: options/meta may have
+    // changed while waiting, without resolving an unchanged page again.
+    const opening = identity.value
+    if (disposed || expectedRevision !== revision || !opening || opening.findOptions.enabled === false)
+      return
+    watchedIdentity = opening
+    const { collection: currentCollection, findOptions: resolved } = opening
     const currentId = subscriptionId = crypto.randomUUID()
     const currentRevision = expectedRevision
-    const currentCollection = runtime.getCollection()
     /** Callbacks only act while this exact subscription still owns its page. */
     const isActive = () => !disposed && subscriptionId === currentId && revision === currentRevision
       && runtime.getCollection() === currentCollection && options.isActive?.() !== false
-    previousKey = key
-    previousFindOptions = findOptions
     previousCollection = currentCollection
+    subscriptionKey = resolved.key
+    subscriptionFindOptions = resolved
     try {
       await subscribe({
         store: runtime.store,
         meta: meta.value,
         collection: previousCollection,
         subscriptionId,
-        key: previousKey,
-        findOptions: previousFindOptions,
-        pageIndex: toValue(options.pageIndex),
-        refresh: options.refresh && (refreshOptions => isActive() ? options.refresh!(refreshOptions) : Promise.resolve()),
+        key: subscriptionKey,
+        findOptions: subscriptionFindOptions,
+        many: options.many,
+        pageIndex: options.pageIndex?.(resolved),
+        end: options.refresh && ((endOptions) => {
+          if (!isActive())
+            return
+          const endedRevision = ++revision
+          live.value = false
+          // A synchronous live-state observer may dispose or change ownership.
+          if (disposed || revision !== endedRevision)
+            return
+          // Invalidate immediately; teardown and recovery still use the same
+          // queue as option changes and every other followed page.
+          recovery.end(endedRevision, endOptions.retry)
+        }),
+        refresh: options.refresh && (async (refreshOptions) => {
+          if (!isActive())
+            return
+          const result = await options.refresh!(refreshOptions)
+          if (isActive())
+            recovery.reset()
+          return result
+        }),
         setResult: options.setResult && ((result, resultOptions) => {
           if (!isActive())
             return 'inactive'
-          return options.setResult!(result, resultOptions)
+          const outcome = options.setResult!(result, resultOptions)
+          // Publication can synchronously change options or end this lease.
+          if (outcome === 'applied' && isActive())
+            recovery.reset()
+          return outcome
         }),
       })
+      if (isActive())
+        live.value = true
     }
     catch (error) {
       // A provider can acquire its remote lease before registration rejects.
@@ -151,12 +191,14 @@ export function subscribeToApiQuery(
   /** Serialized unsubscribe, safe to call from anywhere. */
   const unsub = () => {
     revision++
+    recovery.reset()
+    live.value = false
     return enqueue(unsubNow, true)
   }
   /** Serialized (re)subscribe, safe to call from anywhere. */
-  const sub = (optionsValue: string | number | FindOptions<any, any, any> | undefined, force = false) => {
+  const sub = () => {
     const expectedRevision = revision
-    return enqueue(() => subNow(optionsValue, force, expectedRevision))
+    return enqueue(() => subNow(expectedRevision))
   }
 
   // Option and collection followers live in a detached scope so an explicit
@@ -175,23 +217,40 @@ export function subscribeToApiQuery(
     return unsub()
   }
 
+  /** Resolve current input synchronously so equivalent changes never fence callbacks. */
+  function readIdentity(): SubscriptionIdentity | undefined {
+    if (options.identity)
+      return options.identity()
+    const value = toValue(keyOrFindOptions)
+    const findOptions: FindFirstOptions<any, any, any> = typeof value === 'string' || typeof value === 'number' ? { key: value } : value ?? {}
+    if (findOptions.enabled === false)
+      return undefined
+    return resolveSubscriptionIdentity(runtime.store, runtime.getCollection(), findOptions, options.many ?? (findOptions.key == null), meta.value)
+  }
+
   followers.run(() => {
-    let watchedOptions: unknown
     let initialized = false
-    watch(() => toValue(keyOrFindOptions), (value) => {
-      if (initialized && equalFindOptions(value, watchedOptions))
+    // Live pages fence callbacks synchronously themselves. Batch transport
+    // watching so unmount can stop it before component options become invalid.
+    watch(identity, (next) => {
+      // Computed reads include reactive metadata consumed by resolution hooks.
+      if (disposed || (initialized && equalSubscriptionIdentity(next, watchedIdentity)))
         return
       initialized = true
-      watchedOptions = klona(value)
+      watchedIdentity = next
       // Invalidate old callbacks before serialized unsubscribe reaches the transport.
       revision++
-      void sub(klona(value))
-    }, { immediate: true, deep: true, flush: 'sync' })
+      recovery.reset()
+      live.value = false
+      void sub()
+    }, { immediate: true, deep: true, flush: options.identity ? 'pre' : 'sync' })
     if (runtime.onInvalidate) {
       // Force: the collection may have changed even though options are equal.
       const { off } = runtime.onInvalidate(() => {
         revision++
-        return sub(klona(toValue(keyOrFindOptions)), true)
+        recovery.reset()
+        live.value = false
+        return sub()
       })
       onScopeDispose(off)
     }
@@ -206,5 +265,5 @@ export function subscribeToApiQuery(
   tryOnScopeDispose(() => {
     void dispose()
   })
-  return { unsubscribe: dispose, meta }
+  return { unsubscribe: dispose, meta, live: readonly(live) }
 }

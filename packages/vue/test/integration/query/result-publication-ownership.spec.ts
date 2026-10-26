@@ -43,7 +43,6 @@ describe('nested result publications own rows, metadata and cache retention', ()
       await query
     const stop = watch(() => query.mainPage.data[0]?.title, (title) => {
       if (title === 'One') {
-        writeRows(store, [{ id: '4', title: 'Nested' }])
         main.setResult!([{ id: '4', title: 'Nested' }], { version: 6, meta: { totalCount: 2 } as CustomHookMeta })
       }
     }, { flush: 'sync' })
@@ -72,7 +71,6 @@ describe('nested result publications own rows, metadata and cache retention', ()
     remote.seed('todos', [{ id: '1', title: 'Refreshed' }])
     const stop = watch(query.foreground.completed, (completed) => {
       if (completed) {
-        writeRows(store, [{ id: '4', title: 'Nested' }])
         main.setResult!([{ id: '4', title: 'Nested' }], { version: 6 })
       }
     }, { flush: 'sync' })

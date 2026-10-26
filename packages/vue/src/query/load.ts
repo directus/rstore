@@ -7,7 +7,7 @@ import { capturePageConfirmation, getMatchingPageRefs, preparePageConfirmation, 
 import { isCurrentPageRequest, markPagesAsComputed, setPageResult } from './page'
 import { recordPrunedFetch } from './prune'
 import { beginPagePublication } from './publicationOwnership'
-import { collectUnreconciledTracking, getTrackingResult, isStalePageResult, reconcilePageTracking, releaseDiscardedPageOwnership, updateQueryMeta } from './result'
+import { collectUnreconciledTracking, createPageFetchPublication, getTrackingResult, reconcilePageTracking, releaseDiscardedPageOwnership, updateQueryMeta } from './result'
 import { startPageFetch } from './state'
 import { readFetchVersion } from './version'
 
@@ -130,29 +130,35 @@ async function fetchPage(
   // Pruning needs the written identities even without ownership. That payload
   // stays out of the ownership paths below, which only see `newQueryTracking`.
   const hookTracking = tracksPage ? newQueryTracking : pruneRun && !uncachedPage ? createTrackingObject() : undefined
+  const publication = createPageFetchPublication(ctx, page, savedPageRequestId)
   const fetchMeta: CustomHookMeta = {
     ...ctx.meta.value,
-    $canPublishQuery: responseMeta => isCurrentPageRequest(ctx, page, savedPageRequestId) && !isStalePageResult(page, readFetchVersion(responseMeta ?? fetchMeta), savedPageRequestId),
+    $canPublishQuery: responseMeta => publication.canPublish(responseMeta ?? fetchMeta),
     $queryTracking: hookTracking,
   }
-  const confirmationOptions = capturePageConfirmation(ctx, page)
-  const pageResult = await ctx.fetchMethod(finalOptions, fetchMeta)
-  const { isCurrent } = await setPageResult(ctx, page, savedPageRequestId, pageResult, finalOptions.fetchPolicy, readFetchVersion(fetchMeta), readFetchConfirmation(fetchMeta) ?? finalOptions.fetchPolicy !== 'cache-only', confirmationOptions)
-  if (!isCurrent()) {
-    collectUnreconciledTracking(ctx, newQueryTracking)
-    return false
+  try {
+    const confirmationOptions = capturePageConfirmation(ctx, page)
+    const pageResult = await ctx.fetchMethod(finalOptions, fetchMeta)
+    const { isCurrent } = await setPageResult(ctx, page, savedPageRequestId, pageResult, finalOptions.fetchPolicy, readFetchVersion(fetchMeta), readFetchConfirmation(fetchMeta) ?? finalOptions.fetchPolicy !== 'cache-only', confirmationOptions)
+    if (!isCurrent()) {
+      collectUnreconciledTracking(ctx, newQueryTracking)
+      return false
+    }
+    updateQueryMeta(ctx, page, fetchMeta, isCurrent)
+    if (!isCurrent()) {
+      collectUnreconciledTracking(ctx, newQueryTracking)
+      return false
+    }
+    // A no-cache result says nothing about the cache: left unrecorded, it cancels the prune.
+    if (pruneRun && !uncachedPage) {
+      recordPrunedFetch(pruneRun, hookTracking, pageResult, finalOptions.include, tracksPage, isCurrent)
+    }
+    reconcilePageTracking(ctx, page, tracksPage ? getTrackingResult(page, pageResult) : undefined, finalOptions, tracksPage ? newQueryTracking : undefined, isCurrent)
+    return isCurrent()
   }
-  updateQueryMeta(ctx, page, fetchMeta, isCurrent)
-  if (!isCurrent()) {
-    collectUnreconciledTracking(ctx, newQueryTracking)
-    return false
+  finally {
+    publication.release()
   }
-  // A no-cache result says nothing about the cache: left unrecorded, it cancels the prune.
-  if (pruneRun && !uncachedPage) {
-    recordPrunedFetch(pruneRun, hookTracking, pageResult, finalOptions.include, tracksPage, isCurrent)
-  }
-  reconcilePageTracking(ctx, page, tracksPage ? getTrackingResult(page, pageResult) : undefined, finalOptions, tracksPage ? newQueryTracking : undefined, isCurrent)
-  return isCurrent()
 }
 
 /**
@@ -165,9 +171,10 @@ function fetchCacheAndFetchBackground(
   finalOptions: FindOptions<any, any, any>,
 ) {
   const newQueryTracking = ctx.queryTrackingEnabled ? ctx.queryTracking?.createTrackingObject() : undefined
+  const publication = createPageFetchPublication(ctx, page, savedPageRequestId)
   const fetchMeta: CustomHookMeta = {
     ...ctx.meta.value,
-    $canPublishQuery: responseMeta => isCurrentPageRequest(ctx, page, savedPageRequestId) && !isStalePageResult(page, readFetchVersion(responseMeta ?? fetchMeta), savedPageRequestId),
+    $canPublishQuery: responseMeta => publication.canPublish(responseMeta ?? fetchMeta),
     $queryTracking: newQueryTracking,
   }
 
@@ -189,19 +196,24 @@ function fetchCacheAndFetchBackground(
   // from the result handling (`setPageResult`, `updateQueryMeta`) are both handled below.
   // `then(onFulfilled, onRejected)` keeps the chain from ever rejecting.
   void (async () => {
-    const confirmationOptions = capturePageConfirmation(ctx, page)
-    const backgroundResult = await ctx.fetchMethod({ ...finalOptions, fetchPolicy: 'fetch-only' }, fetchMeta)
-    const { isCurrent } = await setPageResult(ctx, page, savedPageRequestId, backgroundResult, 'fetch-only', readFetchVersion(fetchMeta), true, confirmationOptions)
-    if (!isCurrent()) {
-      collectUnreconciledTracking(ctx, newQueryTracking)
-      return false
+    try {
+      const confirmationOptions = capturePageConfirmation(ctx, page)
+      const backgroundResult = await ctx.fetchMethod({ ...finalOptions, fetchPolicy: 'fetch-only' }, fetchMeta)
+      const { isCurrent } = await setPageResult(ctx, page, savedPageRequestId, backgroundResult, 'fetch-only', readFetchVersion(fetchMeta), true, confirmationOptions)
+      if (!isCurrent()) {
+        collectUnreconciledTracking(ctx, newQueryTracking)
+        return false
+      }
+      updateQueryMeta(ctx, page, fetchMeta, isCurrent)
+      if (!isCurrent()) {
+        collectUnreconciledTracking(ctx, newQueryTracking)
+        return false
+      }
+      reconcilePageTracking(ctx, page, newQueryTracking ? getTrackingResult(page, backgroundResult) : undefined, finalOptions, newQueryTracking, isCurrent)
+      return isCurrent()
     }
-    updateQueryMeta(ctx, page, fetchMeta, isCurrent)
-    if (!isCurrent()) {
-      collectUnreconciledTracking(ctx, newQueryTracking)
-      return false
+    finally {
+      publication.release()
     }
-    reconcilePageTracking(ctx, page, newQueryTracking ? getTrackingResult(page, backgroundResult) : undefined, finalOptions, newQueryTracking, isCurrent)
-    return isCurrent()
   })().then(published => finish(null, published), (e: any) => finish(e))
 }

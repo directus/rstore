@@ -1,12 +1,11 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FindManyOptions, FindOptions, GlobalStoreType, QueryResult, ResolvedCollection, ResolvedCollectionItemBase, StoreCore, StoreSchema, WrappedItem, WriteItem } from '@rstore/shared'
-import { defaultMarker, getMarker } from '../cache'
+import type { Collection, CollectionDefaults, CustomHookMeta, FindManyOptions, FindOptions, GlobalStoreType, QueryResult, ResolvedCollection, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import { defaultMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
-import { unwrapItem } from '../item'
-import { isKeyDefined } from '../key'
 import { stringifyFindOptions } from '../utils/findOptions'
 import { createOperationErrorReporter } from '../utils/operationError'
 import { dedupeQuery } from './dedupe'
 import { peekMany } from './peekMany'
+import { processQueryResult, wrapQueryResult } from './processResult'
 
 export interface FindManyParams<
   TCollection extends Collection,
@@ -143,38 +142,7 @@ async function _findMany<
             },
           })
 
-          if (result) {
-            const newResult = [] as typeof result
-
-            for (const item of result) {
-              const unwrappedItem = unwrapItem(item)
-              store.$processItemParsing(collection, unwrappedItem)
-              newResult.push(unwrappedItem)
-            }
-
-            result = newResult
-
-            if (fetchPolicy !== 'no-cache' && meta.$canPublishQuery?.() !== false) {
-              const items = result
-              const writes: Array<WriteItem<TCollection, TCollectionDefaults, TSchema>> = []
-              for (const item of items) {
-                const key = collection.getKey(item)
-                if (!isKeyDefined(key)) {
-                  console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
-                  continue
-                }
-                writes.push({ key, value: item })
-              }
-              if (writes.length) {
-                store.$cache.writeItems<TCollection>({
-                  collection,
-                  items: writes,
-                  marker: getMarker('many', marker),
-                  meta,
-                })
-              }
-            }
-          }
+          result = processQueryResult({ store, collection, result, many: true, findOptions, meta, marker })
         }
         catch (error) {
           reportError(error)
@@ -211,13 +179,7 @@ async function _findMany<
       }, abort)
     }
 
-    if (result?.length) {
-      result = result.map((item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => store.$cache.wrapItem({
-        collection,
-        item,
-        noCache: fetchPolicy === 'no-cache' || meta.$canPublishQuery?.() === false,
-      }))
-    }
+    result = wrapQueryResult({ store, collection, result, many: true, noCache: fetchPolicy === 'no-cache' || meta.$canPublishQuery?.() === false })
 
     return {
       result: result ?? [],

@@ -138,11 +138,12 @@ function processQueuedWriteItems(ctx: CacheRuntime, operation: Extract<QueuedOpe
       if (!canProcessQueuedWrite(ctx)) {
         return false
       }
-      const { key, value: item } = operation.params.items[operation.index]!
+      const { key, value: item, fieldTimestamps } = operation.params.items[operation.index]!
       writeItemNow(ctx, {
         collection: operation.params.collection,
         key,
         item,
+        fieldTimestamps,
         meta: operation.params.meta,
         fromWriteItems: true,
         batch: operation.batch,

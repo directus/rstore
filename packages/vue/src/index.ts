@@ -120,6 +120,8 @@ export type {
   CustomParams,
   CustomPluginMeta,
   CustomSortOption,
+  EndSubscription,
+  EndSubscriptionOptions,
   FindFirstOptions,
   FindManyOptions,
   FindOptions,

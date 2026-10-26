@@ -1,24 +1,35 @@
-import type { CustomHookMeta, FieldTimestampValue, SetResultOutcome } from '@rstore/shared'
+import type { CustomHookMeta, SetResultOptions, SetResultOutcome } from '@rstore/shared'
 import type { VueQueryPage } from './types'
+import { processQueryResult, wrapQueryResult } from '@rstore/core'
 import { klona } from 'klona'
 import { createTrackingObject } from '../trackingRelations'
 import { equalFindOptions, toSerializableOptions } from './options'
 import { applyPageResult, getPageOptions, isCurrentPageRequest } from './page'
 import { getMainPagePublicationRelease, waitForMainPagePublication } from './publication'
-import { isStalePageResult, markVersionedPush, reconcilePageTracking, reservePageResult, updateQueryMeta } from './result'
+import { beginPagePublication } from './publicationOwnership'
+import { collectUnreconciledTracking, isStalePageResult, markVersionedPush, reconcilePageTracking, reservePageResult, updateQueryMeta, watchDeferredPageTracking } from './result'
 import { capturePageFetches, completePageFromPush } from './state'
 import { assertPushVersion } from './version'
 
 /** Unversioned pushes supersede every older queued push, independently of fetches. */
 const unversionedPushes = new WeakMap<object, number>()
 
-/** Publish parsed server rows, superseding transport work without writing items. */
-export function publishPageResult(ctx: any, page: VueQueryPage<any, any, any, any, any>, result: any, meta?: CustomHookMeta, version?: FieldTimestampValue): SetResultOutcome {
+/** Write accepted server rows and publish their page, superseding older transport work. */
+export function publishPageResult(ctx: any, page: VueQueryPage<any, any, any, any, any>, result: any, resultOptions: SetResultOptions = {}): SetResultOutcome {
+  const { meta, version } = resultOptions
   assertPushVersion(version)
   if (ctx.disposed || ctx.isDisabled() || !ctx.pages.value.includes(page))
     return 'inactive'
   if (isStalePageResult(page, version))
     return 'stale'
+  // Detach at acceptance: parsing and a main-page wait must never mutate or
+  // retain connector-owned rows or their index-aligned timestamp array.
+  result = klona(result)
+  const fieldTimestamps = klona(resultOptions.fieldTimestamps)
+  const rowCount = ctx.many ? result?.length ?? 0 : result == null ? 0 : 1
+  // eslint-disable-next-line node/prefer-global/process -- Bundlers replace NODE_ENV; a node:process import would require a browser polyfill.
+  if (process.env.NODE_ENV !== 'production' && Array.isArray(fieldTimestamps) && fieldTimestamps.length !== rowCount)
+    console.warn(`[rstore] fieldTimestamps length must match result rows (received ${fieldTimestamps.length} timestamps for ${rowCount} rows).`)
   // Versioned replies may describe a newer snapshot even when their fetch
   // started before this push. Keep their request ownership until they answer;
   // an unversioned reply to that request is dropped as stale.
@@ -40,33 +51,42 @@ export function publishPageResult(ctx: any, page: VueQueryPage<any, any, any, an
       && unversionedPushes.get(page) === pushRevision
       && (version == null ? isCurrentPageRequest(ctx, page, requestId) : equalFindOptions(pageOptions, getPageOptions(ctx, page)))
   }
-  // Reserve before the main-page wait: a lower-version fetch must not overwrite
-  // the connector's already-cached pushed fields while publication is queued.
+  // Reserve before the main-page wait so older fetches cannot write a result
+  // that the accepted queued snapshot already superseded.
   const release = version == null ? undefined : reservePageResult(page, version, isCurrent)
   const tracksPage = ctx.queryTrackingEnabled && fetchPolicy !== 'no-cache'
-  // A queued push owns its rows from acceptance: another owner's release must
-  // not collect them before the main page lets this push publish.
-  const unpin = page.main ? undefined : pinPushedRows(ctx, page, tracksPage ? readTrackingResult(ctx, result) : undefined, options)
   /** Recheck ownership after a main-page wait before publishing any state. */
   function publish(): void {
     let fetches: Array<() => void> = []
+    const tracking = tracksPage ? createTrackingObject() : undefined
+    let published = false
     try {
       if (!isCurrent() || isStalePageResult(page, version))
         return
       const publishingRequestId = page.requestId
       fetches = capturePageFetches(page)
       const releaseMain = page.main ? getMainPagePublicationRelease(ctx) : undefined
-      /** Reactive writes can synchronously replace the request or dispose its scope. */
-      const ownsPublication = applyPageResult(ctx, page, result, fetchPolicy, version, true, confirmationOptions, () => isCurrent() && page.requestId === publishingRequestId)
+      // Establish ownership before parsing or cache writes: either can trigger
+      // synchronous observers that publish again or dispose this consumer.
+      const ownsPublication = beginPagePublication(page, () => isCurrent() && page.requestId === publishingRequestId)
+      const writeMeta: CustomHookMeta = { ...ctx.meta.value, ...meta, $queryTracking: tracking, $canPublishQuery: ownsPublication }
+      const parsed = processQueryResult({ store: ctx.store, collection: ctx.getCollection(), result, many: ctx.many, findOptions: options, meta: writeMeta, fieldTimestamps })
+      if (!ownsPublication())
+        return
+      const pageResult = wrapQueryResult({ store: ctx.store, collection: ctx.getCollection(), result: parsed, many: ctx.many, noCache: fetchPolicy === 'no-cache' })
+      applyPageResult(ctx, page, pageResult, fetchPolicy, version, true, confirmationOptions, ownsPublication, ownsPublication)
       if (!ownsPublication())
         return
       updateQueryMeta(ctx, page, { ...ctx.meta.value, ...meta }, ownsPublication)
       if (!ownsPublication())
         return
-      const trackingResult = tracksPage ? readTrackingResult(ctx, result) : undefined
-      reconcilePageTracking(ctx, page, trackingResult, { ...options, fetchPolicy }, tracksPage ? createTrackingObject() : undefined, ownsPublication)
+      const trackingResult = tracksPage ? pageResult : undefined
+      reconcilePageTracking(ctx, page, trackingResult, { ...options, fetchPolicy }, tracking, ownsPublication)
       if (!ownsPublication())
         return
+      if (tracking)
+        watchDeferredPageTracking(ctx, page, options, tracking, writeMeta, ownsPublication)
+      published = true
       completePageFromPush(ctx, page, fetches, ownsPublication)
       if (ownsPublication())
         releaseMain?.()
@@ -76,9 +96,9 @@ export function publishPageResult(ctx: any, page: VueQueryPage<any, any, any, an
       // pre-push slots even when its remaining side effects lost ownership.
       for (const detach of fetches)
         detach()
+      if (!published)
+        collectUnreconciledTracking(ctx, tracking)
       release?.()
-      // Published rows are owned by the page now; dropped ones are released.
-      unpin?.()
     }
   }
   // The callback returns acceptance synchronously; non-main pages publish only
@@ -87,27 +107,4 @@ export function publishPageResult(ctx: any, page: VueQueryPage<any, any, any, an
     void waitForMainPagePublication(ctx).then(publish).catch(error => console.error(error))
   else publish()
   return 'applied'
-}
-
-/**
- * Resolve plain wire rows to their already-written cache wrappers, so tracking
- * also follows the relations selected by the page's include.
- */
-function readTrackingResult(ctx: any, result: any): any {
-  /** Resolve one wire row to its cache wrapper. */
-  const cached = (item: any) => item && ctx.store.$cache.readItem({ collection: ctx.getCollection(), key: ctx.getCollection().getKey(item) })
-  return Array.isArray(result) ? result.map(cached).filter(Boolean) : cached(result)
-}
-
-/**
- * Retain a queued push's rows under a dedicated tracking id until it settles.
- * The page's own ownership is untouched, so the rows it still shows stay owned
- * too. Releasing after publication keeps rows the page now tracks.
- */
-function pinPushedRows(ctx: any, page: VueQueryPage<any, any, any, any, any>, trackingResult: any, options: any): (() => void) | undefined {
-  if (!ctx.queryTracking || trackingResult === undefined)
-    return undefined
-  const pinId = `${page.id}:push:${crypto.randomUUID()}`
-  ctx.queryTracking.handleQueryTracking(pinId, createTrackingObject(), trackingResult, options.include, false)
-  return () => ctx.queryTracking.releasePage(pinId, { collect: true })
 }

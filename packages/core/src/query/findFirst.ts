@@ -1,13 +1,12 @@
 import type { Collection, CollectionDefaults, CustomHookMeta, FindFirstOptions, FindOptions, GlobalStoreType, QueryResult, ResolvedCollection, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
-import { defaultMarker, getMarker } from '../cache'
+import { defaultMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
-import { unwrapItem } from '../item'
-import { isKeyDefined } from '../key'
 import { stringifyFindOptions } from '../utils/findOptions'
 import { createOperationErrorReporter } from '../utils/operationError'
 import { dedupeQuery } from './dedupe'
 import { peekFirst } from './peekFirst'
+import { processQueryResult, wrapQueryResult } from './processResult'
 
 export interface FindFirstParams<
   TCollection extends Collection,
@@ -165,27 +164,7 @@ async function _findFirst<
             },
           })
 
-          if (result) {
-            result = unwrapItem(result)
-
-            store.$processItemParsing(collection, result)
-
-            if (fetchPolicy !== 'no-cache' && meta.$canPublishQuery?.() !== false) {
-              const key = collection.getKey(result)
-              if (!isKeyDefined(key)) {
-                console.warn(`Key is undefined for ${collection.name}. Item was not written to cache.`)
-              }
-              else {
-                store.$cache.writeItem({
-                  collection,
-                  key,
-                  item: result,
-                  marker: getMarker('first', marker),
-                  meta,
-                })
-              }
-            }
-          }
+          result = processQueryResult({ store, collection, result, many: false, findOptions, meta, marker })
         }
         catch (error) {
           reportError(error)
@@ -223,9 +202,7 @@ async function _findFirst<
       }, abort)
     }
 
-    if (result) {
-      result = store.$cache.wrapItem({ collection, item: result, noCache: fetchPolicy === 'no-cache' || meta.$canPublishQuery?.() === false })
-    }
+    result = wrapQueryResult({ store, collection, result, many: false, noCache: fetchPolicy === 'no-cache' || meta.$canPublishQuery?.() === false })
 
     return {
       // A miss is `null`, never `undefined`: the batched branch and a `no-cache`
