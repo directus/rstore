@@ -25,7 +25,8 @@ describe('automatic read-only SSR devtools lifecycle', async () => {
     expect(alpha).toContain('store-ready')
     expect(beta).toContain('store-ready')
     const diagnostics = await $fetch<Diagnostics>('/api/ssr-diagnostics')
-    expect(diagnostics).toMatchObject({ privateConfigured: true, workerStarted: true, credentialRetained: false })
+    // Late devtools config publish must not wipe keys only Nitro modules wrote.
+    expect(diagnostics).toMatchObject({ privateConfigured: true, nitroModuleConfigPreserved: true, workerStarted: true, credentialRetained: false })
     const records = diagnostics.snapshots.filter(record => ['/ssr/alpha', '/ssr/beta'].includes(record.request.path))
     expect(records).toHaveLength(2)
     expect(new Set(records.map(record => record.session.sessionId)).size).toBe(2)

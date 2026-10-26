@@ -20,13 +20,21 @@ export async function setupDevToolsUI(nuxt: Nuxt, resolver: Resolver, options: R
     config.runtimeConfig ||= {}
     config.runtimeConfig.rstoreDevtoolsSSR = privateConfig
   })
+  // Nitro modules may extend its resolved runtime config; read it live on publish
+  // since every updateConfig swaps in a new object.
+  let nitroOptions: { runtimeConfig: Record<string, unknown> } | undefined
+  nuxt.hook('nitro:init', (nitro) => {
+    nitroOptions = nitro.options
+  })
   /** Publish late listening address to Nitro's actual resolved config/worker. */
   async function publishPrivateConfig() {
     nuxt.options.runtimeConfig.rstoreDevtoolsSSR = { ...privateConfig }
-    // Nitro's updateConfig replaces its normalized config; preserve app/public keys.
+    // Nitro's updateConfig replaces its normalized config; preserve app/public keys
+    // and keys only Nitro modules wrote there (e.g. nitro-cloudflare-dev's `wrangler`).
     const runtimeConfig = {
       ...nuxt.options.nitro.runtimeConfig,
       ...nuxt.options.runtimeConfig,
+      ...nitroOptions?.runtimeConfig,
       rstoreDevtoolsSSR: { ...privateConfig },
     }
     await runWithNuxtContext(nuxt, () => updateRuntimeConfig(runtimeConfig))

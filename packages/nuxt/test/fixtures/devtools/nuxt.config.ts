@@ -6,4 +6,12 @@ export default defineNuxtConfig({
   devtools: { enabled: false },
   rstore: { devtools: { base: '/inspect', readOnly: true } },
   alias: runtimeSourceAliases,
+  nitro: {
+    modules: [
+      // Like nitro-cloudflare-dev's `wrangler`: written only to Nitro's resolved config.
+      (nitro) => {
+        nitro.options.runtimeConfig.fixtureNitroModule = { configured: true }
+      },
+    ],
+  },
 })
