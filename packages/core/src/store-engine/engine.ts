@@ -1,4 +1,5 @@
 import type { FieldTimestampValue } from '@rstore/shared'
+import type { QueuedOperation } from './internal-types.js'
 import type { EngineOptions, StoreEngine } from './types.js'
 import { createTombstoneStore, gcTombstones as gcTombstonesStore, scheduleTombstoneGc } from '../tombstone.js'
 import { createChangeRecorder, createFlushChangeRecorder, discardStateChangeSink } from './change-recorder.js'
@@ -259,6 +260,21 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
 
     removeLayer(layerId) {
       enqueueOperation(ctx, { type: 'removeLayer', layerId })
+    },
+
+    hasPendingWrites(meta) {
+      // Entries before the head already committed; a staggered batch stays
+      // pending until its last item lands. Writes the running flush consumed
+      // count until their notifications finish, like the former Vue queue.
+      const matches = (operation: QueuedOperation) => (operation.type === 'writeItem' || operation.type === 'writeItems')
+        && operation.params.meta === meta
+      if (ctx.settlingWrites.some(matches))
+        return true
+      for (let index = ctx.queueHead; index < ctx.queue.length; index++) {
+        if (matches(ctx.queue[index]!))
+          return true
+      }
+      return false
     },
 
     tombstones,

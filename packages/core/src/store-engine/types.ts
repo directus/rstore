@@ -129,8 +129,8 @@ export interface WriteItemParams {
 export interface WriteItemsParams {
   /** Target collection. */
   collection: ResolvedCollection<any, any, any>
-  /** Keyed items in commit order. */
-  items: Array<{ key: string | number, value: ResolvedCollectionItemBase<any, any, any> }>
+  /** Keyed items in commit order, each with optional LWW stamps. */
+  items: Array<{ key: string | number, value: ResolvedCollectionItemBase<any, any, any>, fieldTimestamps?: FieldTimestamps }>
   /** Optional marker set after the final item. */
   marker?: string
   /** Hook metadata shared by the batch. */
@@ -248,6 +248,8 @@ export interface StoreEngine<
   tombstones: TombstoneStore
   /** Remove tombstones older than a cutoff. */
   gcTombstones: (olderThan: FieldTimestampValue) => Array<{ collection: string, key: string | number }>
+  /** Whether a queued, not yet committed write carries this exact hook meta. */
+  hasPendingWrites: (meta: CustomHookMeta) => boolean
   /** Increment queue pause depth. */
   pause: () => void
   /** Decrement pause depth and drain at zero. */
