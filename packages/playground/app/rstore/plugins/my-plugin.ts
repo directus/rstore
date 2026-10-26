@@ -38,7 +38,8 @@ export default defineRstorePlugin({
           payload.setResult(result)
         }
         else {
-          const result: any = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
+          // The list endpoint answers with a `{ result, meta }` envelope.
+          const { result }: any = await $fetch(`/api/rest/${payload.collection.meta.path}`, {
             method: 'GET',
             query: {
               ...payload.findOptions?.params,

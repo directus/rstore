@@ -1,6 +1,4 @@
 <script lang="ts" setup>
-import { RstoreDevtools } from '@rstore/devtools'
-
 useHead({
   title: 'rstore playground',
 })
@@ -21,8 +19,11 @@ const devtoolsOpen = useLocalStorage('rstore-devtools-open', false)
             '!h-0': !devtoolsOpen,
           }"
         >
-          <RstoreDevtools
-            class="w-full h-full"
+          <!-- Inspector served by the rstore Nuxt module at its default base -->
+          <iframe
+            v-if="devtoolsOpen"
+            src="/__rstore/"
+            class="w-full h-full border-0"
           />
         </div>
       </ClientOnly>
