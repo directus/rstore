@@ -132,6 +132,8 @@ export interface VueCachePrivate {
     rebuildIndexes: () => void
     /** Read a committed row, ignoring optimistic layers. */
     readCommittedItem: (collection: ResolvedCollection<any, any, any>, key: string | number) => any | undefined
+    /** Whether writes carrying this hook meta are still queued (paused or staggered cache). */
+    hasPendingWrites: (meta: CustomHookMeta) => boolean
     /** Queue a prune, so it runs after the writes already queued by the same refresh. */
     prune: (params: CachePruneParams) => void
     /** Record that a live query saved results under `queryId`, for retention. */

@@ -62,6 +62,10 @@ export function flushQueuedOperations(
       const operation = ctx.queue[ctx.queueHead]!
       const headBefore = ctx.queueHead
       const batchIndexBefore = operation.type === 'writeItems' ? operation.index : undefined
+      // Consumers observing a write's notification still see it as pending,
+      // so record it before the cursor advances past it.
+      if (operation.type === 'writeItem' || operation.type === 'writeItems')
+        ctx.settlingWrites.push(operation)
       try {
         if (!processOperation(ctx, operation, flushChanges))
           break
@@ -94,6 +98,7 @@ export function flushQueuedOperations(
       sweepEmptyIndexBuckets(ctx)
     if (flushChanges.changes)
       errors = dispatchFinalObservers(ctx, flushChanges, errors)
+    ctx.settlingWrites.length = 0
   }
   throwCollectedErrors(errors, 'Store engine callbacks failed')
 }
@@ -262,13 +267,14 @@ function processBatch(
       publishBatchSlice(operation)
       return false
     }
-    const { key, value } = operation.params.items[operation.index]!
+    const { key, value, fieldTimestamps } = operation.params.items[operation.index]!
     const partial = { committed: false, effects: [] }
     try {
       const result = writeItemNow(ctx, changes, {
         collection: operation.params.collection,
         key,
         item: value,
+        fieldTimestamps,
         meta: operation.params.meta,
         fromWriteItems: true,
       }, partial)

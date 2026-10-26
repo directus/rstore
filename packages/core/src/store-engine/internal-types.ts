@@ -243,6 +243,8 @@ export interface EngineContext {
   queue: QueuedOperation[]
   /** Cursor into pending operations. */
   queueHead: number
+  /** Queued writes the current flush consumed but has not finished notifying. */
+  settlingWrites: QueuedOperation[]
   /** Reentrancy guard. */
   isFlushingQueue: boolean
   /** Completion flag claimed by the next enqueued operation, set by `withReceipt`. */

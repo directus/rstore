@@ -130,6 +130,7 @@ export function createCacheApi<
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
       rebuildIndexes: () => ctx.engine.rebuildIndexes(),
       readCommittedItem: (collection, key) => ctx.engine.readBaseItemRaw({ collection, key }),
+      hasPendingWrites: meta => ctx.engine.hasPendingWrites(meta),
       prune: params => ctx.engine.prune({
         ...params,
         onPruned: (collection, key) => invalidatePageRefsForItem(ctx, collection.name, key),

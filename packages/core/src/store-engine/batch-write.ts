@@ -27,6 +27,8 @@ export function prepareBatchWrite(ctx: EngineContext, params: WriteItemsParams):
     || ctx.staggering.enabled
     || state.layers.length > 0
     || ctx.fieldTimestamps.has(params.collection.name)
+    // Stamped rows need the LWW merge of the general write path.
+    || params.items.some(item => item.fieldTimestamps)
     || ctx.tombstones.size() > 0
     || params.meta?.$queryTracking
     || hasActiveStateSink(ctx)

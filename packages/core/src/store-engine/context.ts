@@ -50,6 +50,7 @@ export function createEngineContext(options: {
     pauseDepth: 0,
     queue: [],
     queueHead: 0,
+    settlingWrites: [],
     isFlushingQueue: false,
     disposed: false,
     callbacks: options.callbacks,
