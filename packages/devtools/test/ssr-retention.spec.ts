@@ -96,7 +96,8 @@ describe('sSR detached retention', () => {
     finalizeSSRSnapshot(record, 'error', new Error('x'.repeat(100_000)))
     expect(new TextEncoder().encode(JSON.stringify(record)).length).toBeLessThanOrEqual(512 * 1024)
     expect(record.session.request).toEqual(record.request)
-  })
+    // ~3s locally (5.6 MB of rows); coverage instrumentation on CI exceeds the 5s default.
+  }, 30_000)
 
   it('exposes detached terminal request metadata when store creation never completed', () => {
     const runtime = createRstoreDevtools({ kind: 'ssr' })
