@@ -42,6 +42,8 @@ jobs:
           cache: pnpm
       - run: pnpm install
       - run: pnpm build
+      # The devtools Nuxt boot suite drives a real browser.
+      - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test --project nuxt-boot
       - run: pnpm test --project integration --sequence.shuffle --sequence.seed=3
       - run: pnpm test:coverage
@@ -86,6 +88,8 @@ jobs:
           node-version: 26
           cache: pnpm
       - run: pnpm install
+      # Fixtures load package entries and the built devtools client.
+      - run: pnpm build
       - run: pnpm exec playwright install --with-deps chromium
       - run: pnpm test:browser
 
