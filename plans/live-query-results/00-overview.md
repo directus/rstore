@@ -1,115 +1,90 @@
-# Live query results: overview and implementation contract
+# Live query results: overview
 
-- Status: S01–S05 implemented and verified in the working tree, followed by two review-fix passes and a cleanup pass; landed on `main` in `4dd1de55` (feature) and `6fc9b58e` (docs), after `80b1eb1b`, `2247bf17`, `590883d1` and `2738c9e7`. S06 delivered as a design (ADR Proposed, contract not agreed). S07 planned.
-- Written: 2026-10-23.
-- Planning checkout: `main` at `6dd52b3c`. All S01–S05 work, review fixes and cleanup landed on top of it in commits `80b1eb1b`..`6fc9b58e`.
-- Packages: `@rstore/shared`, `@rstore/core`, `@rstore/vue`. S07 changes the Monospace Studio consumer (`directus-next`), not this repository.
-- Delivery: 7 slices. Staging, commit and push are not authorized.
+- Status: closed. S01–S05 shipped on rstore `main`; S06 rejected; S07 implemented in Monospace (`directus-next` working tree, uncommitted).
+- Packages: `@rstore/shared`, `@rstore/core`, `@rstore/vue`. S07 lives in `directus-next` (engine and Studio).
 
 ## Outcome
 
-Live queries stay correct on every page they show, without a client refetch after each realtime push:
+Live queries stay correct on the pages they show without a client refetch after each realtime push:
 
-- a connector that receives a server-computed result for a live query can hand it to the query;
-- live queries can follow loaded pages beyond the main one;
-- an older result never replaces a newer one;
-- consumers can tell server-confirmed results from cache guesses.
+- a realtime connector publishes a server-computed result into the followed page with `payload.setResult`;
+- a live query can follow pages other than its main page;
+- a push supersedes its page's in-flight fetch; connectors can additionally order results with versions;
+- queries and pages expose whether the shown result was confirmed by the server.
 
-## Motivation
+Monospace's engine pushes full live-query results over WebSocket. Studio writes pushed rows into the cache, publishes them with one `setResult`, and keeps only the displayed offset page live. Studio uses S02/S03 and S01's disabled-subscription guard, never `payload.refresh`, result versions or confirmation-gated UI. Pushes need no REST refetch, but Studio mutations still trigger their existing REST refresh.
 
-Monospace's realtime engine re-runs a subscriber's REST list read when the mutated fields intersect its read dependencies, and pushes the full new result. Its Studio connector (`packages/studio/app/rstore/plugins/3.realtime.ts` in `directus-next`) must currently:
+## Slices
 
-- write pushed rows into the cache, then call `refresh` when the rows of the result changed. Membership is lost otherwise for `resultMode: 'responseRefs'` queries, and any change is lost for `no-cache` queries. So every relevant change costs a push plus a REST round trip, and the REST response can land after, and overwrite, a newer push;
-- carry its own `liveRefresh` callback in find options, because the pinned build doesn't pass `refresh` to the subscribe hook (S01);
-- open a second, plain subscription for the page shown past the first (`useLivePage`), because `liveQuery` only follows its options' window, the main page.
+| Slice | Status |
+| --- | --- |
+| [S01: refresh handoff](./01-refresh-handoff.md) | Shipped in `4dd1de55` |
+| [S02: pushed page results](./02-pushed-page-results.md) | Shipped in `4dd1de55`, `740913b6` |
+| [S03: live pages](./03-live-pages.md) | Shipped in `4dd1de55` |
+| [S04: result ordering](./04-result-ordering.md) | Shipped in `4dd1de55`, `b2fa1076`; unused by Monospace |
+| [S05: result confirmation](./05-result-confirmation.md) | Shipped in `4dd1de55`; unused by Monospace |
+| [S06: pinned cursor pages](./06-pinned-cursor-pages.md) | Rejected 2026-10-25 ([ADR](./adr-pinned-cursor-pages.md)) |
+| [S07: Monospace live queries](./07-monospace-migration.md) | Implemented, uncommitted in `directus-next` |
+| [S08: resolved subscribe payload](./08-subscribe-payload.md) | Implemented; review fixes verified |
+| [S09: pushed item writes](./09-pushed-item-writes.md) | Implemented; review fixes verified 2026-10-26 (types, lint, full suite) |
+| [S10: subscription identity](./10-subscription-identity.md) | Implemented; review fixes verified |
+| [S11: ended live queries](./11-ended-live-queries.md) | Planned |
+| [S12: Monospace adoption of S08–S11](./12-monospace-adoption.md) | Planned |
 
-Research into other libraries (Hasura, PostGraphile, Convex, InstantDB, Zero, TanStack DB/Query, Firestore, Meteor, RxDB) found:
+Docs shipped in `6fc9b58e`: `docs/guide/data/{live,query,cache}.md`, `docs/guide/plugin/hooks.md`, and the `rstore-vue` skill references. Supporting commits landed first: `80b1eb1b` (shared todos test stack), `2247bf17` (query state key matching), `590883d1` (`cache/reset.ts`), `2738c9e7` (deduped result versions, simplified by `b2fa1076`).
 
-1. Systems that push the full result apply it directly; none of them refetch after the push.
-2. Nobody keeps independent offset pages live. They rerun everything, pin each page to a key range (Convex, Instant), or use one growing window.
-3. Results carry a version or snapshot so stale ones are dropped.
-4. Partial or unconfirmed results are labeled (Zero `unknown`/`complete`).
+Dependency order: S01, then S02, then S03; S04 and S05 depend on S02; S06 would have depended on S03. S07 consumes S02/S03 plus S01's disabled guard.
 
-The full write-up lives in the Monospace session notes (`live-list-queries-research.md`).
+S08–S11 close API gaps found while building the Monospace connector: subscribe hooks get unresolved options and no key for keyed live queries (S08), connectors must write pushed rows themselves, even for rejected or uncached pushes (S09), fetch-only option changes reopen subscriptions (S10), and a server-ended live query can't be reported (S11). S08, S09 and S11 are independent; S10 builds on S08. S12 applies them in Monospace.
 
-## Locked decisions
+## Design rules
 
-1. Additive API. Defaults keep current behavior: main page only, no versioning, refresh-based connectors keep working.
-2. A pushed result follows the same representation rules as a fetched one: refs for cached results, data for `no-cache`, computed slices for `computed` pages.
-3. Connectors still write pushed items into the cache themselves (`$cache.writeItem` with `fieldTimestamps`, as today). `setResult` only publishes a page result and meta; it never writes items.
-4. Page-level liveness is opt-in, chosen per live query, and lives outside find options. It must not affect `queryId`, fetch options or the subscription's `findOptions` comparison.
-5. Item-level CRDT stamps (`fieldTimestamps`, tombstones) stay as they are. S04 orders page results, not item fields.
-6. Pinned cursor pages (S06) are a design slice. Do not implement them before their contract is agreed and recorded.
+1. Additive API. Defaults keep previous behavior: main page only, no versions, refresh-based connectors keep working.
+2. A pushed result follows the same representation rules as a fetched one: refs for cached results, data for `no-cache`, cache slices for paginated `computed` pages.
+3. Since S09, connectors pass raw full-result rows and optional `fieldTimestamps` directly to `setResult`. rstore clones accepted inputs, parses and writes them through the fetch pipeline, then publishes the page. No-cache results are wrapped without cache writes; rejected or dropped snapshots write nothing. Delta-only connectors still write deltas directly.
+4. Page liveness is chosen per live query outside find options; it never enters `queryId`, fetch options or subscription comparison.
+5. Item CRDT stamps and tombstones are unchanged. Versions order page results, not item fields.
 
-## Documents and order
-
-- [S01: refresh handoff](./01-refresh-handoff.md)
-- [S02: pushed page results](./02-pushed-page-results.md)
-- [S03: live pages](./03-live-pages.md)
-- [S04: result ordering](./04-result-ordering.md)
-- [S05: result confirmation](./05-result-confirmation.md)
-- [S06: pinned cursor pages (design)](./06-pinned-cursor-pages.md)
-- [S07: Monospace consumer migration](./07-monospace-migration.md)
-
-Dependencies:
-
-- S01 first.
-- S02 and S03 both depend on S01. They touch the same payload builder, so implement S02 before S03.
-- S04 depends on S02.
-- S05 depends on S02 and can run alongside S04 if file ownership is split: S05 owns `state.ts`/`types.ts` page fields, S04 owns `page.ts` ordering.
-- S06 depends on S03.
-- S07 depends on S01–S03; it gains from S04 and S05 when available.
-
-## Shared payload contract (target after S03)
-
-The subscribe hook payload for a live query subscription:
+## Subscribe payload
 
 ```ts
+import type { FieldTimestampValue, FindOptions, PublicHookMeta, QueryRefreshOptions } from '@rstore/shared'
+
 interface LiveSubscriptionPayload {
-  store: GlobalStoreType
-  meta: CustomHookMeta
-  collection: ResolvedCollection
   subscriptionId: string
   key?: string | number
-  /** Options of the followed page: base options merged with the page's own (`pageIndex`, params). */
-  findOptions?: FindOptions
-  /** S03: index of the page this subscription follows; `undefined` for keyed or unpaged live queries. */
+  /** Base options merged with the followed page's options. */
+  findOptions?: FindOptions<any, any, any>
+  /** Followed page; absent for keyed and unpaged live queries. */
   pageIndex?: number
-  /** S01, scoped to the followed page by S03. */
-  refresh?: (options?: QueryRefreshOptions<FindOptions>) => Promise<unknown>
-  /** S02: publishes a server-computed result for the followed page. */
-  setResult?: (result: unknown, options?: SetResultOptions) => SetResultOutcome
+  /** Live queries only: refetches the followed page. */
+  refresh?: (options?: QueryRefreshOptions<FindOptions<any, any, any>>) => Promise<unknown>
+  /** Live queries only: publishes a parsed result into the followed page. */
+  setResult?: (result: unknown, options?: { meta?: PublicHookMeta, version?: FieldTimestampValue }) => 'applied' | 'stale' | 'inactive'
 }
-
-interface SetResultOptions {
-  /** Public metadata only: `$`-prefixed fields are excluded from the type. */
-  meta?: PublicHookMeta
-  /** S04 snapshot version. */
-  version?: FieldTimestampValue
-}
-
-/** `'applied'` means accepted: a queued non-main push can still be dropped before it publishes. */
-type SetResultOutcome = 'applied' | 'stale' | 'inactive'
 ```
 
-Plain `subscribe()` subscriptions get neither `refresh` nor `setResult`.
+Plain `subscribe()` subscriptions get neither `refresh` nor `setResult`. Public types exported from `@rstore/vue`: `LiveQueryOptions`, `SetResultOutcome`, `SetResultOptions`, `SetSubscriptionResult`, `CachedPageRefs`, `PublicHookMeta`.
 
-## Global test rules
+## Behavior changes for existing rstore users
 
-- Write the failing integration test first, using `createVueStack`, `FakeRemote`, `remote.seed` and the `subscribe` hook payload, as in `packages/vue/test/integration/subscriptions.spec.ts`. Record the failure in the slice receipt.
-- Assert observable query state: `data`, `pages`, `meta`, loading/error lanes and remote call counts. Don't assert private fields unless no public effect exists.
-- Superseding is part of every result-publishing slice: cover a response in flight when a push lands, and a push landing after the scope is disposed.
-- Run `pnpm exec vitest run --project unit <files>` per slice, then `pnpm test`, `pnpm test:types` and lint before acceptance.
+Studio's `@rstore/{core,shared,vue}` bump from pkg.pr.new `66834cb2` to `de62e099` brings these behavior changes to all Studio queries, where applicable, not just realtime lists. The pin is on `feat/core-data-store`, containing all current `main` plus 19 commits; [S07](./07-monospace-migration.md) also records required relation test-helper updates.
 
-## Documentation
+- Disabled live queries (`enabled: false`) don't subscribe; enabling subscribes, disabling unsubscribes.
+- The live query subscribes after its query is created, so its first load starts before the subscribe hook runs.
+- Function-valued find options (such as `filter`) are no longer part of query, page, confirmation or subscription identity. A function-only change reloads pages in place instead of resetting them.
+- `mainPage.options` keeps only a refreshed `pageIndex`; other refresh overrides live in a private per-page `_refreshOptions`, shaping later loads and pushes without changing subscription options.
+- Cache state (`$cache.getState()` / `setState()`) carries `pageRefs` with their effective options and confirmation.
+- `first` queries keep a fetched or pushed `null` until a committed write could change the answer.
 
-- Each public addition updates `docs/guide/plugin/hooks.md` (Subscriptions) and `docs/guide/data/live.md`.
-- S03 also updates the pagination docs.
-- Skill and readme copies follow the repository's existing generation (`SKILLS-GENERATION.md`).
+## Changelog notes
 
-## Cleanup pass
+Changes since v0.8.4 for the next release:
 
-- Behavior unchanged. Public types `LiveQueryOptions`, `SetResultOutcome`, `SetResultOptions`, `SetSubscriptionResult`, `CachedPageRefs` and `PublicHookMeta` are exported from the `@rstore/vue` root. `SetResultOptions.meta` excludes `$` fields; the internal fetch confirmation flag moved from `CustomHookMeta` to a private `WeakMap` in `query/confirmation.ts`.
-- `cache/writes.ts` split: state replacement (`setStateNow`, `clearNow`) moved to `cache/reset.ts`.
-- Test helpers merged into `packages/vue/test/utils/live-query.ts`; overlapping teardown and provenance specs merged; private `_result` / `_setPageResult` assertions replaced by public observations.
-- Guides gained behavior-change notes for existing users and precise `setResult` outcomes; the S06 links in user docs became "not supported yet".
+- Subscribe hooks receive required resolved options, including store defaults and resolution-hook transforms; no-argument `subscribe()` resolves with `many: true`.
+- `liveQuery(q => q.first(k))` now passes top-level `key`; Drizzle narrows its topic to the item key.
+- Unsubscribe hooks receive the options and key captured when the subscription opened.
+- Plain `subscribe()` no longer reopens on client-only option changes (`fetchPolicy`, `dedupe`, `experimentalGarbageCollection`, `fetchOptions`/`autoRefresh`).
+
+- Live-query subscribe payloads expose `end({ reason, retry })`; accepted results renew the bounded recovery budget.
+- Drizzle `rejected` messages now end matching live queries: permanent rejections refresh once and set `live` false instead of only warning. Transient `authorize-error` rejections retry with backoff.

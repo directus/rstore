@@ -1,98 +1,49 @@
 # S05: result confirmation
 
-- Status: verified; implemented and validated on 2026-10-23.
-- Depends on: S02.
-- Owner: telling cache guesses from server-confirmed results.
-- Contract: [overview](./00-overview.md).
+- Status: shipped in `4dd1de55` (docs `6fc9b58e`). Optional; Monospace doesn't use it.
 
 ## Outcome
 
-Queries and pages expose whether the result shown was confirmed by the server for the current options. UIs can then show empty states, "not found" and counts only once they are true, instead of while a cache read is a guess. This follows Zero's `unknown`/`complete` result types.
+Queries and pages expose whether the shown result was confirmed by the server for the current options, so UIs can show empty states, "not found" and counts only once they are true.
 
 ## API
 
 ```ts
-import type { Ref } from 'vue'
+import { computed } from 'vue'
 
-declare const page: { readonly confirmed: boolean }
-declare const query: { confirmed: Readonly<Ref<boolean>> } // every existing page confirmed
+declare const store: any
+
+const query = store.Todo.query((q: any) => q.many({ fetchPolicy: 'cache-and-fetch' }))
+const showEmpty = computed(() => query.confirmed.value && query.data.value.length === 0)
+const firstPageConfirmed = computed(() => query.pages.value[0]?.confirmed)
 ```
 
-A page is confirmed when its current representation came from:
-
-- a fetch that reached the server, under any policy that fetched (`fetch-only`, `no-cache`, `cache-and-fetch` background, `cache-first` miss);
-- or an S02 push, for the page's current options.
-
-It is not confirmed:
-
-- while it only shows a cache read (`cache-only`, the cache half of `cache-and-fetch`, a `pageRefs` hit from another query);
-- after its options changed;
-- after `$cache.clear` / `$onCacheReset`.
-
-Confirmation persists across later cache writes. Membership of a `computed` page can drift with local writes, but the page was confirmed for these options, and S04 versions cover ordering.
+- `page.confirmed`: readonly boolean.
+- `query.confirmed`: readonly ref, true when every existing page is confirmed; holes don't count.
 
 ## Semantics
 
-1. Set `confirmed` in the shared publishing path, next to `_fetchPolicy`. Clear it when the page is created, on options change and on cache reset.
-2. A `pageRefs` hit (`fetchPage` early return) copies the confirmation recorded with the refs. Store it in `pageRefs` entries so a remount within the cache lifetime stays confirmed.
-3. SSR hydration: pages hydrated from a server-rendered fetch are confirmed. Check the hydration path in `packages/vue/src/cache` for where `pageRefs` are restored.
+- **Confirms:** a fetch that reached the server (Core returned a `fetchPromise`), including the background half of `cache-and-fetch`, empty lists and missing items; a published `setResult` push; a `cache-first` hit on a saved page ref recorded as confirmed for the same effective options.
+- **Doesn't confirm:** cache-only reads, cache-first hits without saved confirmation, the cache half of `cache-and-fetch`, failed fetches.
+- **Drops confirmation:** a change of effective options (checked on read, before the reload starts, refresh overrides included); a disabled query; `$onCacheReset` (which also refreshes); `$cache.clearCollection` of the query's collection (no refetch; `no-cache` pages keep it).
+- **Kept:** local cache writes, including membership changes in `computed` pages; refreshes with unchanged options; function-only option changes. Options compare serializable values only, so a rebuilt inline callback after re-render, remount or hydration keeps confirmation.
+- **Saved refs.** `pageRefs` entries store `confirmed` and `effectiveOptions`. A remount within the cache lifetime reuses them only when effective options match; refs without provenance are ignored. `no-cache` values are not saved.
+- **SSR.** `$cache.getState()` serializes detached `pageRefs`; `setState()` restores them, so a hydrated query with the same effective options shows the server page confirmed, without a client fetch. Older payloads without `pageRefs` stay unconfirmed until fetched or pushed.
+- **Privacy.** The fetch confirmation flag is kept in a module `WeakMap` (`query/confirmation.ts`), not in hook metadata.
 
 ## Files
 
-- `packages/vue/src/query/page.ts`, `types.ts`, `createQuery.ts`.
-- Cache `pageRefs` state type in `packages/vue/src/cache`.
-- Tests: new `packages/vue/test/integration/query/confirmation.spec.ts`. Reuse the `fetch-policy.spec.ts` setups instead of duplicating them.
+- `packages/vue/src/query/{confirmation,page,load,createQuery,types}.ts`.
+- `packages/vue/src/api/query.ts`: `markFetchConfirmation` from Core's `fetchPromise`.
+- `packages/vue/src/cache/{types,api,reset,queryState}.ts`: `CachedPageRefs`, serialization, hydration, invalidation.
 
-## Tests first
+## Tests
 
-- `cache-and-fetch`: unconfirmed while the background fetch is held, confirmed after it lands.
-- `cache-only`: never confirmed.
-- After a push via `setResult`: confirmed without a fetch.
-- An options change unconfirms until the new fetch lands.
-- Remounting the same query reuses `pageRefs` and stays confirmed; after a cache reset it is unconfirmed.
-- Hydrated SSR result: confirmed on the client.
+- `packages/vue/test/integration/query/confirmation.spec.ts`: fetch policies, pushes, option changes, remount, cache reset, `clearCollection`, SSR.
+- `confirmation-provenance.spec.ts`, `page-ref-provenance.spec.ts`.
+- `packages/vue/test/query-public-api.test-d.ts`.
 
-## Exit gate
+## Notes
 
-Focused spec plus fetch-policy, hydration and SSR suites pass; docs gain a "Confirmed results" section in the query guide.
-
-## Implementation receipt
-
-- Status: verified; implemented and validated on 2026-10-23.
-- Changed files:
-  - `packages/vue/src/query/{confirmation,page,types,createQuery,load,result}.ts`: readonly page/query confirmation, shared fetch/push publication, effective-option invalidation (including refresh overrides, disabled queries and function changes), cache-reset invalidation, saved-ref restoration, and private publication metadata cleanup. New option helper uses weak page ownership; source files remain at or below 300 lines.
-  - `packages/vue/src/api/query.ts`, `packages/vue/src/types.ts`: use Core's returned `fetchPromise` to distinguish a real fetch from cache-only/cache-first guesses without changing Core; type the private confirmation flag and optional SSR page refs.
-  - `packages/vue/src/cache/{types,api,writes,queryState}.ts`: save/serialize/restore page refs and confirmation, including confirmed first-query absence. Computed pages retain saved response identities while still rendering cache slices. Item invalidation ignores absent-result entries; reset replaces old refs with the incoming payload's refs. Older payloads remain supported.
-  - New `packages/vue/test/integration/query/confirmation.spec.ts`: 19 real-store/cache scenarios for fetch policies, held background work, pushes, superseded responses, disposed callbacks, effective-option changes, remount/reset, sparse pages, local writes and SSR (including not found).
-  - `packages/vue/test/integration/fetch-policy.spec.ts` and new `fetch-policy.utils.ts`: moved the existing stack setup unchanged into one shared helper, reused by the new suite. Existing fetch-policy scenarios retained.
-  - `packages/vue/test/query-public-api.test-d.ts`: public query/page confirmation booleans checked through package-root types.
-  - `docs/guide/data/{query,live}.md`, `docs/guide/plugin/hooks.md`: confirmed-results section and fetch/push, lifetime, remount and SSR semantics.
-  - `packages/vue/skills/rstore-vue/{SKILL.md,references/api-query.md,references/api-live-query.md}`, `SKILLS-GENERATION.md`: incremental documentation-derived skill sync. Dependency copies remain generated by sync-skills/prepack; README has no duplicated confirmation reference.
-  - This plan: status and receipt. No staging, commit or push.
-- Failing-first evidence:
-  - Before implementation, `pnpm exec vitest run --project integration packages/vue/test/integration/query/confirmation.spec.ts`: **15 failed / 15**, because `query.confirmed` was absent. Log: `/tmp/rstore-s05-failing-first.log`.
-  - Additional edge tests before their fixes: **2 failed / 18**. SSR not-found hydration made an unwanted client request (`expected 0, received 1`); disabling an optionless query retained confirmation (`expected true to be false`). Both now pass. Log: `/tmp/rstore-s05-edge-red.log`.
-  - Function-option regression before its fix: **1 failed / 19**, because a serialized query id reused refs confirmed for the previous function options (`expected true to be false`). Now invalidates those saved refs. Log: `/tmp/rstore-s05-options-red.log`.
-  - Isolated copied-workspace fault probes under `/tmp/rstore-s05-confirmation-probe`, with private Vite caches: correct baseline **19 passed**; falsely confirming every cache read caused **6 behavioral failures**; omitting SSR page-ref serialization caused **3 behavioral failures**; restored source **19 passed**. Logs: `/tmp/rstore-s05-probe-{baseline,cache-is-confirmed,missing-ssr,restored}.log`. Shared checkout was never fault-injected.
-- Commands and results:
-  - Installed Node **26.2.0** on `PATH`, standalone pnpm. pnpm's embedded Node 20 emits engine warnings; child Node commands use Node 26. Initial mise-shim attempt failed before running tests; switching to installed executables resolved it.
-  - `pnpm exec vitest run --project unit packages/vue/test/public-exports.spec.ts`: **1 file / 1 test passed**. Log: `/tmp/rstore-s05-unit.log`.
-  - `pnpm exec vitest run --project integration packages/vue/test/integration/query/confirmation.spec.ts packages/vue/test/integration/fetch-policy.spec.ts packages/vue/test/integration/hydration.spec.ts packages/vue/test/integration/harness/ssr.spec.ts packages/vue/test/integration/query/pushed-results.spec.ts packages/vue/test/integration/query/pushed-results-ordering.spec.ts packages/vue/test/integration/query/live-pages.spec.ts`: **7 files / 94 tests passed**. Log: `/tmp/rstore-s05-focused-final.log`.
-  - `pnpm test:types`: **passed**, including workspace package scripts, Vue build/declarations, and root integration/browser types. Initial runs caught a misplaced confirmation declaration and untyped hook parameters; both corrected. No stale Shared declarations required a separate rebuild. Log: `/tmp/rstore-s05-types-final.log`.
-  - `pnpm exec eslint` on all slice-changed source, tests, guides and `SKILLS-GENERATION.md`: **passed**. Explicit `pnpm exec eslint --no-ignore` on the three changed canonical skill files: **passed**. Logs: `/tmp/rstore-s05-{lint-final,skills-lint}.log`.
-  - `pnpm docs:build` outside sandbox: **passed**, including rendered pages. Existing Tailwind plugin and chunk-size warnings remain. Log: `/tmp/rstore-s05-docs.log`.
-  - Full `pnpm test` outside sandbox: **288 files / 2,120 tests passed; 1 file / 4 tests conditionally skipped**. Log: `/tmp/rstore-s05-full.log`.
-  - `pnpm exec eslint plans/live-query-results/05-result-confirmation.md` and `git diff --check`: **passed**. Fixed the pre-existing pseudocode API block to valid TypeScript declarations for receipt lint. Final code/test review retained one shared fetch-policy setup, no presentation assertions, and source/test files at or below 300 lines. No unrelated changes reverted or reformatted.
-- Limitations / follow-ups:
-  - Real Vue/store/cache behavior is covered against shared FakeRemote; external connector interoperability is not claimed.
-  - Confirmation records that a server result was published for these options; computed membership can still drift with local cache writes. Saved confirmation lasts only as long as its cached refs; no-cache results are not retained for remounts or hydration.
-  - Older SSR payloads without saved page confirmation are conservative cache guesses until fetched or pushed.
-  - Four distribution tests require `RSTORE_DISTRIBUTION_ROOT` / `RSTORE_DISTRIBUTION_PEERS_ROOT` and remain skipped in the default suite. All requested commands ran; no S05 blocker remains.
-
-## Review fixes
-
-- `isPageConfirmationCurrent` drops confirmation as soon as effective options change, before the reload starts.
-- `$cache.clearCollection` unconfirms that collection's cached pages without refetching; `no-cache` pages keep confirmation.
-- `clonePageRefs` detaches saved page refs at `getState`/`setState`, which now carry `pageRefs` with `effectiveOptions` for SSR.
-- Confirmation compares serializable options only: inline callbacks rebuilt after re-render, remount or hydration keep it.
-- Cleanup: the internal `$resultConfirmed` flag moved off public `CustomHookMeta` into a private `WeakMap`; duplicated SSR function-identity cases merged; saved-ref provenance specs merged into `page-ref-provenance.spec.ts`.
+- Confirmation means the server confirmed these options, not that later local writes cannot change a `computed` page's rows or count. Use `resultMode: 'responseRefs'` for server-controlled membership.
+- Saved query results, `pageRefs` included, are bounded by `queryStateRetention` since `4e1ca8b2`.

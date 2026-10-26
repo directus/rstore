@@ -1,96 +1,61 @@
 # S04: result ordering
 
-- Status: verified; implemented in the working tree on 2026-10-23.
-- Depends on: S02.
-- Owner: rejecting page results older than the one shown.
-- Contract: [overview](./00-overview.md).
+- Status: shipped in `4dd1de55` (docs `6fc9b58e`); deduped consumers simplified in `b2fa1076`. Optional; Monospace doesn't use it.
 
 ## Outcome
 
-Fetched and pushed page results can carry a version, such as a transaction id, an LSN or an HLC stamp. A page never replaces a result with one carrying an older version, whatever order the responses arrive in.
-
-`requestId` superseding only orders requests by when they started. Versions order results by the server state they reflect: a fetch started before a push can still answer with newer data, and a push can describe older data than a fetch in flight.
+Fetched and pushed page results can carry a version. A page never replaces a result with an older one, whatever order responses arrive in. `requestId` supersession orders requests by start time; versions order results by the server state they reflect.
 
 ## API
 
-- Fetch hooks set `meta.$resultVersion` (`FieldTimestampValue`) on the fetch meta they receive.
-- `setResult(result, { version })` passes it for pushes.
-- Comparison uses `compareHLC` from `@rstore/core`. It already orders `number | string` stamps for field timestamps; keep one comparator.
-- Results without a version are always applied, as today.
+```ts
+import { definePlugin } from '@rstore/vue'
+
+export default definePlugin({
+  name: 'versioned-remote',
+  category: 'remote',
+  setup({ hook }) {
+    hook('fetchMany', async ({ meta, setResult }) => {
+      const response = await fetchRows()
+      meta.$resultVersion = response.version
+      setResult(response.rows)
+    })
+    hook('subscribe', ({ setResult }) => {
+      onPush((rows, version) => setResult?.(rows, { version }))
+    })
+  },
+})
+
+declare function fetchRows(): Promise<{ rows: any[], version: number }>
+declare function onPush(cb: (rows: any[], version: number) => void): void
+```
+
+Versions are `FieldTimestampValue`: a finite number or a serialized HLC string, compared with Core's `compareHLC`. Transaction ids or LSNs must be encoded into one of these.
 
 ## Semantics
 
-1. Each page keeps a private `_resultVersion`, set when a result is applied.
-2. In `setPageResult` and the S02 publish path, a result whose version compares lower than `_resultVersion` is dropped:
-   - its tracking is collected like a superseded fetch;
-   - the push path returns `stale`;
-   - a stale fetch still settles its lane as complete, because the page holds a result at least as new.
-3. Equal versions apply. That makes a push echoing the state of a just-landed fetch a no-op in effect.
-4. `refresh()` doesn't reset `_resultVersion`. An options change creates new pages and therefore new versions.
-5. Meta from a stale result is not applied.
+- **Validation** (`query/version.ts`). `setResult` throws a `TypeError` for any other format, before changing the page. An invalid fetch `$resultVersion` warns once and counts as unversioned.
+- **Comparison.** Each page keeps a private `_resultVersion`. A lower version is dropped: a stale push returns `'stale'`; a stale fetch collects its unowned tracking, keeps its metadata out and still settles its lane. Equal versions apply.
+- **Unversioned results** apply without comparison and clear the page's version.
+- **Versioned push vs fetch in flight.** A versioned push keeps the page's current `requestId`, so a fetch already in flight can still publish a newer version. An unversioned fetch that was in flight when a versioned push was accepted is dropped, cache writes included; fetches started later apply.
+- **Queued pushes.** A versioned non-main push reserves its version before the main-page wait, so a lower-version fetch cannot overwrite its rows meanwhile.
+- **Lifecycle.** `refresh()` keeps versions. A base-options reset clears the reused main page's version; other pages are dropped.
+- **Metadata.** rstore reads `$resultVersion` from fetch metadata and removes it from published query metadata.
+- **Deduped fetches** (`packages/core/src/query/dedupe.ts`). Core passes the shared request metadata to each consumer's `$canPublishQuery(responseMeta)`, so its guard sees the response version while cache writes run, and copies `$resultVersion` to every consumer's metadata when the request settles (background completion included).
 
 ## Files
 
-- `packages/vue/src/query/page.ts`: version check in the shared publishing path.
-- `packages/vue/src/query/load.ts`: read `$resultVersion` from fetch meta, and strip it from published meta like `$canPublishQuery`.
-- `packages/vue/src/query/types.ts`: private page field.
-- `packages/shared/src/types/hooks/meta.ts`: document `$resultVersion` on `CustomHookMeta`.
-- Tests: extend `pushed-results.spec.ts`.
+- `packages/shared/src/types/hooks/{meta,realtime}.ts`: `$resultVersion`, `$canPublishQuery(responseMeta)`, `SetResultOptions.version`.
+- `packages/core/src/query/dedupe.ts`.
+- `packages/vue/src/query/{version,result,push,page,load}.ts`: validation, `isStalePageResult`, `markVersionedPush`, `reservePageResult`.
 
-## Tests first
+## Tests
 
-- A push with version 5, then a fetch answering with version 4: the push result stays and the stale fetch's rows are collected.
-- A fetch with version 5, then a push with version 4: `setResult` returns `stale` and the page is unchanged.
-- Unversioned results keep current behavior (existing suites unchanged).
-- HLC string stamps order like the existing field-timestamp tests.
+- `packages/vue/test/integration/query/pushed-results-ordering.spec.ts`: both race directions, equal versions, per-page versions, option resets, deduped consumers (including one joining an older request after a push), unversioned in-flight drop.
+- `packages/vue/test/integration/query/result-version-format.spec.ts`.
+- `packages/vue/test/query-public-api.test-d.ts`.
 
-## Exit gate
+## Notes
 
-Focused and full suites pass; docs describe versioning for connector authors.
-
-## Implementation receipt
-
-- Status: verified; implementation and acceptance gates completed on 2026-10-23. No staging, commit or push. Existing S01–S03 and unrelated working changes preserved.
-- Changed files:
-  - `packages/shared/src/types/hooks/{meta,realtime}.ts`: typed/documented fetch `$resultVersion` and push `SetResultOptions.version`, both `FieldTimestampValue`.
-  - `packages/vue/src/query/{page,result,load,types}.ts`: private per-page version and shared `compareHLC` rejection; fetch/background versions participate in publication guards before cache writes, are checked again after main-page waits, and stay out of public metadata. Rejected fetches collect unreconciled tracking and settle their loading lane successfully.
-  - New `packages/vue/src/query/push.ts`: existing S02 publisher extracted from `page.ts` to keep sources below 300 lines. Rejects stale pushes before side effects; rechecks queued delivery. Versioned pushes complete lanes while allowing an already-started fetch to publish a newer snapshot. Unversioned pushes keep request supersession.
-  - `packages/vue/src/query/createQuery.ts` and `packages/vue/src/api/livePages.ts`: forward push versions through the actual page adapter. Refresh retains versions; base option resets clear the reused main page's version (this implementation retains that object rather than creating a new main page).
-  - `packages/core/src/query/dedupe.ts`: required cross-package ordering prerequisite. Each pending consumer reads the shared response version before cache publication guards run, then receives its completed version separately from private ownership metadata. Ordinary metadata and tracking ownership retain their existing behavior.
-  - New `packages/vue/test/integration/query/pushed-results-ordering.spec.ts`: 12 real-store/cache scenarios cover both race directions, same-key fields, stale-row collection, stale metadata, numeric/equal/zero/unversioned versions, HLC logical/node/mixed ordering, page isolation, option resets, deduped cache-write guards, and foreground/background version fan-out. Uses FakeRemote only for server replies.
-  - `packages/vue/test/integration/query/pushed-results.spec.ts` and new `pushed-results.utils.ts`: moved existing setup, subscription wait and connector cache-write helpers without changing the existing scenarios; reused by the ordering suite. Source/test files remain below 300 lines.
-  - `packages/vue/test/query-public-api.test-d.ts`: numeric/HLC versions accepted; invalid object version rejected; fetch metadata version typed.
-  - `docs/guide/data/live.md`, `docs/guide/plugin/hooks.md`: fetch/push API, comparator format, stale/equal/unversioned behavior, refresh/options lifecycle, metadata privacy and item timestamp boundaries.
-  - `packages/vue/skills/rstore-vue/{SKILL.md,references/api-live-query.md,references/api-query.md}` and `SKILLS-GENERATION.md`: documentation-derived incremental sync. Dependency copies remain generated by sync-skills/prepack; README has no duplicated ordering reference.
-  - This plan: Status and implementation receipt.
-- Failing-first evidence:
-  - Before implementation, `pnpm exec vitest run --project integration packages/vue/test/integration/query/pushed-results-ordering.spec.ts`: **8 failed, 1 passed**. Stale pushes returned `applied`, HLC ordering was absent, and an in-flight fetch carrying newer version 6 was discarded after push 5. Log: `/tmp/rstore-s04-failing-first.log`.
-  - Added the same-key/pre-cache-write race before implementation: **9 failed, 2 passed**, including fetch 6 failing to replace pushed fields. Log: `/tmp/rstore-s04-failing-first-final.log`.
-  - Additional deduped-cache-write regression failed before its fix: two consumers accepted push 5, but late fetch 4 changed their shared row title from `Pushed one` to `One`. Forwarding the live response version to every pending consumer's guard fixes this. Log: `/tmp/rstore-s04-dedupe-red.log`.
-  - Initial focused run after implementation exposed the existing queued non-main publication contract: callbacks acknowledge acceptance synchronously, with delivery after the main-page promise. The page-isolation test now observes delivered data before checking rejection against that version; no production contract was weakened. Log: `/tmp/rstore-s04-first-green.log`.
-- Commands and results:
-  - Used installed Node **26.2.0** on `PATH` and standalone pnpm. pnpm's embedded Node 20 emits engine warnings; child Node commands use installed Node 26.
-  - `pnpm exec vitest run --project unit packages/core/test/hlc.spec.ts packages/vue/test/public-exports.spec.ts`: **2 files / 33 tests passed**. Log: `/tmp/rstore-s04-unit.log`.
-  - `pnpm exec vitest run --project integration packages/vue/test/integration/query/pushed-results-ordering.spec.ts packages/vue/test/integration/query/pushed-results.spec.ts packages/vue/test/integration/query/live-pages.spec.ts packages/vue/test/integration/subscriptions.spec.ts packages/vue/test/integration/query/pagination-results.spec.ts packages/vue/test/integration/query/mixed-policy-pagination.spec.ts`: **6 files / 68 tests passed**. Log: `/tmp/rstore-s04-focused-final.log`.
-  - Initial `pnpm test:types` found stale built Shared declarations missing `$resultVersion`. `pnpm --filter @rstore/shared build`, `pnpm --filter @rstore/core build`, `pnpm --filter @rstore/vue build`: **passed**. Logs: `/tmp/rstore-s04-build-{shared,core,vue}.log`.
-  - Final `pnpm test:types`: **passed**, including workspace packages and root integration/browser types. Log: `/tmp/rstore-s04-types-final.log`.
-  - `pnpm exec eslint` on all slice-changed source/test/guide files and `SKILLS-GENERATION.md`: **passed** after import order and trailing-blank-line fixes. Log: `/tmp/rstore-s04-lint-final.log`. Explicit `pnpm exec eslint --no-ignore` on the three changed canonical skill files: **passed**. Log: `/tmp/rstore-s04-skills-lint.log`.
-  - `pnpm docs:build` outside sandbox: **passed**, including page rendering. Existing Tailwind plugin and chunk-size warnings remain. Log: `/tmp/rstore-s04-docs.log`.
-  - Full `pnpm test` outside sandbox: **287 files / 2,101 tests passed; 1 file / 4 tests conditionally skipped**. Log: `/tmp/rstore-s04-full.log`.
-  - `pnpm exec eslint plans/live-query-results/04-result-ordering.md`: **passed**. Log: `/tmp/rstore-s04-receipt-lint.log`.
-  - `git diff --check`: **passed**. Final source/test review found no duplicated helper implementation or presentation assertions; no unrelated changes reverted or reformatted.
-- Limitations / follow-ups:
-  - Real Vue/store/cache/query behavior is covered against the shared stateful fake remote; external connector interoperability is not claimed.
-  - Versions use numeric or serialized HLC stamps accepted by `compareHLC`; arbitrary transaction-ID/LSN strings require connector encoding into that format.
-  - Unversioned applied results clear the page's version, so mixed versioned/unversioned transports cannot claim continuous monotonic snapshot ordering. Supply versions consistently when that guarantee is needed.
-  - Page versions do not replace field timestamps or tombstones and cannot undo connector cache writes made before a stale push is rejected. Offset-window design and result confirmation remain S06/S05.
-  - Four distribution tests require `RSTORE_DISTRIBUTION_ROOT` / `RSTORE_DISTRIBUTION_PEERS_ROOT` and remain skipped in the default suite. No requested command was left unrun; no S04 blocker remains.
-
-## Review fixes
-
-- `query/version.ts` validates versions: `setResult` throws a `TypeError` for anything but a finite number or a serialized HLC string; an invalid fetch `$resultVersion` warns once and counts as unversioned.
-- `markVersionedPush`: an unversioned fetch already in flight when a versioned push is accepted is dropped as stale, cache writes included; later fetches apply.
-- A queued versioned push reserves its version before the main-page wait, so a lower-version fetch cannot overwrite the connector's pushed fields meanwhile.
-- Out of plan, kept for a separate decision: the module-level `WeakMap` side tables.
-- Core `dedupe.ts` metadata accessors (out of plan, `2738c9e7`) replaced by a simpler design: Core passes the shared request metadata to each `$canPublishQuery(responseMeta)`, so a deduped consumer's guard reads the response `$resultVersion` while cache writes run, and copies `$resultVersion` to each consumer's metadata when the request settles. The accessor-only regression suite `packages/core/test/integration/query-dedupe-retry.spec.ts` was removed; `pushed-results-ordering.spec.ts` gained *rejects stale cache writes for a consumer that joins an older request after a push*, which fails without the shared metadata (`expected [ 'One' ] to deeply equal [ 'Pushed one' ]`).
-- Cleanup: `$resultVersion` docs say connectors set it and rstore removes it from published metadata; `SetResultOptions.meta` no longer accepts it.
+- Versions order page results, not item fields: connectors still supply `fieldTimestamps`, and a stale push cannot undo cache writes made before `setResult`.
+- Mixing versioned and unversioned results on one page gives no continuous ordering guarantee.
