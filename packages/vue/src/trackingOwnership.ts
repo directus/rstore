@@ -4,6 +4,7 @@ import type { VueCachePrivate } from './cache'
 import type { VueStore } from './store'
 import { computed, ref, toValue, watch } from 'vue'
 import { DirtyQueryMemberships } from './trackingDirtyMemberships'
+import { watchQueryTracking } from './trackingEffect'
 import { addToQueryTracking, createTrackingObject, populateTracking } from './trackingRelations'
 
 /** Options needed to reconcile one query's page ownership. */
@@ -180,8 +181,8 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       if (include) {
         // This watcher starts after asynchronous loading, so page lifecycle owns
         // its disposal explicitly. Track relation reads, not mutable ownership
-        // metadata. Synchronous adoption protects even immediate public GC.
-        const stop = watch(() => {
+        // metadata. Reconcile once per commit, before immediate public GC.
+        const stop = watchQueryTracking(store, () => {
           const current = createTrackingObject()
           // A released nested row can remain in the shared cache until its
           // deferred sweep. Do not let a sibling deletion re-adopt it.
@@ -194,7 +195,7 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
           pageTrackings.set(pageId, current)
           retain(current)
           releaseMembers(previous, collecting.value)
-        }, { flush: 'sync' })
+        })
         relationWatchers.set(pageId, stop)
       }
     },

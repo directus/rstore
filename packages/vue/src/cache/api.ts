@@ -102,12 +102,11 @@ export function createCacheApi<
       ctx.engine.clearCollection(params)
     },
     garbageCollectItem({ collection, item }) {
-      if (ctx.rowRetention.managed(collection))
-        sweepManagedRows(ctx, new Set([collection.name]))
-      else
-        garbageCollectItem(ctx, collection, item)
+      ctx.trackingEffects.flush()
+      garbageCollectItem(ctx, collection, item)
     },
     garbageCollect() {
+      ctx.trackingEffects.flush()
       garbageCollect(ctx)
     },
     addLayer(layer) {
@@ -137,8 +136,7 @@ export function createCacheApi<
       disposeCache(ctx)
     },
     _private: {
-      scopes: ctx.scopes,
-      membership: ctx.membership,
+      trackingEffects: ctx.trackingEffects,
       state: ctx.state,
       getWrappedItem: (collection, item, noCache) => getWrappedItem(ctx, collection, item, noCache),
       layers: ctx.layers,

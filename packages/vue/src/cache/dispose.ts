@@ -51,6 +51,7 @@ function notifyDispose(ctx: CacheRuntime): void {
 
 /** Release every bridge-owned registry without invoking reset hooks. */
 function disposeCacheRuntime(ctx: CacheRuntime): void {
+  ctx.trackingEffects.clear()
   ctx.engine.dispose()
   ctx.signals.dispose()
   ctx.versions.dispose()
