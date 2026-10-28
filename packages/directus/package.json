@@ -41,7 +41,7 @@
     "dev:prepare": "pnpm run dev",
     "prepack": "node ../../scripts/sync-dep-skills.mjs .",
     "test": "RSTORE_TEST_PACKAGE=directus pnpm -w exec vitest run --config vitest.config.ts",
-    "test:types": "tsc --noEmit"
+    "test:types": "tsrs --noEmit"
   },
   "dependencies": {
     "@directus/sdk": "^19.0.1",

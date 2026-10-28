@@ -78,7 +78,7 @@ export function createHistory(options: HistoryOptions = {}): History {
       }
       catch { /* Observers must never affect application operation outcomes. */ }
     },
-    page({ limit = 100, beforeSequence, afterSequence, maxBytes = 448 * 1024 } = {}) {
+    page({ limit = 100, beforeSequence, afterSequence, maxBytes = 448 * 1024 }: NonNullable<Parameters<History['page']>[0]> = {}) {
       const matching = entries.filter(({ entry }) =>
         (beforeSequence === undefined || entry.sequence < beforeSequence)
         && (afterSequence === undefined || entry.sequence > afterSequence))

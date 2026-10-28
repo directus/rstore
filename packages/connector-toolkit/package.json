@@ -40,7 +40,7 @@
     "dev": "unbuild --stub",
     "dev:prepare": "pnpm run dev",
     "test": "RSTORE_TEST_PACKAGE=connector-toolkit pnpm -w exec vitest run --config vitest.config.ts",
-    "test:types": "tsc --noEmit"
+    "test:types": "tsrs --noEmit"
   },
   "peerDependencies": {
     "vite": "^7.0.0"

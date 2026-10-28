@@ -2,15 +2,15 @@
   "compilerOptions": {
     "target": "ESNext",
     "module": "ESNext",
-    "moduleResolution": "Node",
+    "moduleResolution": "Bundler",
     // The shared test helpers in `test/utils/`, imported as `#test-utils/…`.
-    // Resolved relative to this file: under `moduleResolution: "Node"`, `paths`
-    // is consulted before any `imports`-field handling, so no `baseUrl` is needed.
+    // Paths are resolved relative to this config file.
     "paths": {
       "#test-utils/*": [
         "../../test/utils/*"
       ]
     },
+    "types": ["node"],
     "strict": true,
     "noImplicitOverride": true,
     "noImplicitThis": true,

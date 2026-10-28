@@ -32,7 +32,7 @@
     "build": "nuxt-module-build build",
     "dev": "pnpm run build",
     "test": "RSTORE_TEST_PACKAGE=nuxt-multiplayer-server pnpm -w exec vitest run --config vitest.config.ts",
-    "test:types": "vue-tsc --noEmit"
+    "test:types": "tsrs --noEmit"
   },
   "dependencies": {
     "@nuxt/kit": "^4.0.0",

@@ -1,17 +1,18 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "paths": {
+      "*": ["./*"],
       "@rstore/directus": [
-        "../directus/src/index"
+        "./../directus/src/index"
       ],
       "@rstore/directus/schema": [
-        "../directus/src/schema/index"
+        "./../directus/src/schema/index"
       ]
     },
+    "types": ["node"],
     "strict": true,
     "noImplicitOverride": true,
     "noImplicitThis": true,

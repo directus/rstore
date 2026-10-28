@@ -55,7 +55,7 @@
     "build": "unbuild && vite build",
     "dev": "vite --host 127.0.0.1",
     "dev:prepare": "unbuild --stub",
-    "test:types": "tsc --noEmit -p tsconfig.json && vue-tsc --noEmit -p tsconfig.client.json"
+    "test:types": "tsrs --noEmit -p tsconfig.json && vue-tsc --noEmit -p tsconfig.client.json"
   },
   "peerDependencies": {
     "vite": "^8.2.2",

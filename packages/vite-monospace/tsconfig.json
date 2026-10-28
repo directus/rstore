@@ -1,17 +1,18 @@
 {
   "compilerOptions": {
     "target": "ESNext",
-    "baseUrl": ".",
     "module": "ESNext",
     "moduleResolution": "Bundler",
     "paths": {
+      "*": ["./*"],
       "@rstore/monospace": [
-        "../monospace/src/index"
+        "./../monospace/src/index"
       ],
       "@rstore/monospace/schema": [
-        "../monospace/src/schema/index"
+        "./../monospace/src/schema/index"
       ]
     },
+    "types": ["node"],
     "strict": true,
     "noImplicitOverride": true,
     "noImplicitThis": true,

@@ -33,7 +33,7 @@
   "scripts": {
     "build": "unbuild",
     "dev": "unbuild --stub && printf \"export * from '../src/index'\" > ./dist/index.mjs",
-    "test:types": "tsc --noEmit"
+    "test:types": "tsrs --noEmit"
   },
   "dependencies": {
     "@rstore/core": "workspace:^",
