@@ -5,6 +5,32 @@ import { $fetch, createPage, setup, url, waitForHydration } from '@nuxt/test-uti
 import { describe, expect, it } from 'vitest'
 import { openRelayRpc } from '../../../devtools/src/node/rpc'
 
+/** Wait for one connected browser whose current cache is readable and hydrated. */
+async function waitForBrowserCache(
+  viewer: Awaited<ReturnType<typeof openRelayRpc>>,
+  expectedRows: CachePage['rows'],
+  options: { excludeSessionId?: string, onFirstMatch?: (session: SessionSummary) => Promise<void> } = {},
+) {
+  let match: { session: SessionSummary, target: SessionSummary['stores'][number]['target'], cache: ReadReply<CachePage> } | undefined
+  let firstMatch: Promise<void> | undefined
+  await expect.poll(async () => {
+    const sessions = await viewer.rpc.$call('rstore:list-sessions', {}) as SessionSummary[]
+    const candidates = sessions.filter(session => session.kind === 'browser' && session.connected && session.sessionId !== options.excludeSessionId && session.stores.some(store => store.target.storeId === 'default'))
+    if (candidates.length !== 1)
+      return undefined
+    const session = candidates[0]!
+    const target = session.stores.find(store => store.target.storeId === 'default')!.target
+    if (!firstMatch && options.onFirstMatch)
+      firstMatch = options.onFirstMatch(session)
+    await firstMatch
+    const cache = await viewer.rpc.$call('rstore:get-cache', { target, collection: 'todos' }) as ReadReply<CachePage>
+    expect(cache.target).toEqual(target)
+    match = { session, target, cache }
+    return cache.data.rows
+  }, { timeout: 15_000 }).toEqual(expectedRows)
+  return match!
+}
+
 /** Real Nuxt dev server, generated plugin, SSR render, and custom inspector mount. */
 describe('portable devtools Nuxt boot', async () => {
   await setup({
@@ -36,34 +62,26 @@ describe('portable devtools Nuxt boot', async () => {
     try {
       const page = await createPage('/ssr/browser')
       releasePage = () => page.close()
-      await expect.poll(async () => {
-        const sessions = await viewer.rpc.$call('rstore:list-sessions', {}) as SessionSummary[]
-        return sessions.filter(session => session.kind === 'browser' && session.connected && session.stores.some(store => store.target.storeId === 'default')).length
-      }, { timeout: 15_000 }).toBe(1)
-      const sessions = await viewer.rpc.$call('rstore:list-sessions', {}) as SessionSummary[]
-      const browser = sessions.find(session => session.kind === 'browser' && session.connected)!
-      const target = browser.stores[0]!.target
-      expect(target.storeId).toBe('default')
-      const cache = await viewer.rpc.$call('rstore:get-cache', { target, collection: 'todos' }) as ReadReply<CachePage>
-      expect(cache.target).toEqual(target)
-      expect(cache.data.rows).toEqual([{ key: 0, value: { kind: 'object', entries: [['id', 0], ['title', '/ssr/browser']] } }])
+      const expectedRows: CachePage['rows'] = [{ key: 0, value: { kind: 'object', entries: [['id', 0], ['title', '/ssr/browser']] } }]
+      const { session: browser, target, cache } = await waitForBrowserCache(viewer, expectedRows, {
+        async onFirstMatch(session) {
+          // Reload after discovery to exercise a real disconnect before the cache read.
+          await page.reload()
+          await waitForHydration(page, page.url(), 'hydration')
+          await expect.poll(async () => (await viewer.rpc.$call('rstore:list-sessions', {}) as SessionSummary[]).find(current => current.sessionId === session.sessionId)?.connected, { timeout: 10_000 }).toBe(false)
+          const oldTarget = session.stores.find(store => store.target.storeId === 'default')!.target
+          await expect(viewer.rpc.$call('rstore:get-cache', { target: oldTarget, collection: 'todos' })).rejects.toThrow()
+        },
+      })
       expect(await page.locator('body').textContent()).toContain('store-ready')
       await expect(viewer.rpc.$call('rstore:write-cache-item', { action: 'write-cache-item', target, commandId: randomUUID(), issuedAt: Date.now(), collection: 'todos', item: { id: 0, title: 'forbidden' } })).rejects.toThrow()
       const untouched = await viewer.rpc.$call('rstore:get-cache', { target, collection: 'todos' }) as ReadReply<CachePage>
       expect(untouched.data.rows).toEqual(cache.data.rows)
       await page.reload()
       await waitForHydration(page, page.url(), 'hydration')
-      await expect.poll(async () => {
-        const current = await viewer.rpc.$call('rstore:list-sessions', {}) as SessionSummary[]
-        return current.some(session => session.kind === 'browser' && session.connected && session.sessionId !== browser.sessionId && session.stores.some(store => store.target.storeId === 'default'))
-      }, { timeout: 15_000 }).toBe(true)
-      const replacement = (await viewer.rpc.$call('rstore:list-sessions', {}) as SessionSummary[]).find(session => session.kind === 'browser' && session.connected && session.sessionId !== browser.sessionId)!
-      expect(replacement.stores[0]!.target.storeId).toBe('default')
+      const { session: replacement, target: replacementTarget, cache: refreshed } = await waitForBrowserCache(viewer, expectedRows, { excludeSessionId: browser.sessionId })
       await expect.poll(async () => (await viewer.rpc.$call('rstore:list-sessions', {}) as SessionSummary[]).find(session => session.sessionId === browser.sessionId)?.connected, { timeout: 10_000 }).toBe(false)
       await expect(viewer.rpc.$call('rstore:get-cache', { target, collection: 'todos' })).rejects.toThrow()
-      const refreshed = await viewer.rpc.$call('rstore:get-cache', { target: replacement.stores[0]!.target, collection: 'todos' }) as ReadReply<CachePage>
-      expect(refreshed.data.rows[0]!.key).toBe(0)
-      expect(JSON.stringify(refreshed.data.rows[0]!.value)).toContain('/ssr/browser')
       const inspector = await createPage()
       try {
         await inspector.goto(new URL('/inspect/', page.url()).href)
@@ -79,7 +97,7 @@ describe('portable devtools Nuxt boot', async () => {
       finally {
         await inspector.close()
       }
-      const surviving = await viewer.rpc.$call('rstore:get-cache', { target: replacement.stores[0]!.target, collection: 'todos' }) as ReadReply<CachePage>
+      const surviving = await viewer.rpc.$call('rstore:get-cache', { target: replacementTarget, collection: 'todos' }) as ReadReply<CachePage>
       expect(surviving.data.rows).toEqual(refreshed.data.rows)
     }
     finally {
