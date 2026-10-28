@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { watchSyncEffect } from 'vue'
 
 describe('cache writeItems', () => {
-  it('keeps staggered slices unpublished until the batch completes', async () => {
+  it('publishes each staggered slice and sets the marker once the batch completes', async () => {
     vi.useFakeTimers()
 
     try {
@@ -33,7 +33,7 @@ describe('cache writeItems', () => {
         expect(cache.readItem({ collection, key: 2 })).toEqual({ id: 2, name: 'Item 2' })
         expect(cache.readItem({ collection, key: 3 })).toBeUndefined()
         expect(cache.readItems({ collection, marker: 'testMarker' })).toHaveLength(0)
-        expect(observedLengths).toEqual([0])
+        expect(observedLengths).toEqual([0, 2])
 
         vi.advanceTimersByTime(10)
 
@@ -41,13 +41,13 @@ describe('cache writeItems', () => {
         expect(cache.readItem({ collection, key: 4 })).toEqual({ id: 4, name: 'Item 4' })
         expect(cache.readItem({ collection, key: 5 })).toBeUndefined()
         expect(cache.readItems({ collection, marker: 'testMarker' })).toHaveLength(0)
-        expect(observedLengths).toEqual([0])
+        expect(observedLengths).toEqual([0, 2, 4])
 
         vi.advanceTimersByTime(10)
 
         expect(cache.readItem({ collection, key: 5 })).toEqual({ id: 5, name: 'Item 5' })
         expect(cache.readItems({ collection, marker: 'testMarker' })).toHaveLength(5)
-        expect(observedLengths).toEqual([0, 5])
+        expect(observedLengths).toEqual([0, 2, 4, 5])
       }
       finally {
         stop()
@@ -198,7 +198,8 @@ describe('cache writeItems', () => {
       try {
         cache.writeItems({ collection: parentCollection, items })
 
-        expect(parentLengths).toEqual([0])
+        // The first slice is published before the batch yields.
+        expect(parentLengths).toEqual([0, 1])
         expect(relatedLengths).toEqual([0])
         expect(otherLengths).toEqual([0])
 

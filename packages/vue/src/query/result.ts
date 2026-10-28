@@ -75,7 +75,7 @@ export function getTrackingResult(page: VueQueryPage<any, any, any, any, any>, r
  * collector remains the authority for whether an unowned row can disappear.
  */
 export function collectUnreconciledTracking(ctx: any, tracking: any): void {
-  if (!tracking) {
+  if (!tracking || !ctx.queryCollectionEnabled) {
     return
   }
   nextTick(() => {
@@ -120,9 +120,9 @@ export function reconcilePageTracking(
  * continues through the controller's existing include watcher.
  */
 export function watchDeferredPageTracking(ctx: any, page: VueQueryPage<any, any, any, any, any>, options: FindOptions<any, any, any>, tracking: any, meta: CustomHookMeta, isCurrent: () => boolean): void {
-  const queue = ctx.cache._private.state.queue
-  const pending = queue.filter((operation: any) => operation.params?.meta === meta)
-  if (!pending.length)
+  // The engine owns the write queue; each push carries its own meta object.
+  const hasPending = (): boolean => ctx.cache._private.hasPendingWrites(meta)
+  if (!hasPending())
     return
   /** Install inside the original query scope even when transport delivers later. */
   function install(): void {
@@ -130,7 +130,7 @@ export function watchDeferredPageTracking(ctx: any, page: VueQueryPage<any, any,
       void page.rawData
       void page.requestId
       // An envelope also observes a keyed wrapper whose identity stays stable.
-      return isCurrent() && pending.some((operation: any) => queue.includes(operation)) ? { result: page.data } : undefined
+      return isCurrent() && hasPending() ? { result: page.data } : undefined
     }, (snapshot) => {
       if (!snapshot || !isCurrent()) {
         stop()
@@ -142,7 +142,7 @@ export function watchDeferredPageTracking(ctx: any, page: VueQueryPage<any, any,
     }, { flush: 'sync' })
     /** Release observation once its deferred cache operations leave the queue. */
     function stopIfSettled(): void {
-      if (!isCurrent() || !pending.some((operation: any) => queue.includes(operation)))
+      if (!isCurrent() || !hasPending())
         stop()
     }
     void nextTick(stopIfSettled)

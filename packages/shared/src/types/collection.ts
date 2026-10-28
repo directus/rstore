@@ -193,9 +193,17 @@ export interface NormalizedRelation {
   to: Array<NormalizedRelationTarget>
 }
 
+/** Precomputed relation target metadata consumed by cache adapters. */
 export interface NormalizedRelationTarget {
+  /** Related collection name. */
   collection: string
+  /** Target-field to source-field mapping. */
   on: Record<string, string>
+  /** Canonical target index key, precomputed during collection normalization. */
+  indexKey: string
+  /** Sorted target fields used to build tuple index lookups. */
+  indexFields: readonly string[]
+  /** Optional relation-specific filter. */
   filter?: (item: any, relationItem: any) => boolean
 }
 

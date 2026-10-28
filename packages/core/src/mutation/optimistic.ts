@@ -1,5 +1,5 @@
 import type { CacheLayer, Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
-import { pickNonSpecialProps } from '@rstore/shared'
+import { pickNonSpecialProps, set } from '@rstore/shared'
 import { fieldValuesEqual } from '../utils/equality'
 
 /** Known application values paired with the wire values exposed to hooks. */
@@ -99,6 +99,50 @@ export function prepareMutationItem<
   // a detached snapshot so those edits cannot change the restoration baseline.
   const transportSnapshot = pickNonSpecialProps(transportItem, true)
   return { optimisticItem, transportItem, transportSnapshot }
+}
+
+/**
+ * Keep one stable transport object while beforeMutation hooks prepare an
+ * application-shaped optimistic item.
+ *
+ * Create and update share this narrow state only. Their key, layer, dispatch,
+ * and finalization policies remain in their own mutation paths.
+ */
+export function createMutationHookState<
+  TCollection extends Collection,
+  TCollectionDefaults extends CollectionDefaults,
+  TSchema extends StoreSchema,
+>(
+  store: StoreCore<TSchema, TCollectionDefaults>,
+  collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>,
+  inputItem: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
+) {
+  let preparedItem = prepareMutationItem(store, collection, inputItem)
+  const transportItem = preparedItem.transportItem
+
+  /** Rebuild serialized transport values after an in-place optimistic edit. */
+  function modifyItem(path: any, value: any): void {
+    set(preparedItem.optimisticItem, path, value)
+    preparedItem = prepareMutationItem(store, collection, preparedItem.optimisticItem)
+    replaceTransportItem(transportItem, preparedItem.transportItem)
+  }
+
+  /** Rebuild both values after a hook replaces its payload. */
+  function setItem(item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>): void {
+    preparedItem = prepareMutationItem(store, collection, item, preparedItem)
+    replaceTransportItem(transportItem, preparedItem.transportItem)
+  }
+
+  return {
+    /** Wire payload object shared by all hooks and remote dispatch. */
+    transportItem,
+    /** Current application-shaped value for the optimistic layer. */
+    get optimisticItem() {
+      return preparedItem.optimisticItem
+    },
+    modifyItem,
+    setItem,
+  }
 }
 
 /**

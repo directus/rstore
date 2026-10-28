@@ -51,6 +51,9 @@ describe('optional Vue devtools adapter', () => {
       '2': { id: 2, title: 'numeric' },
       '02': { id: '02', title: 'string' },
     }, deletedItems: new Set() })
+    // Installing the layer derives its keys; only diagnostics are measured.
+    keyCallbacks = 0
+    keyGetters = 0
     const runtime = createRstoreDevtools()
     const adapter = createVueDevtoolsAdapter()
     let stop: (() => void) | undefined
@@ -91,15 +94,17 @@ describe('optional Vue devtools adapter', () => {
       layer.state.one.title = 'after'
       await nextTick()
       await Promise.resolve()
-      expect(fixture.cache.readItem({ collection: fixture.store.$collections[0]!, key: 'one' })).toMatchObject({ title: 'after' })
+      // App reads resolve the layer as added; diagnostics read it live.
+      expect(fixture.cache.readItem({ collection: fixture.store.$collections[0]!, key: 'one' })).toMatchObject({ title: 'before' })
+      expect(Array.from(fixture.cache.inspect!().collections[0]!.effectiveRows(), row => (row.value as any).title)).toContain('after')
       expect(changes, 'inspector must refresh changed layer row').toEqual(['cache'])
       layer.deletedItems.add('one')
       await nextTick()
       await Promise.resolve()
       const rows = Array.from(fixture.cache.inspect!().collections[0]!.effectiveRows())
       expect(rows.map(row => [row.key, (row.value as any).title])).toEqual([['two', 'retained']])
-      // App reads preserve pre-migration memo until cache-owned invalidation.
-      expect(fixture.cache.readItem({ collection: fixture.store.$collections[0]!, key: 'one' })).toMatchObject({ title: 'after' })
+      // App reads keep the add-time layer until cache-owned invalidation.
+      expect(fixture.cache.readItem({ collection: fixture.store.$collections[0]!, key: 'one' })).toMatchObject({ title: 'before' })
       expect(changes, 'inspector must refresh deleted layer row').toEqual(['cache', 'cache'])
       stop()
       layer.state.two.title = 'after release'

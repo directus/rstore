@@ -70,6 +70,17 @@ describe('rstoreDirectus', () => {
     await expect(runBuildStart(plugin)).rejects.toThrow('@rstore/vite-directus requires url and adminToken options')
   })
 
+  it('resolves generated modules with Vite internal IDs', async () => {
+    const { rstoreDirectus } = await import('../src')
+    const plugin = rstoreDirectus({
+      url: 'https://directus.example.com',
+      adminToken: 'secret-admin-token',
+      scopeId: 'test-scope',
+    })
+
+    expect(await (plugin.resolveId as any).call({}, 'virtual:rstore-directus/schema', undefined, {})).toBe('\0virtual:rstore-directus/schema')
+  })
+
   it('generates virtual schema, plugin, index, and declarations without leaking the admin token', async () => {
     const { rstoreDirectus } = await import('../src')
     const root = await createTempRoot()

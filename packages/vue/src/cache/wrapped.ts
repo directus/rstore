@@ -1,11 +1,11 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { WrappedItemMetadata } from '../itemMetadata'
 import type { CacheRuntime } from './types'
-import { computed, shallowRef } from 'vue'
+import { shallowRef } from 'vue'
 import { wrapItem } from '../item'
-import { addWrappedItemKeyToLayer, ensureCollectionRef, getItemKey, getItemWrapKey, releaseUnwrittenItem } from './context'
-import { isKeyPinnedByActiveLayer } from './layers'
+import { createWrappedItemMetadata } from '../itemMetadata'
+import { getItemKey, readRawCacheItem } from './context'
 import { invalidatePageRefsForItem } from './queryState'
-import { deleteItemNow } from './writes'
 
 /** Return the cached wrapped proxy for an item, creating it when needed. */
 export function getWrappedItem<
@@ -17,6 +17,8 @@ export function getWrappedItem<
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>,
   item: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | null | undefined,
   noCache = false,
+  knownKey?: string | number,
+  track = false,
 ): WrappedItem<TCollection, TCollectionDefaults, TSchema> | undefined {
   if (!item) {
     return undefined
@@ -27,57 +29,40 @@ export function getWrappedItem<
       store: ctx.getStore(),
       collection,
       item: shallowRef(item),
-      metadata: {
-        queries: new Set(),
-        dirtyQueries: new Set(),
-      },
+      metadata: createWrappedItemMetadata(),
     })
   }
 
-  const key = getItemKey(collection, item)
-  const layer = item.$layer
-  const wrapKey = getItemWrapKey(collection, key, layer)
-  let wrappedItem = ctx.wrappedItems.get(wrapKey)
-  if (!wrappedItem) {
-    let metadata = ctx.wrappedItemsMetadata.get(wrapKey)
-    if (!metadata) {
-      metadata = {
-        queries: new Set(),
-        dirtyQueries: new Set(),
-      }
-      ctx.wrappedItemsMetadata.set(wrapKey, metadata)
-    }
-    wrappedItem = wrapItem({
+  const key = knownKey ?? getItemKey(collection, item)
+  // Public wrapItem calls can carry embedded relation payloads that engine
+  // normalized into child rows. Seed cached wrappers from canonical engine
+  // state so relation fields keep resolving through indexes.
+  const current = knownKey === undefined
+    ? readRawCacheItem(ctx, collection, key) ?? item
+    : item
+  const layer = current.$layer
+  let entry = ctx.wrappedItems.get(collection.name, key, layer?.id)
+  if (!entry) {
+    const metadata = createWrappedItemMetadata()
+    const cell = ctx.itemCells.create(collection.name, key, current, track)
+    const wrappedItem = wrapItem({
       store: ctx.getStore(),
       collection,
-      // A layer row is owned by its layer, which outlives this wrapper anyway.
-      item: layer ? shallowRef(item) : createCachedRowSource(ctx, collection.name, key, item),
+      item: cell.source,
       metadata,
+      seed: current,
     })
-    ctx.wrappedItems.set(wrapKey, wrappedItem)
-    addWrappedItemKeyToLayer(ctx, item.$layer, wrapKey)
+    entry = { item: wrappedItem, metadata, cell }
+    ctx.wrappedItems.set(
+      collection.name,
+      key,
+      layer?.id,
+      entry as unknown as Parameters<typeof ctx.wrappedItems.set>[3],
+    )
   }
-  return wrappedItem as WrappedItem<TCollection, TCollectionDefaults, TSchema>
-}
-
-/**
- * Read a row from cache state, falling back to the last value seen.
- *
- * The initial value is often a raw fetch response, nested relation payloads
- * included. It only serves until the (possibly queued) write lands: from then
- * on the fallback is the latest state row, so holders of an evicted wrapper
- * keep its last cached fields without pinning the response or its children.
- */
-function createCachedRowSource(ctx: CacheRuntime, collectionName: string, key: string | number, initial: any) {
-  // The computed closes over `fallback` only, which the first state row replaces.
-  let fallback = initial
-  return computed(() => {
-    const row = ensureCollectionRef(ctx, collectionName).value[key]
-    if (row) {
-      fallback = row
-    }
-    return fallback
-  })
+  if (track)
+    entry.cell.track()
+  return entry.item as WrappedItem<TCollection, TCollectionDefaults, TSchema>
 }
 
 /** Delete an unreferenced item from cache and emit garbage collection hooks. */
@@ -85,15 +70,13 @@ export function garbageCollectItem<TCollection extends Collection>(
   ctx: CacheRuntime,
   collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
   item: WrappedItem<TCollection, CollectionDefaults, StoreSchema>,
+  knownKey?: string | number,
 ) {
   if (item.$meta.queries.size !== 0) {
     return
   }
-  const key = getItemKey(collection, item)
-  if (isKeyPinnedByActiveLayer(ctx, collection.name, key)) {
-    return
-  }
-  if (!deleteItemNow(ctx, collection, key)) {
+  const key = knownKey ?? getItemKey(collection, item)
+  if (!ctx.engine.garbageCollectKey(collection, key)) {
     return
   }
   invalidatePageRefsForItem(ctx, collection.name, key)
@@ -106,24 +89,34 @@ export function garbageCollectItem<TCollection extends Collection>(
   })
 }
 
-/** Forget every unowned committed-row wrapper whose row is not in state. */
-export function releaseUnwrittenItems(ctx: CacheRuntime) {
-  const layerWrapKeys = new Set<string>()
-  for (const keys of ctx.wrappedItemKeysPerLayer.values()) {
-    for (const wrapKey of keys) {
-      layerWrapKeys.add(wrapKey)
-    }
+/**
+ * Forget the base wrapper of a row that is not in cache state.
+ *
+ * Fetches wrap their response rows right away, even when the cache write is
+ * still queued (paused cache, staggering). If that write is then dropped or
+ * rejected, nothing else would ever remove the wrapper and the raw row it
+ * holds. Wrappers still owned by a query are kept, so their ownership
+ * survives until the row lands.
+ */
+export function releaseUnwrittenItem(ctx: CacheRuntime, collection: ResolvedCollection<any, any, any>, key: string | number): void {
+  const entry = ctx.wrappedItems.get(collection.name, key)
+  if (entry && !isOwned(entry.metadata) && readRawCacheItem(ctx, collection, key) === undefined) {
+    ctx.wrappedItems.deleteBase(collection.name, key)
   }
-  const collections = ctx.getStore().$collections
-  // Map iteration tolerates deleting the current entry.
-  for (const [wrapKey, wrappedItem] of ctx.wrappedItems) {
-    if (layerWrapKeys.has(wrapKey)) {
-      continue
+}
+
+/** Forget every unowned base wrapper whose row is not in cache state. */
+export function releaseUnwrittenItems(ctx: CacheRuntime): void {
+  const collections = new Map(ctx.getStore().$collections.map(collection => [collection.name, collection]))
+  ctx.wrappedItems.forEachBase((collectionName, id, entry) => {
+    const collection = collections.get(collectionName)
+    if (collection && !isOwned(entry.metadata) && readRawCacheItem(ctx, collection, id) === undefined) {
+      ctx.wrappedItems.deleteBase(collectionName, id)
     }
-    const collection = collections.find(candidate => candidate.name === wrappedItem.$collection)
-    const key = collection?.getKey(wrappedItem)
-    if (collection && key != null) {
-      releaseUnwrittenItem(ctx, collection, key)
-    }
-  }
+  })
+}
+
+/** Whether a query still owns, or is reconciling ownership of, a wrapper. */
+function isOwned(metadata: WrappedItemMetadata): boolean {
+  return metadata.queries.size > 0 || metadata.dirtyQueries.size > 0
 }

@@ -1,3 +1,4 @@
+import type { Collection, CollectionDefaults, FindOptionsInclude, StoreSchema } from '@rstore/shared'
 import type { MaybeRefOrGetter } from 'vue'
 import type { VueStore } from './store'
 import { tryOnScopeDispose } from '@vueuse/core'
@@ -11,6 +12,8 @@ export interface UseQueryTrackingOptions<TResult> {
   cached: MaybeRefOrGetter<TResult>
   /** Latest network result, used when cache data is unavailable. */
   result?: MaybeRefOrGetter<TResult>
+  /** Included relations selected by the current query options. */
+  include?: () => FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> | undefined
 }
 
 /**
@@ -21,6 +24,6 @@ export interface UseQueryTrackingOptions<TResult> {
  */
 export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResult>) {
   const controller = createQueryTrackingController(options)
-  tryOnScopeDispose(() => controller.releaseAll({ collect: true }))
+  tryOnScopeDispose(() => controller.dispose())
   return controller
 }
