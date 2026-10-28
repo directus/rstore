@@ -38,10 +38,10 @@ describe('garbage collection option resolution', () => {
   })
 
   it.each([
-    [false, undefined, 'cache-first', false, false],
+    [false, undefined, 'cache-first', false, true],
     [false, true, 'cache-first', false, true],
     [true, undefined, 'cache-first', false, true],
-    [true, false, 'cache-first', false, false],
+    [true, false, 'cache-first', false, true],
     [true, true, 'no-cache', false, false],
     [true, undefined, 'cache-first', true, false],
   ])('uses default=%s override=%s policy=%s server=%s', async (storeDefault, queryOverride, fetchPolicy, isServer, retains) => {
@@ -82,20 +82,26 @@ describe('garbage collection option resolution', () => {
     expect(cached(stack, 'todos', '1')).toBeDefined()
   })
 
-  it('releases ownership without evicting when a reactive override becomes disabled', async () => {
+  it('retains active data without collecting after the override becomes disabled', async () => {
     const enabled = ref(true)
     const stack = await createGarbageCollectionStack({
       schema: todoSchema,
       data: { todos: [{ id: '1' }] },
     })
-    await stack.run(() => stack.store.todos.query((q: any) => q.many({
+    const scope = stack.scope(() => stack.store.todos.query((q: any) => q.many({
       experimentalGarbageCollection: enabled.value,
     })))
+    const query = await scope.result
 
     enabled.value = false
     await nextTick()
     expect(cached(stack, 'todos', '1')).toBeDefined()
 
+    stack.cache.garbageCollect()
+    expect(queryIds(query)).toEqual(['1'])
+    scope.stop()
+    await drainGarbageCollection()
+    expect(cached(stack, 'todos', '1')).toBeDefined()
     stack.cache.garbageCollect()
     expect(cached(stack, 'todos', '1')).toBeUndefined()
   })

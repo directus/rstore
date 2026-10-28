@@ -38,14 +38,7 @@ export function createQuery<
   ctx.cached = computed(() => readCachedResult(ctx))
   ctx.queryTracking = ctx.store.$isServer
     ? null
-    : useQueryTracking({
-        store: ctx.store,
-        result: ctx.result,
-        cached: ctx.cached,
-        visibleRows: () => ctx.resultMode !== 'responseRefs' && !hasIndependentPage(ctx)
-          && (ctx.cache._private.hasRowRetention() || ctx.mainPage.cacheStatus !== 'untracked'),
-        include: () => ctx.getPageOptions(ctx.mainPage).include,
-      })
+    : useQueryTracking({ store: ctx.store, result: ctx.result, cached: ctx.cached, include: () => ctx.getOptions()?.include })
   ctx.updateQueryTrackingMode()
 
   // `data` is read by the `loading` aggregate, so it has to exist first.
@@ -260,8 +253,12 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     if (resolved.fetchPolicy === 'no-cache') {
       return false
     }
-    return getQueryCollectionEnabled() || resolved.resultMode === 'responseRefs' || !!resolved.cacheScope || cache._private.hasRowRetention()
+    return true
   }
+  /** Whether this query collects rows after releasing its ownership. */
+  const getQueryCollectionEnabled = () => options.store.$experimentalGarbageCollection
+    ? getOptions()?.experimentalGarbageCollection !== false
+    : getOptions()?.experimentalGarbageCollection === true
 
   const ctx = {
     ...options,
