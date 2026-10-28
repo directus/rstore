@@ -92,9 +92,11 @@ export function createCacheApi<
       ctx.engine.clearCollection(params)
     },
     garbageCollectItem({ collection, item }) {
+      ctx.trackingEffects.flush()
       garbageCollectItem(ctx, collection, item)
     },
     garbageCollect() {
+      ctx.trackingEffects.flush()
       garbageCollect(ctx)
     },
     addLayer(layer) {
@@ -124,6 +126,7 @@ export function createCacheApi<
       disposeCache(ctx)
     },
     _private: {
+      trackingEffects: ctx.trackingEffects,
       state: ctx.state,
       getWrappedItem: (collection, item, noCache) => getWrappedItem(ctx, collection, item, noCache),
       layers: ctx.layers,

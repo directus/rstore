@@ -6,6 +6,7 @@ import type { IndexResultCache } from './indexResultCache'
 import type { ItemCellRegistry } from './itemCells'
 import type { QueryStateHolder } from './queryHolders'
 import type { SignalRegistry } from './signals'
+import type { TrackingEffectBatch } from './trackingEffects'
 import type { CacheVersionRegistry } from './versions'
 import type { WrappedItemRegistry } from './wrappedRegistry'
 
@@ -99,6 +100,8 @@ export interface CacheRuntime<
   state: VueCacheState
   /** Vue signal registry subscribed to engine observers. */
   signals: SignalRegistry
+  /** Ownership effects coalesced across each cache publication. */
+  trackingEffects: TrackingEffectBatch
   /** Wrapper-owned exact item cells synchronized after commits. */
   itemCells: ItemCellRegistry
   /** Reactive fallback for Vue computed getters without a scope owner. */
@@ -116,6 +119,8 @@ export interface CacheRuntime<
 /** Private Vue cache surface consumed by existing Vue internals and devtools. */
 export interface VueCachePrivate {
   _private: {
+    /** Schedule relation ownership reads at the synchronous commit boundary. */
+    trackingEffects: TrackingEffectBatch
     /** Bridge-owned cache state. */
     state: VueCacheState
     /** Return an existing wrapped item or create one for the raw item. */

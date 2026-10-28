@@ -14,6 +14,7 @@ import { createCacheStateSink } from './stateSink'
 import { synchronizeBridgeIndex } from './stateSinkIndex'
 import { synchronizeBridgeItem } from './stateSinkItem'
 import { appendSyncError, runSyncTask, throwSyncErrors } from './syncErrors'
+import { createTrackingEffectBatch } from './trackingEffects'
 import { createCacheVersionRegistry } from './versions'
 import { releaseUnwrittenItem } from './wrapped'
 import { createWrappedItemRegistry } from './wrappedRegistry'
@@ -43,7 +44,7 @@ export function createCacheRuntime<
     recordList: collection => sinkImplementation.recordList(collection),
     recordIndex: dependency => sinkImplementation.recordIndex(dependency),
     recordCollectionReset: collection => sinkImplementation.recordCollectionReset(collection),
-    commit: () => sinkImplementation.commit(),
+    commit: () => runtime.trackingEffects.run(() => sinkImplementation.commit()),
     discard: () => sinkImplementation.discard(),
   }
 
@@ -70,6 +71,7 @@ export function createCacheRuntime<
     queryStateHeldCount: 0,
     engine,
     changeInterest,
+    trackingEffects: createTrackingEffectBatch(),
     state: {
       pageRefs,
       get queryMeta() {
