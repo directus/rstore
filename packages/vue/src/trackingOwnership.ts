@@ -13,6 +13,8 @@ export interface QueryTrackingOwnershipOptions<TResult> {
   cached: MaybeRefOrGetter<TResult>
   /** Network/page result used when cache data is unavailable. */
   result?: MaybeRefOrGetter<TResult>
+  /** Included relations selected by the current query options. */
+  include?: () => FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> | undefined
 }
 
 /** Controller kept for one logical query, with ownership separated by page id. */
@@ -27,8 +29,10 @@ export interface QueryTrackingController<TResult> {
   releasePage: (pageId: string, options: { collect: boolean }) => void
   /** Release ownership held by every page. */
   releaseAll: (options: { collect: boolean }) => void
+  /** Release all leases and prevent a stopped query from reacquiring them. */
+  dispose: () => void
   /** Enable or disable ownership for current reactive query options. */
-  setEnabled: (enabled: boolean) => void
+  setEnabled: (enabled: boolean, collect?: boolean) => void
   /** Public compatibility access to relation tracking. */
   addToQueryTracking: (tracking: HookMetaQueryTracking, item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>, include?: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema>) => void
 }
@@ -42,13 +46,20 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
   // Historical exclusions can outlive page membership while a peer owns rows.
   const dirtyMetadata = new DirtyQueryMemberships(trackingQueryId)
   const enabled = ref(false)
+  const collecting = ref(true)
   const dataKey = ref(0)
+  const visiblePageId = '\0visible'
 
   const filteredCached = computed<TResult>(() => {
     // Make deferred releases observable even if a cache array was not replaced.
     void dataKey.value
     const result = toValue(options.cached)
-    if (!enabled.value || !result) {
+    if (enabled.value && !collecting.value) {
+      const tracking = createTrackingObject()
+      populateTracking(store, tracking, result, options.include?.())
+      updateVisibleTracking(tracking)
+    }
+    if (!enabled.value || !collecting.value || !result) {
       return result
     }
     if (Array.isArray(result)) {
@@ -125,7 +136,7 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       pageTrackings.set(pageId, next)
       retain(next)
       if (previous && reconcilePrevious) {
-        releaseMembers(previous, true)
+        releaseMembers(previous, collecting.value)
       }
       relationWatchers.get(pageId)?.()
       relationWatchers.delete(pageId)
@@ -137,7 +148,7 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
           const current = createTrackingObject()
           // A released nested row can remain in the shared cache until its
           // deferred sweep. Do not let a sibling deletion re-adopt it.
-          populateTracking(store, current, visible, include, trackingQueryId)
+          populateTracking(store, current, visible, include, collecting.value ? trackingQueryId : undefined)
           return current
         }, (current) => {
           const previous = pageTrackings.get(pageId)
@@ -145,7 +156,7 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
             return
           pageTrackings.set(pageId, current)
           retain(current)
-          releaseMembers(previous, true)
+          releaseMembers(previous, collecting.value)
         }, { flush: 'sync' })
         relationWatchers.set(pageId, stop)
       }
@@ -159,7 +170,7 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
         return
       }
       pageTrackings.delete(pageId)
-      releaseMembers(tracking, collect)
+      releaseMembers(tracking, collect && collecting.value)
     },
 
     releaseAll({ collect }) {
@@ -170,7 +181,16 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       dirtyMetadata.clear()
     },
 
-    setEnabled(nextEnabled) {
+    dispose() {
+      enabled.value = false
+      controller.releaseAll({ collect: true })
+    },
+
+    setEnabled(nextEnabled, nextCollecting = true) {
+      if (!nextCollecting && collecting.value) {
+        dirtyMetadata.clear()
+      }
+      collecting.value = nextCollecting
       if (enabled.value === nextEnabled) {
         return
       }
@@ -180,6 +200,37 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       }
     },
   }
+  // Non-collecting computed queries expose every matching cached row, not only
+  // rows returned by their last fetch. Retain that live view as it changes.
+  watch(() => {
+    if (!enabled.value || collecting.value)
+      return undefined
+    try {
+      const tracking = createTrackingObject()
+      populateTracking(store, tracking, toValue(options.cached), options.include?.())
+      return tracking
+    }
+    catch {
+      // A component can invalidate its options immediately before unmount.
+      // Keep its last lease until normal query handling or scope disposal.
+      return pageTrackings.get(visiblePageId)
+    }
+  }, updateVisibleTracking, { flush: 'pre' })
+
+  /** Retain the live cache view before releasing its prior membership. */
+  function updateVisibleTracking(tracking: HookMetaQueryTracking | undefined): void {
+    const previous = pageTrackings.get(visiblePageId)
+    if (tracking) {
+      pageTrackings.set(visiblePageId, tracking)
+      retain(tracking)
+    }
+    else {
+      pageTrackings.delete(visiblePageId)
+    }
+    if (previous)
+      releaseMembers(previous, false)
+  }
+
   return controller
 }
 

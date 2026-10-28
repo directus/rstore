@@ -208,6 +208,9 @@ export interface FindOptionsBase<
   /**
    * Experimental: Enable garbage collection for items that are not referenced by any query or other item.
    *
+   * Active cache-backed queries always retain their results. When disabled,
+   * releasing the query does not schedule collection of its records.
+   *
    * Relations resolve from the shared cache, so a nested item dropped by a refreshed
    * response stays visible in this query's relations while another query retains it.
    */

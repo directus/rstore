@@ -129,7 +129,11 @@ async function fetchPage(
 
   // Pruning needs the written identities even without ownership. That payload
   // stays out of the ownership paths below, which only see `newQueryTracking`.
-  const hookTracking = tracksPage ? newQueryTracking : pruneRun && !uncachedPage ? createTrackingObject() : undefined
+  // A non-collecting query still owns its result, but pruning must retain a
+  // separate payload for writes that can remain queued after publication.
+  const hookTracking = pruneRun && !ctx.queryCollectionEnabled && !uncachedPage
+    ? createTrackingObject()
+    : tracksPage ? newQueryTracking : pruneRun && !uncachedPage ? createTrackingObject() : undefined
   const publication = createPageFetchPublication(ctx, page, savedPageRequestId)
   const fetchMeta: CustomHookMeta = {
     ...ctx.meta.value,
@@ -151,7 +155,7 @@ async function fetchPage(
     }
     // A no-cache result says nothing about the cache: left unrecorded, it cancels the prune.
     if (pruneRun && !uncachedPage) {
-      recordPrunedFetch(pruneRun, hookTracking, pageResult, finalOptions.include, tracksPage, isCurrent)
+      recordPrunedFetch(pruneRun, hookTracking, pageResult, finalOptions.include, hookTracking === newQueryTracking, isCurrent)
     }
     reconcilePageTracking(ctx, page, tracksPage ? getTrackingResult(page, pageResult) : undefined, finalOptions, tracksPage ? newQueryTracking : undefined, isCurrent)
     return isCurrent()

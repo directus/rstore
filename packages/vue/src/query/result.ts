@@ -75,7 +75,7 @@ export function getTrackingResult(page: VueQueryPage<any, any, any, any, any>, r
  * collector remains the authority for whether an unowned row can disappear.
  */
 export function collectUnreconciledTracking(ctx: any, tracking: any): void {
-  if (!tracking) {
+  if (!tracking || !ctx.queryCollectionEnabled) {
     return
   }
   nextTick(() => {
