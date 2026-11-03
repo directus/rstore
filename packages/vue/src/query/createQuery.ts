@@ -33,7 +33,11 @@ export function createQuery<
   })
   ctx.mainPage = createPage(ctx, {}, true)
   ctx.result = computed(() => mergePages(ctx))
-  ctx.cacheRead = computed(() => ctx.cacheMethod(ctx.getOptions(), { ...ctx.meta.value }) ?? null)
+  // A disabled query has no options (`getOptions()` is undefined): reading the
+  // cache with them would scan and wrap the whole collection for nothing.
+  ctx.cacheRead = computed(() => ctx.isDisabled()
+    ? toValue(ctx.defaultValue)
+    : ctx.cacheMethod(ctx.getOptions(), { ...ctx.meta.value }) ?? null)
   ctx.cached = computed(() => readCachedResult(ctx))
   ctx.queryTracking = ctx.store.$isServer
     ? null
