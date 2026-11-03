@@ -15,6 +15,7 @@ import { createObserverRegistry } from './observers.js'
 import { dispatchImmediate } from './queue-dispatch.js'
 import { enqueueOperation, flushQueuedOperations } from './queue.js'
 import { resolveRelationWriteParams } from './relations.js'
+import { scanVisibleRows } from './scan-visible.js'
 import { getState as serializeState } from './serialize.js'
 import { normalizeSnapshotInput } from './snapshot-input.js'
 import { createStaggering } from './staggering.js'
@@ -108,6 +109,10 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
             break
         }
       }
+    },
+
+    scanVisibleRowsRaw({ collection, marker }, reuse, visit) {
+      scanVisibleRows(ctx, collection.name, marker, reuse, visit)
     },
 
     getIndexBucket(collectionName, indexKey, indexValue) {

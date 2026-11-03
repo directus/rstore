@@ -14,6 +14,8 @@ export interface ItemCell {
   track: () => void
   /** Return whether committed engine changes synchronize this cell. */
   isActive: () => boolean
+  /** Return whether its wrapper was evicted from the wrapper registry. */
+  isDetached: () => boolean
   /** Stop registry retention while keeping external wrapper usable. */
   detach: () => void
 }

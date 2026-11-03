@@ -77,6 +77,11 @@ export class CacheItemCell implements ItemCell {
     return this.state === 'active'
   }
 
+  /** Return whether its wrapper was evicted from the wrapper registry. */
+  isDetached(): boolean {
+    return this.state === 'detached'
+  }
+
   /** Stop registry ownership while preserving lazy reads. */
   detach(): void {
     this.registry?.detach(this)

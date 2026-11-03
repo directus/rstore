@@ -195,6 +195,16 @@ export interface StoreEngine<
     visit: (key: string | number, item: unknown) => boolean | void,
     onIndexDependency?: (dependency: string) => boolean | void,
   ) => void
+  /**
+   * Visit a collection's visible rows in order. While the collection has no
+   * optimistic layer, `reuse` runs first for each canonical id; returning
+   * `true` skips resolving that row.
+   */
+  scanVisibleRowsRaw: (
+    params: { collection: ResolvedCollection<any, any, any>, marker?: string },
+    reuse: (id: string) => boolean,
+    visit: (key: string | number, item: unknown, id: string) => void,
+  ) => void
   /** Read one reconciled index bucket. */
   getIndexBucket: (collection: string, indexKey: string, indexValue: CacheIndexValue) => ReadonlySet<string | number> | undefined
   /** Return stable opaque identity for one index dependency. */
