@@ -6,9 +6,8 @@ import { disposeCache } from './dispose'
 import { applyMutationToCache } from './mutations'
 import { holdRetainedQueryState, releaseRetainedQueryState, sweepQueryState } from './queryRetention'
 import { clonePageRefs, invalidatePageRefsForItem } from './queryState'
+import { rebuildVisibleList } from './visibleList'
 import { garbageCollectItem, getWrappedItem, releaseUnwrittenItems } from './wrapped'
-
-type VisibleListResult = Array<WrappedItem<any, any, any>> & { marker?: string }
 
 /** Create the public Cache implementation from a cache runtime. */
 export function createCacheApi<
@@ -151,16 +150,16 @@ function readItems(ctx: CacheRuntime, params: Parameters<Cache['readItems']>[0])
   if (visibleList) {
     if (!ctx.signals.trackList(collection.name))
       ctx.versions.trackList(collection.name)
-    const cached = ctx.visibleListCache.get(collection.name) as VisibleListResult | undefined
+    const cached = ctx.visibleListCache.get(collection.name)
     if (cached && (marker === undefined || cached.marker === marker))
-      return cached.slice()
+      return cached.items.slice()
     if (marker !== undefined && !ctx.engine.hasMarker(marker))
       return []
     if (cached) {
       cached.marker = marker
-      return cached.slice()
+      return cached.items.slice()
     }
-    return scanItems(ctx, params, true, true)
+    return rebuildVisibleList(ctx, collection, marker).items.slice()
   }
   return readUncachedItems(ctx, params)
 }
@@ -172,7 +171,7 @@ function readUncachedItems(ctx: CacheRuntime, params: Parameters<Cache['readItem
   }
 
   const markerActive = params.marker === undefined || ctx.engine.hasMarker(params.marker)
-  return scanItems(ctx, params, markerActive, false)
+  return scanItems(ctx, params, markerActive)
 }
 
 /** Track list dependency through lifecycle or ownerless fallback. */
@@ -186,12 +185,11 @@ function scanItems(
   ctx: CacheRuntime,
   { collection, marker, filter, keys, limit, indexKey, indexValue }: Parameters<Cache['readItems']>[0],
   markerActive: boolean,
-  canReuseVisibleList: boolean,
 ) {
   let indexDependency: string | undefined
   const canReuseIndex = keys == null && indexKey != null && !filter && limit == null
   let cachedIndex: readonly any[] | undefined
-  const result: VisibleListResult = []
+  const result: Array<WrappedItem<any, any, any>> = []
   let count = 0
   ctx.engine.scanItemsRaw(
     { collection, marker, keys, indexKey, indexValue },
@@ -219,11 +217,6 @@ function scanItems(
     return cachedIndex.slice()
   if (!markerActive)
     return []
-  if (canReuseVisibleList) {
-    result.marker = marker
-    ctx.visibleListCache.set(collection.name, result)
-    return result.slice()
-  }
   if (canReuseIndex && indexDependency !== undefined) {
     return ctx.indexResultCache.set(collection.name, indexDependency, result)
       ? result.slice()

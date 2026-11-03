@@ -8,6 +8,7 @@ import type { QueryStateHolder } from './queryHolders'
 import type { SignalRegistry } from './signals'
 import type { TrackingEffectBatch } from './trackingEffects'
 import type { CacheVersionRegistry } from './versions'
+import type { VisibleListCache } from './visibleListCache'
 import type { WrappedItemRegistry } from './wrappedRegistry'
 
 export type { TombstoneGcOptions }
@@ -111,7 +112,7 @@ export interface CacheRuntime<
   /** Structured wrapped-item identities and metadata. */
   wrappedItems: WrappedItemRegistry<TCollectionDefaults, TSchema>
   /** Stable visible-list wrappers reused until cache membership can change. */
-  visibleListCache: Map<string, Array<WrappedItem<Collection, TCollectionDefaults, TSchema>>>
+  visibleListCache: VisibleListCache
   /** Bounded weak exact-index wrapper results retained until membership changes. */
   indexResultCache: IndexResultCache
 }

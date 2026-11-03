@@ -1,6 +1,7 @@
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { WrappedItemMetadata } from '../itemMetadata'
 import type { CacheRuntime } from './types'
+import type { WrappedItemEntry } from './wrappedRegistry'
 import { shallowRef } from 'vue'
 import { wrapItem } from '../item'
 import { createWrappedItemMetadata } from '../itemMetadata'
@@ -40,6 +41,20 @@ export function getWrappedItem<
   const current = knownKey === undefined
     ? readRawCacheItem(ctx, collection, key) ?? item
     : item
+  const entry = getWrappedEntry(ctx, collection, current, key, track)
+  if (track)
+    entry.cell.track()
+  return entry.item as WrappedItem<TCollection, TCollectionDefaults, TSchema>
+}
+
+/** Return the registry entry wrapping one current raw row, creating it when needed. */
+export function getWrappedEntry(
+  ctx: CacheRuntime<any, any>,
+  collection: ResolvedCollection<any, any, any>,
+  current: any,
+  key: string | number,
+  track = false,
+): WrappedItemEntry<any, any> {
   const layer = current.$layer
   let entry = ctx.wrappedItems.get(collection.name, key, layer?.id)
   if (!entry) {
@@ -53,16 +68,9 @@ export function getWrappedItem<
       seed: current,
     })
     entry = { item: wrappedItem, metadata, cell }
-    ctx.wrappedItems.set(
-      collection.name,
-      key,
-      layer?.id,
-      entry as unknown as Parameters<typeof ctx.wrappedItems.set>[3],
-    )
+    ctx.wrappedItems.set(collection.name, key, layer?.id, entry)
   }
-  if (track)
-    entry.cell.track()
-  return entry.item as WrappedItem<TCollection, TCollectionDefaults, TSchema>
+  return entry
 }
 
 /** Delete an unreferenced item from cache and emit garbage collection hooks. */

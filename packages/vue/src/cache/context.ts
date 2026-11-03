@@ -16,6 +16,7 @@ import { synchronizeBridgeItem } from './stateSinkItem'
 import { appendSyncError, runSyncTask, throwSyncErrors } from './syncErrors'
 import { createTrackingEffectBatch } from './trackingEffects'
 import { createCacheVersionRegistry } from './versions'
+import { createVisibleListCache } from './visibleListCache'
 import { releaseUnwrittenItem } from './wrapped'
 import { createWrappedItemRegistry } from './wrappedRegistry'
 
@@ -93,7 +94,7 @@ export function createCacheRuntime<
     versions,
     layers: Object.create(null) as CacheRuntime<TSchema, TCollectionDefaults>['layers'],
     wrappedItems: createWrappedItemRegistry(),
-    visibleListCache: new Map(),
+    visibleListCache: createVisibleListCache(changeInterest),
     indexResultCache: createIndexResultCache(changeInterest),
   }
   sinkImplementation = createCacheStateSink({
@@ -125,8 +126,8 @@ function synchronizeBridge(
     lists: orderListChanges(ctx, changes.lists),
   }
   let errors: unknown[] | undefined
-  for (const collection of orderedChanges.lists) ctx.visibleListCache.delete(collection)
-  for (const collection of resets) ctx.visibleListCache.delete(collection)
+  for (const collection of orderedChanges.lists) ctx.visibleListCache.invalidate(collection)
+  for (const collection of resets) ctx.visibleListCache.drop(collection)
   for (const dependency of changes.indexes) ctx.indexResultCache.invalidate(dependency)
   for (const collection of resets) ctx.indexResultCache.reset(collection)
   // A list signal can synchronously rebuild a custom cache-filter result. For
@@ -254,7 +255,7 @@ function handleConflict(
 
 /** Update layer mirrors before calling layer-add hooks. */
 function handleLayerAdd(ctx: CacheRuntime, layer: CacheLayer): void {
-  ctx.visibleListCache.delete(layer.collectionName)
+  ctx.visibleListCache.drop(layer.collectionName)
   const layers = ensureLayersForCollection(ctx, layer.collectionName)
   layers.value = [...layers.value.filter(candidate => candidate.id !== layer.id), layer]
   const store = ctx.getStore()
@@ -263,7 +264,7 @@ function handleLayerAdd(ctx: CacheRuntime, layer: CacheLayer): void {
 
 /** Remove exact layer wrappers and mirror state before user hooks. */
 function handleLayerRemove(ctx: CacheRuntime, layer: CacheLayer): void {
-  ctx.visibleListCache.delete(layer.collectionName)
+  ctx.visibleListCache.drop(layer.collectionName)
   const layers = ctx.layers[layer.collectionName]
   if (layers) {
     layers.value = layers.value.filter(candidate => candidate.id !== layer.id)
@@ -277,7 +278,7 @@ function handleLayerRemove(ctx: CacheRuntime, layer: CacheLayer): void {
 function handleReset(ctx: CacheRuntime, payload: EngineResetPayload): void {
   if (payload.collection) {
     const collectionName = payload.collection.name
-    ctx.visibleListCache.delete(collectionName)
+    ctx.visibleListCache.drop(collectionName)
     ctx.indexResultCache.reset(collectionName)
     ctx.wrappedItems.deleteCollection(collectionName)
     clearQueryStateForCollection(ctx, collectionName)
