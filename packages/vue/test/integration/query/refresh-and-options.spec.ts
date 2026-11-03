@@ -84,6 +84,30 @@ describe('query', () => {
     expect(readMany('messages')).toEqual([])
   })
 
+  it('should not read cached rows while a many query is disabled', async () => {
+    const { store, run } = await createVueStack({
+      schema: [{ name: 'messages' }],
+      data: { messages: [] },
+    })
+    for (const id of ['foo', 'bar']) {
+      store.$cache.writeItem({ collection: store.$collections[0]!, key: id, item: { id, text: id } })
+    }
+    const enabled = ref(false)
+
+    const query = await run(() => store.messages.query((q: any) => q.many({
+      fetchPolicy: 'cache-only',
+      enabled: enabled.value,
+    })))
+
+    // Disabled options must not fall back to an optionless whole-collection read.
+    expect(query.data.value).toEqual([])
+
+    enabled.value = true
+    await nextTick()
+
+    expect(query.data.value.map((item: any) => item.id).sort()).toEqual(['bar', 'foo'])
+  })
+
   it('should re-enable query by setting option to object', async () => {
     const { store, run, remote, read } = await createVueStack({
       schema: [{ name: 'messages' }],
