@@ -4,7 +4,7 @@ import type { EngineCollectionState, EngineContext, EngineEffect, EngineLayer, K
 import { recordItem, recordList } from './change-recorder.js'
 import { getCollectionMetadata } from './collection-metadata.js'
 import { getPublicKey, isEntityKey, releaseUnusedKey, toKeyId } from './identity.js'
-import { reconcileItemIndexes } from './indexes.js'
+import { reconcileItemIndexes, touchItemIndexes } from './indexes.js'
 import { createNullRecord } from './records.js'
 import { invalidateResolvedItem, invalidateVisibleKeys, resolveItemById } from './view.js'
 
@@ -89,12 +89,19 @@ function reconcileLayerChange(
     const next = resolveItemById(state, id)
     const before = previous[index]
     const keyFormChanged = previousKeys[index] !== getPublicKey(state, id)
+    // Consumers wrap rows per owning layer, so a row that stays visible while
+    // moving between the base and a layer still replaces its list/index entry.
+    const layerChanged = before !== undefined && next !== undefined && before.$layer !== next.$layer
     if (before !== next) {
-      if (hasIndexes)
+      if (hasIndexes) {
         reconcileItemIndexes(ctx, changes, collection, id, before, next)
+        if (layerChanged)
+          touchItemIndexes(ctx, changes, collection, next)
+      }
       recordItem(changes, collection.name, id, next)
     }
-    visibilityChanged ||= (before !== undefined) !== (next !== undefined)
+    visibilityChanged ||= layerChanged
+      || (before !== undefined) !== (next !== undefined)
       || (keyFormChanged && (before !== undefined || next !== undefined))
   }
   if (visibilityChanged) {

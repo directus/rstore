@@ -54,6 +54,29 @@ function addDependency(
   recordIndex(changes, collection, dependency)
 }
 
+/**
+ * Record every bucket currently holding an item without changing membership.
+ * Consumers that cache per-layer row identities must refresh those buckets
+ * even when the item's indexed values stayed the same.
+ */
+export function touchItemIndexes(
+  ctx: EngineContext,
+  changes: ChangeRecorder | undefined,
+  collection: ResolvedCollection<any, any, any>,
+  item: any,
+): void {
+  if (!mayRecordIndex(changes, collection.name))
+    return
+  const state = ctx.ensureCollection(collection.name)
+  for (const [indexKey, fields] of collection.indexes) {
+    const index = state.indexes.get(indexKey)
+    const values = index && readIndexValues(item, fields)
+    const bucket = values && findIndexBucket(index, values)
+    if (bucket)
+      touchBucket(changes, collection.name, indexKey, index, bucket)
+  }
+}
+
 /** Reconcile one item's indexes directly from previous and next values. */
 export function reconcileItemIndexes(
   ctx: EngineContext,

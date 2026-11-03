@@ -39,6 +39,26 @@ describe('non-collecting query visible ownership', () => {
     owner.stop()
   })
 
+  it('keeps a row retained when its optimistic layer is replaced by the base write', async () => {
+    const stack = await createGarbageCollectionStack({ remote: false, experimentalGarbageCollection: true, schema: [{ name: 'todos' }] })
+    const collection = stack.collection('todos')
+    stack.cache.writeItem({ collection, key: '1', item: { id: '1' } })
+    const owner = stack.scope(() => stack.store.todos.query((q: any) => q.many({
+      fetchPolicy: 'cache-only',
+      experimentalGarbageCollection: false,
+    })))
+    const query = await owner.result
+    stack.cache.addLayer({ id: 'create', collectionName: 'todos', state: { 2: { id: '2' } }, deletedItems: new Set() })
+    expect(queryIds(query)).toEqual(['1', '2'])
+
+    stack.cache.writeItem({ collection, key: '2', item: { id: '2' } })
+    stack.cache.removeLayer('create')
+    stack.cache.garbageCollect()
+    expect(queryIds(query)).toEqual(['1', '2'])
+    expect(cached(stack, 'todos', '2')).toBeDefined()
+    owner.stop()
+  })
+
   it('releases a row added after loading once it stops matching the visible result', async () => {
     const stack = await createGarbageCollectionStack({ remote: false, experimentalGarbageCollection: true, schema: [{ name: 'todos' }] })
     const collection = stack.collection('todos')

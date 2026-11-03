@@ -75,6 +75,27 @@ describe('store-engine: layers', () => {
     expect(engine.resolveKeys({ collection, indexKey: 'authorId', indexValue: 'b' }).map(String)).toContain('1')
   })
 
+  it('notifies list and index scopes when a layer swaps a row identity', () => {
+    const collection = buildCollection('Post', {
+      indexes: new Map([['authorId', ['authorId']]]),
+    })
+    const { engine } = createTestEngine([collection])
+    engine.writeItem({ collection, key: 1, item: { id: 1, authorId: 'a' } })
+    const list = vi.fn()
+    const index = vi.fn()
+    engine.observeList('Post', list)
+    engine.observeIndex('Post', 'authorId', 'a', index)
+
+    // Same membership and index value: only the layer owning the row changes.
+    engine.addLayer(buildLayer('l1', 'Post', { 1: { id: 1, authorId: 'a', title: 'draft' } }))
+    expect(list).toHaveBeenCalledTimes(1)
+    expect(index).toHaveBeenCalledTimes(1)
+
+    engine.removeLayer('l1')
+    expect(list).toHaveBeenCalledTimes(2)
+    expect(index).toHaveBeenCalledTimes(2)
+  })
+
   it('getLayer returns the registered layer', () => {
     const collection = buildCollection('User')
     const { engine } = createTestEngine([collection])
