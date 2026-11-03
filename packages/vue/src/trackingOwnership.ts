@@ -1,12 +1,14 @@
 import type { Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryTracking, StoreSchema, WrappedItemBase } from '@rstore/shared'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { VueStore } from './store'
+import type { VisibleMembershipChange } from './trackingVisible'
 import { computed, nextTick, ref, toValue } from 'vue'
 import { DirtyQueryMemberships } from './trackingDirtyMemberships'
 import { watchQueryTracking } from './trackingEffect'
 import { forEachTrackedItem, forEachTrackedKey, resultIsEmpty, trackingHasKey } from './trackingKeys'
 import { addToQueryTracking, createTrackingObject, findTrackedCollection, populateTracking } from './trackingRelations'
 import { createVisibleMembership } from './trackingVisible'
+import { createVisibleGraphMembership } from './trackingVisibleGraph'
 
 /** Options needed to reconcile one query's page ownership. */
 export interface QueryTrackingOwnershipOptions<TResult> {
@@ -45,7 +47,7 @@ type VisibleSource
   = | { kind: 'none' }
     | { kind: 'keep' }
     | { kind: 'result', result: unknown }
-    | { kind: 'graph', tracking: HookMetaQueryTracking }
+    | { kind: 'graph', result: unknown, include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> }
 
 /** Create page-aware ownership and filtered cache reads for one query. */
 export function createQueryTrackingController<TResult>(options: QueryTrackingOwnershipOptions<TResult>): QueryTrackingController<TResult> {
@@ -121,7 +123,12 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
   // Non-collecting queries expose every matching cached row, not only rows
   // returned by their last fetch. Retain that live view once per cache
   // publication, before any synchronous sweep, diffing only changed rows.
+  // With includes, each reached row re-reads only its own selected relations.
   const visibleMembership = createVisibleMembership()
+  const visibleGraph = createVisibleGraphMembership(store, (change) => {
+    if (pageTrackings.get(visiblePageId) === visibleGraph.tracking)
+      applyPageChange(visiblePageId, visibleGraph.tracking, change, visibleGraph.tracking, false)
+  })
   let visibleResult: unknown
   const stopVisible = watchQueryTracking(store, (): VisibleSource => {
     if (!enabled.value || collecting.value)
@@ -129,12 +136,7 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
     try {
       const result = toValue(options.cached)
       const include = options.include?.()
-      if (!include)
-        return { kind: 'result', result }
-      // Relation targets can change under a stable root result: read them here.
-      const tracking = createTrackingObject()
-      populateTracking(store, tracking, result, include)
-      return { kind: 'graph', tracking }
+      return include ? { kind: 'graph', result, include } : { kind: 'result', result }
     }
     catch {
       // A component can invalidate its options immediately before unmount.
@@ -147,37 +149,47 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
   function reconcileVisible(source: VisibleSource): void {
     if (source.kind === 'keep')
       return
-    if (source.kind !== 'result') {
-      visibleResult = undefined
-      updateVisibleTracking(source.kind === 'graph' ? source.tracking : undefined)
-      visibleMembership.reset()
+    if (source.kind === 'none') {
+      releaseVisible()
       return
     }
+    const membership = source.kind === 'graph' ? visibleGraph : visibleMembership
+    // Leaving one mode hands its full payload to the release below.
+    if (source.kind === 'graph')
+      visibleMembership.reset()
+    else visibleGraph.reset()
     const previous = pageTrackings.get(visiblePageId)
     // Cache publications rerun this effect even when the result is unchanged.
-    if (source.result === visibleResult && previous === visibleMembership.tracking)
+    if (source.result === visibleResult && previous === membership.tracking
+      && (source.kind === 'result' || visibleGraph.matches(source.include))) {
       return
+    }
     visibleResult = source.result
-    const { added, removed } = visibleMembership.update(source.result)
-    pageTrackings.set(visiblePageId, visibleMembership.tracking)
-    for (const item of added) {
+    const change = source.kind === 'graph'
+      ? visibleGraph.update(source.result, source.include)
+      : visibleMembership.update(source.result)
+    applyPageChange(visiblePageId, membership.tracking, change, previous, false)
+  }
+
+  /** Install a page's membership, retain entering wrappers, then release departures. */
+  function applyPageChange(pageId: string, tracking: HookMetaQueryTracking, change: VisibleMembershipChange, previous: HookMetaQueryTracking | undefined, collect: boolean): void {
+    pageTrackings.set(pageId, tracking)
+    for (const item of change.added) {
       item.$meta.queries.add(trackingQueryId)
       dirtyMetadata.delete(item.$meta)
     }
-    // A full previous payload comes from relation mode or a released page.
-    releaseMembers(previous && previous !== visibleMembership.tracking ? previous : removed, false)
+    // A full previous payload comes from the other mode, a released page or
+    // the payload installed by the page load.
+    releaseMembers(previous && previous !== tracking ? previous : change.removed, collect)
   }
 
-  /** Retain the live cache view before releasing its prior membership. */
-  function updateVisibleTracking(tracking: HookMetaQueryTracking | undefined): void {
+  /** Release the live cache view when ownership is disabled or collecting. */
+  function releaseVisible(): void {
+    visibleResult = undefined
+    visibleMembership.reset()
+    visibleGraph.reset()
     const previous = pageTrackings.get(visiblePageId)
-    if (tracking) {
-      pageTrackings.set(visiblePageId, tracking)
-      retain(tracking)
-    }
-    else {
-      pageTrackings.delete(visiblePageId)
-    }
+    pageTrackings.delete(visiblePageId)
     if (previous)
       releaseMembers(previous, false)
   }
@@ -210,24 +222,21 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       relationWatchers.get(pageId)?.()
       relationWatchers.delete(pageId)
       if (include) {
-        // This watcher starts after asynchronous loading, so page lifecycle owns
-        // its disposal explicitly. Track relation reads, not mutable ownership
-        // metadata. Reconcile once per commit, before immediate public GC.
-        const stop = watchQueryTracking(store, () => {
-          const current = createTrackingObject()
+        // This graph starts after asynchronous loading, so page lifecycle owns
+        // its disposal explicitly. Each reached row re-reads only its own
+        // relations, once per commit and before immediate public GC.
+        const graph = createVisibleGraphMembership(store, (change) => {
+          const previous = pageTrackings.get(pageId)
+          if (previous)
+            applyPageChange(pageId, graph.tracking, change, previous, collecting.value)
+        }, {
           // A released nested row can remain in the shared cache until its
           // deferred sweep. Do not let a sibling deletion re-adopt it.
-          populateTracking(store, current, visible, include, collecting.value ? trackingQueryId : undefined)
-          return current
-        }, (current) => {
-          const previous = pageTrackings.get(pageId)
-          if (!previous)
-            return
-          pageTrackings.set(pageId, current)
-          retain(current)
-          releaseMembers(previous, collecting.value)
+          dirtyQueryId: () => collecting.value ? trackingQueryId : undefined,
         })
-        relationWatchers.set(pageId, stop)
+        // The installed page payload already retains this first traversal.
+        graph.update(visible, include)
+        relationWatchers.set(pageId, graph.reset)
       }
     },
 
@@ -241,6 +250,8 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       pageTrackings.delete(pageId)
       if (tracking === visibleMembership.tracking)
         visibleMembership.reset()
+      if (tracking === visibleGraph.tracking)
+        visibleGraph.reset()
       releaseMembers(tracking, collect && collecting.value)
     },
 
@@ -254,6 +265,7 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
 
     dispose() {
       stopVisible()
+      visibleGraph.reset()
       enabled.value = false
       controller.releaseAll({ collect: true })
     },
