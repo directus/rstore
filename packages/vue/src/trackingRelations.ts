@@ -4,6 +4,31 @@ import type { VueStore } from './store'
 /** Selection traversed for one occurrence of a related item. */
 type RelationInclude = FindOptionsInclude<Collection, CollectionDefaults, StoreSchema>
 
+/** Selections already traversed, by collection name then stringified key. */
+type VisitedSelections = Map<string, Map<string, Set<RelationInclude | undefined>>>
+
+/** Resolved collection type stored in `store.$collections`. */
+type StoreCollection = VueStore['$collections'][number]
+
+/** Name lookups per collection list; rebuilt when `addCollections` appends. */
+const collectionLookups = new WeakMap<readonly StoreCollection[], { size: number, byName: Map<string, StoreCollection> }>()
+
+/**
+ * Resolve a store collection by name without scanning the list per item.
+ * Ownership traversals ask once per row and relation, so a linear `find`
+ * dominated large cache-backed queries.
+ */
+export function findTrackedCollection(store: VueStore, name: string): StoreCollection | undefined {
+  const collections = store.$collections
+  let lookup = collectionLookups.get(collections)
+  // Collections are only ever appended, so a length change means new names.
+  if (!lookup || lookup.size !== collections.length) {
+    lookup = { size: collections.length, byName: new Map(collections.map(collection => [collection.name, collection])) }
+    collectionLookups.set(collections, lookup)
+  }
+  return lookup.byName.get(name)
+}
+
 /** Create an empty payload used to collect a query page's cached identities. */
 export function createTrackingObject(): HookMetaQueryTracking {
   return { items: {} }
@@ -21,24 +46,33 @@ export function addToQueryTracking(
   tracking: HookMetaQueryTracking,
   item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>,
   include?: RelationInclude,
-  visited: Map<string, Set<RelationInclude | undefined>> = new Map(),
+  visited: VisitedSelections = new Map(),
   dirtyQueryId?: string,
 ): void {
   if (!item.$collection || (dirtyQueryId && item.$meta.dirtyQueries.has(dirtyQueryId))) {
     return
   }
-  const collection = store.$collections.find(collection => collection.name === item.$collection)
+  const collection = findTrackedCollection(store, item.$collection)
   if (!collection) {
     return
   }
   const key = item.$getKey()
-  const visitKey = JSON.stringify([collection.name, String(key)])
-  const selections = visited.get(visitKey) ?? new Set<RelationInclude | undefined>()
-  if (selections.has(include)) {
+  // Nested maps avoid serializing a visit key for every traversed row.
+  let collectionVisits = visited.get(collection.name)
+  if (!collectionVisits) {
+    collectionVisits = new Map()
+    visited.set(collection.name, collectionVisits)
+  }
+  const visitKey = String(key)
+  let selections = collectionVisits.get(visitKey)
+  if (!selections) {
+    selections = new Set()
+    collectionVisits.set(visitKey, selections)
+  }
+  else if (selections.has(include)) {
     return
   }
   selections.add(include)
-  visited.set(visitKey, selections)
   ;(tracking.items[collection.name] ??= new Set()).add(key)
 
   for (const relationName in collection.relations) {
@@ -56,7 +90,7 @@ export function addToQueryTracking(
         continue
       }
       const relatedCollection = relatedItem.$collection
-        ? store.$collections.find(collection => collection.name === relatedItem.$collection)
+        ? findTrackedCollection(store, relatedItem.$collection)
         : undefined
       addToQueryTracking(
         store,
@@ -106,7 +140,7 @@ export function populateTracking<TResult>(
   }
   // Related graphs can converge from multiple visible roots. Keep one visit
   // set for this population pass while preserving isolated public traversals.
-  const visited = new Map<string, Set<RelationInclude | undefined>>()
+  const visited: VisitedSelections = new Map()
   for (const item of Array.isArray(result) ? result : [result]) {
     if (item && typeof item === 'object') {
       addToQueryTracking(store, tracking, item as WrappedItemBase<Collection, CollectionDefaults, StoreSchema>, include, visited, dirtyQueryId)
