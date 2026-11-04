@@ -81,11 +81,21 @@ export function collectUnreconciledTracking(ctx: any, tracking: any): void {
   if (!tracking || !ctx.queryCollectionEnabled) {
     return
   }
-  for (const [collectionName, keys] of Object.entries(tracking.items) as Array<[string, Set<string | number>]>) {
-    const collection = ctx.store.$collections.find((candidate: any) => candidate.name === collectionName)
-    if (collection) {
-      for (const key of keys)
-        ctx.cache._private.collectReleasedRow(collection, key)
+  nextTick(() => {
+    for (const [collectionName, keys] of Object.entries(tracking.items) as Array<[string, Set<string | number>]>) {
+      const collection = ctx.store.$collections.find((candidate: any) => candidate.name === collectionName)
+      if (!collection) {
+        continue
+      }
+      // One cache commit per collection rather than one per stale row.
+      const items = []
+      for (const key of keys) {
+        const item = ctx.store.$cache.readItem({ collection, key })
+        if (item) {
+          items.push(item)
+        }
+      }
+      ctx.store.$cache.garbageCollectItems({ collection, items })
     }
   }
 }

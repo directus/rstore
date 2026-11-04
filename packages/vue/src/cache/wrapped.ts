@@ -73,6 +73,14 @@ export function getWrappedEntry(
   return entry
 }
 
+/** One item considered for garbage collection, with its key when already known. */
+export interface GarbageCollectionCandidate<TCollection extends Collection> {
+  /** Wrapped item to collect when no query owns it. */
+  item: WrappedItem<TCollection, CollectionDefaults, StoreSchema>
+  /** Cache key, to skip resolving it from the item. */
+  key?: string | number
+}
+
 /** Delete an unreferenced item from cache and emit garbage collection hooks. */
 export function garbageCollectItem<TCollection extends Collection>(
   ctx: CacheRuntime,
@@ -80,21 +88,38 @@ export function garbageCollectItem<TCollection extends Collection>(
   item: WrappedItem<TCollection, CollectionDefaults, StoreSchema>,
   knownKey?: string | number,
 ) {
-  if (item.$meta.queries.size !== 0) {
+  garbageCollectItems(ctx, collection, [{ item, key: knownKey }])
+}
+
+/**
+ * Delete unreferenced items of one collection in a single engine commit, then
+ * emit one garbage collection hook per evicted item.
+ */
+export function garbageCollectItems<TCollection extends Collection>(
+  ctx: CacheRuntime,
+  collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
+  candidates: Iterable<GarbageCollectionCandidate<TCollection>>,
+) {
+  const itemsByKey = new Map<string | number, WrappedItem<TCollection, CollectionDefaults, StoreSchema>>()
+  for (const { item, key } of candidates) {
+    if (item.$meta.queries.size === 0) {
+      itemsByKey.set(key ?? getItemKey(collection, item), item)
+    }
+  }
+  if (!itemsByKey.size) {
     return
   }
-  const key = knownKey ?? getItemKey(collection, item)
-  if (!ctx.engine.garbageCollectKey(collection, key)) {
-    return
-  }
-  invalidatePageRefsForItem(ctx, collection.name, key)
+  const removedKeys = ctx.engine.garbageCollectKeys(collection, itemsByKey.keys())
   const store = ctx.getStore()
-  store.$hooks.callHookSync('itemGarbageCollect', {
-    store,
-    collection,
-    item,
-    key,
-  })
+  for (const key of removedKeys) {
+    invalidatePageRefsForItem(ctx, collection.name, key)
+    store.$hooks.callHookSync('itemGarbageCollect', {
+      store,
+      collection,
+      item: itemsByKey.get(key)!,
+      key,
+    })
+  }
 }
 
 /**

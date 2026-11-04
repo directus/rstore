@@ -2,9 +2,9 @@ import type { FieldTimestampValue } from '@rstore/shared'
 import type { QueuedOperation } from './internal-types.js'
 import type { EngineOptions, StoreEngine } from './types.js'
 import { createTombstoneStore, gcTombstones as gcTombstonesStore, scheduleTombstoneGc } from '../tombstone.js'
-import { createChangeRecorder, createFlushChangeRecorder, discardStateChangeSink } from './change-recorder.js'
 import { createEngineContext } from './context.js'
 import { getFieldTimestamps, setFieldTimestamps } from './crdt-state.js'
+import { garbageCollectKeys } from './garbage-collection.js'
 import { getPublicKey, toKeyId } from './identity.js'
 import { cacheIndexDependencyId } from './index-dependencies.js'
 import { getIndexBucket, getIndexBucketIds, getIndexObserverId, getIndexRead, rebuildIndexes } from './indexes.js'
@@ -12,7 +12,6 @@ import { inspectEngine } from './inspection.js'
 import { getLayerNow } from './layers.js'
 import { getModuleState } from './modules.js'
 import { createObserverRegistry } from './observers.js'
-import { dispatchImmediate } from './queue-dispatch.js'
 import { enqueueOperation, flushQueuedOperations } from './queue.js'
 import { resolveRelationWriteParams } from './relations.js'
 import { scanVisibleRows } from './scan-visible.js'
@@ -20,7 +19,6 @@ import { getState as serializeState } from './serialize.js'
 import { normalizeSnapshotInput } from './snapshot-input.js'
 import { createStaggering } from './staggering.js'
 import { getVisibleKeyIds, getVisibleKeys, resolveItem, resolveItemById } from './view.js'
-import { deleteItemFromBase } from './write.js'
 
 /**
  * Create a framework-agnostic storage engine. Plain JS structures own state;
@@ -208,32 +206,11 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     },
 
     garbageCollectKey(collection, key) {
-      const state = ctx.collections.get(collection.name)
-      // A visible optimistic patch/delete owns its base row until its layer is
-      // removed; collecting it would make rollback lose authoritative data.
-      if (state?.layeredKeyCounts?.has(toKeyId(key))) {
-        return false
-      }
-      const flush = createFlushChangeRecorder()
-      const changes = createChangeRecorder(ctx, flush)
-      try {
-        const result = deleteItemFromBase(ctx, changes, { collection, key })
-        if (result.removed) {
-          const timestamps = ctx.fieldTimestamps.get(collection.name)
-          timestamps?.delete(toKeyId(key))
-          if (timestamps?.size === 0)
-            ctx.fieldTimestamps.delete(collection.name)
-          dispatchImmediate(ctx, changes, flush, result.effects)
-        }
-        else {
-          discardStateChangeSink(changes)
-        }
-        return result.removed
-      }
-      catch (error) {
-        discardStateChangeSink(changes)
-        throw error
-      }
+      return garbageCollectKeys(ctx, collection, [key]).length > 0
+    },
+
+    garbageCollectKeys(collection, keys) {
+      return garbageCollectKeys(ctx, collection, keys)
     },
 
     forEachKey(collectionName, callback) {
