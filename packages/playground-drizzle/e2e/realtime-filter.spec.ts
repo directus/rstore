@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
+import { createTodo, todoByTitle, uniqueText } from '../../../test/e2e/todoUi'
 import { openRealtimeApp, toggleTodo } from './realtime-helpers'
-import { createTodo, todoByTitle, uniqueText } from './utils'
 
 test('filtered live query updates when remote tab toggles todo completion', async ({ browser }) => {
   const ctxA = await browser.newContext()

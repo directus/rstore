@@ -26,7 +26,6 @@ declare module '@rstore/vue' {
   }
 
   export interface CustomHookMeta {
-    storeHistoryItem?: Pick<StoreHistoryItem, 'started'>
     totalCount?: number
   }
 

@@ -1,7 +1,8 @@
 import type { Collection, CollectionDefaults, FinalizeMutationOptions, FinalizeMutationResult, GlobalStoreType, ResolvedCollectionItemBase, StoreCore, StoreSchema } from '@rstore/shared'
 import type { FinalizeMutationRuntimeOptions } from './finalize/helpers'
-import { applyCommittedMutation, createManyApplyOptions, createSingleApplyOptions, emitAfterMutationHook, emitItemAfterMutationHooks, getHookItems, getHookKeys, getInitialManyResults, getItemKey, normalizeKey, parseCommittedItem, withManyResults, withSingleResult } from './finalize/helpers'
+import { applyCommittedMutation, createManyApplyOptions, createSingleApplyOptions, emitAfterMutationHook, emitItemAfterMutationHooks, getHookItems, getHookKeys, getInitialManyResults, parseCommittedItem, withManyResults, withSingleResult } from './finalize/helpers'
 import { recordMutationHistory } from './history'
+import { getItemKey, normalizeKey } from './keys'
 
 /** Shared finalize path used after a remote mutation succeeds. */
 export async function finalizeMutation<
@@ -31,7 +32,7 @@ async function finalizeSingleMutation<
   let result = options.result as ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema> | null | undefined
 
   result = await emitAfterMutationHook(store, options, meta, {
-    key: normalizeKey(options.key ?? getItemKey(options, result ?? options.item)),
+    key: normalizeKey(options.key ?? getItemKey(options.collection, result ?? options.item)),
     item: options.item,
     result,
   })
@@ -47,7 +48,7 @@ async function finalizeSingleMutation<
   recordMutationHistory(store, {
     operation: options.mutation,
     collection: options.collection,
-    key: normalizeKey(options.key ?? getItemKey(options, parsedResult ?? options.item)),
+    key: normalizeKey(options.key ?? getItemKey(options.collection, parsedResult ?? options.item)),
     payload: options.item,
   })
 

@@ -41,6 +41,16 @@ describe('isMutationItemEntry shapes', () => {
     expect(isMutationItemEntry(new Row())).toBe(true)
   })
 
+  it('keeps inherited item fields accepted for wire compatibility', () => {
+    const entry = Object.create({ item: 'inherited value', key: 0 })
+
+    // Entries from prototype-backed transport objects have always passed the
+    // `in` checks. Keep that permissive boundary while centralizing its type.
+    expect(isMutationItemEntry(entry)).toBe(true)
+    expect(unwrapMutationItem(entry)).toBe('inherited value')
+    expect(getMutationItemKey(entry)).toBe(0)
+  })
+
   it('misreads a collection item whose only field is `item` (known limitation of the single-key heuristic in mutation.ts:3)', () => {
     const realItem = { item: 'Buy milk' }
 

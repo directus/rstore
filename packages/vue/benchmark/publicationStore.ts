@@ -1,71 +1,38 @@
 import type { Cache } from '@rstore/shared'
-import type { CacheRuntime } from '../src/cache/types'
-import assert from 'node:assert/strict'
 import { createStoreCore } from '@rstore/core'
 import { createHooks } from '@rstore/shared'
 import { createCollectionApi } from '../src/api/createCollectionApi'
 import { createCacheApi } from '../src/cache/api'
-import { createCacheRuntime, mark } from '../src/cache/context'
-import { writeItemNow } from '../src/cache/writes'
+import { createCacheRuntime } from '../src/cache/context'
 
-/** Public write payload accepted by the historical flat control. */
+/** Public write payload accepted by the per-item control. */
 type WriteItemsParams = Parameters<Cache['writeItems']>[0]
 
-/** Queue cursor mirroring the historical synchronous writeItems path. */
-interface LegacyWriteItemsOperation {
-  /** Complete collection write payload. */
-  params: WriteItemsParams
-  /** Next item to apply. */
-  index: number
-}
-
 /**
- * Reproduce the pre-change flat, non-staggered writeItems queue path from
- * 3db362ce95fe5aed6c1e461f6f455ccf50354ad1. The real current writeItemNow
- * retains that path whenever no CacheWriteBatch is supplied.
+ * Model writeItems without atomic publication by applying identical rows
+ * through current public writeItem behavior.
  */
-export function legacyWriteItems(ctx: CacheRuntime, params: WriteItemsParams) {
-  const operation: LegacyWriteItemsOperation = { params, index: 0 }
-  ctx.state.queue.push(operation as unknown as CacheRuntime['state']['queue'][number])
-  ctx.isFlushingQueue = true
-  try {
-    while (operation.index < operation.params.items.length) {
-      const { key, value: item } = operation.params.items[operation.index]!
-      writeItemNow(ctx, {
-        collection: operation.params.collection,
-        key,
-        item,
-        meta: operation.params.meta,
-        fromWriteItems: true,
-      })
-      operation.index++
-    }
-
-    if (operation.params.marker) {
-      mark(ctx, operation.params.marker)
-    }
-    const store = ctx.getStore()
-    store.$hooks.callHookSync('afterCacheWrite', {
-      store,
-      meta: {},
-      collection: operation.params.collection,
-      result: operation.params.items,
-      marker: operation.params.marker,
-      operation: 'write',
+export function writeItemsPerItem(cache: Cache, store: any, params: WriteItemsParams) {
+  for (let index = 0; index < params.items.length; index++) {
+    const { key, value: item } = params.items[index]!
+    cache.writeItem({
+      collection: params.collection,
+      key,
+      item,
+      meta: params.meta,
+      fromWriteItems: true,
+      marker: index === params.items.length - 1 ? params.marker : undefined,
     })
-    ctx.state.queue.shift()
   }
-  finally {
-    ctx.isFlushingQueue = false
-  }
-}
 
-/** Reject benchmark inputs outside the legacy control scope. */
-export function assertLegacyPreconditions(ctx: CacheRuntime) {
-  assert.equal(ctx.cacheStaggering, 0, 'The legacy control only models non-staggered writeItems')
-  assert.equal(ctx.state.paused, false, 'The legacy control expects an active cache')
-  assert.equal(ctx.isFlushingQueue, false, 'The legacy control expects an idle cache queue')
-  assert.equal(ctx.state.queue.length, 0, 'The legacy control expects an empty cache queue')
+  store.$hooks.callHookSync('afterCacheWrite', {
+    store,
+    meta: {},
+    collection: params.collection,
+    result: params.items,
+    marker: params.marker,
+    operation: 'write',
+  })
 }
 
 /** Build an isolated real cache with the public collection query API. */

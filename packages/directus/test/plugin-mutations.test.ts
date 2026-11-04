@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { runConnectorHook as runHook } from '../../../test/utils/connectorPlugin'
 import { createDeferred } from '../../../test/utils/deferred'
 import {
   createMockDirectusClient,
   createOrdersCollection,
   createSettingsCollection,
   createTodosCollection,
-  runHook,
   setupPlugin,
 } from './utils/plugin'
 

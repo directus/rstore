@@ -28,13 +28,6 @@ export function isRelationField<TData extends Record<string, any>, TSchema exten
 }
 
 /**
- * Pick the user-owned payload from a relation field value.
- */
-export function pickRelationRawPayload(value: unknown, clone = false, force = false): Record<string, any> | any[] | undefined {
-  return pickRelationPayload(value, { clone, force })
-}
-
-/**
  * Read a backing form field without resolving proxy-only relation facades.
  */
 export function getRawFormValue<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(
@@ -94,7 +87,7 @@ export function pickFormData<TData extends Record<string, any>, TSchema extends 
     if (!isPublicKey(key))
       continue
     if (isRelationField(ctx, key)) {
-      const relationPayload = pickRelationRawPayload(ctx.form[key], clone)
+      const relationPayload = pickRelationPayload(ctx.form[key], { clone })
       if (relationPayload) {
         data[key] = relationPayload
       }
@@ -120,10 +113,10 @@ export function removeInternalRelationData<TData extends Record<string, any>, TS
 
     const value = (data as any)[key]
     if (isRelationField(ctx, key)) {
-      const hasLivePayload = !!pickRelationRawPayload(ctx.form[key])
+      const hasLivePayload = !!pickRelationPayload(ctx.form[key])
       const isLiveRelationField = value === ctx.form[key]
       const forcePayloadPick = !isLiveRelationField || hasLivePayload || (Array.isArray(value) && value.length === 0)
-      const relationPayload = pickRelationRawPayload(value, true, forcePayloadPick)
+      const relationPayload = pickRelationPayload(value, { clone: true, force: forcePayloadPick })
       if (relationPayload)
         cleanData[key] = relationPayload
       continue
@@ -167,8 +160,8 @@ export function updateChangedProps<TData extends Record<string, any>, TSchema ex
 
   for (const key in ctx.initialData) {
     if (relationKeys?.has(key)) {
-      const current = pickRelationRawPayload(ctx.form[key])
-      const initial = pickRelationRawPayload(ctx.initialData[key as keyof typeof ctx.initialData], false, true)
+      const current = pickRelationPayload(ctx.form[key])
+      const initial = pickRelationPayload(ctx.initialData[key as keyof typeof ctx.initialData], { force: true })
       if (!formFieldValuesEqual(current, initial)) {
         changed[key as keyof TData] = [current, initial] as [TData[keyof TData], TData[keyof TData]]
       }
@@ -189,11 +182,11 @@ export function updateChangedProps<TData extends Record<string, any>, TSchema ex
     if ((!isRelationKey && key in (ctx.initialData as Record<string, any>)) || key in changed)
       continue
     const current = isRelationKey
-      ? pickRelationRawPayload(ctx.form[key])
+      ? pickRelationPayload(ctx.form[key])
       : ctx.form[key]
     if (current !== undefined) {
       const initial = isRelationKey
-        ? pickRelationRawPayload(ctx.initialData[key as keyof typeof ctx.initialData], false, true)
+        ? pickRelationPayload(ctx.initialData[key as keyof typeof ctx.initialData], { force: true })
         : undefined
       changed[key as keyof TData] = [current, initial] as [TData[keyof TData], TData[keyof TData]]
     }
@@ -261,8 +254,8 @@ export function snapshotFormOperation<TData extends Record<string, any>, TSchema
   if (op.type === 'set' && ctx.relationPayloadSetOps.has(op) && isRelationField(ctx, field)) {
     return {
       ...op,
-      newValue: pickRelationRawPayload(op.newValue, true, true),
-      oldValue: pickRelationRawPayload(op.oldValue, true, true),
+      newValue: pickRelationPayload(op.newValue, { clone: true, force: true }),
+      oldValue: pickRelationPayload(op.oldValue, { clone: true, force: true }),
     }
   }
   return pickNonSpecialProps(op, true) as FormOperation<TData>
@@ -287,7 +280,7 @@ export function applyRuntimeOp<TData extends Record<string, any>, TSchema extend
   const field = String(op.field)
   if (op.type === 'set' && ctx.relationPayloadSetOps.has(op) && isRelationField(ctx, field)) {
     if (options.attachRelationApi === false) {
-      target[field] = pickRelationRawPayload(op.newValue, true, true)
+      target[field] = pickRelationPayload(op.newValue, { clone: true, force: true })
       return
     }
     const relationField = createRelationPayloadField(ctx.relationMethods[field], op.newValue)

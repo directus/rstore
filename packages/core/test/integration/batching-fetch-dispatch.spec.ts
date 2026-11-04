@@ -235,4 +235,27 @@ describe('batched fetch dispatch', () => {
     expect(stack.read('todos', '2')).toBeUndefined()
     expect(stack.remote.callCount('fetchFirst')).toBe(0)
   })
+
+  it('keeps the first terminal fetch resolution when later calls disagree', async () => {
+    const stack = await batchStack({
+      on: {
+        batchFetch: ({ payload }: any) => {
+          const [operation] = payload.operations
+          operation.setResult({ id: '1', title: 'First' })
+          operation.setError(new Error('Late failure'))
+          operation.setResult({ id: '1', title: 'Late result' })
+        },
+      },
+    })
+
+    const { result } = await findFirst({
+      store: stack.store,
+      collection: stack.collection('todos'),
+      findOptions: { key: '1' },
+    })
+
+    expect(result).toMatchObject({ id: '1', title: 'First' })
+    expect(stack.read('todos', '1')).toMatchObject({ title: 'First' })
+    expect(stack.remote.callCount('fetchFirst')).toBe(0)
+  })
 })

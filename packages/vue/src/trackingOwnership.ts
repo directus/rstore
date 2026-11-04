@@ -1,9 +1,14 @@
-import type { Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryTracking, StoreSchema, WrappedItemBase } from '@rstore/shared'
+import type { Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryTracking, ResolvedCollection, StoreSchema, WrappedItemBase } from '@rstore/shared'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { VueStore } from './store'
-import { computed, nextTick, ref, toValue, watch } from 'vue'
+import type { VisibleMembershipChange } from './trackingVisible'
+import { computed, nextTick, ref, toValue } from 'vue'
 import { DirtyQueryMemberships } from './trackingDirtyMemberships'
-import { addToQueryTracking, createTrackingObject, populateTracking } from './trackingRelations'
+import { watchQueryTracking } from './trackingEffect'
+import { forEachTrackedItem, forEachTrackedKey, resultIsEmpty, trackingHasKey } from './trackingKeys'
+import { addToQueryTracking, createTrackingObject, findTrackedCollection, populateTracking } from './trackingRelations'
+import { createVisibleMembership } from './trackingVisible'
+import { createVisibleGraphMembership } from './trackingVisibleGraph'
 
 /** Options needed to reconcile one query's page ownership. */
 export interface QueryTrackingOwnershipOptions<TResult> {
@@ -13,6 +18,8 @@ export interface QueryTrackingOwnershipOptions<TResult> {
   cached: MaybeRefOrGetter<TResult>
   /** Network/page result used when cache data is unavailable. */
   result?: MaybeRefOrGetter<TResult>
+  /** Included relations selected by the current query options. */
+  include?: () => FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> | undefined
 }
 
 /** Controller kept for one logical query, with ownership separated by page id. */
@@ -27,11 +34,20 @@ export interface QueryTrackingController<TResult> {
   releasePage: (pageId: string, options: { collect: boolean }) => void
   /** Release ownership held by every page. */
   releaseAll: (options: { collect: boolean }) => void
+  /** Release all leases and prevent a stopped query from reacquiring them. */
+  dispose: () => void
   /** Enable or disable ownership for current reactive query options. */
-  setEnabled: (enabled: boolean) => void
+  setEnabled: (enabled: boolean, collect?: boolean) => void
   /** Public compatibility access to relation tracking. */
   addToQueryTracking: (tracking: HookMetaQueryTracking, item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>, include?: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema>) => void
 }
+
+/** Live cache view read by the visible ownership effect of a non-collecting query. */
+type VisibleSource
+  = | { kind: 'none' }
+    | { kind: 'keep' }
+    | { kind: 'result', result: unknown }
+    | { kind: 'graph', result: unknown, include: FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> }
 
 /** Create page-aware ownership and filtered cache reads for one query. */
 export function createQueryTrackingController<TResult>(options: QueryTrackingOwnershipOptions<TResult>): QueryTrackingController<TResult> {
@@ -42,13 +58,15 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
   // Historical exclusions can outlive page membership while a peer owns rows.
   const dirtyMetadata = new DirtyQueryMemberships(trackingQueryId)
   const enabled = ref(false)
+  const collecting = ref(true)
   const dataKey = ref(0)
+  const visiblePageId = '\0visible'
 
   const filteredCached = computed<TResult>(() => {
     // Make deferred releases observable even if a cache array was not replaced.
     void dataKey.value
     const result = toValue(options.cached)
-    if (!enabled.value || !result) {
+    if (!enabled.value || !collecting.value || !result) {
       return result
     }
     if (Array.isArray(result)) {
@@ -69,11 +87,14 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
   /** Release only keys no current page of this query still owns. */
   function releaseMembers(tracking: HookMetaQueryTracking, collect: boolean): void {
     let changed = false
+    // Collected together on the next tick: one cache commit per collection,
+    // instead of one per row that would re-run every dependent query each time.
+    const released = new Map<ResolvedCollection<any, any, any>, WrappedItemBase<Collection, CollectionDefaults, StoreSchema>[]>()
     forEachTrackedKey(tracking, (collectionName, key) => {
       if (isTrackedByAnotherPage(collectionName, key)) {
         return
       }
-      const collection = store.$collections.find(candidate => candidate.name === collectionName)
+      const collection = findTrackedCollection(store, collectionName)
       const item = collection && store.$cache.readItem({ collection, key }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
       if (!item) {
         return
@@ -85,10 +106,17 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       }
       dirtyMetadata.add(item.$meta)
       changed = true
-      nextTick(() => store.$cache.garbageCollectItem({ collection: collection!, item: item as any }))
+      const items = released.get(collection!) ?? []
+      items.push(item)
+      released.set(collection!, items)
     })
     if (changed) {
       dataKey.value++
+      nextTick(() => {
+        for (const [collection, items] of released) {
+          store.$cache.garbageCollectItems({ collection, items: items as any })
+        }
+      })
     }
   }
 
@@ -100,6 +128,80 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       }
     }
     return false
+  }
+
+  // Non-collecting queries expose every matching cached row, not only rows
+  // returned by their last fetch. Retain that live view once per cache
+  // publication, before any synchronous sweep, diffing only changed rows.
+  // With includes, each reached row re-reads only its own selected relations.
+  const visibleMembership = createVisibleMembership()
+  const visibleGraph = createVisibleGraphMembership(store, (change) => {
+    if (pageTrackings.get(visiblePageId) === visibleGraph.tracking)
+      applyPageChange(visiblePageId, visibleGraph.tracking, change, visibleGraph.tracking, false)
+  })
+  let visibleResult: unknown
+  const stopVisible = watchQueryTracking(store, (): VisibleSource => {
+    if (!enabled.value || collecting.value)
+      return { kind: 'none' }
+    try {
+      const result = toValue(options.cached)
+      const include = options.include?.()
+      return include ? { kind: 'graph', result, include } : { kind: 'result', result }
+    }
+    catch {
+      // A component can invalidate its options immediately before unmount.
+      // Keep its last lease until normal query handling or scope disposal.
+      return { kind: 'keep' }
+    }
+  }, reconcileVisible, { immediate: true })
+
+  /** Apply the live cache view to the visible page's ownership. */
+  function reconcileVisible(source: VisibleSource): void {
+    if (source.kind === 'keep')
+      return
+    if (source.kind === 'none') {
+      releaseVisible()
+      return
+    }
+    const membership = source.kind === 'graph' ? visibleGraph : visibleMembership
+    // Leaving one mode hands its full payload to the release below.
+    if (source.kind === 'graph')
+      visibleMembership.reset()
+    else visibleGraph.reset()
+    const previous = pageTrackings.get(visiblePageId)
+    // Cache publications rerun this effect even when the result is unchanged.
+    if (source.result === visibleResult && previous === membership.tracking
+      && (source.kind === 'result' || visibleGraph.matches(source.include))) {
+      return
+    }
+    visibleResult = source.result
+    const change = source.kind === 'graph'
+      ? visibleGraph.update(source.result, source.include)
+      : visibleMembership.update(source.result)
+    applyPageChange(visiblePageId, membership.tracking, change, previous, false)
+  }
+
+  /** Install a page's membership, retain entering wrappers, then release departures. */
+  function applyPageChange(pageId: string, tracking: HookMetaQueryTracking, change: VisibleMembershipChange, previous: HookMetaQueryTracking | undefined, collect: boolean): void {
+    pageTrackings.set(pageId, tracking)
+    for (const item of change.added) {
+      item.$meta.queries.add(trackingQueryId)
+      dirtyMetadata.delete(item.$meta)
+    }
+    // A full previous payload comes from the other mode, a released page or
+    // the payload installed by the page load.
+    releaseMembers(previous && previous !== tracking ? previous : change.removed, collect)
+  }
+
+  /** Release the live cache view when ownership is disabled or collecting. */
+  function releaseVisible(): void {
+    visibleResult = undefined
+    visibleMembership.reset()
+    visibleGraph.reset()
+    const previous = pageTrackings.get(visiblePageId)
+    pageTrackings.delete(visiblePageId)
+    if (previous)
+      releaseMembers(previous, false)
   }
 
   const controller: QueryTrackingController<TResult> = {
@@ -125,29 +227,26 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       pageTrackings.set(pageId, next)
       retain(next)
       if (previous && reconcilePrevious) {
-        releaseMembers(previous, true)
+        releaseMembers(previous, collecting.value)
       }
       relationWatchers.get(pageId)?.()
       relationWatchers.delete(pageId)
       if (include) {
-        // This watcher starts after asynchronous loading, so page lifecycle owns
-        // its disposal explicitly. Track relation reads, not mutable ownership
-        // metadata. Synchronous adoption protects even immediate public GC.
-        const stop = watch(() => {
-          const current = createTrackingObject()
+        // This graph starts after asynchronous loading, so page lifecycle owns
+        // its disposal explicitly. Each reached row re-reads only its own
+        // relations, once per commit and before immediate public GC.
+        const graph = createVisibleGraphMembership(store, (change) => {
+          const previous = pageTrackings.get(pageId)
+          if (previous)
+            applyPageChange(pageId, graph.tracking, change, previous, collecting.value)
+        }, {
           // A released nested row can remain in the shared cache until its
           // deferred sweep. Do not let a sibling deletion re-adopt it.
-          populateTracking(store, current, visible, include, trackingQueryId)
-          return current
-        }, (current) => {
-          const previous = pageTrackings.get(pageId)
-          if (!previous)
-            return
-          pageTrackings.set(pageId, current)
-          retain(current)
-          releaseMembers(previous, true)
-        }, { flush: 'sync' })
-        relationWatchers.set(pageId, stop)
+          dirtyQueryId: () => collecting.value ? trackingQueryId : undefined,
+        })
+        // The installed page payload already retains this first traversal.
+        graph.update(visible, include)
+        relationWatchers.set(pageId, graph.reset)
       }
     },
 
@@ -159,7 +258,11 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
         return
       }
       pageTrackings.delete(pageId)
-      releaseMembers(tracking, collect)
+      if (tracking === visibleMembership.tracking)
+        visibleMembership.reset()
+      if (tracking === visibleGraph.tracking)
+        visibleGraph.reset()
+      releaseMembers(tracking, collect && collecting.value)
     },
 
     releaseAll({ collect }) {
@@ -170,7 +273,18 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       dirtyMetadata.clear()
     },
 
-    setEnabled(nextEnabled) {
+    dispose() {
+      stopVisible()
+      visibleGraph.reset()
+      enabled.value = false
+      controller.releaseAll({ collect: true })
+    },
+
+    setEnabled(nextEnabled, nextCollecting = true) {
+      if (!nextCollecting && collecting.value) {
+        dirtyMetadata.clear()
+      }
+      collecting.value = nextCollecting
       if (enabled.value === nextEnabled) {
         return
       }
@@ -181,47 +295,4 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
     },
   }
   return controller
-}
-
-/** Iterate cached items represented by a tracking object. */
-function forEachTrackedItem(
-  store: VueStore,
-  tracking: HookMetaQueryTracking,
-  callback: (item: WrappedItemBase<Collection, CollectionDefaults, StoreSchema>) => void,
-): void {
-  forEachTrackedKey(tracking, (collectionName, key) => {
-    const collection = store.$collections.find(candidate => candidate.name === collectionName)
-    const item = collection && store.$cache.readItem({ collection, key }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
-    if (item) {
-      callback(item)
-    }
-  })
-}
-
-/** Iterate collection/key pairs in a tracking object. */
-function forEachTrackedKey(tracking: HookMetaQueryTracking, callback: (collectionName: string, key: string | number) => void): void {
-  for (const [collectionName, keys] of Object.entries(tracking.items)) {
-    for (const key of keys) {
-      callback(collectionName, key)
-    }
-  }
-}
-
-/** Whether a page result supplies no item identity to a skipped payload. */
-function resultIsEmpty<TResult>(result: TResult | undefined): boolean {
-  return result == null || (Array.isArray(result) && result.length === 0)
-}
-
-/** Check string-equivalent cache identity with at most two Set lookups. */
-function trackingHasKey(tracking: HookMetaQueryTracking, collectionName: string, key: string | number): boolean {
-  const keys = tracking.items[collectionName]
-  if (!keys)
-    return false
-  if (keys.has(key))
-    return true
-  if (typeof key === 'number')
-    return keys.has(String(key))
-  const numericKey = Number(key)
-  // Round-trip before matching: '01', '1.0', and '-0' differ from numeric keys.
-  return String(numericKey) === key && keys.has(numericKey)
 }

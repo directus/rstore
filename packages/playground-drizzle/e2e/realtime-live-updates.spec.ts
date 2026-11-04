@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test'
+import { createTodo, todoByTitle, uniqueText } from '../../../test/e2e/todoUi'
 import { editTodo, framesContainUpdateFor, openRealtimeApp } from './realtime-helpers'
-import { createTodo, todoByTitle, uniqueText } from './utils'
 
 test.describe('realtime live updates', () => {
   test('cross-tab live updates: create propagates without reload', async ({ browser }) => {

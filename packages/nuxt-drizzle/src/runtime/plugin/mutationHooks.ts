@@ -1,4 +1,5 @@
 import type { DrizzlePluginContext } from './context'
+import { stripPrimaryKeys } from '@rstore/connector-toolkit'
 import SuperJSON from 'superjson'
 import { clientIdHeaders } from './context'
 
@@ -16,7 +17,7 @@ export function installMutationHooks(ctx: DrizzlePluginContext, hook: any) {
   hook('updateItem', async (payload: any) => {
     const result: any = await ctx.requestFetch(`${ctx.apiPath}/${payload.collection.name}/${payload.key}`, {
       method: 'PATCH',
-      body: SuperJSON.stringify(stripPrimaryKeys(payload.collection, payload.item)),
+      body: SuperJSON.stringify(stripPrimaryKeys(payload.item, payload.collection.meta?.primaryKeys)),
       headers: clientIdHeaders(),
     })
     payload.setResult(result)
@@ -28,16 +29,4 @@ export function installMutationHooks(ctx: DrizzlePluginContext, hook: any) {
       headers: clientIdHeaders(),
     })
   })
-}
-
-/** Return an item body without primary keys for PATCH requests. */
-export function stripPrimaryKeys(collection: any, item: Record<string, any>) {
-  const body = { ...item }
-  const primaryKeys = collection.meta?.primaryKeys?.length
-    ? collection.meta.primaryKeys
-    : ['id']
-  for (const key of primaryKeys) {
-    delete body[key]
-  }
-  return body
 }

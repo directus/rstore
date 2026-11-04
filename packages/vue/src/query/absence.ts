@@ -1,5 +1,4 @@
 import type { VueQueryPage } from './types'
-import { toRaw } from 'vue'
 import { getCollectionWriteVersion, getItemWriteVersion } from '../cache/queryState'
 import { getMatchingPageRefs } from './confirmation'
 
@@ -21,7 +20,7 @@ const absences = new WeakMap<object, PageAbsence>()
 /** Read committed identity without applying temporary optimistic layers. */
 function getCommittedRow(ctx: any, key: string | number | undefined): unknown {
   const collection = ctx.getCollection()
-  return key == null ? undefined : toRaw(ctx.cache._private.state.collections[collection.name]?.value[key])
+  return key == null ? undefined : ctx.cache._private.readCommittedItem(collection, key)
 }
 
 /** Capture accepted absence before later writes or layers change its cache view. */

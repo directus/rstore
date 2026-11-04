@@ -33,11 +33,15 @@ export function createQuery<
   })
   ctx.mainPage = createPage(ctx, {}, true)
   ctx.result = computed(() => mergePages(ctx))
-  ctx.cacheRead = computed(() => ctx.cacheMethod(ctx.getOptions(), { ...ctx.meta.value }) ?? null)
+  // A disabled query has no options (`getOptions()` is undefined): reading the
+  // cache with them would scan and wrap the whole collection for nothing.
+  ctx.cacheRead = computed(() => ctx.isDisabled()
+    ? toValue(ctx.defaultValue)
+    : ctx.cacheMethod(ctx.getOptions(), { ...ctx.meta.value }) ?? null)
   ctx.cached = computed(() => readCachedResult(ctx))
   ctx.queryTracking = ctx.store.$isServer
     ? null
-    : useQueryTracking({ store: ctx.store, result: ctx.result, cached: ctx.cached })
+    : useQueryTracking({ store: ctx.store, result: ctx.result, cached: ctx.cached, include: () => ctx.getOptions()?.include })
   ctx.updateQueryTrackingMode()
 
   // `data` is read by the `loading` aggregate, so it has to exist first.
@@ -235,10 +239,12 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     if (resolved.fetchPolicy === 'no-cache') {
       return false
     }
-    return options.store.$experimentalGarbageCollection
-      ? getOptions()?.experimentalGarbageCollection !== false
-      : getOptions()?.experimentalGarbageCollection === true
+    return true
   }
+  /** Whether this query collects rows after releasing its ownership. */
+  const getQueryCollectionEnabled = () => options.store.$experimentalGarbageCollection
+    ? getOptions()?.experimentalGarbageCollection !== false
+    : getOptions()?.experimentalGarbageCollection === true
 
   const ctx = {
     ...options,
@@ -255,6 +261,7 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     fetchPolicy: initialResolvedOptions.fetchPolicy,
     resultMode: initialResolvedOptions.resultMode,
     queryTrackingEnabled: getQueryTrackingEnabled(),
+    queryCollectionEnabled: getQueryCollectionEnabled(),
     pages: ref<any[]>([]),
     foreground: createFetchState(),
     background: createFetchState(),
@@ -272,7 +279,8 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
   ctx.getPageOptions = (page: any) => getPageOptions(ctx, page)
   ctx.updateQueryTrackingMode = () => {
     ctx.queryTrackingEnabled = getQueryTrackingEnabled()
-    ctx.queryTracking?.setEnabled(ctx.queryTrackingEnabled)
+    ctx.queryCollectionEnabled = getQueryCollectionEnabled()
+    ctx.queryTracking?.setEnabled(ctx.queryTrackingEnabled, ctx.queryCollectionEnabled)
   }
   return ctx
 }

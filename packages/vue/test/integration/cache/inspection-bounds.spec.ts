@@ -1,15 +1,12 @@
-// eslint-disable-next-line no-restricted-imports -- Transparent read counters require raw cache addresses; all behavior uses public APIs.
-import type { VueCachePrivate } from '../../../src/cache'
 import { createCoreStore } from '#test-utils/store/realCacheStore'
 import { describe, expect, it, onTestFinished } from 'vitest'
-import { toRaw } from 'vue'
 import { createRstoreDevtools } from '../../../../devtools/src'
 import { validateReadResult } from '../../../../devtools/src/protocol'
 
 // Real cache and neutral runtime, no doubles. Transparent address getters observe
 // actual value reads: eager overlay materialization touches rows past scan cap.
 describe('bounded effective cache inspection', () => {
-  it('retains object key order, overlay precedence, and final canonical deletions', async () => {
+  it('retains visible order, overlay precedence, and final canonical deletions', async () => {
     const { store, cache, dispose } = await createCoreStore({ schema: [{ name: 'items' }], syncImmediately: false, tombstoneGc: false })
     onTestFinished(dispose)
     const collection = store.$collections[0]!
@@ -25,9 +22,11 @@ describe('bounded effective cache inspection', () => {
     const view = cache.inspect!().collections[0]!
     expect(view.effectiveCount).toBe(5)
     const rows = Array.from(view.effectiveRows())
-    expect(rows.map(row => [row.key, (row.value as any).name])).toEqual([[0, 'new-zero'], [2, 'final'], ['b', 'base-b'], ['a', 'final-a'], ['c', 'new-c']])
-    expect(rows[1]!.value).toMatchObject({ id: 2, retained: true })
-    expect(cache.readItems({ collection }).map(row => [row.id, row.name])).toEqual([[0, 'new-zero'], [2, 'final'], ['b', 'base-b'], ['a', 'final-a'], ['c', 'new-c']])
+    // Visible order is base write order, then rows first added by each layer.
+    const visible = [[2, 'final'], ['b', 'base-b'], ['a', 'final-a'], ['c', 'new-c'], [0, 'new-zero']]
+    expect(rows.map(row => [row.key, (row.value as any).name])).toEqual(visible)
+    expect(rows[0]!.value).toMatchObject({ id: 2, retained: true })
+    expect(cache.readItems({ collection }).map(row => [row.id, row.name])).toEqual(visible)
   })
 
   it('keeps enumerable overlay fields when frozen base contains hidden property of same name', async () => {
@@ -63,6 +62,8 @@ describe('bounded effective cache inspection', () => {
     })
     cache.writeItem({ collection: store.$collections[0]!, key: 'one', item: observed })
     cache.addLayer({ id: 'overlay', collectionName: 'items', state: { one: { name: 'pending', field0: 'safe override' } }, deletedItems: new Set() })
+    // Ordinary layer resolution reads values; only inspection is measured.
+    getters = 0
     descriptors = 0
     const rows = Array.from(cache.inspect!().collections[0]!.effectiveRows())
     expect(getters, 'inspection must preserve accessor descriptors').toBe(0)
@@ -86,27 +87,30 @@ describe('bounded effective cache inspection', () => {
     const { store, cache, dispose } = await createCoreStore({ schema: [{ name: 'items' }], syncImmediately: false, tombstoneGc: false })
     onTestFinished(dispose)
     const collection = store.$collections[0]!
-    cache.writeItems({ collection, items: Array.from({ length: 10_001 }, (_, key) => ({ key, value: { id: key, name: `base-${key}` } })) })
+    // Frozen rows are stored as-is, so transparent proxies observe value reads.
+    const touched = new Set<number>()
+    const row = (key: number) => new Proxy(Object.freeze({ id: key, name: `base-${key}` }), {
+      get(target, property, receiver) {
+        touched.add(key)
+        return Reflect.get(target, property, receiver)
+      },
+      getOwnPropertyDescriptor(target, property) {
+        touched.add(key)
+        return Reflect.getOwnPropertyDescriptor(target, property)
+      },
+    })
+    cache.writeItems({ collection, items: Array.from({ length: 10_001 }, (_, key) => ({ key, value: row(key) })) })
     cache.addLayer({ id: 'overlay', collectionName: 'items', state: { 0: { name: 'pending' } }, deletedItems: new Set() })
-    // eslint-disable-next-line no-restricted-syntax -- Observe original values without replacing cache logic or asserting internal representation.
-    const state = toRaw((cache as typeof cache & VueCachePrivate)._private.state.collections.items!.value)
-    let reads = 0
-    for (const address in state) {
-      const value = state[address]
-      Object.defineProperty(state, address, { enumerable: true, configurable: true, get() {
-        reads++
-        return value
-      } })
-    }
+    touched.clear()
     const view = cache.inspect!().collections[0]!
     expect(view.effectiveCount).toBe(10_001)
-    expect(reads, 'counting must inspect membership without materializing values').toBe(0)
+    expect(touched.size, 'counting must inspect membership without materializing values').toBe(0)
     const iterator = view.effectiveRows()[Symbol.iterator]()
     expect(iterator.next().value).toMatchObject({ key: 0, value: { id: 0, name: 'pending' } })
     iterator.return?.()
-    expect(reads, 'one consumed row must not read remaining committed values').toBe(1)
+    expect(touched.size, 'one consumed row must not read remaining committed values').toBe(1)
 
-    reads = 0
+    touched.clear()
     const runtime = createRstoreDevtools()
     onTestFinished(runtime.dispose)
     const { target } = runtime.attachStore(store, { id: 'bounded' })
@@ -116,6 +120,6 @@ describe('bounded effective cache inspection', () => {
     expect(reply.data).toMatchObject({ total: 10_001, matchingTotal: null, scanTruncated: true })
     expect(reply.data.rows.map(row => row.key)).toEqual([0])
     expect(reply.data.rows[0]!.value).toMatchObject({ kind: 'object', entries: expect.arrayContaining([['id', 0], ['name', 'pending']]) })
-    expect(reads, 'neutral scan cap must include cache-owned overlay resolution').toBe(10_000)
+    expect(touched.size, 'neutral scan cap must include cache-owned overlay resolution').toBe(10_000)
   })
 })

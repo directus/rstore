@@ -1,11 +1,11 @@
 import type { StoreSchema } from '@rstore/shared'
 import { describe, expect, it, vi } from 'vitest'
+import { runConnectorHook as runHook } from '../../../test/utils/connectorPlugin'
 import {
   createOrderItemsCollection,
   createOrdersCollection,
   createProfilesCollection,
   createTodosCollection,
-  runHook,
   setupPlugin,
 } from './utils/plugin'
 import { createDirectusStack } from './utils/store'

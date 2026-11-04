@@ -1,4 +1,5 @@
 import type { MonospaceFetch, MonospaceWorkspaceOptions } from '../runtime'
+import { trimTrailingSlash } from '../runtime/clientUtils'
 import { resolveMonospaceWorkspace } from '../runtime/workspace'
 
 /**
@@ -30,7 +31,7 @@ export function remoteWorkspaceUrl(options: LoadRemoteMonospaceSchemaOptions, wh
   if (!options.url || !workspace) {
     throw new Error(`@rstore/monospace requires url and workspace options to load the remote Monospace ${what}`)
   }
-  const url = options.url.endsWith('/') ? options.url.slice(0, -1) : options.url
+  const url = trimTrailingSlash(options.url)
   return `${url}/api/${encodeURIComponent(workspace)}`
 }
 

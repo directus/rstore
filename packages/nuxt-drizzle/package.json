@@ -51,6 +51,7 @@
   },
   "dependencies": {
     "@nuxt/kit": "^4.0.0",
+    "@rstore/connector-toolkit": "workspace:^",
     "@rstore/nuxt": "workspace:^",
     "@rstore/offline": "workspace:^",
     "@rstore/shared": "workspace:^",

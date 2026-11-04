@@ -1,6 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect, test } from '@playwright/test'
-import { uniqueText } from './utils'
+import { uniqueText } from '../../../test/e2e/todoUi'
 
 type DirectusCase = 'queries' | 'cacheOperators' | 'bulkMutations' | 'singleton' | 'relations'
 

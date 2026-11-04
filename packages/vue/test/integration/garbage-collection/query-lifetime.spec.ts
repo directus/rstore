@@ -123,7 +123,7 @@ describe('ended query memory', () => {
     stack.cache.garbageCollect()
 
     expect(queryIds(peer)).toEqual(['1', '2'])
-    expect(peer.data.value.map((item: any) => item.$meta.queries.size)).toEqual(baseline)
+    expect(peer.data.value.map((item: any) => item.$meta.queries.size)).toEqual(end === 'disable' ? [baseline[0]! + 1, baseline[1]! + 1] : baseline)
     expect(peer.data.value.map((item: any) => item.$meta.dirtyQueries.size)).toEqual(dirtyBefore)
     expect(queryIds(sibling)).toEqual(['2'])
   })

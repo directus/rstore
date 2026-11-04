@@ -1,3 +1,5 @@
+import { resolveGeneratedPrimaryKeys } from '@rstore/connector-toolkit'
+
 /**
  * Default scope id assigned to generated Directus collections and plugins.
  */
@@ -57,5 +59,5 @@ export function isDirectusSingleton(collection: DirectusCollectionLike): boolean
  * Returns generated Directus primary keys or the default Directus `id` key.
  */
 export function getDirectusPrimaryKeys(collection: DirectusCollectionLike): string[] {
-  return collection.meta?.primaryKeys?.length ? collection.meta.primaryKeys : ['id']
+  return resolveGeneratedPrimaryKeys(collection.meta?.primaryKeys)
 }
