@@ -21,7 +21,7 @@ export function resolveRelationWriteParams(
   ctx: EngineContext,
   params: WriteItemForRelationParams,
 ): WriteItemParams {
-  const { parentCollection, relationKey, relation, childItem, meta } = params
+  const { parentCollection, relationKey, relation, childItem, meta, retain } = params
   const possibleNames = Object.keys(relation.to)
   const collection = ctx.callbacks.resolveChildCollection(childItem, possibleNames)
   if (!collection || !possibleNames.includes(collection.name)) {
@@ -31,7 +31,7 @@ export function resolveRelationWriteParams(
   if (!isKeyDefined(key)) {
     throw new Error(`Could not determine key for relation ${parentCollection.name}.${String(relationKey)}`)
   }
-  return { collection, key, item: childItem, meta, fromRelation: true }
+  return { collection, key, item: childItem, meta, retain, fromRelation: true }
 }
 
 /** Validate a complete nested relation tree and return child-first writes. */
@@ -84,6 +84,7 @@ function planWrite(
           relation,
           childItem,
           meta: params.meta,
+          retain: params.retain,
         })
         planWrite(ctx, childParams, false, path, result)
       }

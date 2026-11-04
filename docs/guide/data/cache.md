@@ -72,6 +72,20 @@ store.$cache.writeItems({
 })
 ```
 
+### Retain written items
+
+With the experimental garbage collection enabled, a row written directly to the cache stays collectible: once a query that displayed it releases it, the row is deleted. When your app owns a dataset instead (for example a local sync that loads a whole table), pass `retain: true` so garbage collection never deletes those rows:
+
+```ts
+store.$cache.writeItems({
+  collection,
+  items: writes,
+  retain: true,
+})
+```
+
+A retained row is kept even after a query fetched, owned and released it. Only deleting it, a prune, or a cache reset removes it. `writeItem` and `writeItemForRelation` accept the same option, and related items written with a retained row are retained too.
+
 ## Delete items
 
 Deleting items from the cache is useful when you want to remove items that are no longer needed. This can be used for example to remove items that are no longer in the store.

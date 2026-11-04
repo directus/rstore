@@ -123,6 +123,8 @@ export interface WriteItemParams {
   meta?: CustomHookMeta
   /** Optional CRDT field timestamps. */
   fieldTimestamps?: FieldTimestamps
+  /** Keep the row out of garbage collection until it is deleted or the cache is reset. */
+  retain?: boolean
 }
 
 /** Parameters for a batch item write. */
@@ -135,6 +137,8 @@ export interface WriteItemsParams {
   marker?: string
   /** Hook metadata shared by the batch. */
   meta?: CustomHookMeta
+  /** Keep the row out of garbage collection until it is deleted or the cache is reset. */
+  retain?: boolean
 }
 
 /** Parameters for one item deletion. */
@@ -159,6 +163,8 @@ export interface WriteItemForRelationParams {
   childItem: any
   /** Hook metadata. */
   meta?: CustomHookMeta
+  /** Retention of the child row, inherited from its parent write. */
+  retain?: boolean
 }
 
 /** Parameters for resolving list candidate keys. */

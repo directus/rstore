@@ -128,6 +128,7 @@ function writeRelationTreeInOrder(
           relation,
           childItem,
           meta: params.meta,
+          retain: params.retain,
         })
         writeRelationTreeInOrder(ctx, changes, childParams, effects, path, progress)
       }
@@ -174,6 +175,10 @@ export function commitWrite(
     }
     ctx.tombstones.clear(collection.name, key)
   }
+  // The writer owns this row (e.g. an app-level sync): no query release may
+  // collect it, even after a tracked query owned and released it.
+  if (params.retain)
+    (state.retainedKeys ??= new Set()).add(id)
   if (derivedKeyIsCanonical)
     clearKeyOverride(state, id)
   else registerBaseKeyValue(state, key, derivedKey, itemOwnsKey || (!metadata.usesDefaultKey && derivedKey !== undefined))
@@ -308,6 +313,7 @@ export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder |
   const previous = layerless ? state.base.get(id) : resolveItemById(state, id)
   const publicKey = getPublicKey(state, id)
   state.base.delete(id)
+  state.retainedKeys?.delete(id)
   clearKeyOverride(state, id)
   if (!layerless)
     invalidateResolvedItem(state, id)
