@@ -185,6 +185,12 @@ export interface Cache<
      * Last-Writer-Wins strategy instead of overwriting the entire object.
      */
     fieldTimestamps?: FieldTimestamps
+    /**
+     * Keep the written row out of garbage collection until it is deleted or
+     * the cache is reset, even after a tracked query owned and released it.
+     * Use it for rows an app-level sync or local dataset owns.
+     */
+    retain?: boolean
   }) => void
 
   /** Submit one deletion; use optional receipts to establish synchronous completion. */
@@ -237,7 +243,11 @@ export interface Cache<
      */
     marker?: string
     meta?: CustomHookMeta
-    /** Keep the committed rows resident until explicit deletion or reset. */
+    /**
+     * Keep the written row out of garbage collection until it is deleted or
+     * the cache is reset, even after a tracked query owned and released it.
+     * Use it for rows an app-level sync or local dataset owns.
+     */
     retain?: boolean
   }) => void
 
@@ -247,6 +257,8 @@ export interface Cache<
     relation: CollectionRelation
     childItem: any
     meta?: CustomHookMeta
+    /** Retention of the child row, see `writeItem`. */
+    retain?: boolean
   }) => void
 
   /**

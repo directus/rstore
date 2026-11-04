@@ -276,6 +276,7 @@ function processBatch(
         item: value,
         fieldTimestamps,
         meta: operation.params.meta,
+        retain: operation.params.retain,
         fromWriteItems: true,
       }, partial)
       operation.index++

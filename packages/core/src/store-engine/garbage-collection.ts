@@ -26,9 +26,11 @@ export function garbageCollectKeys(
   const effects: EngineEffect[] = []
   try {
     for (const key of keys) {
+      const id = toKeyId(key)
       // A visible optimistic patch/delete owns its base row until its layer is
       // removed; collecting it would make rollback lose authoritative data.
-      if (state?.layeredKeyCounts?.has(toKeyId(key))) {
+      // A retained row is owned by its writer, not by the releasing query.
+      if (state?.layeredKeyCounts?.has(id) || state?.retainedKeys?.has(id)) {
         continue
       }
       const result = deleteItemFromBase(ctx, changes, { collection, key })

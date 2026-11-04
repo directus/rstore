@@ -111,6 +111,8 @@ export interface EngineCollectionState {
   layers: EngineLayer[]
   /** Active layer ownership count by affected canonical id. */
   layeredKeyCounts?: Map<KeyId, number>
+  /** Ids written with `retain: true`, which garbage collection never evicts. */
+  retainedKeys?: Set<KeyId>
   /** Cached layer-resolved values. */
   resolvedItems: Map<KeyId, any>
   /** Cached visible canonical ids. */

@@ -45,6 +45,7 @@ export function prepareBatchWrite(ctx: EngineContext, params: WriteItemsParams):
       key: '',
       item: {},
       meta: params.meta,
+      retain: params.retain,
       fromWriteItems: true,
     },
   }
@@ -82,6 +83,8 @@ function writeDirect(prepared: PreparedBatchWrite, key: string | number, item: a
   registerBaseKeyValue(state, key, derived, ownsDefaultKey(item) || (!metadata.usesDefaultKey && derived !== undefined))
   const existing = state.base.get(id)
   state.base.set(id, mutable && existing !== undefined ? { ...existing, ...data } : data)
+  if (params.retain)
+    (state.retainedKeys ??= new Set()).add(id)
 }
 
 /** Return whether configured framework sink currently owns dependencies. */
