@@ -957,6 +957,11 @@ export function createCache<
     garbageCollectItem({ collection, item }) {
       garbageCollectItem(collection, item)
     },
+    garbageCollectItems({ collection, items }) {
+      for (const item of items) {
+        garbageCollectItem(collection, item)
+      }
+    },
     garbageCollect() {
       for (const collectionName in state.collections) {
         const collection = getStore().$collections.find(m => m.name === collectionName)

@@ -1,5 +1,6 @@
 import type { Cache, CacheOperationReceipts, CollectionDefaults, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CacheRuntime, VueCachePrivate } from './types'
+import type { GarbageCollectionCandidate } from './wrapped'
 import { reactive, toRaw } from 'vue'
 import { ensureLayersForCollection, readRawCacheItem } from './context'
 import { disposeCache } from './dispose'
@@ -7,7 +8,7 @@ import { applyMutationToCache } from './mutations'
 import { holdRetainedQueryState, releaseRetainedQueryState, sweepQueryState } from './queryRetention'
 import { clonePageRefs, invalidatePageRefsForItem } from './queryState'
 import { rebuildVisibleList } from './visibleList'
-import { garbageCollectItem, getWrappedItem, releaseUnwrittenItems } from './wrapped'
+import { garbageCollectItem, garbageCollectItems, getWrappedItem, releaseUnwrittenItems } from './wrapped'
 
 /** Create the public Cache implementation from a cache runtime. */
 export function createCacheApi<
@@ -93,6 +94,10 @@ export function createCacheApi<
     garbageCollectItem({ collection, item }) {
       ctx.trackingEffects.flush()
       garbageCollectItem(ctx, collection, item)
+    },
+    garbageCollectItems({ collection, items }) {
+      ctx.trackingEffects.flush()
+      garbageCollectItems(ctx, collection, Array.from(items, item => ({ item })))
     },
     garbageCollect() {
       ctx.trackingEffects.flush()
@@ -228,12 +233,15 @@ function scanItems(
 function garbageCollect(ctx: CacheRuntime) {
   const store = ctx.getStore()
   for (const collection of store.$collections) {
+    // One commit per collection: a full sweep must not re-run readers per row.
+    const candidates: Array<GarbageCollectionCandidate<any>> = []
     ctx.engine.forEachKey(collection.name, (key) => {
       const wrappedItem = getWrappedItem(ctx, collection, readRawCacheItem(ctx, collection, key), false, key)
       if (wrappedItem) {
-        garbageCollectItem(ctx, collection, wrappedItem, key)
+        candidates.push({ item: wrappedItem, key })
       }
     })
+    garbageCollectItems(ctx, collection, candidates)
   }
   // Rows whose queued write was dropped or rejected are only reachable here.
   releaseUnwrittenItems(ctx)

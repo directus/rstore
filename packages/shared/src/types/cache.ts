@@ -284,6 +284,15 @@ export interface Cache<
     item: WrappedItem<TCollection, TCollectionDefaults, TSchema>
   }) => void
 
+  /**
+   * Collect several unreferenced items of one collection in a single cache
+   * commit, so dependent queries re-read once instead of once per item.
+   */
+  garbageCollectItems: <TCollection extends Collection = Collection>(params: {
+    collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+    items: Iterable<WrappedItem<TCollection, TCollectionDefaults, TSchema>>
+  }) => void
+
   garbageCollect: () => void
 
   /**

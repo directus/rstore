@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryTracking, StoreSchema, WrappedItemBase } from '@rstore/shared'
+import type { Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryTracking, ResolvedCollection, StoreSchema, WrappedItemBase } from '@rstore/shared'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { VueStore } from './store'
 import type { VisibleMembershipChange } from './trackingVisible'
@@ -87,6 +87,9 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
   /** Release only keys no current page of this query still owns. */
   function releaseMembers(tracking: HookMetaQueryTracking, collect: boolean): void {
     let changed = false
+    // Collected together on the next tick: one cache commit per collection,
+    // instead of one per row that would re-run every dependent query each time.
+    const released = new Map<ResolvedCollection<any, any, any>, WrappedItemBase<Collection, CollectionDefaults, StoreSchema>[]>()
     forEachTrackedKey(tracking, (collectionName, key) => {
       if (isTrackedByAnotherPage(collectionName, key)) {
         return
@@ -103,10 +106,17 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       }
       dirtyMetadata.add(item.$meta)
       changed = true
-      nextTick(() => store.$cache.garbageCollectItem({ collection: collection!, item: item as any }))
+      const items = released.get(collection!) ?? []
+      items.push(item)
+      released.set(collection!, items)
     })
     if (changed) {
       dataKey.value++
+      nextTick(() => {
+        for (const [collection, items] of released) {
+          store.$cache.garbageCollectItems({ collection, items: items as any })
+        }
+      })
     }
   }
 

@@ -244,6 +244,8 @@ export interface StoreEngine<
   inspect: (collections: readonly ResolvedCollection<any, any, any>[]) => CacheInspection
   /** Immediately evict one unused base item. */
   garbageCollectKey: (collection: ResolvedCollection<any, any, any>, key: string | number) => boolean
+  /** Immediately evict several unused base items in one commit; returns the evicted keys. */
+  garbageCollectKeys: (collection: ResolvedCollection<any, any, any>, keys: Iterable<string | number>) => Array<string | number>
   /** Iterate current base keys. */
   forEachKey: (collection: string, callback: (key: string | number) => void) => void
   /** Rebuild indexes after runtime schema augmentation. */

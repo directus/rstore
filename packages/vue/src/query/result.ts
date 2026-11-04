@@ -84,12 +84,15 @@ export function collectUnreconciledTracking(ctx: any, tracking: any): void {
       if (!collection) {
         continue
       }
+      // One cache commit per collection rather than one per stale row.
+      const items = []
       for (const key of keys) {
         const item = ctx.store.$cache.readItem({ collection, key })
         if (item) {
-          ctx.store.$cache.garbageCollectItem({ collection, item })
+          items.push(item)
         }
       }
+      ctx.store.$cache.garbageCollectItems({ collection, items })
     }
   })
 }
