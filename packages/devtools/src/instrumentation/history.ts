@@ -1,5 +1,6 @@
 import type { HistoryEntry, HistoryPage } from '../protocol'
 import { projectValue } from '../projection'
+import { utf8Length } from '../projection/budget'
 
 /** A hook event before live values cross projection boundary. */
 export interface HistoryInput extends Omit<HistoryEntry, 'sequence' | 'time' | 'arguments' | 'result' | 'error'> {
@@ -61,7 +62,8 @@ export function createHistory(options: HistoryOptions = {}): History {
             entry.truncated = true
         }
       }
-      const size = new TextEncoder().encode(JSON.stringify(entry)).length
+      // Every cache write lands here: count bytes without allocating an encoder.
+      const size = utf8Length(JSON.stringify(entry))
       if (size <= maxBytes) {
         entries.push({ entry, bytes: size })
         bytes += size

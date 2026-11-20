@@ -1,5 +1,6 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createProjectionBudget, ProjectionBudgetExceededError, projectValue } from '../src/projection'
+import { fitString, jsonBytes } from '../src/projection/budget'
 
 /** Pure boundary: real projector; independent expected previews reject retained sources and unsafe getters. */
 describe('detached diagnostic value projection', () => {
@@ -95,5 +96,57 @@ describe('detached diagnostic value projection', () => {
     const tiny = createProjectionBudget(4)
     projectValue(null, { budget: tiny })
     expect(() => projectValue(null, { budget: tiny })).toThrow(ProjectionBudgetExceededError)
+  })
+})
+
+/** Reference size: real UTF-8 encoding of the JSON text. */
+function encodedJsonBytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value)).length
+}
+
+/** Strings covering every JSON escape class and UTF-8 width, including lone surrogates. */
+const TRICKY = ['', 'plain', '"quoted"', 'back\\slash', 'line\nbreak\ttab\r\b\f', '\u0001\u001F\u007F', 'é€', '😀🃏', '\uD800', 'a\uDC00b', '\u2028\u2029', 'mix é😀\n"\\\uD83D']
+
+describe('projection byte accounting', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('counts JSON UTF-8 bytes exactly like encoding the serialized text', () => {
+    for (const value of TRICKY)
+      expect(jsonBytes(value), JSON.stringify(value)).toBe(encodedJsonBytes(value))
+    expect(jsonBytes({ kind: 'object', entries: [['k', TRICKY.join('')]] })).toBe(encodedJsonBytes({ kind: 'object', entries: [['k', TRICKY.join('')]] }))
+  })
+
+  it('fits strings to the largest whole-code-point prefix within the limit', () => {
+    const source = TRICKY.join('').repeat(3)
+    for (let limit = 2; limit < encodedJsonBytes(source) + 2; limit++) {
+      const fitted = fitString(source, limit)
+      expect(encodedJsonBytes(fitted.value)).toBeLessThanOrEqual(limit)
+      expect(source.startsWith(fitted.value)).toBe(true)
+      if (fitted.truncated) {
+        // The next code point (lone surrogates count alone) would not have fit.
+        const next = String.fromCodePoint(source.codePointAt(fitted.value.length)!)
+        expect(encodedJsonBytes(fitted.value + next)).toBeGreaterThan(limit)
+      }
+      else {
+        expect(fitted.value).toBe(source)
+      }
+    }
+  })
+
+  it('projects long strings without allocating an encoder per character', () => {
+    // History records every cache write; per-character encoding froze apps for
+    // seconds while hydrating large collections.
+    let encoders = 0
+    const RealEncoder = globalThis.TextEncoder
+    vi.stubGlobal('TextEncoder', class extends RealEncoder {
+      constructor() {
+        super()
+        encoders++
+      }
+    })
+    projectValue({ text: 'card rules text é😀 '.repeat(2000) })
+    expect(encoders).toBe(0)
   })
 })
