@@ -267,11 +267,8 @@ function readComputedPageData(ctx: any, page: VueQueryPage<any, any, any, any, a
  * holding such a page aggregates its pages instead: reading the cache alone
  * would drop them from the result.
  */
-export function readCachedResult(ctx: any) {
+export function hasComputedCacheResult(ctx: any): boolean {
   // Missing first pages distinguish retained stale rows from later cache writes.
   const missingFirst = !ctx.many && ctx.mainPage._fetchPolicy != null && ctx.mainPage.rawData.type === 'data' && ctx.mainPage.rawData.value == null
-  if (!missingFirst && ctx.fetchPolicy !== 'no-cache' && ctx.resultMode !== 'responseRefs' && !hasIndependentPage(ctx)) {
-    return ctx.cacheRead.value
-  }
-  return ctx.result.value
+  return !missingFirst && ctx.fetchPolicy !== 'no-cache' && ctx.resultMode !== 'responseRefs' && !hasIndependentPage(ctx)
 }

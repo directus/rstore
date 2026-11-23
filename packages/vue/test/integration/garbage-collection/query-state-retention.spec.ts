@@ -161,7 +161,11 @@ describe('saved query state retention', () => {
     })
     const ended = stack.scope(() => stack.store.todos.query((q: any) => q.many({ params: { where: { id: '1' } } })))
     expect((await ended.result).data.value.map((item: any) => item.id)).toEqual(['1'])
-    const live = await stack.run(() => stack.store.todos.query((q: any) => q.many({ params: { where: { id: '2' } } })))
+    // The fake remote's `where` narrows its response. Match it in the computed cache reader too.
+    const live = await stack.run(() => stack.store.todos.query((q: any) => q.many({
+      params: { where: { id: '2' } },
+      filter: (item: any) => item.id === '2',
+    })))
     const before = savedQueryIds(stack.cache.getState())
     expect(before.meta).toHaveLength(2)
 

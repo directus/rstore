@@ -8,6 +8,8 @@ export type TrackedItem = WrappedItemBase<Collection, CollectionDefaults, StoreS
 export interface VisibleMembershipChange {
   /** Wrappers that entered the result and must gain the query's ownership. */
   added: TrackedItem[]
+  /** Wrappers that left, even when another wrapper of the same key is still visible. */
+  removedItems: TrackedItem[]
   /** Identities no visible wrapper holds anymore. */
   removed: HookMetaQueryTracking
 }
@@ -31,14 +33,14 @@ export interface MemberCounts {
   /** Add one reference to a wrapper, recording it in `added` when it is new. */
   add: (item: TrackedItem, collection: string, key: string | number, added: TrackedItem[]) => void
   /** Drop one reference, recording its identity in `removed` once no wrapper holds it. */
-  remove: (item: TrackedItem, removed: HookMetaQueryTracking) => void
+  remove: (item: TrackedItem, change: VisibleMembershipChange) => void
   /** Forget every member. */
   reset: () => void
 }
 
 /** Create an empty membership change. */
 export function createMembershipChange(): VisibleMembershipChange {
-  return { added: [], removed: createTrackingObject() }
+  return { added: [], removedItems: [], removed: createTrackingObject() }
 }
 
 /**
@@ -77,11 +79,12 @@ export function createMemberCounts(): MemberCounts {
       added.push(item)
     },
 
-    remove(item, removed) {
+    remove(item, change) {
       const member = members.get(item)
       if (!member || --member.refs > 0)
         return
       members.delete(item)
+      change.removedItems.push(item)
       const { collection, key } = member
       const keys = counts.get(collection)!
       const count = keys.get(key)! - 1
@@ -91,7 +94,7 @@ export function createMemberCounts(): MemberCounts {
       }
       keys.delete(key)
       tracking.items[collection]?.delete(key)
-      ;(removed.items[collection] ??= new Set()).add(key)
+      ;(change.removed.items[collection] ??= new Set()).add(key)
     },
 
     reset() {
@@ -144,7 +147,7 @@ export function createVisibleMembership(): VisibleMembership {
         return change
       for (const item of Array.from(counts.members.keys())) {
         if (!next.has(item))
-          counts.remove(item, change.removed)
+          counts.remove(item, change)
       }
       return change
     },

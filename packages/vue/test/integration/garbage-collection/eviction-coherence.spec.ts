@@ -75,7 +75,10 @@ describe('item eviction coherence', () => {
       schema: [{ name: 'todos' }, { name: 'notes' }],
       data: { todos: [{ id: 'kept' }] },
     })
-    const query = await stack.run(() => stack.store.todos.query((q: any) => q.many({ experimentalGarbageCollection: true })))
+    const query = await stack.run(() => stack.store.todos.query((q: any) => q.many({
+      filter: (item: any) => item.id === 'kept',
+      experimentalGarbageCollection: true,
+    })))
     stack.cache.writeItem({ collection: stack.collection('todos'), key: 'discarded', item: { id: 'discarded' } })
     stack.cache.writeItem({ collection: stack.collection('notes'), key: 'note', item: { id: 'note' } })
 

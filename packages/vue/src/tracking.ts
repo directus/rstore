@@ -14,6 +14,8 @@ export interface UseQueryTrackingOptions<TResult> {
   result?: MaybeRefOrGetter<TResult>
   /** Included relations selected by the current query options. */
   include?: () => FindOptionsInclude<Collection, CollectionDefaults, StoreSchema> | undefined
+  /** Whether a collecting query also exposes a live, cache-computed result. */
+  computedCacheResult?: () => boolean
 }
 
 /**

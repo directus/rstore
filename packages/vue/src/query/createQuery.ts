@@ -9,7 +9,7 @@ import { installConfirmationResets } from './confirmation'
 import { loadPage } from './load'
 import { getLocalPageTarget, registerQueryMembership } from './localMembership'
 import { watchQueryOptions } from './options'
-import { createPage, getPageId, getPageOptions, hasIndependentPage, readCachedResult } from './page'
+import { createPage, getPageId, getPageOptions, hasComputedCacheResult } from './page'
 import { addPrunedLoad, applyPrune, createPruneRun, recordKeptPage } from './prune'
 import { loadMainPageForPublication } from './publication'
 import { publishPageResult } from './push'
@@ -39,10 +39,17 @@ export function createQuery<
   ctx.cacheRead = computed(() => ctx.isDisabled()
     ? toValue(ctx.defaultValue)
     : ctx.cacheMethod(ctx.getOptions(), { ...ctx.meta.value }) ?? null)
-  ctx.cached = computed(() => readCachedResult(ctx))
+  const computedCacheResult = computed(() => hasComputedCacheResult(ctx))
+  ctx.cached = computed(() => computedCacheResult.value ? ctx.cacheRead.value : ctx.result.value)
   ctx.queryTracking = ctx.store.$isServer
     ? null
-    : useQueryTracking({ store: ctx.store, result: ctx.result, cached: ctx.cached, include: () => ctx.getOptions()?.include })
+    : useQueryTracking({
+        store: ctx.store,
+        result: ctx.result,
+        cached: ctx.cached,
+        include: () => ctx.getOptions()?.include,
+        computedCacheResult: () => computedCacheResult.value,
+      })
   ctx.updateQueryTrackingMode()
 
   // `data` is read by the `loading` aggregate, so it has to exist first.
@@ -53,7 +60,7 @@ export function createQuery<
   // async code) binds to no scope: cached records would retain this query.
   // Reading every cache-derived computed now binds it to this scope, whose
   // disposal unlinks it. `data` reads `cacheRead` exactly when
-  // `readCachedResult` uses it. Reading it otherwise (no-cache, responseRefs)
+  // the query uses it. Reading it otherwise (no-cache, responseRefs)
   // would scan the cache through read hooks for nothing on every mount; a
   // later first read from `cached` links it to that bound computed instead.
   if (getCurrentScope()) {

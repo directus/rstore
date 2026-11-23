@@ -1,8 +1,54 @@
 import { describe, expect, it, vi } from 'vitest'
-import { ref } from 'vue'
-import { blogSchema, cached, createGarbageCollectionStack, drainGarbageCollection } from './utils'
+import { nextTick, ref } from 'vue'
+import { blogSchema, cached, createGarbageCollectionStack, drainGarbageCollection, queryIds } from './utils'
 
 describe('shared list and detail ownership', () => {
+  it.each([false, true])('retains a row added to a computed list by a detail read (includes: %s)', async (includePosts) => {
+    const stack = await createGarbageCollectionStack({
+      schema: blogSchema,
+      experimentalGarbageCollection: true,
+      data: {
+        authors: [{ id: 'a2', posts: [{ id: 'p2', authorId: 'a2' }] }, { id: 'a1', posts: [{ id: 'p1', authorId: 'a1' }] }],
+        posts: [{ id: 'p1', authorId: 'a1' }, { id: 'p2', authorId: 'a2' }],
+      },
+    })
+    const listScope = stack.scope(() => stack.store.authors.query((q: any) => q.many({
+      pageSize: 1,
+      fetchPolicy: 'cache-and-fetch',
+      include: includePosts ? { posts: true } : undefined,
+    })))
+    const list = await listScope.result
+    await list.background.promise
+    expect(queryIds(list)).toEqual(['a2'])
+
+    const key = ref('a1')
+    const detailScope = stack.scope(() => stack.store.authors.query((q: any) => q.first({
+      key: key.value,
+      include: { posts: true },
+      fetchPolicy: 'fetch-only',
+    })))
+    const detail = await detailScope.result
+    expect(detail.data.value?.id).toBe('a1')
+    expect(queryIds(list).sort()).toEqual(['a1', 'a2'])
+
+    key.value = 'a2'
+    await nextTick()
+    await detail.foreground.promise
+    expect(detail.data.value?.id).toBe('a2')
+    await drainGarbageCollection()
+    expect(queryIds(list).sort()).toEqual(['a1', 'a2'])
+    if (includePosts) {
+      expect(list.data.value.find((author: any) => author.id === 'a1')?.posts.map((post: any) => post.id)).toEqual(['p1'])
+    }
+
+    listScope.stop()
+    await drainGarbageCollection()
+    expect(cached(stack, 'authors', 'a1')).toBeUndefined()
+    expect(cached(stack, 'posts', 'p1')).toBeUndefined()
+    expect(detail.data.value?.id).toBe('a2')
+    expect(detail.data.value?.posts.map((post: any) => post.id)).toEqual(['p2'])
+  })
+
   it.each([[false, 'computed'], [false, 'responseRefs'], [true, 'computed'], [true, 'responseRefs']] as const)('preserves a list and its children when a detail is replaced (collection: %s, mode: %s)', async (collect, resultMode) => {
     const stack = await createGarbageCollectionStack({
       schema: blogSchema,

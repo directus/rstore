@@ -139,7 +139,7 @@ export function createVisibleGraphMembership(
       }
       const nodeChange = createMembershipChange()
       reconcileChildren(node, next, nodeChange)
-      if (nodeChange.added.length || Object.keys(nodeChange.removed.items).length)
+      if (nodeChange.added.length || nodeChange.removedItems.length)
         onChange(nodeChange)
     }, { immediate: true }))
     initial = false
@@ -155,7 +155,7 @@ export function createVisibleGraphMembership(
     byInclude.delete(node.include)
     if (!byInclude.size)
       nodes.delete(node.item)
-    counts.remove(node.item, change.removed)
+    counts.remove(node.item, change)
     for (const child of node.children) release(child, change)
   }
 
