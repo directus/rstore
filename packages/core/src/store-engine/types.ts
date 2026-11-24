@@ -16,6 +16,7 @@ import type {
   RetentionOptions,
   StoreSchema,
 } from '@rstore/shared'
+import type { RowRetention } from '../rowRetention.js'
 import type { TombstoneStore } from '../tombstone.js'
 import type { EngineStateChangeSink, EngineWriteCommitPayload } from './write-callbacks.js'
 
@@ -99,6 +100,8 @@ export interface EngineOptions {
   callbacks: EngineCallbacks
   /** Maximum writes per 10ms window; zero disables staggering. */
   cacheStaggering?: number
+  /** Optional row-use bookkeeping shared with the cache adapter. */
+  rowRetention?: RowRetention
   /** Tombstone auto-GC settings; `false` disables background sweeps. */
   tombstoneGc?: false | TombstoneGcOptions
   /** Server engines skip background GC timers. */
@@ -252,6 +255,8 @@ export interface StoreEngine<
   garbageCollectKey: (collection: ResolvedCollection<any, any, any>, key: string | number) => boolean
   /** Immediately evict several unused base items in one commit; returns the evicted keys. */
   garbageCollectKeys: (collection: ResolvedCollection<any, any, any>, keys: Iterable<string | number>) => Array<string | number>
+  /** Whether a committed row exists and is eligible for GC under the engine's ownership rules. */
+  isGarbageCollectible: (collectionName: string, key: string | number) => boolean
   /** Iterate current base keys. */
   forEachKey: (collection: string, callback: (key: string | number) => void) => void
   /** Rebuild indexes after runtime schema augmentation. */

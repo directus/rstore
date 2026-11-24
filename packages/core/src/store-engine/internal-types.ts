@@ -1,4 +1,5 @@
 import type { CacheLayer, CacheStateInput, CacheTombstone, CustomHookMeta, FieldTimestamps, ResolvedCollection } from '@rstore/shared'
+import type { RowRetention } from '../rowRetention.js'
 import type { TombstoneStore } from '../tombstone.js'
 import type { ChangeRecorder } from './change-recorder.js'
 import type { MutableEngineChangeSet } from './change-set.js'
@@ -223,6 +224,8 @@ export interface Staggering {
 export interface EngineContext {
   /** Collection storage. */
   collections: Map<string, EngineCollectionState>
+  /** Optional last-use metadata for row GC. */
+  rowRetention?: RowRetention
   /** Query markers. */
   markers: Record<string, boolean>
   /** Exact module registry. */

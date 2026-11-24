@@ -1,9 +1,14 @@
 import type { ResolvedCollection } from '@rstore/shared'
-import type { EngineContext, EngineEffect } from './internal-types.js'
+import type { EngineCollectionState, EngineContext, EngineEffect, KeyId } from './internal-types.js'
 import { createChangeRecorder, createFlushChangeRecorder, discardStateChangeSink } from './change-recorder.js'
 import { toKeyId } from './identity.js'
 import { dispatchImmediate } from './queue-dispatch.js'
 import { deleteItemFromBase } from './write.js'
+
+/** A writer or active layer can own the underlying base row. */
+export function canCollectBaseKey(state: EngineCollectionState | undefined, id: KeyId): boolean {
+  return !!state?.base.has(id) && !state.layeredKeyCounts?.has(id) && !state.retainedKeys?.has(id)
+}
 
 /**
  * Evict unused base rows of one collection in a single engine commit.
@@ -30,7 +35,7 @@ export function garbageCollectKeys(
       // A visible optimistic patch/delete owns its base row until its layer is
       // removed; collecting it would make rollback lose authoritative data.
       // A retained row is owned by its writer, not by the releasing query.
-      if (state?.layeredKeyCounts?.has(id) || state?.retainedKeys?.has(id)) {
+      if (!canCollectBaseKey(state, id)) {
         continue
       }
       const result = deleteItemFromBase(ctx, changes, { collection, key })

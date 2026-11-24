@@ -84,7 +84,7 @@ export function collectUnreconciledTracking(ctx: any, tracking: any): void {
   nextTick(() => {
     for (const [collectionName, keys] of Object.entries(tracking.items) as Array<[string, Set<string | number>]>) {
       const collection = ctx.store.$collections.find((candidate: any) => candidate.name === collectionName)
-      if (!collection) {
+      if (!collection || ctx.cache._private.scheduleManagedRowGc(collection)) {
         continue
       }
       // One cache commit per collection rather than one per stale row.
@@ -97,7 +97,7 @@ export function collectUnreconciledTracking(ctx: any, tracking: any): void {
       }
       ctx.store.$cache.garbageCollectItems({ collection, items })
     }
-  }
+  })
 }
 
 /** Reconcile cache ownership after either a fetch or a server push. */

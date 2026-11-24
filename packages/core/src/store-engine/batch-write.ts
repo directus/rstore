@@ -3,7 +3,7 @@ import type { EngineCollectionState, EngineContext } from './internal-types.js'
 import type { WriteItemParams, WriteItemsParams } from './types.js'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { getCollectionMetadata } from './collection-metadata.js'
-import { ownsDefaultKey, readDefaultKey, registerBaseKeyValue, toKeyId } from './identity.js'
+import { getPublicKey, ownsDefaultKey, readDefaultKey, registerBaseKeyValue, toKeyId } from './identity.js'
 import { validateWriteInput } from './relations.js'
 import { commitWrite } from './write.js'
 
@@ -63,7 +63,7 @@ export function writePreparedBatchItem(
   params.item = item
   validateWriteInput(params)
   if (prepared.direct) {
-    writeDirect(prepared, key, item)
+    writeDirect(ctx, prepared, key, item)
     return
   }
   const mutable = !Object.isFrozen(item)
@@ -72,7 +72,7 @@ export function writePreparedBatchItem(
 }
 
 /** Commit one observer-free, relation-free, non-indexed row. */
-function writeDirect(prepared: PreparedBatchWrite, key: string | number, item: any): void {
+function writeDirect(ctx: EngineContext, prepared: PreparedBatchWrite, key: string | number, item: any): void {
   const { metadata, state, params } = prepared
   const mutable = !Object.isFrozen(item)
   const data = mutable ? pickNonSpecialProps(item, true) : item
@@ -83,6 +83,8 @@ function writeDirect(prepared: PreparedBatchWrite, key: string | number, item: a
   registerBaseKeyValue(state, key, derived, ownsDefaultKey(item) || (!metadata.usesDefaultKey && derived !== undefined))
   const existing = state.base.get(id)
   state.base.set(id, mutable && existing !== undefined ? { ...existing, ...data } : data)
+  if (ctx.rowRetention?.tracks(params.collection))
+    ctx.rowRetention.touch(params.collection, getPublicKey(state, id))
   if (params.retain)
     (state.retainedKeys ??= new Set()).add(id)
 }

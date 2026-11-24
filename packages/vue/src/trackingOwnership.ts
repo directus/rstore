@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryTracking, StoreSchema, WrappedItemBase } from '@rstore/shared'
+import type { Cache, Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryTracking, StoreSchema, WrappedItemBase } from '@rstore/shared'
 import type { ComputedRef, MaybeRefOrGetter } from 'vue'
 import type { VueCachePrivate } from './cache'
 import type { VueStore } from './store'
@@ -109,8 +109,8 @@ export function createQueryTrackingController<TResult>(options: QueryTrackingOwn
       const item = store.$cache.readItem({ collection, key }) as WrappedItemBase<Collection, CollectionDefaults, StoreSchema> | undefined
       if (!item)
         return
-      if (collect || !visible.owns(item))
-        item.$meta.queries.delete(trackingQueryId)
+      if ((collect || !visible.owns(item)) && item.$meta.queries.delete(trackingQueryId) && !item.$meta.queries.size)
+        cache._private.touchRow(collection, key)
       if (!collect) {
         dirtyMetadata.delete(item.$meta)
         return

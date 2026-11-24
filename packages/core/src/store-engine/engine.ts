@@ -4,7 +4,7 @@ import type { EngineOptions, StoreEngine } from './types.js'
 import { createTombstoneStore, gcTombstones as gcTombstonesStore, scheduleTombstoneGc } from '../tombstone.js'
 import { createEngineContext } from './context.js'
 import { getFieldTimestamps, setFieldTimestamps } from './crdt-state.js'
-import { garbageCollectKeys } from './garbage-collection.js'
+import { canCollectBaseKey, garbageCollectKeys } from './garbage-collection.js'
 import { getPublicKey, toKeyId } from './identity.js'
 import { cacheIndexDependencyId } from './index-dependencies.js'
 import { getIndexBucket, getIndexBucketIds, getIndexObserverId, getIndexRead, rebuildIndexes } from './indexes.js'
@@ -30,11 +30,12 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
     cacheStaggering = 0,
     tombstoneGc = {},
     isServer = false,
+    rowRetention,
   } = options
   const observers = createObserverRegistry()
   const staggering = createStaggering(cacheStaggering)
   const tombstones = createTombstoneStore()
-  const ctx = createEngineContext({ callbacks, observers, staggering, tombstones })
+  const ctx = createEngineContext({ callbacks, observers, staggering, tombstones, rowRetention })
   staggering.setFlush(() => flushQueuedOperations(ctx))
 
   let stopTombstoneGc: (() => void) | undefined
@@ -213,6 +214,10 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       return garbageCollectKeys(ctx, collection, keys)
     },
 
+    isGarbageCollectible(collectionName, key) {
+      return canCollectBaseKey(ctx.collections.get(collectionName), toKeyId(key))
+    },
+
     forEachKey(collectionName, callback) {
       const state = ctx.collections.get(collectionName)
       if (!state) {
@@ -286,6 +291,7 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       stopTombstoneGc?.()
       stopTombstoneGc = undefined
       staggering.dispose()
+      rowRetention?.clear()
       observers.dispose()
       ctx.queue.length = 0
       ctx.queueHead = 0

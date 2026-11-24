@@ -1,4 +1,5 @@
 import type { ResolvedCollection } from '@rstore/shared'
+import type { RowRetention } from '../rowRetention.js'
 import type { TombstoneStore } from '../tombstone.js'
 import type { EngineCollectionState, EngineContext, ObserverRegistry, Staggering } from './internal-types.js'
 import type { EngineCallbacks } from './types.js'
@@ -24,6 +25,8 @@ export function createEngineContext(options: {
   observers: ObserverRegistry
   staggering: Staggering
   tombstones: TombstoneStore
+  /** Optional last-use metadata for committed rows. */
+  rowRetention?: RowRetention
 }): EngineContext {
   const collections = new Map<string, EngineCollectionState>()
 
@@ -39,6 +42,7 @@ export function createEngineContext(options: {
 
   return {
     collections,
+    rowRetention: options.rowRetention,
     markers: createNullRecord<boolean>(),
     modules: new Map(),
     pendingLegacyModules: new Map(),

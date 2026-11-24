@@ -159,7 +159,11 @@ export function removeLayerNow(ctx: EngineContext, changes: ChangeRecorder | und
   if (collection) {
     reconcileLayerChange(ctx, changes, collection, state, entry.affectedKeys, previous, previousKeys)
   }
+  const rowRetention = ctx.rowRetention
+  const usedAt = collection && !entry.layer.skip && rowRetention?.tracks(collection) ? Date.now() : undefined
   for (const id of entry.affectedKeys) {
+    if (usedAt !== undefined && state.base.has(id) && !state.layeredKeyCounts?.has(id))
+      rowRetention!.touch(collection!, getPublicKey(state, id), usedAt)
     releaseUnusedKey(state, id)
   }
   return [{ type: 'layerRemove', layer: entry.layer }]

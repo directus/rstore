@@ -1,7 +1,7 @@
 import type { EngineCallbacks, EngineConflictPayload, EngineResetPayload, EngineStateChangeSink, EngineWriteCommitPayload } from '@rstore/core'
 import type { CacheLayer, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
 import type { CachedPageRefs, CacheRuntime, CreateCacheOptions } from './types'
-import { createStoreEngine, isKeyDefined, resolveRetention } from '@rstore/core'
+import { createRowRetention, createStoreEngine, isKeyDefined, resolveRetention } from '@rstore/core'
 import { reactive, shallowRef } from 'vue'
 import { createCacheChangeInterestRegistry } from './changeInterest'
 import { createIndexResultCache } from './indexResultCache'
@@ -63,12 +63,15 @@ export function createCacheRuntime<
     onReset: payload => handleReset(runtime, payload),
   }
 
-  const engine = createStoreEngine({ callbacks, cacheStaggering, tombstoneGc, isServer })
+  const rowRetention = createRowRetention(garbageCollection)
+  const queryStateRetention = resolveRetention(rawQueryStateRetention, defaultQueryStateRetention)
+  const engine = createStoreEngine({ callbacks, cacheStaggering, tombstoneGc, isServer, rowRetention })
   const versions = createCacheVersionRegistry(changeInterest)
   const signals = createSignalRegistry({ isServer, interest: changeInterest })
   runtime = {
     getStore,
-    queryStateRetention: resolveRetention(rawQueryStateRetention, defaultQueryStateRetention),
+    queryStateRetention,
+    rowRetention,
     queryStateUsedAt: new Map(),
     queryStateHeldCount: 0,
     engine,

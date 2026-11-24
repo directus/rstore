@@ -1,8 +1,10 @@
-import type { Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryTracking, StoreSchema } from '@rstore/shared'
+import type { Cache, Collection, CollectionDefaults, FindOptionsInclude, HookMetaQueryTracking, StoreSchema } from '@rstore/shared'
+import type { VueCachePrivate } from './cache'
 import type { VueStore } from './store'
 import type { TrackedItem, VisibleMembership, VisibleMembershipChange } from './trackingVisible'
 import type { VisibleGraphMembership } from './trackingVisibleGraph'
 import { watchQueryTracking } from './trackingEffect'
+import { findTrackedCollection } from './trackingRelations'
 import { createVisibleMembership } from './trackingVisible'
 import { createVisibleGraphMembership } from './trackingVisibleGraph'
 
@@ -25,6 +27,7 @@ export function createVisibleQueryOwnership(
   hasPageOwner: (item: TrackedItem) => boolean,
   scheduleReleased: (tracking: HookMetaQueryTracking) => void,
 ) {
+  const cache = store.$cache as Cache & VueCachePrivate
   const wrappers = new Set<TrackedItem>()
   let active: VisibleMembership | VisibleGraphMembership | undefined
   let result: unknown
@@ -38,8 +41,11 @@ export function createVisibleQueryOwnership(
 
   /** Drop visible ownership without releasing a fetched page's ownership. */
   function release(item: TrackedItem): void {
-    if (wrappers.delete(item) && !hasPageOwner(item))
-      item.$meta.queries.delete(id)
+    if (wrappers.delete(item) && !hasPageOwner(item) && item.$meta.queries.delete(id) && !item.$meta.queries.size) {
+      const collection = findTrackedCollection(store, item.$collection)
+      if (collection)
+        cache._private.touchRow(collection, item.$getKey())
+    }
   }
 
   /** Forget the visible lease when an authoritative page removed the query marker. */

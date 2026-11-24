@@ -7,6 +7,8 @@ import { disposeCache } from './dispose'
 import { applyMutationToCache } from './mutations'
 import { holdRetainedQueryState, releaseRetainedQueryState, sweepQueryState } from './queryRetention'
 import { clonePageRefs, invalidatePageRefsForItem } from './queryState'
+import { sweepManagedRows, touchCommittedRow } from './rowGc'
+import { createRowGcQueue } from './rowGcQueue'
 import { rebuildVisibleList } from './visibleList'
 import { garbageCollectItem, garbageCollectItems, getWrappedItem, releaseUnwrittenItems } from './wrapped'
 
@@ -44,6 +46,7 @@ export function createCacheApi<
         : undefined
       if (cached?.cell.isActive()) {
         cached.cell.track()
+        touchCommittedRow(ctx, collection, key)
         return cached.item
       }
       const raw = readRawCacheItem(ctx, collection, key)
@@ -52,10 +55,17 @@ export function createCacheApi<
           ctx.versions.trackItem(collection.name)
         return undefined
       }
+      touchCommittedRow(ctx, collection, key)
       return getWrappedItem(ctx, collection, raw, false, key, true)
     },
     readItems(params) {
-      return readItems(ctx, params)
+      const items = readItems(ctx, params)
+      if (items.length && ctx.rowRetention.tracks(params.collection)) {
+        const now = Date.now()
+        for (const item of items)
+          touchCommittedRow(ctx, params.collection, item.$getKey(), now)
+      }
+      return items
     },
     writeItem(params) {
       ctx.engine.writeItem(params)
@@ -102,15 +112,22 @@ export function createCacheApi<
       ctx.engine.clearCollection(params)
     },
     garbageCollectItem({ collection, item }) {
+      if (ctx.rowRetention.managed(collection)) {
+        sweepManagedRows(ctx, new Set([collection.name]))
+        return
+      }
       ctx.trackingEffects.flush()
       garbageCollectItem(ctx, collection, item)
     },
     garbageCollectItems({ collection, items }) {
+      if (ctx.rowRetention.managed(collection)) {
+        sweepManagedRows(ctx, new Set([collection.name]))
+        return
+      }
       ctx.trackingEffects.flush()
       garbageCollectItems(ctx, collection, Array.from(items, item => ({ item })))
     },
     garbageCollect() {
-      ctx.trackingEffects.flush()
       garbageCollect(ctx)
     },
     addLayer(layer) {
@@ -152,6 +169,14 @@ export function createCacheApi<
         ...params,
         onPruned: (collection, key) => invalidatePageRefsForItem(ctx, collection.name, key),
       }),
+      scheduleManagedRowGc(collection) {
+        if (!ctx.rowRetention.managed(collection))
+          return false
+        if (!ctx.disposed)
+          queueManagedGc(collection.name)
+        return true
+      },
+      touchRow: (collection, key) => touchCommittedRow(ctx, collection, key),
       holdQueryState: (queryId, holder) => holdRetainedQueryState(ctx, queryId, holder),
       releaseQueryState: holder => releaseRetainedQueryState(ctx, holder),
       isDisposed: () => ctx.disposed === true,
@@ -241,8 +266,11 @@ function scanItems(
 }
 
 function garbageCollect(ctx: CacheRuntime) {
+  sweepManagedRows(ctx)
   const store = ctx.getStore()
   for (const collection of store.$collections) {
+    if (ctx.rowRetention.managed(collection))
+      continue
     // One commit per collection: a full sweep must not re-run readers per row.
     const candidates: Array<GarbageCollectionCandidate<any>> = []
     ctx.engine.forEachKey(collection.name, (key) => {

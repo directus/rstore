@@ -140,6 +140,19 @@ describe('row garbage collection limits', () => {
     expect(snapshotKeys(stack, 'todos')).toEqual([])
   })
 
+  it('keeps explicitly retained batch writes outside the unused budget', async () => {
+    const stack = await createGarbageCollectionStack({
+      schema: todoSchema,
+      garbageCollection: { maxSize: 0 },
+      remote: false,
+    })
+    const collection = stack.collection('todos')
+    stack.cache.writeItems({ collection, items: [{ key: 'retained', value: { id: 'retained' } }], retain: true })
+    stack.cache.writeItems({ collection, items: [{ key: 'unused', value: { id: 'unused' } }] })
+    stack.cache.garbageCollect()
+    expect(snapshotKeys(stack, 'todos')).toEqual(['retained'])
+  })
+
   it('protects rows that enter a mounted computed result after its fetch', async () => {
     const stack = await createGarbageCollectionStack({
       schema: todoSchema,

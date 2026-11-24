@@ -253,9 +253,6 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
   }
   const getAutoRefresh = () => options.store.$resolveFindOptions(options.getCollection(), getOptions() ?? {}, options.many, { ...meta.value }).fetchOptions.autoRefresh
   const initialResolvedOptions = options.store.$resolveFindOptions(options.getCollection(), getOptions() ?? {}, options.many, meta.value)
-  const getQueryCollectionEnabled = () => options.store.$experimentalGarbageCollection
-    ? getOptions()?.experimentalGarbageCollection !== false
-    : getOptions()?.experimentalGarbageCollection === true
   const getQueryTrackingEnabled = () => {
     if (options.store.$isServer || isDisabled()) {
       return false

@@ -192,6 +192,7 @@ export function commitWrite(
     : { value: data, valueChanged: true }
   if (mergedBase.valueChanged)
     state.base.set(id, mergedBase.value)
+  ctx.rowRetention?.touch(collection, publicKey)
   if (mergedBase.valueChanged && !layerless)
     invalidateResolvedItem(state, id)
   const next = mergedBase.valueChanged
@@ -313,6 +314,7 @@ export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder |
   const previous = layerless ? state.base.get(id) : resolveItemById(state, id)
   const publicKey = getPublicKey(state, id)
   state.base.delete(id)
+  ctx.rowRetention?.forget(collection.name, id)
   state.retainedKeys?.delete(id)
   clearKeyOverride(state, id)
   if (!layerless)

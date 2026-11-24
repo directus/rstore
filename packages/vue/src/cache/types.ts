@@ -1,4 +1,4 @@
-import type { PruneParams, ResolvedRetention, StoreEngine, TombstoneGcOptions } from '@rstore/core'
+import type { PruneParams, ResolvedRetention, RowRetention, StoreEngine, TombstoneGcOptions } from '@rstore/core'
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, QueryResultMode, ResolvedCollection, ResolvedCollectionItem, RetentionOptions, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { CacheChangeInterestRegistry } from './changeInterest'
@@ -87,6 +87,8 @@ export interface CacheRuntime<
   disposed?: boolean
   /** Resolved bounds for saved results of unmounted queries. */
   queryStateRetention: ResolvedRetention | false
+  /** Last-use bookkeeping and eviction policy for committed rows. */
+  rowRetention: RowRetention
   /** Last use (ms) of each saved query id, for retention. */
   queryStateUsedAt: Map<string, number>
   /** Mounted entries found by the last sweep, minus unmounts since. */
@@ -144,6 +146,10 @@ export interface VueCachePrivate {
     hasPendingWrites: (meta: CustomHookMeta) => boolean
     /** Queue a prune, so it runs after the writes already queued by the same refresh. */
     prune: (params: CachePruneParams) => void
+    /** Queue policy-based GC if the collection has a policy. */
+    scheduleManagedRowGc: (collection: ResolvedCollection) => boolean
+    /** Record when the last query no longer uses an existing committed row. */
+    touchRow: (collection: ResolvedCollection, key: string | number) => void
     /** Record that a live query saved results under `queryId`, for retention. */
     holdQueryState: (queryId: string, holder: QueryStateHolder) => void
     /** Record that a query stopped using the results it last saved. */

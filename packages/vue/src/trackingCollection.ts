@@ -1,4 +1,5 @@
-import type { HookMetaQueryTracking, ResolvedCollection } from '@rstore/shared'
+import type { Cache, HookMetaQueryTracking, ResolvedCollection } from '@rstore/shared'
+import type { VueCachePrivate } from './cache'
 import type { VueStore } from './store'
 import { nextTick } from 'vue'
 import { forEachTrackedKey } from './trackingKeys'
@@ -6,6 +7,7 @@ import { findTrackedCollection } from './trackingRelations'
 
 /** Queue released rows once per collection, after reactive ownership settles. */
 export function createQueryCollector(store: VueStore) {
+  const cache = store.$cache as Cache & VueCachePrivate
   let pending: Map<ResolvedCollection<any, any, any>, Set<string | number>> | undefined
 
   /** Re-read current wrappers so a replacement can acquire ownership while queued. */
@@ -22,6 +24,8 @@ export function createQueryCollector(store: VueStore) {
 
   /** Queue an identity released by a fetched page or by the visible result. */
   function schedule(collection: ResolvedCollection<any, any, any>, key: string | number): void {
+    if (cache._private.scheduleManagedRowGc(collection))
+      return
     if (!pending) {
       pending = new Map()
       void nextTick(collect)

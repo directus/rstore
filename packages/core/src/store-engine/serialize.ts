@@ -219,8 +219,16 @@ function commitCollections(ctx: EngineContext, changes: ChangeRecorder | undefin
     }
   }
   ctx.collections.clear()
+  const rowRetention = ctx.rowRetention
+  rowRetention?.clear()
+  const usedAt = rowRetention ? Date.now() : undefined
   for (const [name, state] of staged) {
     ctx.collections.set(name, state)
+    const collection = state.collection
+    if (collection && rowRetention?.tracks(collection)) {
+      for (const id of state.base.keys())
+        rowRetention.touch(collection, getPublicKey(state, id), usedAt)
+    }
   }
 }
 
