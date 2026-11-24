@@ -1,9 +1,12 @@
 import type { PruneParams, ResolvedRetention, RowRetention, StoreEngine, TombstoneGcOptions } from '@rstore/core'
 import type { CacheLayer, Collection, CollectionDefaults, CustomHookMeta, QueryResultMode, ResolvedCollection, ResolvedCollectionItem, RetentionOptions, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
+import type { QueryStateRetentionOptions } from '../storeOptions'
 import type { CacheChangeInterestRegistry } from './changeInterest'
+import type { createCompleteScopes } from './completeScopes'
 import type { IndexResultCache } from './indexResultCache'
 import type { ItemCellRegistry } from './itemCells'
+import type { createLocalMembership } from './localMembership'
 import type { QueryStateHolder } from './queryHolders'
 import type { SignalRegistry } from './signals'
 import type { TrackingEffectBatch } from './trackingEffects'
@@ -47,6 +50,8 @@ export type CachedPageRefs = (
   confirmed: boolean
   /** Serializable effective options (function values dropped), including page and refresh overrides. */
   effectiveOptions?: unknown
+  /** Required included rows, grouped by collection. */
+  requiredRows?: Record<string, Array<string | number>>
 }
 
 /** Bridge-owned state surfaced to Vue internals. */
@@ -86,9 +91,23 @@ export interface CacheRuntime<
   /** Whether disposal notification has already been emitted. */
   disposed?: boolean
   /** Resolved bounds for saved results of unmounted queries. */
-  queryStateRetention: ResolvedRetention | false
+  queryStateRetention: (ResolvedRetention & { maxPages: number, maxKeys: number }) | false
   /** Last-use bookkeeping and eviction policy for committed rows. */
   rowRetention: RowRetention
+  /** Local creates over saved exact pages. */
+  membership: ReturnType<typeof createLocalMembership>
+  /** Complete indexed partitions and in-flight scope request fences. */
+  scopes: ReturnType<typeof createCompleteScopes>
+  /** Last use and optional holder id for engine markers. */
+  markerRetention: Map<string, { usedAt: number, owner?: string }>
+  /** Number of query markers without an owning saved query. */
+  standaloneMarkers: number
+  /** Saved key count since the previous sweep. */
+  queryStateKeyCount: number
+  /** Queue a row sweep after writes publish and ownership settles. */
+  scheduleRowGc?: (collection: string) => void
+  /** Sweep idle retained rows periodically when there is a policy. */
+  rowGcTimer?: ReturnType<typeof setInterval>
   /** Last use (ms) of each saved query id, for retention. */
   queryStateUsedAt: Map<string, number>
   /** Mounted entries found by the last sweep, minus unmounts since. */
@@ -128,6 +147,10 @@ export interface VueCachePrivate {
     trackingEffects: TrackingEffectBatch
     /** Bridge-owned cache state. */
     state: VueCacheState
+    /** Active and saved exact-page create placements. */
+    membership: CacheRuntime['membership']
+    /** Complete indexed cache partitions. */
+    scopes: CacheRuntime['scopes']
     /** Return an existing wrapped item or create one for the raw item. */
     getWrappedItem: <TCollection extends Collection>(
       collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
@@ -140,8 +163,8 @@ export interface VueCachePrivate {
     ensureLayersForCollection: (collectionName: string) => Ref<CacheLayer[]>
     /** Rebuild engine indexes after a runtime schema change. */
     rebuildIndexes: () => void
-    /** Read a committed row, ignoring optimistic layers. */
-    readCommittedItem: (collection: ResolvedCollection<any, any, any>, key: string | number) => any | undefined
+    /** Read committed data and optionally subscribe to a missing row's arrival. */
+    readCommittedItem: (collection: ResolvedCollection<any, any, any>, key: string | number, trackMissing?: boolean) => any | undefined
     /** Whether writes carrying this hook meta are still queued (paused or staggered cache). */
     hasPendingWrites: (meta: CustomHookMeta) => boolean
     /** Queue a prune, so it runs after the writes already queued by the same refresh. */
@@ -151,7 +174,7 @@ export interface VueCachePrivate {
     /** Record when the last query no longer uses an existing committed row. */
     touchRow: (collection: ResolvedCollection, key: string | number) => void
     /** Record that a live query saved results under `queryId`, for retention. */
-    holdQueryState: (queryId: string, holder: QueryStateHolder) => void
+    holdQueryState: (queryId: string, holder: QueryStateHolder, savedKeys?: number) => void
     /** Record that a query stopped using the results it last saved. */
     releaseQueryState: (holder: QueryStateHolder) => void
     /** Whether `dispose()` already ran. */

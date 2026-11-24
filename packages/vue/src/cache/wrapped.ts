@@ -103,7 +103,9 @@ export function garbageCollectItems<TCollection extends Collection>(
   const itemsByKey = new Map<string | number, WrappedItem<TCollection, CollectionDefaults, StoreSchema>>()
   for (const { item, key } of candidates) {
     if (item.$meta.queries.size === 0) {
-      itemsByKey.set(key ?? getItemKey(collection, item), item)
+      const itemKey = key ?? getItemKey(collection, item)
+      if (!ctx.membership.pins(collection.name, itemKey))
+        itemsByKey.set(itemKey, item)
     }
   }
   if (!itemsByKey.size) {

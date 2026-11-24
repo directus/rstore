@@ -1,4 +1,4 @@
-import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CreatePlacement, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
 import { isKeyDefined } from '../key'
 import { reportOperationError } from '../utils/operationError'
@@ -74,7 +74,10 @@ export async function createItem<
     })
 
     const membership = skipCache ? undefined : store.$cache.createMembership
-    const placement = meta.$createPlacement ?? membership?.prepare(collection.name, optimisticItem, insertInto)
+    const placement = meta.$createPlacement ?? membership?.prepare(collection.name, {
+      ...mutationHookState.optimisticItem,
+      ...typeof optimistic === 'object' ? optimistic : {},
+    }, insertInto)
     const isReplay = meta.$createPlacement !== undefined
     if (placement)
       meta.$createPlacement = placement

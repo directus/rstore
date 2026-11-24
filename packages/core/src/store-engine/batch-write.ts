@@ -82,7 +82,9 @@ function writeDirect(ctx: EngineContext, prepared: PreparedBatchWrite, key: stri
     : params.collection.getKey(item)
   registerBaseKeyValue(state, key, derived, ownsDefaultKey(item) || (!metadata.usesDefaultKey && derived !== undefined))
   const existing = state.base.get(id)
-  state.base.set(id, mutable && existing !== undefined ? { ...existing, ...data } : data)
+  const next = mutable && existing !== undefined ? { ...existing, ...data } : data
+  state.base.set(id, next)
+  ctx.callbacks.onBaseChange?.(params.collection.name, existing, next)
   if (ctx.rowRetention?.tracks(params.collection))
     ctx.rowRetention.touch(params.collection, getPublicKey(state, id))
   if (params.retain)

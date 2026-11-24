@@ -3,6 +3,7 @@ import type { RowRetention } from '../rowRetention.js'
 import type { TombstoneStore } from '../tombstone.js'
 import type { ChangeRecorder } from './change-recorder.js'
 import type { MutableEngineChangeSet } from './change-set.js'
+import type { ReplaceScopeParams } from './replace-scope.js'
 import type {
   DeleteItemParams,
   EngineCallbacks,
@@ -204,6 +205,8 @@ export type QueuedOperation = {
   | { type: 'clearCollection', collection: ResolvedCollection<any, any, any> }
   | { type: 'clear' }
   | { type: 'prune', params: PruneParams }
+  | { type: 'replaceScope', params: ReplaceScopeParams, settle: (applied: boolean) => void, reject: (error: unknown) => void }
+  | { type: 'afterWrites', callback: () => void }
 )
 
 /** Write staggering controller. */

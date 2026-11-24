@@ -19,6 +19,8 @@ export interface EngineWriteCommitPayload {
   marker?: string
   /** Applied operation kind. */
   operation: 'write' | 'delete'
+  /** Whether a deletion came from cache pressure or pruning. */
+  evicted?: boolean
 }
 
 /** Immediate framework projection receiving compact operation changes. */

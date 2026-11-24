@@ -37,6 +37,8 @@ export function createCacheApi<
   return {
     receipts,
     inspect: () => ctx.engine.inspect(ctx.getStore().$collections),
+    createMembership: ctx.membership.api,
+    scopes: ctx.scopes.api,
     wrapItem({ collection, item, noCache }) {
       return getWrappedItem(ctx, collection, item, noCache)!
     },
@@ -59,6 +61,9 @@ export function createCacheApi<
       return getWrappedItem(ctx, collection, raw, false, key, true)
     },
     readItems(params) {
+      const marker = params.marker && ctx.markerRetention.get(params.marker)
+      if (marker)
+        marker.usedAt = Date.now()
       const items = readItems(ctx, params)
       if (items.length && ctx.rowRetention.tracks(params.collection)) {
         const now = Date.now()
@@ -158,12 +163,19 @@ export function createCacheApi<
     },
     _private: {
       trackingEffects: ctx.trackingEffects,
+      scopes: ctx.scopes,
+      membership: ctx.membership,
       state: ctx.state,
       getWrappedItem: (collection, item, noCache) => getWrappedItem(ctx, collection, item, noCache),
       layers: ctx.layers,
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
       rebuildIndexes: () => ctx.engine.rebuildIndexes(),
-      readCommittedItem: (collection, key) => ctx.engine.readBaseItemRaw({ collection, key }),
+      readCommittedItem(collection, key, trackMissing) {
+        const value = ctx.engine.readBaseItemRaw({ collection, key })
+        if (value === undefined && trackMissing)
+          ctx.versions.trackItem(collection.name)
+        return value
+      },
       hasPendingWrites: meta => ctx.engine.hasPendingWrites(meta),
       prune: params => ctx.engine.prune({
         ...params,
@@ -177,7 +189,10 @@ export function createCacheApi<
         return true
       },
       touchRow: (collection, key) => touchCommittedRow(ctx, collection, key),
-      holdQueryState: (queryId, holder) => holdRetainedQueryState(ctx, queryId, holder),
+      holdQueryState: (queryId, holder, savedKeys = 0) => {
+        ctx.queryStateKeyCount += savedKeys
+        holdRetainedQueryState(ctx, queryId, holder)
+      },
       releaseQueryState: holder => releaseRetainedQueryState(ctx, holder),
       isDisposed: () => ctx.disposed === true,
     },
@@ -191,10 +206,10 @@ function readItems(ctx: CacheRuntime, params: Parameters<Cache['readItems']>[0])
     if (!ctx.signals.trackList(collection.name))
       ctx.versions.trackList(collection.name)
     const cached = ctx.visibleListCache.get(collection.name)
-    if (cached && (marker === undefined || cached.marker === marker))
-      return cached.items.slice()
     if (marker !== undefined && !ctx.engine.hasMarker(marker))
       return []
+    if (cached && (marker === undefined || cached.marker === marker))
+      return cached.items.slice()
     if (cached) {
       cached.marker = marker
       return cached.items.slice()

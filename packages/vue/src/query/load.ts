@@ -146,9 +146,10 @@ async function fetchPage(
   // stays out of the ownership paths below, which only see `newQueryTracking`.
   // A non-collecting query still owns its result, but pruning must retain a
   // separate payload for writes that can remain queued after publication.
-  const hookTracking = pruneRun && !ctx.queryCollectionEnabled && !uncachedPage
-    ? createTrackingObject()
-    : tracksPage ? newQueryTracking : pruneRun && !uncachedPage ? createTrackingObject() : undefined
+  const needsSeparateTracking = !uncachedPage && (pruneRun || (exact && finalOptions.include))
+  const hookTracking = tracksPage && !(pruneRun && !ctx.queryCollectionEnabled)
+    ? newQueryTracking
+    : needsSeparateTracking ? createTrackingObject() : undefined
   const publication = createPageFetchPublication(ctx, page, savedPageRequestId)
   const fetchMeta: CustomHookMeta = {
     ...ctx.meta.value,

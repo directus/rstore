@@ -18,6 +18,7 @@ import type {
 } from '@rstore/shared'
 import type { RowRetention } from '../rowRetention.js'
 import type { TombstoneStore } from '../tombstone.js'
+import type { ReplaceScopeParams } from './replace-scope.js'
 import type { EngineStateChangeSink, EngineWriteCommitPayload } from './write-callbacks.js'
 
 export type { EngineStateChangeSink, EngineWriteCommitPayload } from './write-callbacks.js'
@@ -58,6 +59,10 @@ export interface EngineCallbacks {
   stateChangeSink?: EngineStateChangeSink
   /** Allocation-light write callback for embedding adapters. */
   onWriteCommitted?: (payload: EngineWriteCommitPayload) => void
+  /** Record a committed row change before reactive publication. */
+  onBaseChange?: (collection: string, before: any, after: any, evicted?: boolean) => void
+  /** Record when a query marker became available. */
+  onMarker?: (marker: string, owner?: string) => void
   /**
    * Fired when a write is dropped (stale query publication) or rejected (older
    * than a tombstone) without committing, so adapters can release state they
@@ -220,6 +225,14 @@ export interface StoreEngine<
   getIndexDependencyId: (collection: string, indexKey: string, indexValue: CacheIndexValue) => string
   /** Check whether a query marker exists. */
   hasMarker: (marker: string) => boolean
+  /** Visit existing markers, including those hydrated from a snapshot. */
+  markerKeys: () => string[]
+  /** Forget one inactive marker without disturbing unrelated rows. */
+  deleteMarker: (marker: string) => void
+  /** Reconcile an authoritative index partition as one queued operation. */
+  replaceScope: (params: ReplaceScopeParams) => Promise<boolean>
+  /** Run after all earlier queued operations have committed. */
+  afterPendingWrites: (callback: () => void) => void
   /** Queue one item write. */
   writeItem: (params: WriteItemParams) => void
   /** Queue a batch item write. */

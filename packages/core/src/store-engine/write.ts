@@ -190,8 +190,10 @@ export function commitWrite(
   const mergedBase = mutable
     ? mergeMutableItem(ctx, params, data, existing, publicKey, effects)
     : { value: data, valueChanged: true }
-  if (mergedBase.valueChanged)
+  if (mergedBase.valueChanged) {
     state.base.set(id, mergedBase.value)
+    ctx.callbacks.onBaseChange?.(collection.name, existing, mergedBase.value)
+  }
   ctx.rowRetention?.touch(collection, publicKey)
   if (mergedBase.valueChanged && !layerless)
     invalidateResolvedItem(state, id)
@@ -211,7 +213,8 @@ export function commitWrite(
   const keyFormChange = keyFormChanged && previousPublicKey !== undefined
     ? { previousKey: previousPublicKey, key: publicKey }
     : undefined
-  if ((layerless ? mergedBase.valueChanged : visibleValueChanged) || keyFormChanged) {
+  const baseArrived = existing === undefined && mergedBase.value !== undefined
+  if ((layerless ? mergedBase.valueChanged : visibleValueChanged || baseArrived) || keyFormChanged) {
     recordItem(
       changes,
       collection.name,
@@ -231,6 +234,7 @@ export function commitWrite(
 
   if (marker !== undefined) {
     ctx.markers[marker] = true
+    ctx.callbacks.onMarker?.(marker, meta?.$queryCacheKey)
     recordList(changes, collection.name)
   }
   if (meta?.$queryTracking) {
@@ -299,7 +303,7 @@ function mergeMutableItem(
 }
 
 /** Delete one base item and collect its post-commit hook. */
-export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder | undefined, params: DeleteItemParams): DeleteCommitResult {
+export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder | undefined, params: DeleteItemParams, evicted = false): DeleteCommitResult {
   const { collection, key } = params
   const state = ctx.collections.get(collection.name)
   if (!state) {
@@ -311,9 +315,11 @@ export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder |
   }
 
   const layerless = state.layers.length === 0
-  const previous = layerless ? state.base.get(id) : resolveItemById(state, id)
+  const base = state.base.get(id)
+  const previous = layerless ? base : resolveItemById(state, id)
   const publicKey = getPublicKey(state, id)
   state.base.delete(id)
+  ctx.callbacks.onBaseChange?.(collection.name, base, undefined, evicted)
   ctx.rowRetention?.forget(collection.name, id)
   state.retainedKeys?.delete(id)
   clearKeyOverride(state, id)
@@ -346,6 +352,7 @@ export function deleteItemFromBase(ctx: EngineContext, changes: ChangeRecorder |
       keyFormChanged,
       visibilityChanged,
       operation: 'delete',
+      evicted,
     }),
   }
 }

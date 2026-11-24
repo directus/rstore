@@ -113,7 +113,7 @@ export function sweepQueryState(ctx: CacheRuntime, now = Date.now()): void {
   }
   const groups = new Map<string, string[]>()
   ctx.standaloneMarkers = 0
-  for (const marker of Object.keys(ctx.state.markers)) {
+  for (const marker of ctx.engine.markerKeys()) {
     const record = ctx.markerRetention.get(marker) ?? { usedAt: now }
     ctx.markerRetention.set(marker, record)
     if (!record.owner)
@@ -153,7 +153,7 @@ export function sweepQueryState(ctx: CacheRuntime, now = Date.now()): void {
     for (const marker of groups.get(item.id) ?? []) {
       if (!ctx.markerRetention.get(marker)?.owner)
         ctx.standaloneMarkers--
-      delete ctx.state.markers[marker]
+      ctx.engine.deleteMarker(marker)
       ctx.markerRetention.delete(marker)
     }
     ctx.membership.evict(item.id)

@@ -2,7 +2,6 @@ import type { CacheCreateMembership, CreatePlacement, FindManyOptions, PendingCr
 import type { CacheRuntime } from './types'
 import { nextTick, shallowReactive } from 'vue'
 import { queueQueryStateSweep } from './queryRetention'
-import { enqueueOperation } from './queue'
 
 /** Active exact page that a local create can refresh or place into. */
 export interface LocalMembershipPage {
@@ -94,15 +93,12 @@ export function createLocalMembership(ctx: CacheRuntime) {
     },
     show: publish,
     commit(placement, key, queued) {
-      enqueueOperation(ctx, {
-        type: 'acknowledgeCreatePlacement',
-        apply() {
-          publish(placement, key, queued ? undefined : ++sequence)
-          if (queued)
-            return
-          queueQueryStateSweep(ctx, true)
-          refreshTargets(placement)
-        },
+      ctx.engine.afterPendingWrites(() => {
+        publish(placement, key, queued ? undefined : ++sequence)
+        if (queued)
+          return
+        queueQueryStateSweep(ctx, true)
+        refreshTargets(placement)
       })
     },
     discard(id) {

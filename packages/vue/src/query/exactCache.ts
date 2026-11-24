@@ -11,18 +11,19 @@ export function readSavedPage(ctx: any, page: Pick<VueQueryPage<any, any, any, a
     return
   if (saved.type === 'data')
     return saved.invalidated ? undefined : saved
-  if (hasExactRows(ctx, saved, saved.requiredRows))
+  if (hasExactRows(ctx, saved, saved.requiredRows, false))
     return saved
 }
 
 /** Check refs against committed state, even if optimistic layers currently hide them. */
-export function hasExactRows(ctx: any, refs: { type: 'ref', key: string | number } | { type: 'refs', keys: Array<string | number> }, requiredRows?: Record<string, Array<string | number>>): boolean {
-  const rows = ctx.cache._private.state.collections[ctx.getCollection().name]?.value
+export function hasExactRows(ctx: any, refs: { type: 'ref', key: string | number } | { type: 'refs', keys: Array<string | number> }, requiredRows?: Record<string, Array<string | number>>, trackMissing = true): boolean {
+  const collection = ctx.getCollection()
+  const read = ctx.cache._private.readCommittedItem
   const keys = refs.type === 'ref' ? [refs.key] : refs.keys
-  return keys.every(key => rows?.[key] !== undefined)
-    && Object.entries(requiredRows ?? {}).every(([collection, keys]) => {
-      const related = ctx.cache._private.state.collections[collection]?.value
-      return keys.every(key => related?.[key] !== undefined)
+  return keys.every(key => read(collection, key, trackMissing) !== undefined)
+    && Object.entries(requiredRows ?? {}).every(([name, keys]) => {
+      const related = ctx.store.$collections.find((candidate: { name: string }) => candidate.name === name)
+      return !!related && keys.every(key => read(related, key, trackMissing) !== undefined)
     })
 }
 

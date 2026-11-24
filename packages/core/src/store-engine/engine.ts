@@ -138,6 +138,26 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       return ctx.markers[marker] === true
     },
 
+    markerKeys: () => Object.keys(ctx.markers),
+
+    deleteMarker(marker) {
+      delete ctx.markers[marker]
+    },
+
+    replaceScope(params) {
+      return new Promise((settle, reject) => {
+        if (ctx.disposed)
+          settle(false)
+        else
+          enqueueOperation(ctx, { type: 'replaceScope', params, settle, reject })
+      })
+    },
+
+    afterPendingWrites(callback) {
+      if (!ctx.disposed)
+        enqueueOperation(ctx, { type: 'afterWrites', callback })
+    },
+
     writeItem(params) {
       enqueueOperation(ctx, { type: 'writeItem', params })
     },
@@ -293,6 +313,10 @@ export function createStoreEngine(options: EngineOptions): StoreEngine {
       staggering.dispose()
       rowRetention?.clear()
       observers.dispose()
+      for (const operation of ctx.queue) {
+        if (operation.type === 'replaceScope')
+          operation.settle(false)
+      }
       ctx.queue.length = 0
       ctx.queueHead = 0
       ctx.pauseDepth = 0

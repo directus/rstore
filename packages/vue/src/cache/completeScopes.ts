@@ -1,12 +1,9 @@
-import type { CacheScope, CacheScopes, FieldTimestampValue, ResolvedCollection, WriteItem } from '@rstore/shared'
-import type { CacheRuntime, CacheWriteBatch } from './types'
-import { compareHLC, IncompleteCacheScopeError, isKeyDefined, selectEvictions } from '@rstore/core'
+import type { CacheScope, CacheScopes, FieldTimestampValue } from '@rstore/shared'
+import type { CacheRuntime } from './types'
+import { compareHLC, IncompleteCacheScopeError, selectEvictions } from '@rstore/core'
 import { shallowReactive } from 'vue'
 import { isQueryStateHeld } from './queryHolders'
 import { queueQueryStateSweep } from './queryRetention'
-import { removeDeletedPageKey } from './queryState'
-import { enqueueOperation } from './queue'
-import { deleteItemNow, writeItemNow } from './writes'
 
 interface ScopeRecord {
   /** Cache lifetime of this partition, fencing restores and resets. */
@@ -53,28 +50,22 @@ export function createCompleteScopes(ctx: CacheRuntime) {
       const generation = existing.generation
       const request = ++sequence
       return {
-        replace: (rows, { revision, canPublish }) => new Promise((resolve, reject) => {
-          enqueueOperation(ctx, {
-            type: 'completeScope',
-            apply(batch) {
-              try {
-                const current = records.get(key)
-                if (!current || current.lifetime !== existing.lifetime || current.generation !== generation || canPublish?.() === false
-                  || (current.revision != null && revision != null
-                    ? compareHLC(revision, current.revision) < 0
-                    : request < current.accepted)) {
-                  resolve(false)
-                  return
-                }
-                replaceBucket(ctx, collection, scope, rows, batch)
-                records.set(key, { ...current, generation, accepted: request, complete: true, revision: revision ?? current.revision, usedAt: Date.now() })
-                resolve(true)
-              }
-              catch (error) {
-                reject(error)
-              }
-            },
-          })
+        replace: (rows, { revision, canPublish }) => ctx.engine.replaceScope({
+          collection,
+          scope,
+          rows,
+          canApply() {
+            const current = records.get(key)
+            return !!current && current.lifetime === existing.lifetime
+              && current.generation === generation && canPublish?.() !== false
+              && (current.revision != null && revision != null
+                ? compareHLC(revision, current.revision) >= 0
+                : request >= current.accepted)
+          },
+          onApplied() {
+            const current = records.get(key)!
+            records.set(key, { ...current, accepted: request, complete: true, revision: revision ?? current.revision, usedAt: Date.now() })
+          },
         }),
         release() {
           const current = records.get(key)
@@ -160,34 +151,5 @@ export function createCompleteScopes(ctx: CacheRuntime) {
         fields.delete(collection)
       }
     },
-  }
-}
-
-/** Validate every key before updating the committed rows and deleting old members. */
-function replaceBucket(ctx: CacheRuntime, collection: ResolvedCollection, scope: CacheScope, rows: WriteItem[], batch: CacheWriteBatch): void {
-  const keys = new Set<string>()
-  for (const { key, value } of rows) {
-    if (!isKeyDefined(key) || value?.[scope.field] !== scope.value || keys.has(String(key)))
-      throw new IncompleteCacheScopeError(scope)
-    keys.add(String(key))
-  }
-  // Index overlays can hide base rows or add provisional entries. Reconcile
-  // only committed records whose scope field matches the requested value.
-  const indexed = ctx.state.collectionIndexes.get(collection.name)?.get(scope.field)?.get(String(scope.value))
-  const previous = new Set(indexed?.value ?? [])
-  for (const layer of ctx.layers[collection.name]?.value ?? []) {
-    for (const key of Object.keys(layer.state))
-      previous.add(key)
-    for (const key of layer.deletedItems ?? [])
-      previous.add(key)
-  }
-  for (const { key, value } of rows)
-    writeItemNow(ctx, { collection, key, item: value, batch })
-  for (const key of previous) {
-    const item = ctx.state.collections[collection.name]?.value[key]
-    if (item?.[scope.field] === scope.value && !keys.has(String(key))) {
-      removeDeletedPageKey(ctx, collection.name, key)
-      deleteItemNow(ctx, collection, collection.getKey(item) ?? key, { batch })
-    }
   }
 }

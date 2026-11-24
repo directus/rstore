@@ -176,8 +176,6 @@ export interface Cache<
     item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
     marker?: string
     fromWriteItems?: boolean
-    /** Keep the committed row resident until explicit deletion or reset. */
-    retain?: boolean
     meta?: CustomHookMeta
     /**
      * Per-field timestamps for CRDT-like field-level LWW merge.

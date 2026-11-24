@@ -40,7 +40,7 @@ export function pruneNow(
         continue
       }
       const key = getPublicKey(state, id)
-      const result = deleteItemFromBase(ctx, changes, { collection, key })
+      const result = deleteItemFromBase(ctx, changes, { collection, key }, true)
       if (!result.removed) {
         continue
       }

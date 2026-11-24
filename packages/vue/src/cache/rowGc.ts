@@ -1,11 +1,14 @@
 import type { ResolvedCollection } from '@rstore/shared'
 import type { CacheRuntime } from './types'
 import type { GarbageCollectionCandidate } from './wrapped'
+import { sweepQueryState } from './queryRetention'
+import { getPageQueryId, isQueryStateKeyForCollection } from './queryState'
 import { garbageCollectItems, getWrappedItem } from './wrapped'
 
 /** Check base ownership without materializing wrappers for every candidate. */
 function canEvict(ctx: CacheRuntime, collection: ResolvedCollection, key: string | number): boolean {
   return ctx.engine.isGarbageCollectible(collection.name, key)
+    && !ctx.membership.pins(collection.name, key)
     && !ctx.wrappedItems.get(collection.name, key)?.metadata.queries.size
 }
 
@@ -38,4 +41,27 @@ export function sweepManagedRows(ctx: CacheRuntime, names?: ReadonlySet<string>)
 export function touchCommittedRow(ctx: CacheRuntime, collection: ResolvedCollection, key: string | number, now?: number): void {
   if (ctx.rowRetention.tracks(collection) && ctx.engine.readBaseItemRaw({ collection, key }) !== undefined)
     ctx.rowRetention.touch(collection, key, now)
+}
+/** Keep whole warm exact pages ahead of other unused rows when pressure allows. */
+function preferExactPageRows(ctx: CacheRuntime, collections: ResolvedCollection[]): Map<string, Set<string>> {
+  const result = new Map<string, Set<string>>()
+  for (const [pageId, page] of ctx.state.pageRefs) {
+    if (!page.confirmed || (page.effectiveOptions as { resultMode?: string } | undefined)?.resultMode !== 'responseRefs' || page.type === 'data')
+      continue
+    for (const [collection, keys] of Object.entries(page.requiredRows ?? {})) {
+      const saved = result.get(collection) ?? new Set()
+      for (const key of keys)
+        saved.add(String(key))
+      result.set(collection, saved)
+    }
+    const id = getPageQueryId(pageId)
+    const collection = id && collections.find(candidate => isQueryStateKeyForCollection(id, candidate.name))
+    if (!collection)
+      continue
+    const keys = result.get(collection.name) ?? new Set()
+    for (const key of page.type === 'refs' ? page.keys : [page.key])
+      keys.add(String(key))
+    result.set(collection.name, keys)
+  }
+  return result
 }

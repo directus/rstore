@@ -10,6 +10,7 @@ import { sweepEmptyIndexBuckets } from './index-sweep.js'
 import { addLayerNow, removeLayerNow } from './layers.js'
 import { pruneNow } from './prune.js'
 import { appendError, dispatchCommitted, dispatchFinalObservers } from './queue-dispatch.js'
+import { replaceScopeNow } from './replace-scope.js'
 import { clearCollectionNow, clearNow, setStateNow } from './serialize.js'
 import { createWriteEffects } from './write-effects.js'
 import { deleteItemFromBase, writeItemNow } from './write.js'
@@ -201,6 +202,30 @@ function processOperation(
       return processSimple(ctx, flushChanges, changes => clearCollectionNow(ctx, changes, operation.collection))
     case 'clear':
       return processSimple(ctx, flushChanges, changes => clearNow(ctx, changes))
+    case 'afterWrites':
+      advance(ctx)
+      operation.callback()
+      return true
+    case 'replaceScope': {
+      try {
+        let applied = false
+        processSimple(ctx, flushChanges, (changes) => {
+          if (!operation.params.canApply())
+            return []
+          const effects = replaceScopeNow(ctx, changes, operation.params)
+          operation.params.onApplied()
+          applied = true
+          return effects
+        })
+        operation.settle(applied)
+      }
+      catch (error) {
+        operation.reject(error)
+        if (ctx.queue[ctx.queueHead] === operation)
+          advance(ctx)
+      }
+      return true
+    }
     case 'prune': {
       const pruned: PrunedItem[] = []
       processSimple(ctx, flushChanges, changes => pruneNow(ctx, changes, operation.params, pruned))
@@ -396,6 +421,7 @@ function finishBatch(
 ): true {
   if (operation.params.marker !== undefined) {
     ctx.markers[operation.params.marker] = true
+    ctx.callbacks.onMarker?.(operation.params.marker, operation.params.meta?.$queryCacheKey)
     recordList(recorder, operation.params.collection.name)
   }
   const effects = [...pendingEffects, ...createWriteEffects(ctx, {

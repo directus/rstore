@@ -38,7 +38,7 @@ export function garbageCollectKeys(
       if (!canCollectBaseKey(state, id)) {
         continue
       }
-      const result = deleteItemFromBase(ctx, changes, { collection, key })
+      const result = deleteItemFromBase(ctx, changes, { collection, key }, true)
       if (!result.removed) {
         continue
       }

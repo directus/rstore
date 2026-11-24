@@ -15,6 +15,10 @@ export function disposeCache(ctx: CacheRuntime): void {
   finally {
     ctx.stopQueryStateSweeps?.()
     ctx.stopQueryStateSweeps = undefined
+    if (ctx.rowGcTimer) {
+      clearInterval(ctx.rowGcTimer)
+      ctx.rowGcTimer = undefined
+    }
     disposeCacheRuntime(ctx)
   }
 }
@@ -52,6 +56,9 @@ function notifyDispose(ctx: CacheRuntime): void {
 /** Release every bridge-owned registry without invoking reset hooks. */
 function disposeCacheRuntime(ctx: CacheRuntime): void {
   ctx.trackingEffects.clear()
+  ctx.markerRetention.clear()
+  ctx.scopes.clear()
+  ctx.membership.clear()
   ctx.engine.dispose()
   ctx.signals.dispose()
   ctx.versions.dispose()

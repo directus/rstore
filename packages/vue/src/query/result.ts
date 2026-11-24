@@ -149,11 +149,11 @@ export function watchDeferredPageTracking(ctx: any, page: VueQueryPage<any, any,
     }, { flush: 'sync' })
     /** Release observation once its deferred cache operations leave the queue. */
     function stopIfSettled(): void {
-      if (!isCurrent() || !hasPending())
+      if (!isCurrent()) {
         stop()
         return
       }
-      if (!pending.some((operation: any) => queue.includes(operation))) {
+      if (!hasPending()) {
         rememberRequiredRows(ctx, page, tracking)
         stop()
       }

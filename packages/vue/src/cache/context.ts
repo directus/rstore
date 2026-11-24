@@ -1,14 +1,16 @@
 import type { EngineCallbacks, EngineConflictPayload, EngineResetPayload, EngineStateChangeSink, EngineWriteCommitPayload } from '@rstore/core'
 import type { CacheLayer, CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
 import type { CachedPageRefs, CacheRuntime, CreateCacheOptions } from './types'
-import { createRowRetention, createStoreEngine, isKeyDefined, resolveRetention } from '@rstore/core'
+import { createRowRetention, createStoreEngine, isKeyDefined } from '@rstore/core'
 import { reactive, shallowRef } from 'vue'
 import { createCacheChangeInterestRegistry } from './changeInterest'
+import { createCompleteScopes } from './completeScopes'
 import { createIndexResultCache } from './indexResultCache'
 import { createItemCellRegistry } from './itemCells'
+import { createLocalMembership } from './localMembership'
 import { invalidatePageRefsForWrite, restoreSnapshotPageRefs } from './pageRefSync'
-import { defaultQueryStateRetention, scheduleQueryStateSweeps } from './queryRetention'
-import { clearAllQueryState, clearQueryStateForCollection } from './queryState'
+import { queueQueryStateSweep, resolveQueryStateRetention, scheduleQueryStateSweeps } from './queryRetention'
+import { clearAllQueryState, clearQueryStateForCollection, removeDeletedPageKey } from './queryState'
 import { createSignalRegistry } from './signals'
 import { createCacheStateSink } from './stateSink'
 import { synchronizeBridgeIndex } from './stateSinkIndex'
@@ -33,6 +35,8 @@ export function createCacheRuntime<
   garbageCollection,
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): CacheRuntime<TSchema, TCollectionDefaults> {
   let runtime: CacheRuntime<TSchema, TCollectionDefaults>
+  let membership: CacheRuntime['membership']
+  let scopes: CacheRuntime['scopes']
   let sinkImplementation: EngineStateChangeSink
   const pageRefs = new Map<string, CachedPageRefs>()
   const changeInterest = createCacheChangeInterestRegistry()
@@ -56,6 +60,8 @@ export function createCacheRuntime<
     wrapModuleState: value => value && typeof value === 'object' ? reactive(value) : value,
     stateChangeSink,
     onWriteCommitted: payload => handleAfterWrite(runtime, payload),
+    onBaseChange: (collection, before, after, evicted) => scopes.change(collection, before, after, evicted),
+    onMarker: (marker, owner) => rememberMarker(runtime, marker, owner),
     onWriteDropped: (collection, key) => releaseUnwrittenItem(runtime, collection, key),
     onConflict: payload => handleConflict(getStore, payload),
     onLayerAdd: layer => handleLayerAdd(runtime, layer),
@@ -64,7 +70,7 @@ export function createCacheRuntime<
   }
 
   const rowRetention = createRowRetention(garbageCollection)
-  const queryStateRetention = resolveRetention(rawQueryStateRetention, defaultQueryStateRetention)
+  const queryStateRetention = resolveQueryStateRetention(rawQueryStateRetention)
   const engine = createStoreEngine({ callbacks, cacheStaggering, tombstoneGc, isServer, rowRetention })
   const versions = createCacheVersionRegistry(changeInterest)
   const signals = createSignalRegistry({ isServer, interest: changeInterest })
@@ -72,6 +78,15 @@ export function createCacheRuntime<
     getStore,
     queryStateRetention,
     rowRetention,
+    get membership() {
+      return membership
+    },
+    get scopes() {
+      return scopes
+    },
+    markerRetention: new Map(),
+    standaloneMarkers: 0,
+    queryStateKeyCount: 0,
     queryStateUsedAt: new Map(),
     queryStateHeldCount: 0,
     engine,
@@ -101,6 +116,8 @@ export function createCacheRuntime<
     visibleListCache: createVisibleListCache(changeInterest),
     indexResultCache: createIndexResultCache(changeInterest),
   }
+  membership = createLocalMembership(runtime)
+  scopes = createCompleteScopes(runtime)
   sinkImplementation = createCacheStateSink({
     interest: changeInterest,
     flush: (changes, values, keyForms, resets, deletions) => synchronizeBridge(runtime, changes, values, keyForms, resets, deletions),
@@ -222,14 +239,33 @@ function cleanupChangedWrappers(
   return errors
 }
 
+/** Track engine marker age and its saved-query owner. */
+function rememberMarker(ctx: CacheRuntime, marker: string, owner?: string): void {
+  if (!ctx.queryStateRetention)
+    return
+  const previous = ctx.markerRetention.get(marker)
+  if (previous && previous.owner === undefined)
+    ctx.standaloneMarkers--
+  if (owner === undefined)
+    ctx.standaloneMarkers++
+  ctx.markerRetention.set(marker, { usedAt: Date.now(), owner })
+  queueQueryStateSweep(ctx)
+}
+
 /** Apply bridge write invalidation before calling user hooks. */
 function handleAfterWrite(ctx: CacheRuntime, payload: EngineWriteCommitPayload): void {
   if (payload.operation === 'delete')
     ctx.wrappedItems.deleteBase(payload.collection.name, payload.key!)
   else if (payload.keyFormChanged && payload.previousKey !== undefined)
     ctx.wrappedItems.deleteBase(payload.collection.name, payload.previousKey)
-  if (payload.operation === 'write')
+  if (payload.operation === 'write') {
     invalidatePageRefsForWrite(ctx, payload)
+    if (ctx.rowRetention.managed(payload.collection))
+      ctx.scheduleRowGc?.(payload.collection.name)
+  }
+  else if (!payload.evicted && payload.key !== undefined) {
+    removeDeletedPageKey(ctx, payload.collection.name, payload.key)
+  }
   const store = ctx.getStore()
   store.$hooks.callHookSync('afterCacheWrite', {
     store,
@@ -286,11 +322,20 @@ function handleReset(ctx: CacheRuntime, payload: EngineResetPayload): void {
     ctx.indexResultCache.reset(collectionName)
     ctx.wrappedItems.deleteCollection(collectionName)
     clearQueryStateForCollection(ctx, collectionName)
+    ctx.scopes.clear(collectionName)
   }
   else {
     ctx.visibleListCache.clear()
     ctx.indexResultCache.reset()
     ctx.wrappedItems.clear()
+    ctx.scopes.clear()
+    ctx.markerRetention.clear()
+    ctx.standaloneMarkers = 0
+    ctx.queryStateKeyCount = 0
+    ctx.queryStateHeldCount = 0
+    queueQueryStateSweep(ctx, true)
+    if (payload.source === 'clear')
+      ctx.membership.clear()
     // Hydration replaces saved pages with the snapshot's own; live consumers
     // and their retention bookkeeping stay.
     if (payload.source === 'setState')
