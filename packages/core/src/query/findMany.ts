@@ -1,8 +1,9 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FindManyOptions, FindOptions, GlobalStoreType, QueryResult, ResolvedCollection, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CompleteScopeResult, CustomHookMeta, FindManyOptions, FindOptions, GlobalStoreType, QueryResult, ResolvedCollection, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import { defaultMarker } from '../cache'
 import { shouldFetchDataFromFetchPolicy, shouldReadCacheFromFetchPolicy } from '../fetchPolicy'
 import { stringifyFindOptions } from '../utils/findOptions'
 import { createOperationErrorReporter } from '../utils/operationError'
+import { IncompleteCacheScopeError, validateCompleteScope } from './completeScope'
 import { dedupeQuery } from './dedupe'
 import { peekMany } from './peekMany'
 import { processQueryResult, wrapQueryResult } from './processResult'
@@ -74,7 +75,12 @@ async function _findMany<
     many: true,
   })
   try {
+    validateCompleteScope(findOptions)
     const fetchPolicy = findOptions.fetchPolicy
+    const scope = findOptions.cacheScope
+    const cacheComplete = scope && store.$cache.scopes?.isComplete(collection, scope)
+    if (scope && !store.$cache.scopes)
+      throw new IncompleteCacheScopeError(scope)
 
     let result: any[] | undefined
     let marker: string | undefined
@@ -91,8 +97,11 @@ async function _findMany<
       marker = peekManyResult.marker
     }
 
-    if (!result?.length && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
+    const shouldFetch = scope ? !cacheComplete || fetchPolicy !== 'cache-first' : !result?.length
+    if (shouldFetch && shouldFetchDataFromFetchPolicy(fetchPolicy)) {
       const fetch = async () => {
+        const request = scope && store.$cache.scopes?.begin(collection, scope)
+        let scopeResult: CompleteScopeResult | undefined
         try {
           if (!marker) {
             marker = defaultMarker(collection, findOptions)
@@ -119,7 +128,8 @@ async function _findMany<
             getResult: () => result ?? [],
             setResult: (value, options) => {
               result = value
-              if (result?.length && options?.abort !== false) {
+              scopeResult = options
+              if ((result?.length || options?.completeScope) && options?.abort !== false) {
                 abort()
               }
             },
@@ -142,11 +152,27 @@ async function _findMany<
             },
           })
 
-          result = processQueryResult({ store, collection, result, many: true, findOptions, meta, marker })
+          if (!scope || !request) {
+            result = processQueryResult({ store, collection, result, many: true, findOptions, meta, marker })
+            return
+          }
+          if (scopeResult?.completeScope?.field !== scope.field || scopeResult.completeScope.value !== scope.value || !Array.isArray(result))
+            throw new IncompleteCacheScopeError(scope)
+          const rows = processQueryResult({ store, collection, result, many: true, findOptions: { ...findOptions, fetchPolicy: 'no-cache' }, meta })
+          const accepted = await request.replace(rows.map((value: any) => ({ key: collection.getKey(value), value })), {
+            revision: scopeResult.revision,
+            canPublish: meta.$canPublishQuery,
+          })
+          if (!accepted)
+            throw new IncompleteCacheScopeError(scope)
+          result = rows
         }
         catch (error) {
           reportError(error)
           throw error
+        }
+        finally {
+          request?.release()
         }
       }
 

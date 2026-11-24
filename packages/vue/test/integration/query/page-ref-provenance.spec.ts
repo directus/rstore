@@ -71,8 +71,8 @@ describe('saved page references follow effective options', () => {
     await restored
 
     expect(restored.data.value?.id).toBe('1')
-    expect(restored.confirmed.value).toBe(false)
-    expect(client.remote.callCount('fetchFirst')).toBe(0)
+    expect(restored.confirmed.value).toBe(true)
+    expect(client.remote.callCount('fetchFirst')).toBe(1)
   })
 
   it('does not restore a secondary page under different page-specific options', async () => {

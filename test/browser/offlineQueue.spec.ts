@@ -85,3 +85,27 @@ for (const type of ['create', 'createMany'] as const) {
     expect(Number.isNaN(Date.parse(result.queue[0].time))).toBe(false)
   })
 }
+
+test('restores an exact-list create after reload and replays it once', async ({ page, context }) => {
+  const dbName = `offline-list-${crypto.randomUUID()}`
+  await callOffline(page, session, 'dispose')
+  await callOffline(page, session, 'initialize', { dbName })
+  await callOffline(page, scenarios)
+  await context.setOffline(true)
+  expect(await callOffline(page, scenarios, 'createInExactList')).toEqual({ rows: ['offline-exact'], status: 'miss' })
+
+  await context.setOffline(false)
+  await page.reload()
+  await callOffline(page, session, 'initialize', { dbName })
+  await callOffline(page, scenarios)
+  await context.setOffline(true)
+  expect(await callOffline(page, scenarios, 'readExactList')).toEqual({ rows: ['offline-exact'], status: 'miss' })
+
+  await context.setOffline(false)
+  const synced = await callOffline(page, session, 'sync')
+  expect(synced.queue).toEqual([])
+  expect(synced.remote.filter((row: { id: string }) => row.id === 'offline-exact')).toEqual([{ id: 'offline-exact', text: 'Draft' }])
+  const reopened = await callOffline(page, scenarios, 'readExactList')
+  expect(reopened.status).toBe('complete')
+  expect(reopened.rows.filter((key: string) => key === 'offline-exact')).toEqual(['offline-exact'])
+})

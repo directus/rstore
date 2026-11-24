@@ -1,9 +1,11 @@
 import type { CacheInspection } from './cacheInspection'
+import type { CacheScopes } from './cacheScope'
 import type { Collection, CollectionDefaults, CollectionRelation, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from './collection'
 import type { FieldTimestamps, FieldTimestampValue } from './crdt'
 import type { CustomHookMeta } from './hooks'
 import type { WrappedItem } from './item'
 import type { CacheLayer } from './layer'
+import type { CacheCreateMembership } from './localMembership'
 import type { Module, ResolvedModuleState } from './module'
 import type { ApplyMutationOptions, ApplyMutationResult } from './mutation'
 
@@ -86,6 +88,12 @@ export interface Cache<
   TSchema extends StoreSchema = StoreSchema,
   TCollectionDefaults extends CollectionDefaults = CollectionDefaults,
 > {
+  /** Local membership updates for exact reactive pages. */
+  createMembership?: CacheCreateMembership
+
+  /** Indexed complete-scope operations, where supported. */
+  scopes?: CacheScopes
+
   /** Optional cache-owned diagnostic readers. Values are borrowed, not snapshots. */
   inspect?: () => CacheInspection
 
@@ -104,6 +112,8 @@ export interface Cache<
     item: Partial<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
     marker?: string
     fromWriteItems?: boolean
+    /** Keep the committed row resident until explicit deletion or reset. */
+    retain?: boolean
     meta?: CustomHookMeta
     /**
      * Per-field timestamps for CRDT-like field-level LWW merge.
@@ -163,6 +173,8 @@ export interface Cache<
      */
     marker?: string
     meta?: CustomHookMeta
+    /** Keep the committed rows resident until explicit deletion or reset. */
+    retain?: boolean
   }) => void
 
   writeItemForRelation: <TCollection extends Collection = Collection>(params: {

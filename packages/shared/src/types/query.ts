@@ -1,6 +1,7 @@
+import type { BatchCallConfig } from './batch'
 /* eslint-disable unused-imports/no-unused-vars */
 
-import type { BatchCallConfig } from './batch'
+import type { CacheScope } from './cacheScope'
 import type { Collection, CollectionByName, CollectionDefaults, CollectionRelation, RelationsByName, ResolvedCollectionItem, StoreSchema } from './collection'
 import type { CustomHookMeta } from './hooks'
 
@@ -204,6 +205,12 @@ export interface FindOptionsBase<
    * @default 'computed'
    */
   resultMode?: QueryResultMode
+
+  /** Let a connector prove placement of new local rows in an exact first page. */
+  localMembership?: 'auto'
+
+  /** Require an authoritative unpaginated result for an indexed equality partition. */
+  cacheScope?: CacheScope
 
   /**
    * Experimental: Enable garbage collection for items that are not referenced by any query or other item.

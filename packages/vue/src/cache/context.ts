@@ -1,8 +1,10 @@
 import type { CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
 import type { CacheRuntime, CreateCacheOptions } from './types'
-import { createRowRetention, createTombstoneStore, isKeyDefined, resolveRetention, scheduleTombstoneGc } from '@rstore/core'
+import { createRowRetention, createTombstoneStore, isKeyDefined, scheduleTombstoneGc } from '@rstore/core'
 import { ref } from 'vue'
-import { defaultQueryStateRetention, scheduleQueryStateSweeps } from './queryRetention'
+import { createCompleteScopes } from './completeScopes'
+import { createLocalMembership } from './localMembership'
+import { queueQueryStateSweep, resolveQueryStateRetention, scheduleQueryStateSweeps } from './queryRetention'
 
 /** Create the mutable runtime shared by all cache modules. */
 export function createCacheRuntime<
@@ -17,13 +19,25 @@ export function createCacheRuntime<
   garbageCollection,
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): CacheRuntime<TSchema, TCollectionDefaults> {
   const cacheStaggering = Math.max(0, Math.floor(rawCacheStaggering))
+  let membership: CacheRuntime['membership']
+  let scopes: CacheRuntime['scopes']
   const runtime: CacheRuntime<TSchema, TCollectionDefaults> = {
+    get membership() {
+      return membership
+    },
+    get scopes() {
+      return scopes
+    },
     getStore,
     cacheStaggering,
     rowRetention: createRowRetention(garbageCollection),
-    queryStateRetention: resolveRetention(rawQueryStateRetention, defaultQueryStateRetention),
+    queryStateRetention: resolveQueryStateRetention(rawQueryStateRetention),
+    markerRetention: new Map(),
     queryStateUsedAt: new Map(),
     queryStateHeldCount: 0,
+    queryStateKeyCount: 0,
+    standaloneMarkers: 0,
+    retainedRows: new Map(),
     state: {
       markers: {},
       collections: {},
@@ -46,6 +60,8 @@ export function createCacheRuntime<
     isFlushingQueue: false,
     staggeringBudget: cacheStaggering,
   }
+  membership = createLocalMembership(runtime)
+  scopes = createCompleteScopes(runtime)
 
   // Server stores live for one request: the size limit is enough there.
   if (!isServer) {
@@ -155,8 +171,17 @@ export function removeFieldTimestampsForItem(ctx: CacheRuntime, collectionName: 
 }
 
 /** Mark a query marker as fetched. */
-export function mark(ctx: CacheRuntime, marker: string) {
+export function mark(ctx: CacheRuntime, marker: string, owner?: string) {
   ctx.state.markers[marker] = true
+  if (ctx.queryStateRetention) {
+    const previous = ctx.markerRetention.get(marker)
+    if (previous && previous.owner === undefined)
+      ctx.standaloneMarkers--
+    if (owner === undefined)
+      ctx.standaloneMarkers++
+    ctx.markerRetention.set(marker, { usedAt: Date.now(), owner })
+    queueQueryStateSweep(ctx)
+  }
 }
 
 /** Get or create a collection index map. */

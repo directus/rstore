@@ -2,6 +2,9 @@ import type { ResolvedRetention, RowRetention, TombstoneStore } from '@rstore/co
 import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, QueryResultMode, ResolvedCollection, ResolvedCollectionItem, RetentionOptions, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from '../item'
+import type { QueryStateRetentionOptions } from '../storeOptions'
+import type { createCompleteScopes } from './completeScopes'
+import type { createLocalMembership } from './localMembership'
 import type { QueryStateHolder } from './queryHolders'
 
 /** Cache operations delayed while the cache is paused or write staggering is active. */
@@ -17,6 +20,8 @@ export type QueuedOperation = {
   | { type: 'setState', state: CustomCacheState }
   | { type: 'clear' }
   | { type: 'prune', params: CachePruneParams }
+  | { type: 'completeScope', apply: (batch: CacheWriteBatch) => void }
+  | { type: 'acknowledgeCreatePlacement', apply: () => void }
 )
 
 /** Deletion of every item of some collections except the ones a refreshed query still holds. */
@@ -67,6 +72,8 @@ export type CachedPageRefs = (
     invalidated?: boolean
   }
 ) & {
+  /** Required included rows, kept by collection and key. */
+  requiredRows?: Record<string, Array<string | number>>
   /** Whether these identities came from a server fetch or accepted push. */
   confirmed: boolean
   /** Serializable effective options (function values dropped), including page and refresh overrides. */
@@ -116,7 +123,7 @@ export interface CreateCacheOptions<
   /** Whether this cache belongs to a server-side store instance. */
   isServer?: boolean
   /** Bounds for saved results of unmounted queries; `false` keeps them forever. */
-  queryStateRetention?: false | RetentionOptions
+  queryStateRetention?: false | QueryStateRetentionOptions
   /** Bounds for unused committed rows when GC runs. */
   garbageCollection?: RetentionOptions
 }
@@ -133,13 +140,29 @@ export interface CacheRuntime<
   /** Write staggering budget. */
   cacheStaggering: number
   /** Resolved bounds for saved results of unmounted queries. */
-  queryStateRetention: ResolvedRetention | false
+  queryStateRetention: (ResolvedRetention & Required<QueryStateRetentionOptions>) | false
+  /** Complete indexed partition state. */
+  scopes: ReturnType<typeof createCompleteScopes>
+  /** Local create placements and their active consumers. */
+  membership: ReturnType<typeof createLocalMembership>
+  /** Fetch markers and the query state that owns them, if known. */
+  markerRetention: Map<string, { usedAt: number, owner?: string }>
   /** Last-use bookkeeping and eviction policy for committed rows. */
   rowRetention: RowRetention
   /** Last use (ms) of each saved query id, for retention. */
   queryStateUsedAt: Map<string, number>
   /** Mounted entries found by the last sweep, minus unmounts since. */
   queryStateHeldCount: number
+  /** Approximate inactive key count plus newly saved keys since the last sweep. */
+  queryStateKeyCount: number
+  /** Count of fetch markers written without a reactive query owner. */
+  standaloneMarkers: number
+  /** Rows explicitly retained by application-owned datasets. */
+  retainedRows: Map<string, Set<string>>
+  /** Coalesce managed row collection after cache publication. */
+  scheduleRowGc?: (collection: string) => void
+  /** Stop the idle row expiry timer once the cache is disposed. */
+  rowGcTimer?: ReturnType<typeof setInterval>
   /** Whether a size-limit sweep is already queued for this task. */
   queryStateSweepQueued?: boolean
   /** Stop the saved-results expiration timer, when one is active. */
@@ -174,6 +197,8 @@ export interface CacheRuntime<
 
 export interface VueCachePrivate {
   _private: {
+    scopes: ReturnType<typeof createCompleteScopes>
+    membership: ReturnType<typeof createLocalMembership>
     state: InternalCacheState
     wrappedItems: Map<string, WrappedItem<Collection, CollectionDefaults, StoreSchema>>
     wrappedItemsMetadata: Map<string, WrappedItemMetadata<Collection, CollectionDefaults, StoreSchema>>
@@ -195,7 +220,7 @@ export interface VueCachePrivate {
     /** Record the latest use of an existing committed row. */
     touchRow: (collection: ResolvedCollection, key: string | number) => void
     /** Record that a live query saved results under `queryId`, for retention. */
-    holdQueryState: (queryId: string, holder: QueryStateHolder) => void
+    holdQueryState: (queryId: string, holder: QueryStateHolder, savedKeys?: number) => void
     /** Record that a query stopped using the results it last saved. */
     releaseQueryState: (holder: QueryStateHolder) => void
     /** Whether `dispose()` already ran. */

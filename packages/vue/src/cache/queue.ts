@@ -4,6 +4,7 @@ import { triggerRef } from 'vue'
 import { ensureCollectionRef, evictCollectionStateCache, mark, releaseUnwrittenItem } from './context'
 import { addLayerNow, removeLayer } from './layers'
 import { pruneNow } from './prune'
+import { removeDeletedPageKey } from './queryState'
 import { clearNow, setStateNow } from './reset'
 import { deleteItemNow, writeItemNow } from './writes'
 
@@ -100,6 +101,14 @@ function processQueuedOperation(ctx: CacheRuntime, operation: QueuedOperation) {
     case 'clear':
       clearNow(ctx)
       return true
+    case 'acknowledgeCreatePlacement':
+      operation.apply()
+      return true
+    case 'completeScope': {
+      const batch: CacheWriteBatch = { affectedCollections: new Set(), deferredAfterCacheWrites: [] }
+      operation.apply(batch)
+      return { settlementErrors: settleWriteBatch(ctx, batch) }
+    }
     case 'prune':
       pruneNow(ctx, operation.params)
       return true
@@ -145,6 +154,7 @@ function processQueuedWriteItems(ctx: CacheRuntime, operation: Extract<QueuedOpe
         item,
         fieldTimestamps,
         meta: operation.params.meta,
+        retain: operation.params.retain,
         fromWriteItems: true,
         batch: operation.batch,
       })
@@ -156,7 +166,7 @@ function processQueuedWriteItems(ctx: CacheRuntime, operation: Extract<QueuedOpe
     throwWithSecondaryErrors(error, settleWriteBatch(ctx, operation.batch))
   }
   if (operation.params.marker) {
-    mark(ctx, operation.params.marker)
+    mark(ctx, operation.params.marker, operation.params.meta?.$queryCacheKey)
   }
 
   const settlementErrors = settleWriteBatch(ctx, operation.batch)
@@ -248,6 +258,7 @@ function processQueuedDelete(ctx: CacheRuntime, operation: Extract<QueuedOperati
       deletedAt,
     })
   }
+  removeDeletedPageKey(ctx, collection.name, key)
   deleteItemNow(ctx, collection, key)
 }
 

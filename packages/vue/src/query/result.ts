@@ -3,6 +3,7 @@ import type { VueQueryPage } from './types'
 import { compareHLC } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { nextTick, watch } from 'vue'
+import { rememberRequiredRows } from './representation'
 import { readFetchVersion } from './version'
 
 /** Accepted versioned push that has not yet passed the main-page barrier. */
@@ -39,6 +40,8 @@ export function updateQueryMeta(ctx: any, page: VueQueryPage<any, any, any, any,
   // The publication check belongs to this fetch and its queued cache writes,
   // not to metadata a consumer may later reuse for an unrelated mutation.
   const publishedMeta = { ...newMeta }
+  delete publishedMeta.$queryCacheKey
+  delete publishedMeta.$queryReadSequence
   delete publishedMeta.$canPublishQuery
   delete publishedMeta.$resultVersion
   ctx.meta.value = publishedMeta
@@ -129,14 +132,21 @@ export function watchDeferredPageTracking(ctx: any, page: VueQueryPage<any, any,
         stop()
         return
       }
+      rememberRequiredRows(ctx, page, tracking)
       reconcilePageTracking(ctx, page, snapshot.result, options, tracking, isCurrent)
       // A synchronous cache notification precedes removal of its queue entry.
       void nextTick(stopIfSettled)
     }, { flush: 'sync' })
     /** Release observation once its deferred cache operations leave the queue. */
     function stopIfSettled(): void {
-      if (!isCurrent() || !pending.some((operation: any) => queue.includes(operation)))
+      if (!isCurrent()) {
         stop()
+        return
+      }
+      if (!pending.some((operation: any) => queue.includes(operation))) {
+        rememberRequiredRows(ctx, page, tracking)
+        stop()
+      }
     }
     void nextTick(stopIfSettled)
   }

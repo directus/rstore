@@ -137,9 +137,14 @@ export function invalidatePageRefsForItem(ctx: CacheRuntime, collectionName: str
   const evicted = new Set<string>()
   for (const [pageId, ref] of ctx.state.pageRefs) {
     const queryId = getPageQueryId(pageId)
-    if (!queryId || !isQueryStateKeyForCollection(queryId, collectionName)) {
+    const related = ref.requiredRows?.[collectionName]
+    if (queryId && related?.some(candidate => String(candidate) === String(key))) {
+      ctx.state.pageRefs.delete(pageId)
+      evicted.add(queryId)
       continue
     }
+    if (!queryId || !isQueryStateKeyForCollection(queryId, collectionName))
+      continue
     if (ref.type === 'data') {
       continue
     }
@@ -208,7 +213,7 @@ export function getPageQueryId(pageId: string) {
  * Query ids are `JSON.stringify([source, options])`, so the serialized source
  * is an exact prefix. This avoids parsing the whole id, options included.
  */
-function isQueryStateKeyForCollection(queryId: string, collectionName: string) {
+export function isQueryStateKeyForCollection(queryId: string, collectionName: string) {
   return queryId.startsWith(`[${JSON.stringify(`${collectionName}-first`)},`)
     || queryId.startsWith(`[${JSON.stringify(`${collectionName}-many`)},`)
 }
@@ -257,6 +262,34 @@ export function pruneItemWrites(ctx: CacheRuntime): void {
       if (!kept?.has(key)) {
         versions.delete(key)
       }
+    }
+  }
+}
+
+/** Apply an explicit deletion to exact list membership, including saved cold pages. */
+export function removeDeletedPageKey(ctx: CacheRuntime, collectionName: string, key: string | number): void {
+  for (const [pageId, page] of ctx.state.pageRefs) {
+    const options = page.effectiveOptions as { resultMode?: string } | undefined
+    if (options?.resultMode !== 'responseRefs')
+      continue
+    const required = page.requiredRows?.[collectionName]
+    if (required) {
+      for (let index = required.length - 1; index >= 0; index--) {
+        if (String(required[index]) === String(key))
+          required.splice(index, 1)
+      }
+    }
+    const id = getPageQueryId(pageId)
+    if (!id || !isQueryStateKeyForCollection(id, collectionName))
+      continue
+    if (page.type === 'refs') {
+      for (let index = page.keys.length - 1; index >= 0; index--) {
+        if (String(page.keys[index]) === String(key))
+          page.keys.splice(index, 1)
+      }
+    }
+    else if (page.type === 'ref' && String(page.key) === String(key)) {
+      ctx.state.pageRefs.delete(pageId)
     }
   }
 }

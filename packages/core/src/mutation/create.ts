@@ -1,4 +1,4 @@
-import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
+import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CreatePlacement, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { set } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
 import { isKeyDefined } from '../key'
@@ -17,6 +17,8 @@ export interface CreateOptions<
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
   item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   skipCache?: boolean
+  /** Exact pages to update as the item is created. */
+  insertInto?: CreatePlacement[]
   optimistic?: boolean | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   /**
    * Form operations (op log) from a form submission.
@@ -48,6 +50,7 @@ export async function createItem<
   collection,
   item: inputItem,
   skipCache,
+  insertInto = [],
   optimistic = true,
   formOperations,
   batch,
@@ -81,6 +84,11 @@ export async function createItem<
       formOperations: formOperations as FormOperation[],
     })
 
+    const membership = skipCache ? undefined : store.$cache.createMembership
+    const placement = meta.$createPlacement ?? membership?.prepare(collection.name, optimisticItem, insertInto)
+    const isReplay = meta.$createPlacement !== undefined
+    if (placement)
+      meta.$createPlacement = placement
     const optimisticLayer = createOptimisticLayerLifecycle(store)
 
     if (!skipCache && optimistic) {
@@ -106,6 +114,8 @@ export async function createItem<
           delete: true,
         },
       }
+      if (placement && !isReplay)
+        membership?.show(placement, key)
       optimisticLayer.add(layer)
     }
 
@@ -146,15 +156,27 @@ export async function createItem<
       }, {
         requireResultError: 'Item creation failed: result is nullish',
         missingCacheKeyError: 'Item creation failed: key is not defined',
-        onBeforeApplyCache: optimisticLayer.remove,
+        onBeforeApplyCache: placement ? undefined : optimisticLayer.remove,
       })
 
       result = commitResult.result as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+      if (placement) {
+        const key = collection.getKey(result)
+        if (isKeyDefined(key))
+          membership?.commit(placement, key, meta.mutationStatus === 'queued')
+        optimisticLayer.remove()
+      }
     }
     catch (error) {
+      if (placement && !isReplay)
+        membership?.discard(placement.id)
       // Rollback optimistic layer in case of error
       optimisticLayer.remove()
       throw error
+    }
+    finally {
+      if (placement && !isReplay && meta.$createPlacement === placement)
+        delete meta.$createPlacement
     }
 
     return result as NonNullable<typeof result>

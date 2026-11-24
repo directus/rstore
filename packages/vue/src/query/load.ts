@@ -3,11 +3,13 @@ import type { PruneRun } from './prune'
 import type { VueQueryPage } from './types'
 import { createTrackingObject } from '../trackingRelations'
 import { rememberPageAbsence } from './absence'
-import { capturePageConfirmation, getMatchingPageRefs, preparePageConfirmation, readFetchConfirmation } from './confirmation'
+import { capturePageConfirmation, preparePageConfirmation, readFetchConfirmation } from './confirmation'
+import { invalidateDeniedPage, readSavedPage } from './exactCache'
+import { acceptLocalMembership } from './localMembership'
 import { isCurrentPageRequest, markPagesAsComputed, setPageResult } from './page'
 import { recordPrunedFetch } from './prune'
 import { beginPagePublication } from './publicationOwnership'
-import { collectUnreconciledTracking, createPageFetchPublication, getTrackingResult, reconcilePageTracking, releaseDiscardedPageOwnership, updateQueryMeta } from './result'
+import { collectUnreconciledTracking, createPageFetchPublication, getTrackingResult, reconcilePageTracking, releaseDiscardedPageOwnership, updateQueryMeta, watchDeferredPageTracking } from './result'
 import { startPageFetch } from './state'
 import { readFetchVersion } from './version'
 
@@ -50,6 +52,8 @@ export async function loadPage(
   }
   catch (e: any) {
     caughtError = e
+    if (isCurrentPageRequest(ctx, page, savedPageRequestId))
+      invalidateDeniedPage(ctx, page, e)
   }
   finally {
     const current = isCurrentPageRequest(ctx, page, savedPageRequestId)
@@ -65,6 +69,8 @@ export async function loadPage(
     const resolvedOptions = ctx.store.$resolveFindOptions(ctx.getCollection(), finalOptions, ctx.many, ctx.meta.value)
     const currentFetchPolicy = finalOptions.fetchPolicy = resolvedOptions.fetchPolicy
     const currentResultMode = finalOptions.resultMode = resolvedOptions.resultMode
+    if (resolvedOptions.cacheScope)
+      finalOptions.cacheScope = resolvedOptions.cacheScope
 
     if (page.main) {
       ctx.fetchPolicy = currentFetchPolicy
@@ -97,7 +103,8 @@ async function fetchPage(
   // own them nor be represented by them.
   const uncachedPage = finalOptions.fetchPolicy === 'no-cache'
   const tracksPage = ctx.queryTrackingEnabled && ctx.queryTracking && newQueryTracking && !uncachedPage
-  const cached = !uncachedPage && finalOptions.fetchPolicy !== 'fetch-only' ? getMatchingPageRefs(ctx, page) : undefined
+  const exact = finalOptions.resultMode === 'responseRefs' && !uncachedPage
+  const cached = !finalOptions.cacheScope && !uncachedPage && finalOptions.fetchPolicy !== 'fetch-only' ? readSavedPage(ctx, page, exact) : undefined
   const ownsCachePublication = beginPagePublication(page, () => isCurrentPageRequest(ctx, page, savedPageRequestId))
   if (cached) {
     page._confirmed ||= finalOptions.fetchPolicy !== 'cache-only' && cached.confirmed === true
@@ -108,6 +115,7 @@ async function fetchPage(
   // confirmed. Read current cache data while retaining the saved confirmation.
   if (cached && (cached.type !== 'data' || !cached.invalidated)) {
     page.rawData = cached
+    page._hasExactResult = exact
     // Serving saved results makes this query their live consumer: retention
     // must not evict them while it stays mounted.
     ctx.cache._private.holdQueryState(ctx.queryId.value, ctx)
@@ -127,19 +135,28 @@ async function fetchPage(
     return ownsCachePublication()
   }
 
+  if (exact && finalOptions.fetchPolicy === 'cache-only')
+    return false
+
+  // A missing exact page must fetch, even when rows matching its filter are cached.
+  if (exact && finalOptions.fetchPolicy === 'cache-first')
+    finalOptions.fetchPolicy = 'fetch-only'
+
   // Pruning needs the written identities even without ownership. That payload
   // stays out of the ownership paths below, which only see `newQueryTracking`.
-  const hookTracking = tracksPage ? newQueryTracking : pruneRun && !uncachedPage ? createTrackingObject() : undefined
+  const hookTracking = tracksPage ? newQueryTracking : (pruneRun && !uncachedPage) || (exact && finalOptions.include) ? createTrackingObject() : undefined
   const publication = createPageFetchPublication(ctx, page, savedPageRequestId)
   const fetchMeta: CustomHookMeta = {
     ...ctx.meta.value,
     $canPublishQuery: responseMeta => publication.canPublish(responseMeta ?? fetchMeta),
+    $queryCacheKey: ctx.queryId.value,
+    $queryReadSequence: ctx.cache._private.membership.beginRead(),
     $queryTracking: hookTracking,
   }
   try {
     const confirmationOptions = capturePageConfirmation(ctx, page)
     const pageResult = await ctx.fetchMethod(finalOptions, fetchMeta)
-    const { isCurrent } = await setPageResult(ctx, page, savedPageRequestId, pageResult, finalOptions.fetchPolicy, readFetchVersion(fetchMeta), readFetchConfirmation(fetchMeta) ?? finalOptions.fetchPolicy !== 'cache-only', confirmationOptions)
+    const { isCurrent } = await setPageResult(ctx, page, savedPageRequestId, pageResult, finalOptions.fetchPolicy, readFetchVersion(fetchMeta), readFetchConfirmation(fetchMeta) ?? finalOptions.fetchPolicy !== 'cache-only', confirmationOptions, hookTracking)
     if (!isCurrent()) {
       collectUnreconciledTracking(ctx, newQueryTracking)
       return false
@@ -149,11 +166,15 @@ async function fetchPage(
       collectUnreconciledTracking(ctx, newQueryTracking)
       return false
     }
+    if (page._confirmed)
+      acceptLocalMembership(ctx, page, fetchMeta.$queryReadSequence ?? 0)
     // A no-cache result says nothing about the cache: left unrecorded, it cancels the prune.
     if (pruneRun && !uncachedPage) {
       recordPrunedFetch(pruneRun, hookTracking, pageResult, finalOptions.include, tracksPage, isCurrent)
     }
     reconcilePageTracking(ctx, page, tracksPage ? getTrackingResult(page, pageResult) : undefined, finalOptions, tracksPage ? newQueryTracking : undefined, isCurrent)
+    if (hookTracking)
+      watchDeferredPageTracking(ctx, page, finalOptions, hookTracking, fetchMeta, isCurrent)
     return isCurrent()
   }
   finally {
@@ -171,11 +192,14 @@ function fetchCacheAndFetchBackground(
   finalOptions: FindOptions<any, any, any>,
 ) {
   const newQueryTracking = ctx.queryTrackingEnabled ? ctx.queryTracking?.createTrackingObject() : undefined
+  const hookTracking = newQueryTracking ?? (finalOptions.resultMode === 'responseRefs' && finalOptions.include ? createTrackingObject() : undefined)
   const publication = createPageFetchPublication(ctx, page, savedPageRequestId)
   const fetchMeta: CustomHookMeta = {
     ...ctx.meta.value,
     $canPublishQuery: responseMeta => publication.canPublish(responseMeta ?? fetchMeta),
-    $queryTracking: newQueryTracking,
+    $queryCacheKey: ctx.queryId.value,
+    $queryReadSequence: ctx.cache._private.membership.beginRead(),
+    $queryTracking: hookTracking,
   }
 
   const settle = startPageFetch(ctx, page, true)
@@ -186,6 +210,8 @@ function fetchCacheAndFetchBackground(
    */
   function finish(error: Error | null, published = false) {
     const current = isCurrentPageRequest(ctx, page, savedPageRequestId)
+    if (error && current)
+      invalidateDeniedPage(ctx, page, error)
     settle({ error, current, published })
     if (error && current) {
       console.error(error)
@@ -199,7 +225,7 @@ function fetchCacheAndFetchBackground(
     try {
       const confirmationOptions = capturePageConfirmation(ctx, page)
       const backgroundResult = await ctx.fetchMethod({ ...finalOptions, fetchPolicy: 'fetch-only' }, fetchMeta)
-      const { isCurrent } = await setPageResult(ctx, page, savedPageRequestId, backgroundResult, 'fetch-only', readFetchVersion(fetchMeta), true, confirmationOptions)
+      const { isCurrent } = await setPageResult(ctx, page, savedPageRequestId, backgroundResult, 'fetch-only', readFetchVersion(fetchMeta), true, confirmationOptions, hookTracking)
       if (!isCurrent()) {
         collectUnreconciledTracking(ctx, newQueryTracking)
         return false
@@ -209,7 +235,10 @@ function fetchCacheAndFetchBackground(
         collectUnreconciledTracking(ctx, newQueryTracking)
         return false
       }
+      acceptLocalMembership(ctx, page, fetchMeta.$queryReadSequence ?? 0)
       reconcilePageTracking(ctx, page, newQueryTracking ? getTrackingResult(page, backgroundResult) : undefined, finalOptions, newQueryTracking, isCurrent)
+      if (hookTracking)
+        watchDeferredPageTracking(ctx, page, finalOptions, hookTracking, fetchMeta, isCurrent)
       return isCurrent()
     }
     finally {

@@ -2,8 +2,8 @@ import type { Cache, Collection, CollectionDefaults, ResolvedCollection, StoreSc
 import type { CacheRuntime, CacheWriteBatch } from './types'
 import { mergeItemFields, shouldResurrect } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
-import { markRaw, shallowRef } from 'vue'
-import { ensureCollectionRef, getItemWrapKey, invalidateCollectionStateCache, mark, releaseUnwrittenItem, removeFieldTimestampsForItem } from './context'
+import { markRaw, shallowRef, toRaw } from 'vue'
+import { ensureCollectionRef, getItemWrapKey, mark, releaseUnwrittenItem, removeFieldTimestampsForItem } from './context'
 import { removeItemIndexes, updateItemIndexes } from './indexes'
 import { forgetInspectionKey, rememberInspectionKey } from './inspectionKeys'
 import { invalidateMissingPageRefsForItem } from './queryState'
@@ -15,6 +15,7 @@ export function deleteItemNow<TCollection extends Collection>(
   ctx: CacheRuntime,
   collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
   key: string | number,
+  options: { batch?: CacheWriteBatch, evicted?: boolean } = {},
 ): boolean {
   const collectionState = ensureCollectionRef(ctx, collection.name).value
   const item = collectionState[key]
@@ -22,12 +23,15 @@ export function deleteItemNow<TCollection extends Collection>(
     return false
   }
 
-  removeItemIndexes(ctx, collection, key, item)
-  invalidateCollectionStateCache(ctx, collection.name)
+  removeItemIndexes(ctx, collection, key, item, options.batch)
+  ctx.scopes.change(collection.name, item, undefined, options.evicted)
+  invalidateCollectionWrite(ctx, collection.name, options.batch)
   ctx.rowRetention.forget(collection.name, key)
-  delete collectionState[key]
+  ctx.retainedRows.get(collection.name)?.delete(String(key))
+  const target = options.batch ? toRaw(collectionState) : collectionState
+  delete target[key]
   forgetInspectionKey(ctx, collection.name, key)
-  invalidateCollectionStateCache(ctx, collection.name)
+  invalidateCollectionWrite(ctx, collection.name, options.batch)
   removeFieldTimestampsForItem(ctx, collection.name, key)
 
   const wrapKey = getItemWrapKey(collection, key, undefined)
@@ -35,13 +39,11 @@ export function deleteItemNow<TCollection extends Collection>(
   ctx.wrappedItemsMetadata.delete(wrapKey)
 
   const store = ctx.getStore()
-  store.$hooks.callHookSync('afterCacheWrite', {
-    store,
-    meta: {},
-    collection,
-    key,
-    operation: 'delete',
-  })
+  const payload = { store, meta: {}, collection, key, operation: 'delete' as const }
+  if (options.batch)
+    options.batch.deferredAfterCacheWrites.push(payload)
+  else
+    store.$hooks.callHookSync('afterCacheWrite', payload)
   return true
 }
 
@@ -77,19 +79,28 @@ export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeI
   invalidateCollectionWrite(ctx, collection.name, params.batch)
 
   const collectionState = ensureCollectionRef(ctx, collection.name).value
+  const previous = collectionState[key]
   if (Object.isFrozen(item)) {
     setCollectionItem(collectionState, key, item, params.batch)
   }
   else {
     writeMutableItem(ctx, params, collectionState)
   }
+  ctx.scopes.change(collection.name, previous, collectionState[key])
   ctx.rowRetention.touch(collection, key)
+  if (params.retain) {
+    const retained = ctx.retainedRows.get(collection.name) ?? new Set()
+    retained.add(String(key))
+    ctx.retainedRows.set(collection.name, retained)
+  }
+  if (ctx.rowRetention.tracks(collection))
+    ctx.scheduleRowGc?.(collection.name)
   rememberInspectionKey(ctx, collection.name, key)
   invalidateMissingPageRefsForItem(ctx, collection.name, key)
   invalidateCollectionWrite(ctx, collection.name, params.batch)
 
   if (marker) {
-    mark(ctx, marker)
+    mark(ctx, marker, meta?.$queryCacheKey)
   }
 
   if (meta?.$queryTracking) {

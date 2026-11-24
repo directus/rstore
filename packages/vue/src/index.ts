@@ -85,6 +85,8 @@ export type {
   VueStoreCollectionApiProxy,
 } from './store'
 
+export type { QueryStateRetentionOptions } from './storeOptions'
+
 export {
   useQueryTracking,
 } from './tracking'
@@ -101,6 +103,7 @@ export {
   addCollectionRelations,
   defineCollection,
   defineRelations,
+  IncompleteCacheScopeError,
   withItemType,
 } from '@rstore/core'
 
@@ -143,3 +146,4 @@ export type {
   StoreSchema,
   WrappedItem,
 } from '@rstore/shared'
+export type { CacheScope, CompleteScopeResult, CreatePlacement, QueryPageTarget } from '@rstore/shared'

@@ -91,10 +91,10 @@ export function garbageCollectItem<TCollection extends Collection>(
     return
   }
   const key = knownKey ?? getItemKey(collection, item)
-  if (isKeyPinnedByActiveLayer(ctx, collection.name, key)) {
+  if (ctx.membership.pins(collection.name, key) || ctx.retainedRows.get(collection.name)?.has(String(key)) || isKeyPinnedByActiveLayer(ctx, collection.name, key)) {
     return
   }
-  if (!deleteItemNow(ctx, collection, key)) {
+  if (!deleteItemNow(ctx, collection, key, { evicted: true })) {
     return
   }
   invalidatePageRefsForItem(ctx, collection.name, key)

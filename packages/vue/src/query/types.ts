@@ -1,4 +1,4 @@
-import type { Collection, CollectionDefaults, CustomHookMeta, FetchPolicy, FieldTimestampValue, FindOptions, HybridPromise, QueryRefreshOptions, ResolvedCollection, SetResultOptions, SetResultOutcome, StoreSchema } from '@rstore/shared'
+import type { Collection, CollectionDefaults, CustomHookMeta, FetchPolicy, FieldTimestampValue, FindOptions, HybridPromise, QueryPageTarget, QueryRefreshOptions, ResolvedCollection, SetResultOptions, SetResultOutcome, StoreSchema } from '@rstore/shared'
 import type { MaybeRefOrGetter, Raw, Ref, ShallowRef } from 'vue'
 import type { VueStore } from '../store'
 
@@ -86,6 +86,8 @@ export interface VueQueryReturn<
   /** Create a new page and fetch it. */
   fetchMore: (optionsExtension: Partial<TOptions>) => HybridPromise<{ page: VueQueryPage<TCollection, TCollectionDefaults, TSchema, any, TResult> }>
   /** Get a page or create a new one if missing. */
+  /** Capture the identity of an exact list page for a local create. */
+  getPageTarget: (pageIndex?: number) => QueryPageTarget
   getPage: (optionsExtension: Partial<TOptions>) => VueQueryPage<TCollection, TCollectionDefaults, TSchema, any, TResult>
   meta: Ref<CustomHookMeta>
   /** @private */
@@ -137,10 +139,16 @@ export interface VueQueryPage<
   readonly loading: boolean
   /** Whether the latest page fetch completed. Alias of `foreground.completed`. */
   readonly completed: boolean
+  /** Whether this page has a complete local result. */
+  readonly cacheStatus: 'complete' | 'miss' | 'untracked'
   /** Whether this page has a server-confirmed result for its current options. */
   readonly confirmed: boolean
   /** Mutable backing value for the readonly confirmation getter. @private */
   _confirmed: boolean
+  /** Internal state for a loaded or restored exact result. */
+  _hasExactResult: boolean
+  /** Whether the current exact page was explicitly denied access. */
+  _accessDenied: boolean
   /** Latest page error, the foreground one taking precedence. */
   readonly error: Error | null
   /** State of blocking fetches for this page. */

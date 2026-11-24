@@ -79,7 +79,7 @@ describe.each(['first', 'many'] as const)('%s refresh scheduling', (method) => {
     await query.refresh()
 
     expect(query.foreground.error.value).toBe(failure)
-    expect(title(query, method)).toBe('a')
+    expect(title(query, method)).toBe(fetchPolicy === 'cache-first' ? undefined : 'a')
     expect(stack.remote.callCount(hook, 'todos')).toBe(2)
   })
 })

@@ -5,11 +5,20 @@ import { ref, shallowRef } from 'vue'
 import { restoreCausality } from './hydration'
 import { updateItemIndexes } from './indexes'
 import { rebuildInspectionKeys } from './inspectionKeys'
+import { queueQueryStateSweep } from './queryRetention'
 import { clearAllQueryState, clonePageRefs, resetItemWrites } from './queryState'
 
 /** Replace the entire cache state immediately. */
 export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
-  ctx.state.markers = value.markers || {}
+  ctx.scopes.clear()
+  ctx.state.markers = { ...value.markers }
+  ctx.markerRetention.clear()
+  ctx.retainedRows.clear()
+  ctx.standaloneMarkers = 0
+  ctx.queryStateKeyCount = 0
+  ctx.queryStateHeldCount = 0
+  ctx.queryStateUsedAt.clear()
+  queueQueryStateSweep(ctx, true)
 
   // Replacing the state means replacing everything derived from it. Indexes
   // are rebuilt below from the incoming items; leaving the old buckets in
@@ -65,8 +74,15 @@ export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
 
 /** Clear all cache data immediately. */
 export function clearNow(ctx: CacheRuntime) {
+  ctx.scopes.clear()
+  ctx.membership.clear()
   ctx.rowRetention.clear()
   ctx.state.markers = {}
+  ctx.markerRetention.clear()
+  ctx.retainedRows.clear()
+  ctx.standaloneMarkers = 0
+  ctx.queryStateKeyCount = 0
+  ctx.queryStateHeldCount = 0
   ctx.publicKeys?.clear()
   for (const collectionName in ctx.state.collections) {
     ctx.state.collections[collectionName]!.value = {}

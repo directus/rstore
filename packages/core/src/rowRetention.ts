@@ -75,7 +75,7 @@ export function createRowRetention(options?: RetentionOptions) {
     },
 
     /** Select unused rows by TTL, collection capacity, then shared capacity. */
-    select(collections: Iterable<ResolvedCollection>, isEligible: (collection: ResolvedCollection, key: string | number) => boolean, now = Date.now()): Map<ResolvedCollection, RowUse[]> {
+    select(collections: Iterable<ResolvedCollection>, isEligible: (collection: ResolvedCollection, key: string | number) => boolean, now = Date.now(), prefer?: (collection: ResolvedCollection, key: string | number) => boolean): Map<ResolvedCollection, RowUse[]> {
       const selected = new Map<ResolvedCollection, RowUse[]>()
       const survivors: Array<[RowUse, number]> = []
       const owners = new Map<RowUse, ResolvedCollection>()
@@ -95,7 +95,7 @@ export function createRowRetention(options?: RetentionOptions) {
         }
         const evicted = local.ttlMs === Infinity && eligible.length <= local.maxSize
           ? []
-          : selectEvictions(eligible, local, now)
+          : selectRows(eligible, local, now, prefer && (use => prefer(collection, use.key)))
         if (evicted.length)
           selected.set(collection, evicted)
 
@@ -112,7 +112,7 @@ export function createRowRetention(options?: RetentionOptions) {
       }
 
       if (store && survivors.length > store.maxSize) {
-        const overflow = selectEvictions(survivors, { ttlMs: Infinity, maxSize: store.maxSize }, now)
+        const overflow = selectRows(survivors, { ttlMs: Infinity, maxSize: store.maxSize }, now, prefer && (use => prefer(owners.get(use)!, use.key)))
         for (const use of overflow) {
           const collection = owners.get(use)!
           const evicted = selected.get(collection)
@@ -125,4 +125,19 @@ export function createRowRetention(options?: RetentionOptions) {
       return selected
     },
   }
+}
+
+/** Expire by age, then evict unreferenced rows before warm snapshot rows. */
+function selectRows(rows: Array<[RowUse, number]>, limits: { ttlMs: number, maxSize: number }, now: number, prefer?: (use: RowUse) => boolean): RowUse[] {
+  if (!prefer)
+    return selectEvictions(rows, limits, now)
+  const cutoff = now - limits.ttlMs
+  const expired = rows.filter(([, at]) => at <= cutoff).map(([row]) => row)
+  const candidates = rows.filter(([, at]) => at > cutoff)
+  const overflow = candidates.length - limits.maxSize
+  if (overflow > 0) {
+    candidates.sort(([a, aTime], [b, bTime]) => Number(prefer(a)) - Number(prefer(b)) || aTime - bTime)
+    expired.push(...candidates.slice(0, overflow).map(([row]) => row))
+  }
+  return expired
 }

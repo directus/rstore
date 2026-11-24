@@ -7,6 +7,7 @@ import { useQueryTracking } from '../tracking'
 import { installAutoRefresh } from './autoRefresh'
 import { installConfirmationResets } from './confirmation'
 import { loadPage } from './load'
+import { getLocalPageTarget, registerQueryMembership } from './localMembership'
 import { watchQueryOptions } from './options'
 import { createPage, getPageId, getPageOptions, hasIndependentPage, readCachedResult } from './page'
 import { addPrunedLoad, applyPrune, createPruneRun, recordKeptPage } from './prune'
@@ -41,7 +42,8 @@ export function createQuery<
         store: ctx.store,
         result: ctx.result,
         cached: ctx.cached,
-        visibleRows: () => ctx.cache._private.hasRowRetention() && !hasIndependentPage(ctx) && ctx.resultMode !== 'responseRefs',
+        visibleRows: () => ctx.resultMode !== 'responseRefs' && !hasIndependentPage(ctx)
+          && (ctx.cache._private.hasRowRetention() || ctx.mainPage.cacheStatus !== 'untracked'),
         include: () => ctx.getPageOptions(ctx.mainPage).include,
       })
   ctx.updateQueryTrackingMode()
@@ -83,12 +85,19 @@ export function createQuery<
     mainPage: ctx.mainPage,
     fetchMore,
     getPage,
+    getPageTarget: (pageIndex = 0) => {
+      const page = ctx.pages.value[pageIndex]
+      if (!page || !ctx.many || ctx.resultMode !== 'responseRefs' || page.cacheStatus === 'untracked')
+        throw new Error('Create placement requires an existing responseRefs list page')
+      return getLocalPageTarget(ctx, page)
+    },
     meta: ctx.meta,
     _result: ctx.result,
     _setPageResult: (page: any, result: unknown, options?: SetResultOptions) => publishPageResult(ctx, page, result, options),
     _refreshPage: (page: any, options?: VueQueryRefreshOptions<TOptions>) => page.main ? refresh(getMainPageRefreshOptions<TOptions>(page, options)) : refreshSecondaryPage(ctx, page, options),
   }
 
+  registerQueryMembership(ctx)
   installAutoRefresh(ctx, refresh)
   const queryOptions = watchQueryOptions(() => toValue(ctx.options), (reset) => {
     ctx.updateQueryTrackingMode()
@@ -221,7 +230,14 @@ export function createQuery<
  */
 function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, any>) {
   const cache = options.store.$cache as Cache & VueCachePrivate
-  const queryId = computed(() => JSON.stringify([options.id(), toValue(options.options)]))
+  const legacyQueryId = computed(() => JSON.stringify([options.id(), toValue(options.options)]))
+  const queryId = computed(() => {
+    const raw = toValue(options.options)
+    if ((raw?.resultMode ?? options.store.$findDefaults.resultMode) !== 'responseRefs')
+      return legacyQueryId.value
+    const { fetchPolicy, ...identity } = raw ?? {}
+    return fetchPolicy === 'no-cache' ? legacyQueryId.value : JSON.stringify([options.id(), identity])
+  })
   const meta = shallowRef(cache._private.state.queryMeta[queryId.value] || {})
   const getOptions = () => {
     const result = toValue(options.options)
@@ -244,7 +260,7 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     if (resolved.fetchPolicy === 'no-cache') {
       return false
     }
-    return getQueryCollectionEnabled() || cache._private.hasRowRetention()
+    return getQueryCollectionEnabled() || resolved.resultMode === 'responseRefs' || !!resolved.cacheScope || cache._private.hasRowRetention()
   }
 
   const ctx = {
@@ -255,6 +271,7 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     scope: getCurrentScope(),
     cache,
     queryId,
+    legacyQueryId,
     meta,
     getOptions,
     isDisabled,

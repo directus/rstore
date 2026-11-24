@@ -46,7 +46,7 @@ function getEffectiveOptions(ctx: any, page: Pick<VueQueryPage<any, any, any, an
 
 /** Detach requested options before transport awaits can observe newer defaults. */
 export function capturePageConfirmation(ctx: any, page: Pick<VueQueryPage<any, any, any, any, any>, 'options'>): unknown {
-  return toSerializableOptions(getEffectiveOptions(ctx, page))
+  return comparableOptions(toSerializableOptions(getEffectiveOptions(ctx, page)))
 }
 
 /** Remember the effective options that produced newly saved page references. */
@@ -59,10 +59,12 @@ export function rememberPageConfirmation(ctx: any, page: VueQueryPage<any, any, 
 
 /** Resolve saved identities only after checking effective-option provenance. */
 export function getMatchingPageRefs(ctx: any, page: Pick<VueQueryPage<any, any, any, any, any>, 'id' | 'options'>): CachedPageRefs | undefined {
-  const saved = ctx.cache._private.state.pageRefs.get(page.id) as CachedPageRefs | undefined
+  const refs = ctx.cache._private.state.pageRefs
+  const legacyId = ctx.legacyQueryId?.value + page.id.slice(page.id.lastIndexOf('#'))
+  const saved = (refs.get(page.id) ?? refs.get(legacyId)) as CachedPageRefs | undefined
   // Legacy refs lack provenance: fall back to an ordinary cache read rather
   // than trust identities saved for unknown options.
-  return saved?.effectiveOptions !== undefined && deepEqual(saved.effectiveOptions, capturePageConfirmation(ctx, page)) ? saved : undefined
+  return saved?.effectiveOptions !== undefined && deepEqual(comparableOptions(saved.effectiveOptions), capturePageConfirmation(ctx, page)) ? saved : undefined
 }
 
 /** Invalidate confirmation when a load targets different effective options. */
@@ -73,9 +75,10 @@ export function preparePageConfirmation(ctx: any, page: VueQueryPage<any, any, a
     page._confirmed = false
     // Refresh overrides and defaults can change under a reused page id. Its
     // saved refs describe the previous options, not this cache guess.
-    if (previous?.id === page.id) {
+    if (previous?.id === page.id)
       ctx.cache._private.state.pageRefs.delete(page.id)
-    }
+    if (previous && page.cacheStatus !== 'untracked')
+      clearExactPage(ctx, page)
     pageOptions.set(page, { id: page.id, options })
   }
 }
@@ -101,16 +104,38 @@ export function isPageConfirmationCurrent(ctx: any, page: VueQueryPage<any, any,
 export function installConfirmationResets(ctx: any, refresh: () => unknown): void {
   ctx.store.$onCacheReset(() => {
     for (const page of ctx.pages.value) {
-      if (page)
+      if (page) {
+        if (page.cacheStatus !== 'untracked')
+          clearExactPage(ctx, page)
         page._confirmed = false
+      }
     }
     return refresh()
   })
   watch(() => getCollectionClearVersion(ctx.cache._private.state, ctx.getCollection().name), () => {
     for (const page of ctx.pages.value) {
       // No-cache pages show server rows the cleared cache never held.
-      if (page && page._fetchPolicy !== 'no-cache')
+      if (page && page._fetchPolicy !== 'no-cache') {
+        if (page.cacheStatus !== 'untracked')
+          clearExactPage(ctx, page)
         page._confirmed = false
+      }
     }
   }, { flush: 'sync' })
+}
+
+/** Forget displayed refs when their effective query or authorization lifetime ends. */
+function clearExactPage(ctx: any, page: VueQueryPage<any, any, any, any, any>): void {
+  page._accessDenied = false
+  page._hasExactResult = false
+  page.rawData = { type: 'data', value: ctx.many ? [] : null }
+}
+
+/** Exact membership does not change with the fetch policy used to read it. */
+function comparableOptions(options: unknown): unknown {
+  if (options && typeof options === 'object' && 'resultMode' in options && options.resultMode === 'responseRefs' && 'fetchPolicy' in options && options.fetchPolicy !== 'no-cache') {
+    const { fetchPolicy: _fetchPolicy, dedupe: _dedupe, ...identity } = options as { fetchPolicy: unknown, dedupe?: unknown }
+    return identity
+  }
+  return options
 }

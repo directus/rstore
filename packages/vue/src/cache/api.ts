@@ -21,6 +21,15 @@ export function createCacheApi<
   TCollectionDefaults extends CollectionDefaults,
 >(ctx: CacheRuntime<TSchema, TCollectionDefaults>): Cache & VueCachePrivate {
   const queueManagedGc = createRowGcQueue(names => sweepManagedRows(ctx, names))
+  // Let async query ownership settle before enforcing pressure from writes.
+  const queueWriteGc = createRowGcQueue(names => sweepManagedRows(ctx, names), flush => void setTimeout(flush, 0))
+  ctx.scheduleRowGc = (collection) => {
+    if (!ctx.rowGcTimer && !ctx.getStore().$isServer) {
+      ctx.rowGcTimer = setInterval(() => sweepManagedRows(ctx), 60_000)
+      ctx.rowGcTimer.unref?.()
+    }
+    queueWriteGc(collection)
+  }
   // Legacy calls keep their undefined runtime results. Diagnostics explicitly
   // opt into completion tracking while using the same queue and publication.
   const receipts: CacheOperationReceipts = {
@@ -31,6 +40,8 @@ export function createCacheApi<
   return {
     receipts,
     inspect: () => inspectCache(ctx),
+    createMembership: ctx.membership.api,
+    scopes: ctx.scopes.api,
     wrapItem({ collection, item, noCache }) {
       return getWrappedItem(ctx, collection, item, noCache)!
     },
@@ -158,6 +169,10 @@ export function createCacheApi<
       }
       finally {
         ctx.rowRetention.clear()
+        if (ctx.rowGcTimer) {
+          clearInterval(ctx.rowGcTimer)
+          ctx.rowGcTimer = undefined
+        }
         ctx.stopTombstoneGc?.()
         ctx.stopTombstoneGc = undefined
         ctx.stopQueryStateSweeps?.()
@@ -165,6 +180,8 @@ export function createCacheApi<
       }
     },
     _private: {
+      scopes: ctx.scopes,
+      membership: ctx.membership,
       state: ctx.state,
       wrappedItems: ctx.wrappedItems,
       wrappedItemsMetadata: ctx.wrappedItemsMetadata,
@@ -193,7 +210,10 @@ export function createCacheApi<
             garbageCollectItem(ctx, collection, item)
         })
       },
-      holdQueryState: (queryId, holder) => holdRetainedQueryState(ctx, queryId, holder),
+      holdQueryState: (queryId, holder, savedKeys = 0) => {
+        ctx.queryStateKeyCount += savedKeys
+        holdRetainedQueryState(ctx, queryId, holder)
+      },
       releaseQueryState: holder => releaseRetainedQueryState(ctx, holder),
       isDisposed: () => ctx.disposed === true,
     },
@@ -204,6 +224,9 @@ function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit,
   if (marker && !ctx.state.markers[marker]) {
     return []
   }
+  const retainedMarker = marker && ctx.markerRetention.get(marker)
+  if (retainedMarker)
+    retainedMarker.usedAt = Date.now()
   const data: Record<string | number, ResolvedCollectionItemBase<any, any, any>> = getStateForCollection(ctx, collection.name)
   const result: Array<WrappedItem<any, any, any>> = []
   let count = 0
@@ -238,7 +261,7 @@ function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit,
 function getState(ctx: CacheRuntime): CustomCacheState {
   const result: CustomCacheState = {
     collections: {},
-    markers: toValue(ctx.state.markers),
+    markers: { ...ctx.state.markers },
     modules: {},
     queryMeta: ctx.state.queryMeta,
     pageRefs: Object.fromEntries(clonePageRefs(ctx.state.pageRefs)),
@@ -282,6 +305,8 @@ function getState(ctx: CacheRuntime): CustomCacheState {
 
 function clearCollection(ctx: CacheRuntime, collection: Parameters<Cache['clearCollection']>[0]['collection']) {
   clearQueryStateForCollection(ctx, collection.name)
+  ctx.retainedRows.delete(collection.name)
+  ctx.scopes.clear(collection.name)
   invalidateCollectionStateCache(ctx, collection.name)
   ctx.state.fieldTimestamps.delete(collection.name)
   const tombIds = Array.from(ctx.state.tombstones.entries(), ([, t]) => t)

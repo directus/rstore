@@ -78,6 +78,7 @@ async function shareQueryMetadata<TResult extends QueryResult<unknown>>(
     // response itself, so every consumer orders its result with it.
     if (source.$resultVersion !== undefined)
       target.$resultVersion = source.$resultVersion
+    target.$queryReadSequence = source.$queryReadSequence
   }
   const result = await pending
   publish()

@@ -1,4 +1,4 @@
-import type { ResolvedCollection } from '@rstore/shared'
+import type { PendingCreatePlacement, ResolvedCollection } from '@rstore/shared'
 import type { useIndexedDb } from '../indexeddb'
 
 export interface CreateOfflinePluginOptions {
@@ -52,6 +52,8 @@ export interface QueuedMutation {
   key?: string | number
   /** Item payload for create/update replay. */
   item?: any
+  /** Resolved exact-page insertions for a queued create. */
+  createPlacement?: PendingCreatePlacement
   /** Queue insertion time. */
   time: Date
 }

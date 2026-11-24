@@ -37,11 +37,12 @@ export function removeItemIndexes<TCollection extends Collection>(
   collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
   key: string | number,
   item: any,
+  batch?: CacheWriteBatch,
 ) {
   for (const [indexKey, indexFields] of collection.indexes) {
     const index = getCollectionIndex(ctx, collection.name, indexKey)
     const previousValue = indexFields.map(f => item[f]).join(':')
-    removeKeyFromBucket(index, previousValue, key)
+    removeKeyFromBucket(index, previousValue, key, batch)
   }
 }
 
