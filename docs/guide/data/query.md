@@ -799,3 +799,21 @@ const query = await store.$collection('posts').query(q => q.many())
 ::: warning
 Using `$collection` will not provide type inference for the collection API. You will need to manually type the result if needed.
 :::
+
+### Exact page cache reads
+
+With `resultMode: 'responseRefs'`, a cached page represents an accepted server response in its original order. RStore can reuse it when its effective options match and all referenced rows are still available. After GC evicts a required row, the page fetches again instead of displaying a subset assembled from the shared cache. An accepted empty page is reusable too.
+
+`page.cacheStatus` is `complete` when an exact result is available, `miss` when it is unavailable, and `untracked` for ordinary computed and no-cache pages. Use the query's fetch lanes for progress and `confirmed` for server confirmation. A page with pending offline creates can have rows while its status is `miss`.
+
+Keep authenticated results within a store lifetime. Clear the store cache before changing identity or tenant. An explicit access denial invalidates the affected exact result. A transient error leaves a usable warm result available.
+
+### Complete indexed scopes
+
+Connectors can support unpaginated `computed` queries with `cacheScope: { field, value }`. The field must have a single-field cache index. The transport must attest that the response contains every authorized row in that exact partition.
+
+```ts
+setResult(rows, { completeScope: { field: 'orderId', value: orderId }, revision })
+```
+
+RStore atomically replaces that partition, including when the authoritative result is empty. Existing optimistic changes remain visible, and a response racing a newer accepted write cannot remove it. GC invalidates scope completeness when it evicts a required row. Use exact response references for paginated or filtered views whose membership the backend controls.

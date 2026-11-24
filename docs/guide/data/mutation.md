@@ -370,3 +370,17 @@ const store = await createStore({
 ```
 
 `store.$mutationHistoryRetention` holds the resolved bounds. Assigning it at runtime validates the value like the option (an invalid limit throws a `TypeError`, omitted limits use the defaults); the new bounds apply when the next mutation is recorded.
+
+### Insert a new row into an exact list
+
+Computed queries already render matching local creates. Exact pages retain server membership and can display a local create through an explicit placement:
+
+```ts
+await store.todos.create({ id: crypto.randomUUID(), title: 'Draft' }, {
+  insertInto: [{ page: query.getPageTarget(0), position: 'start' }],
+})
+```
+
+Capture an existing exact list page before navigation. The insertion appears with the optimistic row and rolls back if creation fails. After acknowledgement, the list refresh adopts server membership and order. `localMembership: 'auto'` lets a connector place new rows in the first page when it can prove membership and position. Explicit placement takes precedence for the same page.
+
+The offline plugin persists resolved placements with queued creates. Give offline creates stable client keys. On reload the pending rows reappear even when the server page is unavailable. The pending rows do not establish a complete page.

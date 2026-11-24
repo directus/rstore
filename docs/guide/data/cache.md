@@ -257,3 +257,11 @@ When the cache is paused:
 When `resume()` is called:
 - All queued operations are applied in the order they were received
 - Vue will only re-render once after all updates are applied
+
+### Exact results and retention
+
+`queryStateRetention` bounds unused query state separately from the row cache. It defaults to 500 query identities, 1,000 pages, 50,000 saved row keys, and a 30 minute TTL. Set `maxSize`, `maxPages`, `maxKeys`, or `ttlMs` to override those limits. Use `false` to disable query-state retention. Fetch markers also expire with their query state.
+
+Mounted results, optimistic layers, pending durable list inserts, and rows written with `retain: true` are protected from row GC. Inactive exact pages are reclaimable. GC prefers reclaiming rows with no exact page references. If a required row is evicted, the next exact read treats the page as a cache miss.
+
+Explicit retention lasts until the row is deleted or the cache is reset. It can keep more rows in memory than the configured unused-row limit. An application that needs a bounded offline working set should be able to rehydrate its durable rows before using them.
