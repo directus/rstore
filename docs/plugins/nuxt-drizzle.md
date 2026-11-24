@@ -1216,3 +1216,19 @@ export default defineNuxtConfig({
 ::: tip Hooks stay Nitro-only
 The `realtime.filter` hook, `publishRstoreDrizzleRealtimeUpdate`, and `hooksForTable` rely on the generated collection metadata and the H3 peer object, so they are only available as Nitro server auto-imports. A standalone server is expected to enforce permissions inline (typically inside the `subscribe` handler shown above, before forwarding the `update` frame to the socket). If it narrows a frame's `record` for one socket, it must narrow that frame's `fieldTimestamps` to the same keys — otherwise the client merges a newer stamp for a field it did not receive and erases its cached value.
 :::
+
+## Complete scopes and local create placement
+
+Set `rstoreDrizzle.cacheScopeFields` to register one indexed field per collection. An unpaginated computed query with an exact equality filter on that field requests a complete scope.
+
+```ts
+export default defineNuxtConfig({
+  rstoreDrizzle: {
+    cacheScopeFields: { lineItems: 'orderId' },
+  },
+})
+```
+
+In the table's `index.get.after` hook, check `requestedCacheScope` and call `confirmCompleteScope(scope, revision?)` only after establishing that the read is authorized and includes the entire partition. Empty permission-filtered results must not be attested. The module withholds attestations on pagination, projections, and responses that may have hit the row cap. Normal response bodies stay unchanged.
+
+For `responseRefs` queries with `localMembership: 'auto'`, the same server hook can call `confirmLocalCreatePlacement()` after approving the filter, row visibility, and ordering. The connector currently infers placement for SQLite exact equality filters with concrete integer or ASCII values and a final primary-key sort. Use explicit placement for server-computed filters or ordering.

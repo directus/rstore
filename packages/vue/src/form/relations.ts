@@ -3,14 +3,15 @@ import type { FormObjectRuntime } from './context'
 import { isKeyDefined } from '@rstore/core'
 import { isPublicKey } from '@rstore/shared'
 import { optimizeOpLog } from './opLog'
-import { formFieldValuesEqual, isRelationField, pickRelationRawPayload, queueChange, recordAndApplyOp, updateChangedProps } from './state'
+import { formFieldValuesEqual, isRelationField, queueChange, recordAndApplyOp, updateChangedProps } from './state'
 import { leafFieldName } from './utils/fieldPath'
 import { itemsMatch } from './utils/items'
-import { createRelationPayloadField, getInitialRelationData } from './utils/relationPayload'
+import { createRelationPayloadField, getInitialRelationData, pickRelationPayload } from './utils/relationPayload'
 
 /**
  * Create the proxy that tracks field writes and resolves relation reads.
  */
+/** Create form proxy handling relation-aware field access. */
 export function createFormProxy<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(ctx: FormObjectRuntime<TData, TSchema, TResult>) {
   return new Proxy(ctx.form, {
     set(_target, key, value) {
@@ -56,7 +57,7 @@ export function createFormProxy<TData extends Record<string, any>, TSchema exten
     ownKeys() {
       return Reflect.ownKeys(ctx.form).filter(key =>
         isPublicKey(key)
-        && (typeof key !== 'string' || !isRelationField(ctx, key) || !!pickRelationRawPayload(ctx.form[key])),
+        && (typeof key !== 'string' || !isRelationField(ctx, key) || !!pickRelationPayload(ctx.form[key])),
       )
     },
   })
@@ -65,6 +66,7 @@ export function createFormProxy<TData extends Record<string, any>, TSchema exten
 /**
  * Install relation methods on the form object.
  */
+/** Install relation mutation helpers on one form runtime. */
 export function installRelationMethods<TData extends Record<string, any>, TSchema extends StandardSchemaV1, TResult extends TData | void>(ctx: FormObjectRuntime<TData, TSchema, TResult>) {
   if (!ctx.options.collection)
     return
@@ -131,7 +133,7 @@ function setRelationPayload<TData extends Record<string, any>, TSchema extends S
     return true
 
   const currentRelationField = ctx.form[key] ?? ctx.relationMethods[key]
-  const oldValue = pickRelationRawPayload(currentRelationField, true)
+  const oldValue = pickRelationPayload(currentRelationField, { clone: true })
   const relationField = createRelationPayloadField(ctx.relationMethods[key], value)
   const op: FormOperation<TData> = {
     timestamp: Date.now(),
@@ -159,7 +161,7 @@ function resolveRelationValue<TData extends Record<string, any>, TSchema extends
   relation: any,
 ) {
   if (!ctx.options.store)
-    return relation.many ? [] : null
+    return getInitialRelationData(relation)
   if (!relation.many)
     return resolveRelationFromCache(ctx, relation, false) ?? null
   const cacheItems = resolveRelationFromCache(ctx, relation, true)
@@ -204,13 +206,12 @@ function resolveRelationFromCache<TData extends Record<string, any>, TSchema ext
     const targetCollection = store.$collections.find((m: any) => m.name === target.collection)
     if (!targetCollection)
       continue
-    const indexKeys = Object.keys(target.on).sort()
-    const indexValue = indexKeys.map((k: string) => ctx.form[leafFieldName(target.on[k]! as string)])
+    const indexValue = target.indexFields.map((key: string) => ctx.form[leafFieldName(target.on[key]! as string)])
     if (indexValue.every((v: any) => v != null)) {
       result.push(...store.$cache.readItems({
         collection: targetCollection as any,
-        indexKey: indexKeys.join(':'),
-        indexValue: indexValue.join(':'),
+        indexKey: target.indexKey,
+        indexValue: indexValue.length === 1 ? String(indexValue[0]) : indexValue,
         limit: many ? undefined : 1,
         filter: target.filter ? (item: any) => target.filter!(ctx.proxy, item) : undefined,
       }))

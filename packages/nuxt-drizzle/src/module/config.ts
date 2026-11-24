@@ -6,12 +6,14 @@ import { addTemplate } from '@nuxt/kit'
 /** Register the generated runtime config consumed by client/server plugins. */
 export function registerRuntimeConfigTemplate({
   apiPath,
+  cacheScopeFields,
   realtime,
   scopeId,
   drizzleConfig,
   offlineOptions,
 }: {
   apiPath: string
+  cacheScopeFields?: Record<string, string>
   realtime: RealtimeResolvedOptions
   scopeId: string
   drizzleConfig: DrizzleKitConfig
@@ -20,6 +22,7 @@ export function registerRuntimeConfigTemplate({
   addTemplate({
     filename: '$rstore-drizzle-config.js',
     getContents: () => `export const apiPath = ${JSON.stringify(apiPath)}
+export const cacheScopeFields = ${JSON.stringify(cacheScopeFields ?? {})}
 export const wsApiPath = ${JSON.stringify(realtime.wsApiPath)}
 export const wsClientEndpoint = ${JSON.stringify(realtime.wsClientEndpoint)}
 export const wsHeartbeatInterval = ${JSON.stringify(realtime.wsHeartbeatInterval)}

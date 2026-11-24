@@ -1,5 +1,7 @@
+import type { CompleteScopeResult } from '../cacheScope'
 import type { Collection, CollectionDefaults, ResolvedCollection, ResolvedCollectionItemBase, StoreSchema } from '../collection'
 import type { GlobalStoreType } from '../global'
+import type { CreatePlacementPosition } from '../localMembership'
 import type { FindFirstOptions, FindManyOptions, FindOptions } from '../query'
 import type { Awaitable, Path, PathValue } from '../utils'
 import type { AbortableOptions, CustomHookMeta } from './meta'
@@ -22,6 +24,17 @@ export interface FetchHookDefinitions<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
 > {
+  /** Prove where a locally created row belongs in an already confirmed exact first page. */
+  resolveCreatePlacement: (payload: {
+    store: GlobalStoreType
+    collection: ResolvedCollection
+    findOptions: FindManyOptions<any, any, any>
+    meta: CustomHookMeta
+    row: Record<string, unknown>
+    rows: ReadonlyArray<Record<string, unknown>>
+    setPlacement: (placement: CreatePlacementPosition) => void
+  }) => void
+
   /** Observe a failed fetch; returned promises are not awaited and observer errors are ignored. */
   fetchError: <TCollection extends Collection>(payload: {
     /** Opaque identity shared only by one Core invocation. @internal */
@@ -156,7 +169,7 @@ export interface FetchHookDefinitions<
       collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
       findOptions?: FindOptions<TCollection, TCollectionDefaults, TSchema>
       getResult: () => Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>
-      setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>, options?: AbortableOptions) => void
+      setResult: (result: Array<ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>>, options?: AbortableOptions & CompleteScopeResult) => void
       setMarker: (marker: string | undefined) => void
       /** Don't call remaining hooks in the queue. */
       abort: () => void

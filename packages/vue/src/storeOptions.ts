@@ -1,6 +1,14 @@
 import type { BatchingConfig, CollectionDefaults, FindOptions, Plugin, RetentionOptions, StoreSchema } from '@rstore/shared'
 import type { TombstoneGcOptions } from './cache/types'
 
+/** Retention limits on unmounted query results and their markers. */
+export interface QueryStateRetentionOptions extends RetentionOptions {
+  /** Maximum number of saved inactive pages. Defaults to 1,000. */
+  maxPages?: number
+  /** Maximum number of keys referenced by inactive pages. Defaults to 50,000. */
+  maxKeys?: number
+}
+
 /** Options of `createStore`. */
 export interface CreateStoreOptions<
   TSchema extends StoreSchema = StoreSchema,
@@ -35,13 +43,18 @@ export interface CreateStoreOptions<
    */
   experimentalGarbageCollection?: boolean
   /**
+   * Limits for unused cached rows, enforced when row GC runs.
+   * The size cap is shared across collections. Collections can override the TTL.
+   */
+  garbageCollection?: RetentionOptions
+  /**
    * Bounds for the results saved by queries no longer mounted, which let a
    * remounted query read cache-first. Each distinct set of query options saves
    * one entry. Pass `false` to keep them forever.
    *
    * @default { ttlMs: 1_800_000, maxSize: 500 }
    */
-  queryStateRetention?: false | RetentionOptions
+  queryStateRetention?: false | QueryStateRetentionOptions
   /**
    * Maximum number of items written to the cache every 10ms.
    *

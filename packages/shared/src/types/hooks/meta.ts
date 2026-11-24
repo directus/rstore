@@ -1,4 +1,5 @@
 import type { FieldTimestampValue } from '../crdt'
+import type { PendingCreatePlacement } from '../localMembership'
 
 /**
  * Query tracking metadata attached to hook payloads.
@@ -32,6 +33,12 @@ export interface CustomHookMeta {
    * @internal
    */
   $canPublishQuery?: (responseMeta?: CustomHookMeta) => boolean
+  /** Query owning the fetch marker, when created by a reactive query. @internal */
+  $queryCacheKey?: string
+  /** When the shared transport started, relative to acknowledged creates. @internal */
+  $queryReadSequence?: number
+  /** Resolved exact-list insertion for this create and its offline replay. @internal */
+  $createPlacement?: PendingCreatePlacement
 }
 
 /**

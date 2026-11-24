@@ -58,7 +58,7 @@ export function publishPageResult(ctx: any, page: VueQueryPage<any, any, any, an
   /** Recheck ownership after a main-page wait before publishing any state. */
   function publish(): void {
     let fetches: Array<() => void> = []
-    const tracking = tracksPage ? createTrackingObject() : undefined
+    const tracking = tracksPage || (options.resultMode === 'responseRefs' && options.include) ? createTrackingObject() : undefined
     let published = false
     try {
       if (!isCurrent() || isStalePageResult(page, version))
@@ -74,7 +74,7 @@ export function publishPageResult(ctx: any, page: VueQueryPage<any, any, any, an
       if (!ownsPublication())
         return
       const pageResult = wrapQueryResult({ store: ctx.store, collection: ctx.getCollection(), result: parsed, many: ctx.many, noCache: fetchPolicy === 'no-cache' })
-      applyPageResult(ctx, page, pageResult, fetchPolicy, version, true, confirmationOptions, ownsPublication, ownsPublication)
+      applyPageResult(ctx, page, pageResult, fetchPolicy, version, true, confirmationOptions, ownsPublication, ownsPublication, tracking)
       if (!ownsPublication())
         return
       updateQueryMeta(ctx, page, { ...ctx.meta.value, ...meta }, ownsPublication)

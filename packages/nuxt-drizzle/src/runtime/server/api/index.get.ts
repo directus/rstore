@@ -1,5 +1,6 @@
 import type { RstoreDrizzleQueryParams } from '../utils'
-import { eventHandler, getQuery, getRouterParams } from 'h3'
+import { eventHandler, getHeader, getQuery, getRouterParams } from 'h3'
+import { queryCacheHeader } from '../../utils/query-cache'
 import { drizzleFindMany } from '../utils/operations'
 import { parseSearchQuery } from '../utils/search-query'
 
@@ -14,5 +15,6 @@ export default eventHandler(async (event) => {
     params,
     query,
     searchQuery,
+    cacheMode: getHeader(event, queryCacheHeader),
   })
 })

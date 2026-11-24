@@ -1,10 +1,6 @@
 import type { Page } from '@playwright/test'
 import { expect } from '@playwright/test'
 
-export function uniqueText(prefix: string) {
-  return `${prefix}-${Date.now()}`
-}
-
 export async function openLoginPopover(page: Page) {
   await page.getByRole('button', { name: 'Login', exact: true }).first().click()
   await expect(page.getByPlaceholder('Email')).toBeVisible()

@@ -3,6 +3,7 @@ import type { VueQueryPage } from './types'
 import { compareHLC } from '@rstore/core'
 import { pickNonSpecialProps } from '@rstore/shared'
 import { nextTick, watch } from 'vue'
+import { rememberRequiredRows } from './representation'
 import { readFetchVersion } from './version'
 
 /** Accepted versioned push that has not yet passed the main-page barrier. */
@@ -39,6 +40,8 @@ export function updateQueryMeta(ctx: any, page: VueQueryPage<any, any, any, any,
   // The publication check belongs to this fetch and its queued cache writes,
   // not to metadata a consumer may later reuse for an unrelated mutation.
   const publishedMeta = { ...newMeta }
+  delete publishedMeta.$queryCacheKey
+  delete publishedMeta.$queryReadSequence
   delete publishedMeta.$canPublishQuery
   delete publishedMeta.$resultVersion
   ctx.meta.value = publishedMeta
@@ -75,21 +78,24 @@ export function getTrackingResult(page: VueQueryPage<any, any, any, any, any>, r
  * collector remains the authority for whether an unowned row can disappear.
  */
 export function collectUnreconciledTracking(ctx: any, tracking: any): void {
-  if (!tracking) {
+  if (!tracking || !ctx.queryCollectionEnabled) {
     return
   }
   nextTick(() => {
     for (const [collectionName, keys] of Object.entries(tracking.items) as Array<[string, Set<string | number>]>) {
       const collection = ctx.store.$collections.find((candidate: any) => candidate.name === collectionName)
-      if (!collection) {
+      if (!collection || ctx.cache._private.scheduleManagedRowGc(collection)) {
         continue
       }
+      // One cache commit per collection rather than one per stale row.
+      const items = []
       for (const key of keys) {
         const item = ctx.store.$cache.readItem({ collection, key })
         if (item) {
-          ctx.store.$cache.garbageCollectItem({ collection, item })
+          items.push(item)
         }
       }
+      ctx.store.$cache.garbageCollectItems({ collection, items })
     }
   })
 }
@@ -120,9 +126,9 @@ export function reconcilePageTracking(
  * continues through the controller's existing include watcher.
  */
 export function watchDeferredPageTracking(ctx: any, page: VueQueryPage<any, any, any, any, any>, options: FindOptions<any, any, any>, tracking: any, meta: CustomHookMeta, isCurrent: () => boolean): void {
-  const queue = ctx.cache._private.state.queue
-  const pending = queue.filter((operation: any) => operation.params?.meta === meta)
-  if (!pending.length)
+  // The engine owns the write queue; each push carries its own meta object.
+  const hasPending = (): boolean => ctx.cache._private.hasPendingWrites(meta)
+  if (!hasPending())
     return
   /** Install inside the original query scope even when transport delivers later. */
   function install(): void {
@@ -130,20 +136,27 @@ export function watchDeferredPageTracking(ctx: any, page: VueQueryPage<any, any,
       void page.rawData
       void page.requestId
       // An envelope also observes a keyed wrapper whose identity stays stable.
-      return isCurrent() && pending.some((operation: any) => queue.includes(operation)) ? { result: page.data } : undefined
+      return isCurrent() && hasPending() ? { result: page.data } : undefined
     }, (snapshot) => {
       if (!snapshot || !isCurrent()) {
         stop()
         return
       }
+      rememberRequiredRows(ctx, page, tracking)
       reconcilePageTracking(ctx, page, snapshot.result, options, tracking, isCurrent)
       // A synchronous cache notification precedes removal of its queue entry.
       void nextTick(stopIfSettled)
     }, { flush: 'sync' })
     /** Release observation once its deferred cache operations leave the queue. */
     function stopIfSettled(): void {
-      if (!isCurrent() || !pending.some((operation: any) => queue.includes(operation)))
+      if (!isCurrent()) {
         stop()
+        return
+      }
+      if (!hasPending()) {
+        rememberRequiredRows(ctx, page, tracking)
+        stop()
+      }
     }
     void nextTick(stopIfSettled)
   }

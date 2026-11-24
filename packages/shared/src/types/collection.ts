@@ -1,6 +1,7 @@
 import type { StandardSchemaV1 } from '@standard-schema/spec'
 import type { CollectionHooks } from './collectionHooks'
 import type { WrappedItem } from './item'
+import type { RetentionOptions } from './retention'
 import type { FilterArray, Full, KeysToUnion, MaybeArray, Path, PathValue } from './utils'
 
 /* eslint-disable unused-imports/no-unused-vars */
@@ -96,6 +97,9 @@ export interface Collection<
    */
   'hooks'?: CollectionHooks<this>
 
+  /** Idle lifetime and size limit for unused cached rows of this collection. */
+  'garbageCollection'?: RetentionOptions
+
   'meta'?: CustomCollectionMeta<this>
 
   /**
@@ -181,6 +185,8 @@ export interface ResolvedCollection<
   'formSchema': Full<TSchemas>
   'scopeId'?: string
   'hooks': TCollection['hooks']
+  /** Collection row GC bounds before inheriting the store TTL. */
+  'garbageCollection'?: RetentionOptions
   'meta'?: CustomCollectionMeta
   '~item'?: TCollection['~item']
 }
@@ -193,9 +199,17 @@ export interface NormalizedRelation {
   to: Array<NormalizedRelationTarget>
 }
 
+/** Precomputed relation target metadata consumed by cache adapters. */
 export interface NormalizedRelationTarget {
+  /** Related collection name. */
   collection: string
+  /** Target-field to source-field mapping. */
   on: Record<string, string>
+  /** Canonical target index key, precomputed during collection normalization. */
+  indexKey: string
+  /** Sorted target fields used to build tuple index lookups. */
+  indexFields: readonly string[]
+  /** Optional relation-specific filter. */
   filter?: (item: any, relationItem: any) => boolean
 }
 

@@ -32,9 +32,10 @@ describe('public cache inspection', () => {
     const view = cache.inspect!().collections[0]!
     expect(view.name).toBe('items')
     expect(view.count).toBe(5)
-    expect(Array.from(view.rows(), row => row.key)).toEqual([0, 2, '', '01', 'override'])
+    // Rows keep their write order, with each address in its written form.
+    expect(Array.from(view.rows(), row => row.key)).toEqual([0, '', '01', 2, 'override'])
     expect(view.effectiveCount).toBe(5)
-    expect(Array.from(view.effectiveRows(), row => row.key)).toEqual([0, 2, '', '01', 'override'])
+    expect(Array.from(view.effectiveRows(), row => row.key)).toEqual([0, '', '01', 2, 'override'])
     expect(cache.inspect!().metadata()).toMatchObject({ markers: { loaded: true } })
     expect(events).toEqual([])
 
@@ -78,12 +79,14 @@ describe('public cache inspection', () => {
     const state = cache.getModuleState<{ name: 'counter', state: { stats: { value: number } } }>('counter', 'one', { stats: { value: 7 } })
     const before = cache.getState()
     const metadata = cache.inspect!().metadata() as any
-    expect(metadata.fieldTimestamps.get('items').get(1)).toEqual({ name: 10 })
+    // Engine metadata is keyed by canonical string identity.
+    expect(metadata.fieldTimestamps.get('items').get('1')).toEqual({ name: 10 })
     expect(Array.from(metadata.tombstones)).toEqual([{ collection: 'items', key: 2, deletedAt: 20 }])
-    expect(metadata.modules['counter:one']).toEqual({ stats: { value: 7 } })
+    const counter = () => metadata.modules.find((module: any) => module.name === 'counter' && module.key === 'one')
+    expect(counter().state).toEqual({ stats: { value: 7 } })
     state.stats.value = 8
-    expect(metadata.modules['counter:one'].stats.value).toBe(8)
-    expect(cache.getState()).toEqual({ ...before, modules: { 'counter:one': { stats: { value: 8 } } } })
+    expect(counter().state.stats.value).toBe(8)
+    expect(cache.getState()).toEqual({ ...before, modules: [{ name: 'counter', key: 'one', state: { stats: { value: 8 } } }] })
   })
 
   // Ordinary reads keep the pre-Devframe memo until cache-owned invalidation.
@@ -121,22 +124,21 @@ describe('public cache inspection', () => {
   it('keeps committed override address types through queues, deletes, and hydration', async () => {
     const { store, cache } = await createFixture()
     const collection = store.$collections[0]!
-    // Exact write-address breadcrumbs belong to explicitly activated diagnostics.
-    cache.inspect!()
     cache.writeItem({ collection, key: 9, item: { id: 'other', $overrideKey: 9, name: 'numeric override' } })
     const rows = () => Array.from(cache.inspect!().collections[0]!.rows(), row => [row.key, (row.value as any).name])
-    expect(rows()).toEqual([[9, 'numeric override']])
+    // Stored rows drop `$overrideKey`, so its numeric form is not retained.
+    expect(rows()).toEqual([['9', 'numeric override']])
     cache.pause()
     cache.writeItem({ collection, key: '9', item: { id: 'other', name: 'queued string override' } })
-    expect(rows()).toEqual([[9, 'numeric override']])
+    expect(rows()).toEqual([['9', 'numeric override']])
     cache.resume()
     expect(rows()).toEqual([['9', 'queued string override']])
     cache.deleteItem({ collection, key: '9' })
     cache.writeItem({ collection, key: 9, item: { id: 'other', name: 'new numeric row' } })
     expect(rows()).toEqual([[9, 'new numeric row']])
     cache.setState({ collections: { items: { 9: { id: 'other', name: 'hydrated' } } }, markers: {}, modules: {}, queryMeta: {} })
-    // Hydration format predates key breadcrumbs; unavailable original type falls back.
-    expect(rows()).toEqual([['9', 'hydrated']])
+    // Hydration re-keys snapshot rows by their collection key.
+    expect(rows()).toEqual([['other', 'hydrated']])
     cache.clear()
     cache.setState({ collections: { items: { 9: { id: 9, name: 'restored primary key' } } }, markers: {}, modules: {}, queryMeta: {} })
     expect(rows()).toEqual([[9, 'restored primary key']])

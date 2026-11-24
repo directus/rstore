@@ -1,8 +1,12 @@
 import type { Collection, CollectionDefaults, CollectionRelation, CollectionRelationReference, CollectionRelations, CollectionSchemas, DefaultIsInstanceOf, Exactly, Full, GetKey, MaybeArray, NormalizedRelation, ResolvedCollection, ResolvedCollectionList, StandardSchemaV1, StoreCore, StoreSchema } from '@rstore/shared'
+import { resolveRetention } from './retention.js'
+import { unboundedRowRetention } from './rowRetention.js'
 
 export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
 
 export const defaultIsInstanceOf: DefaultIsInstanceOf = collection => item => item.__typename === collection.name
+
+const defaultKeyCollections = new WeakSet<object>()
 
 /**
  * Allow typing the collection item type thanks to currying.
@@ -23,6 +27,11 @@ export function withItemType<
   return {
     defineCollection: collection => collection as any,
   }
+}
+
+/** Return whether a resolved collection uses RStore's default item-key policy. */
+export function usesDefaultCollectionKey(collection: ResolvedCollection<any, any, any>): boolean {
+  return defaultKeyCollections.has(collection)
 }
 
 /**
@@ -79,6 +88,10 @@ export function resolveCollection<
     throw new Error(`Collection name "${collection.name}" cannot start with "$"`)
   }
 
+  const garbageCollection = collection.garbageCollection
+  if (garbageCollection !== undefined)
+    resolveRetention(garbageCollection, unboundedRowRetention, `${collection.name}.garbageCollection`)
+
   // Merge default field configs with the collection-specific ones into fresh
   // objects so no collection shares (and can mutate) the defaults or another
   // collection's field configs
@@ -97,7 +110,7 @@ export function resolveCollection<
     }
   }
 
-  return {
+  const resolved = {
     '~resolved': true,
     'name': collection.name,
     'getKey': item => item.$overrideKey ?? (collection.getKey ?? defaults?.getKey ?? defaultGetKey)(item),
@@ -117,11 +130,15 @@ export function resolveCollection<
     },
     'scopeId': collection.scopeId,
     'hooks': collection.hooks,
+    ...(garbageCollection !== undefined && { garbageCollection: { ...garbageCollection } }),
     'meta': {
       ...defaults?.meta,
       ...collection.meta,
     },
-  }
+  } as ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
+  if (!collection.getKey && !defaults?.getKey)
+    defaultKeyCollections.add(resolved)
+  return resolved
 }
 
 /**
@@ -131,6 +148,9 @@ export function resolveCollection<
  * plugins through `addCollectionDefaults` reach the collections that were
  * resolved earlier (collections are resolved before plugins run). Field
  * configs already present on a collection win over the defaults.
+ *
+ * @deprecated Collections now receive defaults during resolution. Retained
+ * for consumers that still resolve collections before plugin setup.
  */
 export function mergeCollectionDefaultsFields(
   collections: ResolvedCollection[],
@@ -208,9 +228,12 @@ export function normalizeCollectionRelations(collections: ResolvedCollection[]):
             const currentKey = on[key]!.replace(`${collection.name}.`, '')
             newOn[oppositeKey] = currentKey
           }
+          const indexFields = Object.keys(newOn).sort()
           newNormalizedRelation.to.push({
             collection: toCollectionName,
             on: newOn,
+            indexKey: indexFields.join(':'),
+            indexFields,
             filter: config.filter,
           })
         }
@@ -235,12 +258,12 @@ export function resolveCollectionOppositeRelations(collections: ResolvedCollecti
         const relation = otherCollection.normalizedRelations[relationKey]!
         for (const target of relation.to) {
           if (target.collection === collection.name) {
-            const fields = Object.keys(target.on as Record<string, string>).sort()
+            const fields = [...target.indexFields]
             collection.oppositeRelations[otherCollection.name] = {
               relation,
               fields,
             }
-            const indexField = fields.join(':')
+            const indexField = target.indexKey
             if (!indexes.has(indexField)) {
               indexes.set(indexField, fields)
             }

@@ -110,7 +110,7 @@ export interface VueCollectionApi<
   /** Create an item directly. */
   create: (
     item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>,
-    createOptions?: Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'formOperations' | 'batch'>,
+    createOptions?: Pick<CreateOptions<TCollection, TCollectionDefaults, TSchema>, 'optimistic' | 'formOperations' | 'batch' | 'insertInto'>,
   ) => Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   /** Create many items directly. */
   createMany: (

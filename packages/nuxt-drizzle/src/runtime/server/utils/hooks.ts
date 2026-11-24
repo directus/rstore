@@ -1,4 +1,4 @@
-import type { Awaitable } from '@rstore/shared'
+import type { Awaitable, CacheScope, FieldTimestampValue } from '@rstore/shared'
 import type { Peer } from 'crossws'
 import type { InferSelectModel, Table, TableConfig } from 'drizzle-orm'
 import type { H3Event } from 'h3'
@@ -147,7 +147,14 @@ export interface RstoreDrizzleHooks<
   TResult = any,
 > {
   'index.get.before': (payload: RstoreDrizzleBeforeHookPayload) => Awaitable<void>
-  'index.get.after': (payload: RstoreDrizzleAfterHookPayload<Array<TResult>>) => Awaitable<void>
+  'index.get.after': (payload: RstoreDrizzleAfterHookPayload<Array<TResult>> & {
+    /** Equality requested by an opt-in cache read. */
+    requestedCacheScope?: CacheScope
+    /** Attest that this read was authorized and exhaustive for the requested partition. */
+    confirmCompleteScope: (scope: CacheScope, revision?: FieldTimestampValue) => void
+    /** Attest that known matching local creates can use this exact equality and sort. */
+    confirmLocalCreatePlacement: () => void
+  }) => Awaitable<void>
   'index.post.before': (payload: RstoreDrizzleBeforeHookPayload) => Awaitable<void>
   'index.post.after': (payload: RstoreDrizzleAfterHookPayload<TResult>) => Awaitable<void>
   'item.get.before': (payload: RstoreDrizzleItemBeforeHookPayload) => Awaitable<void>

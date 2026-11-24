@@ -38,6 +38,12 @@ export default defineNitroPlugin(() => {
     },
     'index.get.after': async (payload) => {
       console.log('Specific hook for todos - index.get.after', payload.collection, payload.result.map(r => r.id))
+      // This playground exposes both public status partitions in full.
+      const scope = payload.requestedCacheScope
+      if (scope?.field === 'completed' && (scope.value === 0 || scope.value === 1)) {
+        payload.confirmCompleteScope(scope)
+        payload.confirmLocalCreatePlacement()
+      }
     },
     'item.patch.after': async (payload) => {
       console.log('Specific hook for todos - item.patch.after', payload.collection, payload.result.id)

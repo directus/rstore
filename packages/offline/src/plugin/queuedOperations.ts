@@ -1,6 +1,23 @@
+import type { StoreCore, StoreSchema } from '@rstore/shared'
 import type { OfflinePluginRuntime, OfflineQueuedOperation } from './types'
 import { createItem, createMany, deleteItem, deleteMany, updateItem, updateMany } from '@rstore/core'
 import { getOfflineDb } from './metadata'
+
+/** Restore durable creates before an exact page can read its pending membership. */
+export async function restoreQueuedCreateMembership(runtime: OfflinePluginRuntime, store: StoreCore<StoreSchema>): Promise<void> {
+  if (!store.$cache.createMembership)
+    return
+  const queued = await getOfflineDb(runtime).readAllItems(runtime.opsStoreName) as OfflineQueuedOperation[]
+  for (const op of queued) {
+    if (op.type !== 'create' || !op.createPlacement || op.key == null)
+      continue
+    const collection = store.$collections.find(candidate => candidate.name === op.collectionName)
+    if (!collection || runtime.options.filterCollection?.(collection) === false)
+      continue
+    store.$cache.createMembership.show(op.createPlacement, op.key)
+    store.$cache.writeItem({ collection, key: op.key, item: op.item })
+  }
+}
 
 /**
  * Replay the queued offline mutations against the remote source, oldest first.
@@ -35,6 +52,13 @@ async function processQueuedOperation(runtime: OfflinePluginRuntime, store: any,
   catch (error) {
     console.error('[rstore/offline] Failed to process queued operation', op, error)
     if (shouldDropFailedOperation(error)) {
+      if (op.type === 'create' && op.createPlacement && op.key != null) {
+        store.$cache.createMembership?.discard(op.createPlacement.id)
+        const collection = store.$collections.find((candidate: { name: string }) => candidate.name === op.collectionName)
+        if (collection)
+          store.$cache.deleteItem({ collection, key: op.key })
+        await getOfflineDb(runtime).deleteItem(op.collectionName, String(op.key))
+      }
       await getOfflineDb(runtime).deleteItem(runtime.opsStoreName, op.id)
     }
   }
@@ -63,6 +87,7 @@ async function replayOperation(store: any, collection: any, op: OfflineQueuedOpe
         store,
         collection,
         item: op.item,
+        meta: { $createPlacement: op.createPlacement },
       })
     case 'update':
       return updateItem({

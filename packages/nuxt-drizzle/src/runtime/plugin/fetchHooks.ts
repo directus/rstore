@@ -1,6 +1,7 @@
 import type { VueStore } from '@rstore/vue'
 import type { DrizzlePluginContext } from './context'
 import SuperJSON from 'superjson'
+import { queryCacheHeader, readQueryCacheMetadata } from '../utils/query-cache'
 import { and, eq, inArray, or } from '../utils/where'
 
 /** Register network fetch and relation loading hooks. */
@@ -43,9 +44,22 @@ export function installFetchHooks(ctx: DrizzlePluginContext, hook: any) {
       options.offset = payload.findOptions.pageIndex * payload.findOptions.pageSize
       options.limit = payload.findOptions.pageSize
     }
-    payload.setResult(await ctx.requestFetch(`${ctx.apiPath}/${payload.collection.name}`, {
-      query: { superjson: SuperJSON.stringify(options) },
-    }))
+    const url = `${ctx.apiPath}/${payload.collection.name}`
+    const query = { superjson: SuperJSON.stringify(options) }
+    if (!payload.findOptions?.cacheScope && payload.findOptions?.localMembership !== 'auto') {
+      payload.setResult(await ctx.requestFetch(url, { query }))
+      return
+    }
+    let metadata: ReturnType<typeof readQueryCacheMetadata> = {}
+    const result = await ctx.requestFetch(url, {
+      query,
+      headers: { [queryCacheHeader]: payload.findOptions.cacheScope ? 'scope' : 'placement' },
+      onResponse: ({ response }: { response: Response }) => {
+        metadata = readQueryCacheMetadata(response.headers.get(queryCacheHeader))
+      },
+    })
+    payload.meta.drizzleLocalCreatePlacement = metadata.localCreatePlacement === true
+    payload.setResult(result, metadata)
   })
 
   hook('fetchRelations', async (payload: any) => {

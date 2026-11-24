@@ -1,10 +1,12 @@
+import type { MutationItemEntry, MutationItemInput } from '../types/mutation.js'
+
 /** Return whether a value is a mutation item entry with an optional key. */
-export function isMutationItemEntry(item: unknown): item is { key?: string | number, item: unknown } {
+export function isMutationItemEntry(item: unknown): item is MutationItemEntry<unknown> {
   return !!item && typeof item === 'object' && 'item' in item && ('key' in item || Object.keys(item).length === 1)
 }
 
 /** Return the actual item carried by a plain item or mutation item entry. */
-export function unwrapMutationItem<T>(item: T | { key?: string | number, item: T }): T {
+export function unwrapMutationItem<T>(item: MutationItemInput<T>): T {
   return isMutationItemEntry(item) ? item.item as T : item as T
 }
 

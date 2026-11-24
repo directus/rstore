@@ -1,5 +1,5 @@
 import type { FieldTimestampValue } from '../hlc/index.js'
-import type { FieldConflict, FieldTimestamps, MergeResult } from './types.js'
+import type { FieldTimestamps, MergeResult } from './types.js'
 import { compareHLC, getDefaultClock, stringifyHLC } from '../hlc/index.js'
 import { fieldValuesEqual } from '../utils/equality.js'
 
@@ -12,40 +12,66 @@ export function mergeItemFields<T extends Record<string, any>>(
   localTimestamps: FieldTimestamps,
   remoteTimestamps: FieldTimestamps,
 ): MergeResult<T> {
-  const allFields = new Set([...Object.keys(local), ...Object.keys(remote)])
-  const merged = {} as Record<string, any>
-  const mergedTimestamps: FieldTimestamps = {}
-  const conflicts: FieldConflict[] = []
-
-  for (const field of allFields) {
-    const localTs = localTimestamps[field] ?? 0
-    const remoteTs = remoteTimestamps[field] ?? 0
-    const order = compareHLC(localTs, remoteTs)
-
-    if (order < 0) {
-      merged[field] = remote[field]
-      mergedTimestamps[field] = remoteTs
-    }
-    else if (order > 0) {
-      merged[field] = local[field]
-      mergedTimestamps[field] = localTs
-    }
-    else {
-      if (!fieldValuesEqual(local[field], remote[field])) {
-        conflicts.push({
-          field,
-          localValue: local[field],
-          remoteValue: remote[field],
-          localTimestamp: localTs,
-          remoteTimestamp: remoteTs,
-        })
-      }
-      merged[field] = local[field]
-      mergedTimestamps[field] = localTs
-    }
+  const result: MutableMergeResult = {
+    merged: local,
+    mergedTimestamps: localTimestamps,
+    conflicts: [],
+    valueChanged: false,
+    timestampsChanged: false,
   }
+  for (const field in local) {
+    if (Object.hasOwn(local, field))
+      mergeField(local, remote, localTimestamps, remoteTimestamps, field, result)
+  }
+  for (const field in remote) {
+    if (Object.hasOwn(remote, field) && !Object.hasOwn(local, field))
+      mergeField(local, remote, localTimestamps, remoteTimestamps, field, result)
+  }
+  return result as MergeResult<T>
+}
 
-  return { merged: merged as T, mergedTimestamps, conflicts }
+/** Mutable merge accumulator reused across local and remote field passes. */
+interface MutableMergeResult extends MergeResult<Record<string, any>> {}
+
+/** Merge one field into a lazily cloned result accumulator. */
+function mergeField(
+  local: Record<string, any>,
+  remote: Record<string, any>,
+  localTimestamps: FieldTimestamps,
+  remoteTimestamps: FieldTimestamps,
+  field: string,
+  result: MutableMergeResult,
+): void {
+  const localTs = localTimestamps[field] ?? 0
+  const remoteTs = remoteTimestamps[field] ?? 0
+  const order = compareHLC(localTs, remoteTs)
+  const remoteWins = order < 0
+  const winningValue = remoteWins ? remote[field] : local[field]
+  const winningTimestamp = remoteWins ? remoteTs : localTs
+  if (remoteWins && (
+    !fieldValuesEqual(local[field], winningValue)
+    || Object.hasOwn(local, field) !== Object.hasOwn(remote, field)
+  )) {
+    if (!result.valueChanged)
+      result.merged = { ...local }
+    result.merged[field] = winningValue
+    result.valueChanged = true
+  }
+  if (!Object.hasOwn(localTimestamps, field) || localTimestamps[field] !== winningTimestamp) {
+    if (!result.timestampsChanged)
+      result.mergedTimestamps = { ...localTimestamps }
+    result.mergedTimestamps[field] = winningTimestamp
+    result.timestampsChanged = true
+  }
+  if (order === 0 && !fieldValuesEqual(local[field], remote[field])) {
+    result.conflicts.push({
+      field,
+      localValue: local[field],
+      remoteValue: remote[field],
+      localTimestamp: localTs,
+      remoteTimestamp: remoteTs,
+    })
+  }
 }
 
 /**

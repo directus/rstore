@@ -116,6 +116,7 @@ function installSingleMutationQueueHooks(runtime: OfflinePluginRuntime, hook: an
       collectionName: collection.name,
       item,
       key,
+      createPlacement: meta.$createPlacement,
     })
     meta.mutationStatus = 'queued'
     setResult(item)

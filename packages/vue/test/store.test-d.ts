@@ -26,6 +26,6 @@ describe('store typing', () => {
     const retention: RetentionOptions = { ttlMs: 1_000, maxSize: 10 }
     const tombstones: TombstoneGcOptions = { ...retention, intervalMs: 5_000 }
 
-    expectTypeOf({ queryStateRetention: retention, mutationHistory: false, tombstoneGc: tombstones } as const).toMatchTypeOf<Partial<CreateStoreOptions<[], CollectionDefaults>>>()
+    expectTypeOf({ queryStateRetention: retention, garbageCollection: retention, mutationHistory: false, tombstoneGc: tombstones } as const).toMatchTypeOf<Partial<CreateStoreOptions<[], CollectionDefaults>>>()
   })
 })

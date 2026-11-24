@@ -1,14 +1,19 @@
 import type { Ref } from 'vue'
 import type { CachedPageRefs, CacheRuntime } from './types'
 import { klona } from 'klona'
-import { ref } from 'vue'
+import { ref, shallowRef } from 'vue'
 import { forgetQueryStateHolders, isQueryStateHeld } from './queryHolders'
 
-/** Accepted collection writes, observed only for unkeyed absence decisions. */
-const collectionWrites = new WeakMap<CacheRuntime['state'], Map<string, number>>()
+/**
+ * Accepted collection writes, observed only for unkeyed absence decisions.
+ *
+ * Generations are reactive: an absence decision can be evaluated while the
+ * write is still publishing, before its generation moves.
+ */
+const collectionWrites = new WeakMap<CacheRuntime['state'], Map<string, Ref<number>>>()
 
 /** Accepted writes for keys observed by authoritative absence pages. */
-const itemWrites = new WeakMap<CacheRuntime['state'], Map<string, Map<string, number>>>()
+const itemWrites = new WeakMap<CacheRuntime['state'], Map<string, Map<string, Ref<number>>>>()
 
 /** Observe a collection's accepted-write generation without retaining its cache. */
 export function getCollectionWriteVersion(state: CacheRuntime['state'], collectionName: string): number {
@@ -17,9 +22,12 @@ export function getCollectionWriteVersion(state: CacheRuntime['state'], collecti
     versions = new Map()
     collectionWrites.set(state, versions)
   }
-  if (!versions.has(collectionName))
-    versions.set(collectionName, 0)
-  return versions.get(collectionName)!
+  let version = versions.get(collectionName)
+  if (!version) {
+    version = shallowRef(0)
+    versions.set(collectionName, version)
+  }
+  return version.value
 }
 
 /** Observe only keys needed by absence pages, normalizing numeric cache keys. */
@@ -35,9 +43,12 @@ export function getItemWriteVersion(state: CacheRuntime['state'], collectionName
     collections.set(collectionName, versions)
   }
   const normalizedKey = String(key)
-  if (!versions.has(normalizedKey))
-    versions.set(normalizedKey, 0)
-  return versions.get(normalizedKey)!
+  let version = versions.get(normalizedKey)
+  if (!version) {
+    version = shallowRef(0)
+    versions.set(normalizedKey, version)
+  }
+  return version.value
 }
 
 /** Reactive clear generations, observed by queries to drop confirmation. */
@@ -91,7 +102,6 @@ export function clearQueryStateForCollection(ctx: CacheRuntime, collectionName: 
  * Drop all query metadata and page refs.
  */
 export function clearAllQueryState(ctx: CacheRuntime) {
-  ctx.state.queryMeta = {}
   ctx.state.pageRefs.clear()
   ctx.queryStateUsedAt.clear()
   forgetQueryStateHolders(ctx.state)
@@ -110,13 +120,13 @@ export function resetItemWrites(ctx: CacheRuntime) {
 
 /** Release computed absence when a later write can change its membership. */
 export function invalidateMissingPageRefsForItem(ctx: CacheRuntime, collectionName: string, key: string | number): void {
-  const versions = collectionWrites.get(ctx.state)
-  if (versions?.has(collectionName))
-    versions.set(collectionName, versions.get(collectionName)! + 1)
-  const keys = itemWrites.get(ctx.state)?.get(collectionName)
+  const collectionVersion = collectionWrites.get(ctx.state)?.get(collectionName)
+  if (collectionVersion)
+    collectionVersion.value++
   const normalizedKey = String(key)
-  if (keys?.has(normalizedKey))
-    keys.set(normalizedKey, keys.get(normalizedKey)! + 1)
+  const itemVersion = itemWrites.get(ctx.state)?.get(collectionName)?.get(normalizedKey)
+  if (itemVersion)
+    itemVersion.value++
   // Runs on every item write: test the saved entry before parsing its page id.
   for (const [pageId, result] of ctx.state.pageRefs) {
     if (result.type !== 'data' || result.resultMode !== 'computed' || result.invalidated)
@@ -137,9 +147,14 @@ export function invalidatePageRefsForItem(ctx: CacheRuntime, collectionName: str
   const evicted = new Set<string>()
   for (const [pageId, ref] of ctx.state.pageRefs) {
     const queryId = getPageQueryId(pageId)
-    if (!queryId || !isQueryStateKeyForCollection(queryId, collectionName)) {
+    const related = ref.requiredRows?.[collectionName]
+    if (queryId && related?.some(candidate => String(candidate) === String(key))) {
+      ctx.state.pageRefs.delete(pageId)
+      evicted.add(queryId)
       continue
     }
+    if (!queryId || !isQueryStateKeyForCollection(queryId, collectionName))
+      continue
     if (ref.type === 'data') {
       continue
     }
@@ -208,7 +223,7 @@ export function getPageQueryId(pageId: string) {
  * Query ids are `JSON.stringify([source, options])`, so the serialized source
  * is an exact prefix. This avoids parsing the whole id, options included.
  */
-function isQueryStateKeyForCollection(queryId: string, collectionName: string) {
+export function isQueryStateKeyForCollection(queryId: string, collectionName: string) {
   return queryId.startsWith(`[${JSON.stringify(`${collectionName}-first`)},`)
     || queryId.startsWith(`[${JSON.stringify(`${collectionName}-many`)},`)
 }
@@ -257,6 +272,34 @@ export function pruneItemWrites(ctx: CacheRuntime): void {
       if (!kept?.has(key)) {
         versions.delete(key)
       }
+    }
+  }
+}
+
+/** Apply an explicit deletion to exact list membership, including saved cold pages. */
+export function removeDeletedPageKey(ctx: CacheRuntime, collectionName: string, key: string | number): void {
+  for (const [pageId, page] of ctx.state.pageRefs) {
+    const options = page.effectiveOptions as { resultMode?: string } | undefined
+    if (options?.resultMode !== 'responseRefs')
+      continue
+    const required = page.requiredRows?.[collectionName]
+    if (required) {
+      for (let index = required.length - 1; index >= 0; index--) {
+        if (String(required[index]) === String(key))
+          required.splice(index, 1)
+      }
+    }
+    const id = getPageQueryId(pageId)
+    if (!id || !isQueryStateKeyForCollection(id, collectionName))
+      continue
+    if (page.type === 'refs') {
+      for (let index = page.keys.length - 1; index >= 0; index--) {
+        if (String(page.keys[index]) === String(key))
+          page.keys.splice(index, 1)
+      }
+    }
+    else if (page.type === 'ref' && String(page.key) === String(key)) {
+      ctx.state.pageRefs.delete(pageId)
     }
   }
 }

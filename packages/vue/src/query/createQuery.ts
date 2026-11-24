@@ -7,8 +7,9 @@ import { useQueryTracking } from '../tracking'
 import { installAutoRefresh } from './autoRefresh'
 import { installConfirmationResets } from './confirmation'
 import { loadPage } from './load'
+import { getLocalPageTarget, registerQueryMembership } from './localMembership'
 import { watchQueryOptions } from './options'
-import { createPage, getPageId, getPageOptions, readCachedResult } from './page'
+import { createPage, getPageId, getPageOptions, hasComputedCacheResult } from './page'
 import { addPrunedLoad, applyPrune, createPruneRun, recordKeptPage } from './prune'
 import { loadMainPageForPublication } from './publication'
 import { publishPageResult } from './push'
@@ -33,11 +34,22 @@ export function createQuery<
   })
   ctx.mainPage = createPage(ctx, {}, true)
   ctx.result = computed(() => mergePages(ctx))
-  ctx.cacheRead = computed(() => ctx.cacheMethod(ctx.getOptions(), { ...ctx.meta.value }) ?? null)
-  ctx.cached = computed(() => readCachedResult(ctx))
+  // A disabled query has no options (`getOptions()` is undefined): reading the
+  // cache with them would scan and wrap the whole collection for nothing.
+  ctx.cacheRead = computed(() => ctx.isDisabled()
+    ? toValue(ctx.defaultValue)
+    : ctx.cacheMethod(ctx.getOptions(), { ...ctx.meta.value }) ?? null)
+  const computedCacheResult = computed(() => hasComputedCacheResult(ctx))
+  ctx.cached = computed(() => computedCacheResult.value ? ctx.cacheRead.value : ctx.result.value)
   ctx.queryTracking = ctx.store.$isServer
     ? null
-    : useQueryTracking({ store: ctx.store, result: ctx.result, cached: ctx.cached })
+    : useQueryTracking({
+        store: ctx.store,
+        result: ctx.result,
+        cached: ctx.cached,
+        include: () => ctx.getOptions()?.include,
+        computedCacheResult: () => computedCacheResult.value,
+      })
   ctx.updateQueryTrackingMode()
 
   // `data` is read by the `loading` aggregate, so it has to exist first.
@@ -48,7 +60,7 @@ export function createQuery<
   // async code) binds to no scope: cached records would retain this query.
   // Reading every cache-derived computed now binds it to this scope, whose
   // disposal unlinks it. `data` reads `cacheRead` exactly when
-  // `readCachedResult` uses it. Reading it otherwise (no-cache, responseRefs)
+  // the query uses it. Reading it otherwise (no-cache, responseRefs)
   // would scan the cache through read hooks for nothing on every mount; a
   // later first read from `cached` links it to that bound computed instead.
   if (getCurrentScope()) {
@@ -77,12 +89,19 @@ export function createQuery<
     mainPage: ctx.mainPage,
     fetchMore,
     getPage,
+    getPageTarget: (pageIndex = 0) => {
+      const page = ctx.pages.value[pageIndex]
+      if (!page || !ctx.many || ctx.resultMode !== 'responseRefs' || page.cacheStatus === 'untracked')
+        throw new Error('Create placement requires an existing responseRefs list page')
+      return getLocalPageTarget(ctx, page)
+    },
     meta: ctx.meta,
     _result: ctx.result,
     _setPageResult: (page: any, result: unknown, options?: SetResultOptions) => publishPageResult(ctx, page, result, options),
     _refreshPage: (page: any, options?: VueQueryRefreshOptions<TOptions>) => page.main ? refresh(getMainPageRefreshOptions<TOptions>(page, options)) : refreshSecondaryPage(ctx, page, options),
   }
 
+  registerQueryMembership(ctx)
   installAutoRefresh(ctx, refresh)
   const queryOptions = watchQueryOptions(() => toValue(ctx.options), (reset) => {
     ctx.updateQueryTrackingMode()
@@ -215,7 +234,14 @@ export function createQuery<
  */
 function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, any>) {
   const cache = options.store.$cache as Cache & VueCachePrivate
-  const queryId = computed(() => JSON.stringify([options.id(), toValue(options.options)]))
+  const legacyQueryId = computed(() => JSON.stringify([options.id(), toValue(options.options)]))
+  const queryId = computed(() => {
+    const raw = toValue(options.options)
+    if ((raw?.resultMode ?? options.store.$findDefaults.resultMode) !== 'responseRefs')
+      return legacyQueryId.value
+    const { fetchPolicy, ...identity } = raw ?? {}
+    return fetchPolicy === 'no-cache' ? legacyQueryId.value : JSON.stringify([options.id(), identity])
+  })
   const meta = shallowRef(cache._private.state.queryMeta[queryId.value] || {})
   const getOptions = () => {
     const result = toValue(options.options)
@@ -235,10 +261,12 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     if (resolved.fetchPolicy === 'no-cache') {
       return false
     }
-    return options.store.$experimentalGarbageCollection
-      ? getOptions()?.experimentalGarbageCollection !== false
-      : getOptions()?.experimentalGarbageCollection === true
+    return true
   }
+  /** Whether this query collects rows after releasing its ownership. */
+  const getQueryCollectionEnabled = () => options.store.$experimentalGarbageCollection
+    ? getOptions()?.experimentalGarbageCollection !== false
+    : getOptions()?.experimentalGarbageCollection === true
 
   const ctx = {
     ...options,
@@ -248,6 +276,7 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     scope: getCurrentScope(),
     cache,
     queryId,
+    legacyQueryId,
     meta,
     getOptions,
     isDisabled,
@@ -255,6 +284,7 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
     fetchPolicy: initialResolvedOptions.fetchPolicy,
     resultMode: initialResolvedOptions.resultMode,
     queryTrackingEnabled: getQueryTrackingEnabled(),
+    queryCollectionEnabled: getQueryCollectionEnabled(),
     pages: ref<any[]>([]),
     foreground: createFetchState(),
     background: createFetchState(),
@@ -272,7 +302,8 @@ function createQueryContext(options: VueCreateQueryOptions<any, any, any, any, a
   ctx.getPageOptions = (page: any) => getPageOptions(ctx, page)
   ctx.updateQueryTrackingMode = () => {
     ctx.queryTrackingEnabled = getQueryTrackingEnabled()
-    ctx.queryTracking?.setEnabled(ctx.queryTrackingEnabled)
+    ctx.queryCollectionEnabled = getQueryCollectionEnabled()
+    ctx.queryTracking?.setEnabled(ctx.queryTrackingEnabled, ctx.queryCollectionEnabled)
   }
   return ctx
 }

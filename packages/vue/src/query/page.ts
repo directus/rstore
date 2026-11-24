@@ -1,8 +1,10 @@
-import type { FetchPolicy, FieldTimestampValue, FindOptions } from '@rstore/shared'
+import type { FetchPolicy, FieldTimestampValue, FindOptions, HookMetaQueryTracking } from '@rstore/shared'
 import type { VueQueryPage, VueQueryPageOptions } from './types'
 import { shallowReactive, toValue } from 'vue'
 import { readMissingPageResult, rememberPageAbsence } from './absence'
-import { getMatchingPageRefs, isPageConfirmationCurrent } from './confirmation'
+import { isPageConfirmationCurrent } from './confirmation'
+import { hasExactRows, readSavedPage } from './exactCache'
+import { readLocalMembership } from './localMembership'
 import { waitForMainPagePublication } from './publication'
 import { beginPagePublication } from './publicationOwnership'
 import { setPageRepresentation } from './representation'
@@ -19,7 +21,11 @@ export function createPage(
 ): VueQueryPage<any, any, any, any, any> {
   const index = optionsExtension.pageIndex != null ? optionsExtension.pageIndex : ctx.pages.value.length
   const id = getPageId(ctx, index)
-  const cached = getMatchingPageRefs(ctx, { id, options: optionsExtension })
+  const options = ctx.store.$resolveFindOptions(ctx.getCollection(), getPageIdentityOptions(ctx, { options: optionsExtension }), ctx.many, {})
+  const exact = options.resultMode === 'responseRefs'
+  const cached = options.fetchPolicy === 'no-cache' || options.fetchPolicy === 'fetch-only' || ctx.isDisabled()
+    ? undefined
+    : options.cacheScope ? undefined : readSavedPage(ctx, { id, options: optionsExtension }, exact)
   if (cached) {
     // Hydrated or remembered results now have a live consumer, see `load.ts`.
     ctx.cache._private.holdQueryState(ctx.queryId.value, ctx)
@@ -52,12 +58,30 @@ export function createPage(
     get confirmed(): boolean {
       return page._confirmed && isPageConfirmationCurrent(ctx, page as unknown as VueQueryPage<any, any, any, any, any>)
     },
+    get cacheStatus(): VueQueryPage<any, any, any, any, any>['cacheStatus'] {
+      const options = ctx.store.$resolveFindOptions(ctx.getCollection(), getPageOptions(ctx, page), ctx.many, { ...ctx.meta.value })
+      if (options.cacheScope) {
+        ctx.cache._private.scopes.hold(ctx.getCollection().name, options.cacheScope, ctx.queryId.value)
+        return ctx.store.$cache.scopes?.isComplete(ctx.getCollection(), options.cacheScope) ? 'complete' : 'miss'
+      }
+      if (options.resultMode !== 'responseRefs' || options.fetchPolicy === 'no-cache')
+        return 'untracked'
+      const raw = page.rawData
+      if (!page._hasExactResult)
+        return 'miss'
+      if (raw.type === 'ref' || raw.type === 'refs')
+        return hasExactRows(ctx, raw) ? 'complete' : 'miss'
+      return raw.type === 'data' && raw.value === null ? 'complete' : 'miss'
+    },
+    _hasExactResult: exact && !!cached,
+    _accessDenied: false,
     _confirmed: false,
     _fetchPolicy: null,
     _resultVersion: undefined,
     rawData: cached ?? { type: 'data', value: toValue(ctx.defaultValue) },
     get data(): any {
-      return readPageData(ctx, page)
+      const data = page.cacheStatus === 'miss' ? (ctx.many ? [] : null) : readPageData(ctx, page)
+      return readLocalMembership(ctx, page, data)
     },
   })
   if (cached?.type === 'data')
@@ -117,6 +141,7 @@ export async function setPageResult(
   version?: FieldTimestampValue,
   confirmed = true,
   confirmationOptions?: unknown,
+  tracking?: HookMetaQueryTracking,
 ): Promise<{ valid: boolean, isCurrent: () => boolean }> {
   const discarded = { valid: false, isCurrent: () => false }
   if (!isCurrentPageRequest(ctx, page, savedPageRequestId)) {
@@ -133,12 +158,12 @@ export async function setPageResult(
   if (isStalePageResult(page, version, savedPageRequestId))
     return discarded
 
-  const isCurrent = applyPageResult(ctx, page, pageResult, fetchPolicy, version, confirmed, confirmationOptions, () => isCurrentPageRequest(ctx, page, savedPageRequestId))
+  const isCurrent = applyPageResult(ctx, page, pageResult, fetchPolicy, version, confirmed, confirmationOptions, () => isCurrentPageRequest(ctx, page, savedPageRequestId), undefined, tracking)
   return { valid: isCurrent(), isCurrent }
 }
 
 /** Apply the same representation rules to fetched and pushed results. */
-export function applyPageResult(ctx: any, page: VueQueryPage<any, any, any, any, any>, result: any, fetchPolicy: FetchPolicy | undefined, version?: FieldTimestampValue, confirmed = true, confirmationOptions?: unknown, current: () => boolean = () => true, publication?: () => boolean): () => boolean {
+export function applyPageResult(ctx: any, page: VueQueryPage<any, any, any, any, any>, result: any, fetchPolicy: FetchPolicy | undefined, version?: FieldTimestampValue, confirmed = true, confirmationOptions?: unknown, current: () => boolean = () => true, publication?: () => boolean, tracking?: HookMetaQueryTracking): () => boolean {
   // Pushes acquire ownership before their cache writes and keep it throughout.
   const isCurrent = publication ?? beginPagePublication(page, current)
   // A later cache read of the same options cannot undo a server confirmation.
@@ -151,7 +176,11 @@ export function applyPageResult(ctx: any, page: VueQueryPage<any, any, any, any,
   page._fetchPolicy = fetchPolicy ?? null
   if (!isCurrent())
     return isCurrent
-  setPageRepresentation(ctx, page, result, fetchPolicy === 'no-cache', confirmationOptions, isCurrent)
+  setPageRepresentation(ctx, page, result, fetchPolicy === 'no-cache', confirmationOptions, isCurrent, tracking)
+  if (isCurrent()) {
+    page._accessDenied = false
+    page._hasExactResult = confirmed && fetchPolicy !== 'no-cache'
+  }
   if (isCurrent())
     markPagesAsComputed(ctx, isCurrent)
   return isCurrent
@@ -238,11 +267,8 @@ function readComputedPageData(ctx: any, page: VueQueryPage<any, any, any, any, a
  * holding such a page aggregates its pages instead: reading the cache alone
  * would drop them from the result.
  */
-export function readCachedResult(ctx: any) {
+export function hasComputedCacheResult(ctx: any): boolean {
   // Missing first pages distinguish retained stale rows from later cache writes.
   const missingFirst = !ctx.many && ctx.mainPage._fetchPolicy != null && ctx.mainPage.rawData.type === 'data' && ctx.mainPage.rawData.value == null
-  if (!missingFirst && ctx.fetchPolicy !== 'no-cache' && ctx.resultMode !== 'responseRefs' && !hasIndependentPage(ctx)) {
-    return ctx.cacheRead.value
-  }
-  return ctx.result.value
+  return !missingFirst && ctx.fetchPolicy !== 'no-cache' && ctx.resultMode !== 'responseRefs' && !hasIndependentPage(ctx)
 }

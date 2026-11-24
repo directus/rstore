@@ -32,6 +32,9 @@ export function peekMany<
 
   findOptions = store.$resolveFindOptions(collection, findOptions ?? {}, true, meta)
   const fetchPolicy = findOptions.fetchPolicy
+  const scope = findOptions.cacheScope
+  if (scope && !store.$cache.scopes?.isComplete(collection, scope))
+    return { result: [] }
 
   if (force || shouldReadCacheFromFetchPolicy(fetchPolicy)) {
     let marker: string | undefined = defaultMarker(collection, findOptions)
@@ -50,10 +53,13 @@ export function peekMany<
       },
     })
 
+    const filter = overrideFilter ?? (typeof findOptions?.filter === 'function' ? findOptions.filter as (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean : undefined)
     let result = store.$cache.readItems({
       collection,
-      marker: force ? undefined : getMarker('many', marker),
-      filter: overrideFilter ?? (typeof findOptions?.filter === 'function' ? findOptions.filter as (item: ResolvedCollectionItemBase<TCollection, TCollectionDefaults, TSchema>) => boolean : undefined),
+      marker: force || scope ? undefined : getMarker('many', marker),
+      indexKey: scope?.field,
+      indexValue: scope && String(scope.value),
+      filter: scope ? item => item[scope.field as keyof typeof item] === scope.value && (!filter || filter(item)) : filter,
     })
 
     store.$hooks.callHookSync('cacheFilterMany', {

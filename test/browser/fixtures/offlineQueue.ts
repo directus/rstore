@@ -1,3 +1,5 @@
+import type { VueStore } from '../../../packages/vue/src'
+import { toValue } from 'vue'
 import { getSession, queue } from './offlineSession'
 
 /** Persist two distinct saved updates with deterministic replay order. */
@@ -26,4 +28,29 @@ export async function seedRenamedCreate() {
   session.cache.writeItem({ collection: session.collection, key: 'local-key', item: { id: 'local-key', text: 'draft' } })
   await queue({ type: 'create', key: 'local-key', item: { id: 'local-key', text: 'draft' } })
   session.remote.respondNext('createItem', () => ({ id: 'server-key', text: 'draft' }))
+}
+
+/** Open an exact list in the current browser session without forcing offline transport. */
+function exactList() {
+  const store = getSession().store as VueStore<[{ name: 'Todos' }]>
+  return store.Todos.query(q => q.many({
+    resultMode: 'responseRefs',
+    fetchPolicy: navigator.onLine ? 'cache-first' : 'cache-only',
+  }))
+}
+
+/** Queue a create via the real mutation entry point and capture the page's target. */
+export async function createInExactList() {
+  const page = await exactList()
+  const store = getSession().store as VueStore<[{ name: 'Todos' }]>
+  await store.Todos.create({ id: 'offline-exact', text: 'Draft' }, {
+    insertInto: [{ page: page.getPageTarget(), position: 'start' }],
+  })
+  return { rows: toValue(page.data).map(item => item.id), status: page.mainPage.cacheStatus }
+}
+
+/** Observe what a newly opened query can render in the current store. */
+export async function readExactList() {
+  const page = await exactList()
+  return { rows: toValue(page.data).map(item => item.id), status: page.mainPage.cacheStatus }
 }

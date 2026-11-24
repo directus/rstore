@@ -1,18 +1,11 @@
-import type { VueStack } from '#test-utils/store/vueStack'
-// eslint-disable-next-line no-restricted-imports -- Index buckets have no public view; all behavior uses public APIs.
-import type { VueCachePrivate } from '../../../src/cache'
 import { describe, expect, it } from 'vitest'
 import { computed } from 'vue'
 import { blogSchema, createGarbageCollectionStack } from './utils'
 
-/** Count relation index buckets of `comments.postId`, which no public API exposes. */
-function countPostIdBuckets(stack: VueStack): number {
-  // eslint-disable-next-line no-restricted-syntax -- Index buckets have no public view; their count is the leak.
-  return (stack.cache as typeof stack.cache & VueCachePrivate)._private.state.collectionIndexes.get('comments')?.get('postId')?.size ?? 0
-}
-
+// The engine bounds retained empty buckets itself (see core store-engine
+// write specs); this spec covers relation reads across emptied buckets.
 describe('relation index buckets', () => {
-  it('drops emptied buckets while relation reads stay reactive', async () => {
+  it('keeps relation reads reactive while buckets empty', async () => {
     const stack = await createGarbageCollectionStack({ schema: blogSchema, remote: false })
     const posts = stack.collection('posts')
     const comments = stack.collection('comments')
@@ -35,7 +28,5 @@ describe('relation index buckets', () => {
       expect(commentIds.value).toEqual([])
       stack.cache.deleteItem({ collection: comments, key })
     }
-
-    expect(countPostIdBuckets(stack)).toBe(0)
   })
 })

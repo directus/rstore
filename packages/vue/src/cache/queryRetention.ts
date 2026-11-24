@@ -1,12 +1,24 @@
-import type { ResolvedRetention } from '@rstore/core'
+import type { QueryStateRetentionOptions } from '../storeOptions'
 import type { QueryStateHolder } from './queryHolders'
 import type { CacheRuntime } from './types'
-import { selectEvictions } from '@rstore/core'
+import { resolveRetention } from '@rstore/core'
 import { holdQueryState, isQueryStateHeld, retainQueryStateHolders } from './queryHolders'
 import { deleteQueryState, getPageQueryId, pruneItemWrites } from './queryState'
 
 /** Saved results of unmounted queries live 30 minutes, at most 500 of them. */
-export const defaultQueryStateRetention: ResolvedRetention = { ttlMs: 30 * 60_000, maxSize: 500 }
+const defaults = { ttlMs: 30 * 60_000, maxSize: 500, maxPages: 1_000, maxKeys: 50_000 }
+
+/** Resolve all query retention limits using the same validation as row caps. */
+export function resolveQueryStateRetention(options?: QueryStateRetentionOptions | false): CacheRuntime['queryStateRetention'] {
+  const base = resolveRetention(options, defaults, 'queryStateRetention')
+  if (!base)
+    return false
+  return {
+    ...base,
+    maxPages: resolveRetention({ maxSize: options === false ? undefined : options?.maxPages }, { ...base, maxSize: defaults.maxPages }, 'queryStateRetention.maxPages').maxSize,
+    maxKeys: resolveRetention({ maxSize: options === false ? undefined : options?.maxKeys }, { ...base, maxSize: defaults.maxKeys }, 'queryStateRetention.maxKeys').maxSize,
+  }
+}
 
 /** How often saved results are checked for expiration. */
 const sweepIntervalMs = 60_000
@@ -27,7 +39,7 @@ export function holdRetainedQueryState(ctx: CacheRuntime, queryId: string, holde
   // Without retention nothing ages: keep no per-id timestamps either.
   if (ctx.queryStateRetention) {
     ctx.queryStateUsedAt.set(queryId, Date.now())
-    queueOverflowSweep(ctx)
+    queueQueryStateSweep(ctx)
   }
 }
 
@@ -43,28 +55,25 @@ export function releaseRetainedQueryState(ctx: CacheRuntime, holder: QueryStateH
   if (queryId != null && ctx.queryStateUsedAt.has(queryId)) {
     ctx.queryStateUsedAt.set(queryId, Date.now())
     ctx.queryStateHeldCount = Math.max(0, ctx.queryStateHeldCount - 1)
-    queueOverflowSweep(ctx)
+    queueQueryStateSweep(ctx)
   }
 }
 
-/**
- * Sweep once at the end of the current task when unmounted entries may exceed
- * the size limit.
- *
- * Mounted entries never count, so the check subtracts how many the last sweep
- * found mounted (minus unmounts since). Otherwise more mounted queries than
- * `maxSize` would run a full sweep, evicting nothing, on every save.
- */
-function queueOverflowSweep(ctx: CacheRuntime): void {
+/** Coalesce retention updates from a batch of reads, writes and releases. */
+export function queueQueryStateSweep(ctx: CacheRuntime, force = false): void {
   const retention = ctx.queryStateRetention
-  const unheld = ctx.queryStateUsedAt.size - ctx.queryStateHeldCount
-  if (retention && unheld > retention.maxSize && !ctx.queryStateSweepQueued) {
-    ctx.queryStateSweepQueued = true
-    queueMicrotask(() => {
-      ctx.queryStateSweepQueued = false
-      sweepQueryState(ctx)
-    })
+  if (!retention || ctx.queryStateSweepQueued)
+    return
+  if (!force && ctx.queryStateUsedAt.size - ctx.queryStateHeldCount + ctx.standaloneMarkers <= retention.maxSize
+    && ctx.state.pageRefs.size <= retention.maxPages && ctx.queryStateKeyCount <= retention.maxKeys) {
+    return
   }
+  ctx.queryStateSweepQueued = true
+  queueMicrotask(() => {
+    ctx.queryStateSweepQueued = false
+    if (!ctx.disposed)
+      sweepQueryState(ctx)
+  })
 }
 
 /**
@@ -78,39 +87,81 @@ export function sweepQueryState(ctx: CacheRuntime, now = Date.now()): void {
   if (!retention) {
     return
   }
+  const sizes = new Map<string, { pages: number, keys: number }>()
   const queryIds = new Set(Object.keys(ctx.state.queryMeta))
-  for (const pageId of ctx.state.pageRefs.keys()) {
-    const queryId = getPageQueryId(pageId)
-    if (queryId) {
-      queryIds.add(queryId)
-    }
+  for (const [pageId, page] of ctx.state.pageRefs) {
+    const id = getPageQueryId(pageId)
+    if (!id)
+      continue
+    queryIds.add(id)
+    const size = sizes.get(id) ?? { pages: 0, keys: 0 }
+    size.pages++
+    size.keys += (page.type === 'refs' ? page.keys.length : Number(page.type === 'ref'))
+      + Object.values(page.requiredRows ?? {}).reduce((sum, keys) => sum + keys.length, 0)
+    sizes.set(id, size)
   }
-  const usedAt = ctx.queryStateUsedAt
-  for (const queryId of usedAt.keys()) {
-    if (!queryIds.has(queryId)) {
-      usedAt.delete(queryId)
-    }
+  for (const placement of ctx.membership.saved()) {
+    const id = getPageQueryId(placement.pageId)
+    if (!id)
+      continue
+    queryIds.add(id)
+    const size = sizes.get(id) ?? { pages: 0, keys: 0 }
+    if (!ctx.state.pageRefs.has(placement.pageId))
+      size.pages++
+    size.keys += placement.keys
+    sizes.set(id, size)
   }
-  const evictable: Array<[string, number]> = []
-  let held = 0
-  for (const queryId of queryIds) {
-    if (isQueryStateHeld(ctx.state, queryId)) {
-      usedAt.set(queryId, now)
-      held++
+  const groups = new Map<string, string[]>()
+  ctx.standaloneMarkers = 0
+  for (const marker of ctx.engine.markerKeys()) {
+    const record = ctx.markerRetention.get(marker) ?? { usedAt: now }
+    ctx.markerRetention.set(marker, record)
+    if (!record.owner)
+      ctx.standaloneMarkers++
+    const id = record.owner ?? marker
+    queryIds.add(id)
+    const markers = groups.get(id) ?? []
+    markers.push(marker)
+    groups.set(id, markers)
+  }
+
+  const inactive: Array<{ id: string, usedAt: number, pages: number, keys: number }> = []
+  for (const id of ctx.queryStateUsedAt.keys()) {
+    if (!queryIds.has(id))
+      ctx.queryStateUsedAt.delete(id)
+  }
+  ctx.queryStateHeldCount = 0
+  for (const id of queryIds) {
+    const markerAge = (groups.get(id) ?? []).reduce((age, marker) => Math.max(age, ctx.markerRetention.get(marker)!.usedAt), 0)
+    const usedAt = Math.max(ctx.queryStateUsedAt.get(id) ?? (markerAge || now), markerAge)
+    ctx.queryStateUsedAt.set(id, usedAt)
+    if (isQueryStateHeld(ctx.state, id)) {
+      ctx.queryStateHeldCount++
+      ctx.queryStateUsedAt.set(id, now)
       continue
     }
-    // Hydrated or restored entries were never touched here: start their age now.
-    if (!usedAt.has(queryId)) {
-      usedAt.set(queryId, now)
+    inactive.push({ id, usedAt, ...(sizes.get(id) ?? { pages: 0, keys: 0 }) })
+  }
+  inactive.sort((a, b) => a.usedAt - b.usedAt)
+  let pages = inactive.reduce((sum, item) => sum + item.pages, 0)
+  let keys = inactive.reduce((sum, item) => sum + item.keys, 0)
+  inactive.forEach((item, index) => {
+    if (now - item.usedAt < retention.ttlMs && inactive.length - index <= retention.maxSize && pages <= retention.maxPages && keys <= retention.maxKeys)
+      return
+    pages -= item.pages
+    keys -= item.keys
+    for (const marker of groups.get(item.id) ?? []) {
+      if (!ctx.markerRetention.get(marker)?.owner)
+        ctx.standaloneMarkers--
+      ctx.engine.deleteMarker(marker)
+      ctx.markerRetention.delete(marker)
     }
-    evictable.push([queryId, usedAt.get(queryId)!])
-  }
-  ctx.queryStateHeldCount = held
-  for (const queryId of selectEvictions(evictable, retention, now)) {
-    deleteQueryState(ctx, queryId)
-  }
-  // Checking each id above already pruned the dead consumers of kept ids.
+    ctx.membership.evict(item.id)
+    deleteQueryState(ctx, item.id)
+  })
+  ctx.queryStateKeyCount = keys
   retainQueryStateHolders(ctx.state, queryIds)
+  ctx.scopes.sweep(now)
   pruneItemWrites(ctx)
 }
 
@@ -119,7 +170,7 @@ export function sweepQueryState(ctx: CacheRuntime, now = Date.now()): void {
  *
  * @returns Stops the timer, or `undefined` when no timer is needed.
  */
-export function scheduleQueryStateSweeps(ctx: CacheRuntime, retention: ResolvedRetention | false): (() => void) | undefined {
+export function scheduleQueryStateSweeps(ctx: CacheRuntime, retention: CacheRuntime['queryStateRetention']): (() => void) | undefined {
   if (!retention || retention.ttlMs === Infinity || typeof setInterval === 'undefined') {
     return undefined
   }

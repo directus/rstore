@@ -3,6 +3,7 @@ import { definePlugin } from '@rstore/core'
 import { useIndexedDb } from '../indexeddb'
 import { createOfflineRuntime } from './metadata'
 import { installMutationHooks } from './mutations'
+import { restoreQueuedCreateMembership } from './queuedOperations'
 import { installReconnectHook } from './reconnect'
 import { installOfflineSyncHook } from './syncOrchestrator'
 import { installVersionCleanupHook } from './versionCleanup'
@@ -25,6 +26,7 @@ export function createOfflinePlugin(options: CreateOfflinePluginOptions = {}) {
       })
 
       installVersionCleanupHook(runtime, hook)
+      hook('init', ({ store }) => restoreQueuedCreateMembership(runtime, store))
       installMutationHooks(runtime, hook)
       // Single ordered `sync` hook: queue replay first, then remote pull.
       installOfflineSyncHook(runtime, hook)

@@ -1,10 +1,9 @@
-import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
-import { set } from '@rstore/shared'
+import type { BatchCallConfig, CacheLayer, Collection, CollectionDefaults, CreatePlacement, CustomHookMeta, FormOperation, GlobalStoreType, ResolvedCollection, ResolvedCollectionItem, StoreCore, StoreSchema } from '@rstore/shared'
 import { resolveBatchCall } from '../batch'
 import { isKeyDefined } from '../key'
 import { reportOperationError } from '../utils/operationError'
 import { finalizeMutation } from './finalizeMutation'
-import { createOptimisticLayerLifecycle, prepareMutationItem, replaceTransportItem } from './optimistic'
+import { createMutationHookState, createOptimisticLayerLifecycle } from './optimistic'
 
 export interface CreateOptions<
   TCollection extends Collection,
@@ -17,6 +16,8 @@ export interface CreateOptions<
   collection: ResolvedCollection<TCollection, TCollectionDefaults, TSchema>
   item: Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   skipCache?: boolean
+  /** Exact pages to update as the item is created. */
+  insertInto?: CreatePlacement[]
   optimistic?: boolean | Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>
   /**
    * Form operations (op log) from a form submission.
@@ -48,15 +49,15 @@ export async function createItem<
   collection,
   item: inputItem,
   skipCache,
+  insertInto = [],
   optimistic = true,
   formOperations,
   batch,
 }: CreateOptions<TCollection, TCollectionDefaults, TSchema>): Promise<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>> {
   const operation = {}
   try {
-    let preparedItem = prepareMutationItem(store, collection, inputItem)
-    let optimisticItem = preparedItem.optimisticItem
-    const transportItem = preparedItem.transportItem
+    const mutationHookState = createMutationHookState(store, collection, inputItem)
+    const { transportItem } = mutationHookState
 
     let result: ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema> | undefined
 
@@ -67,24 +68,23 @@ export async function createItem<
       collection,
       mutation: 'create',
       item: transportItem,
-      modifyItem: (path: any, value: any) => {
-        set(optimisticItem, path, value)
-        preparedItem = prepareMutationItem(store, collection, optimisticItem)
-        replaceTransportItem(transportItem, preparedItem.transportItem)
-      },
-      setItem: (newItem) => {
-        const prepared = prepareMutationItem(store, collection, newItem as Partial<ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>>, preparedItem)
-        preparedItem = prepared
-        optimisticItem = prepared.optimisticItem
-        replaceTransportItem(transportItem, prepared.transportItem)
-      },
+      modifyItem: mutationHookState.modifyItem,
+      setItem: mutationHookState.setItem,
       formOperations: formOperations as FormOperation[],
     })
 
+    const membership = skipCache ? undefined : store.$cache.createMembership
+    const placement = meta.$createPlacement ?? membership?.prepare(collection.name, {
+      ...mutationHookState.optimisticItem,
+      ...typeof optimistic === 'object' ? optimistic : {},
+    }, insertInto)
+    const isReplay = meta.$createPlacement !== undefined
+    if (placement)
+      meta.$createPlacement = placement
     const optimisticLayer = createOptimisticLayerLifecycle(store)
 
     if (!skipCache && optimistic) {
-      let key = collection.getKey(optimisticItem)
+      let key = collection.getKey(mutationHookState.optimisticItem)
       if (!isKeyDefined(key)) {
         key = crypto.randomUUID()
       }
@@ -93,7 +93,7 @@ export async function createItem<
         collectionName: collection.name,
         state: {
           [key]: {
-            ...optimisticItem,
+            ...mutationHookState.optimisticItem,
             ...typeof optimistic === 'object' ? optimistic : {},
             $overrideKey: key,
           },
@@ -106,6 +106,8 @@ export async function createItem<
           delete: true,
         },
       }
+      if (placement && !isReplay)
+        membership?.show(placement, key)
       optimisticLayer.add(layer)
     }
 
@@ -146,15 +148,27 @@ export async function createItem<
       }, {
         requireResultError: 'Item creation failed: result is nullish',
         missingCacheKeyError: 'Item creation failed: key is not defined',
-        onBeforeApplyCache: optimisticLayer.remove,
+        onBeforeApplyCache: placement ? undefined : optimisticLayer.remove,
       })
 
       result = commitResult.result as ResolvedCollectionItem<TCollection, TCollectionDefaults, TSchema>
+      if (placement) {
+        const key = collection.getKey(result)
+        if (isKeyDefined(key))
+          membership?.commit(placement, key, meta.mutationStatus === 'queued')
+        optimisticLayer.remove()
+      }
     }
     catch (error) {
+      if (placement && !isReplay)
+        membership?.discard(placement.id)
       // Rollback optimistic layer in case of error
       optimisticLayer.remove()
       throw error
+    }
+    finally {
+      if (placement && !isReplay && meta.$createPlacement === placement)
+        delete meta.$createPlacement
     }
 
     return result as NonNullable<typeof result>
