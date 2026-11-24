@@ -1,4 +1,4 @@
-import type { ResolvedRetention, TombstoneStore } from '@rstore/core'
+import type { ResolvedRetention, RowRetention, TombstoneStore } from '@rstore/core'
 import type { Cache, CacheHookDefinitions, CacheLayer, Collection, CollectionDefaults, CustomCacheState, CustomHookMeta, FieldTimestamps, QueryResultMode, ResolvedCollection, ResolvedCollectionItem, RetentionOptions, StoreCore, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { Ref } from 'vue'
 import type { WrappedItemMetadata } from '../item'
@@ -117,6 +117,8 @@ export interface CreateCacheOptions<
   isServer?: boolean
   /** Bounds for saved results of unmounted queries; `false` keeps them forever. */
   queryStateRetention?: false | RetentionOptions
+  /** Bounds for unused committed rows when GC runs. */
+  garbageCollection?: RetentionOptions
 }
 
 /** Mutable runtime shared by cache helper modules. */
@@ -132,6 +134,8 @@ export interface CacheRuntime<
   cacheStaggering: number
   /** Resolved bounds for saved results of unmounted queries. */
   queryStateRetention: ResolvedRetention | false
+  /** Last-use bookkeeping and eviction policy for committed rows. */
+  rowRetention: RowRetention
   /** Last use (ms) of each saved query id, for retention. */
   queryStateUsedAt: Map<string, number>
   /** Mounted entries found by the last sweep, minus unmounts since. */
@@ -184,6 +188,12 @@ export interface VueCachePrivate {
     rebuildIndexes: () => void
     /** Queue a prune, so it runs after the writes already queued by the same refresh. */
     prune: (params: CachePruneParams) => void
+    /** Whether any collection has an opt-in GC policy. */
+    hasRowRetention: () => boolean
+    /** Collect released query rows after ownership settles. */
+    collectReleasedRow: (collection: ResolvedCollection, key: string | number, managedOnly?: boolean) => void
+    /** Record the latest use of an existing committed row. */
+    touchRow: (collection: ResolvedCollection, key: string | number) => void
     /** Record that a live query saved results under `queryId`, for retention. */
     holdQueryState: (queryId: string, holder: QueryStateHolder) => void
     /** Record that a query stopped using the results it last saved. */

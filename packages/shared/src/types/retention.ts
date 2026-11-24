@@ -1,5 +1,5 @@
 /**
- * Bounds for cached metadata that would otherwise grow for the store's
+ * Bounds for cached entries that would otherwise grow for the store's
  * lifetime. Omitted limits use the structure's defaults.
  */
 export interface RetentionOptions {

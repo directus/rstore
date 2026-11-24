@@ -75,8 +75,10 @@ export function isKeyPinnedByActiveLayer(ctx: CacheRuntime, collectionName: stri
     if (layer.skip) {
       return false
     }
-    return Object.keys(layer.state).some(candidate => String(candidate) === keyId)
-      || Array.from(layer.deletedItems).some(candidate => String(candidate) === keyId)
+    const alias = Number(keyId)
+    return Object.hasOwn(layer.state, keyId)
+      || layer.deletedItems?.has(keyId) === true
+      || (String(alias) === keyId && layer.deletedItems?.has(alias) === true)
   })
 }
 
@@ -105,6 +107,7 @@ export function removeLayer(ctx: CacheRuntime, layerId: string) {
   // removed layer still applied, and nothing invalidates it a second time.
   invalidateCollectionStateCache(ctx, layer.collectionName)
   updateIndexesAfterLayerRemoval(ctx, layer)
+  markLayerReleased(ctx, layer)
 
   const store = ctx.getStore()
   store.$hooks.callHookSync('cacheLayerRemove', {
@@ -142,6 +145,21 @@ export function addLayerNow(ctx: CacheRuntime, layer: CacheLayer) {
     store,
     layer,
   })
+}
+
+/** Restart age for base rows released by their last active layer. */
+function markLayerReleased(ctx: CacheRuntime, layer: CacheLayer): void {
+  if (layer.skip)
+    return
+  const collection = ctx.getStore().$collections.find(candidate => candidate.name === layer.collectionName)
+  if (!collection || !ctx.rowRetention.tracks(collection))
+    return
+  const now = Date.now()
+  for (const key of [...Object.keys(layer.state), ...(layer.deletedItems ?? [])]) {
+    const row = ctx.state.collections[collection.name]?.value[key]
+    if (row && !isKeyPinnedByActiveLayer(ctx, collection.name, key))
+      ctx.rowRetention.touch(collection, collection.getKey(row) ?? key, now)
+  }
 }
 
 function clearLayerWrappedItems(ctx: CacheRuntime, layerId: string) {

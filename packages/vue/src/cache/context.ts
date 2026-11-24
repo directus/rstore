@@ -1,6 +1,6 @@
 import type { CollectionDefaults, ResolvedCollection, ResolvedCollectionItem, StoreSchema } from '@rstore/shared'
 import type { CacheRuntime, CreateCacheOptions } from './types'
-import { createTombstoneStore, isKeyDefined, resolveRetention, scheduleTombstoneGc } from '@rstore/core'
+import { createRowRetention, createTombstoneStore, isKeyDefined, resolveRetention, scheduleTombstoneGc } from '@rstore/core'
 import { ref } from 'vue'
 import { defaultQueryStateRetention, scheduleQueryStateSweeps } from './queryRetention'
 
@@ -14,11 +14,13 @@ export function createCacheRuntime<
   tombstoneGc = {},
   isServer = (import.meta as unknown as { server?: boolean }).server === true,
   queryStateRetention: rawQueryStateRetention,
+  garbageCollection,
 }: CreateCacheOptions<TSchema, TCollectionDefaults>): CacheRuntime<TSchema, TCollectionDefaults> {
   const cacheStaggering = Math.max(0, Math.floor(rawCacheStaggering))
   const runtime: CacheRuntime<TSchema, TCollectionDefaults> = {
     getStore,
     cacheStaggering,
+    rowRetention: createRowRetention(garbageCollection),
     queryStateRetention: resolveRetention(rawQueryStateRetention, defaultQueryStateRetention),
     queryStateUsedAt: new Map(),
     queryStateHeldCount: 0,

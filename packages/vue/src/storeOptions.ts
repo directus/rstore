@@ -35,6 +35,11 @@ export interface CreateStoreOptions<
    */
   experimentalGarbageCollection?: boolean
   /**
+   * Limits for unused cached rows, enforced when row GC runs.
+   * The size cap is shared across collections. Collections can override the TTL.
+   */
+  garbageCollection?: RetentionOptions
+  /**
    * Bounds for the results saved by queries no longer mounted, which let a
    * remounted query read cache-first. Each distinct set of query options saves
    * one entry. Pass `false` to keep them forever.

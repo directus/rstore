@@ -24,6 +24,7 @@ export function deleteItemNow<TCollection extends Collection>(
 
   removeItemIndexes(ctx, collection, key, item)
   invalidateCollectionStateCache(ctx, collection.name)
+  ctx.rowRetention.forget(collection.name, key)
   delete collectionState[key]
   forgetInspectionKey(ctx, collection.name, key)
   invalidateCollectionStateCache(ctx, collection.name)
@@ -82,6 +83,7 @@ export function writeItemNow(ctx: CacheRuntime, params: Parameters<Cache['writeI
   else {
     writeMutableItem(ctx, params, collectionState)
   }
+  ctx.rowRetention.touch(collection, key)
   rememberInspectionKey(ctx, collection.name, key)
   invalidateMissingPageRefsForItem(ctx, collection.name, key)
   invalidateCollectionWrite(ctx, collection.name, params.batch)

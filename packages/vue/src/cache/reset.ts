@@ -16,6 +16,8 @@ export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
   // place made a relation read return items the payload no longer had.
   ctx.state.collectionIndexes.clear()
 
+  ctx.rowRetention.clear()
+  const now = Date.now()
   const newCollectionsState: Record<string, Ref<Record<string | number, any>>> = {}
   for (const collectionName in value.collections) {
     const collection = ctx.getStore().$collections.find(c => c.name === collectionName)
@@ -30,6 +32,10 @@ export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
         const existing = collectionState.value[key]
         collectionState.value[key] = Object.isFrozen(item) ? item : shallowRef(item)
         updateItemIndexes(ctx, collection, key, existing, item)
+        if (ctx.rowRetention.tracks(collection)) {
+          const publicKey = collection.getKey(item)
+          ctx.rowRetention.touch(collection, publicKey != null && String(publicKey) === key ? publicKey : key, now)
+        }
       }
     }
   }
@@ -59,6 +65,7 @@ export function setStateNow(ctx: CacheRuntime, value: CustomCacheState) {
 
 /** Clear all cache data immediately. */
 export function clearNow(ctx: CacheRuntime) {
+  ctx.rowRetention.clear()
   ctx.state.markers = {}
   ctx.publicKeys?.clear()
   for (const collectionName in ctx.state.collections) {

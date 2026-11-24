@@ -1,23 +1,26 @@
 import type { Cache, CacheOperationReceipts, CollectionDefaults, CustomCacheState, ResolvedCollectionItemBase, StoreSchema, WrappedItem } from '@rstore/shared'
 import type { CacheRuntime, VueCachePrivate } from './types'
 import { gcTombstones } from '@rstore/core'
-import { ref, toRaw, toValue } from 'vue'
+import { nextTick, ref, toRaw, toValue } from 'vue'
 import { getCollectionIndex, invalidateCollectionStateCache } from './context'
 import { rebuildIndexes } from './indexes'
 import { inspectCache } from './inspection'
 import { ensureLayersForCollection, getStateForCollection } from './layers'
 import { applyMutationToCache } from './mutations'
-import { holdRetainedQueryState, releaseRetainedQueryState, sweepQueryState } from './queryRetention'
+import { holdRetainedQueryState, releaseRetainedQueryState } from './queryRetention'
 import { clearQueryStateForCollection, clonePageRefs } from './queryState'
 import { enqueueOperation, enqueueOperationWithReceipt, enqueueWriteItems, flushQueuedOperations } from './queue'
 import { resolveRelationWriteParams } from './relationWrite'
-import { garbageCollectItem, getWrappedItem, releaseUnwrittenItems } from './wrapped'
+import { garbageCollect, sweepManagedRows } from './rowGc'
+import { createRowGcQueue } from './rowGcQueue'
+import { garbageCollectItem, getWrappedItem } from './wrapped'
 
 /** Create the public Cache implementation from a cache runtime. */
 export function createCacheApi<
   TSchema extends StoreSchema,
   TCollectionDefaults extends CollectionDefaults,
 >(ctx: CacheRuntime<TSchema, TCollectionDefaults>): Cache & VueCachePrivate {
+  const queueManagedGc = createRowGcQueue(names => sweepManagedRows(ctx, names))
   // Legacy calls keep their undefined runtime results. Diagnostics explicitly
   // opt into completion tracking while using the same queue and publication.
   const receipts: CacheOperationReceipts = {
@@ -32,7 +35,10 @@ export function createCacheApi<
       return getWrappedItem(ctx, collection, item, noCache)!
     },
     readItem({ collection, key }) {
-      return getWrappedItem(ctx, collection, getStateForCollection(ctx, collection.name)[key])
+      const item = getWrappedItem(ctx, collection, getStateForCollection(ctx, collection.name)[key])
+      if (item && ctx.rowRetention.tracks(collection) && ctx.state.collections[collection.name]?.value[key])
+        ctx.rowRetention.touch(collection, key)
+      return item
     },
     readItems(params) {
       return readItems(ctx, params)
@@ -83,7 +89,10 @@ export function createCacheApi<
       clearCollection(ctx, collection)
     },
     garbageCollectItem({ collection, item }) {
-      garbageCollectItem(ctx, collection, item)
+      if (ctx.rowRetention.managed(collection))
+        sweepManagedRows(ctx, new Set([collection.name]))
+      else
+        garbageCollectItem(ctx, collection, item)
     },
     garbageCollect() {
       garbageCollect(ctx)
@@ -148,6 +157,7 @@ export function createCacheApi<
         }
       }
       finally {
+        ctx.rowRetention.clear()
         ctx.stopTombstoneGc?.()
         ctx.stopTombstoneGc = undefined
         ctx.stopQueryStateSweeps?.()
@@ -163,6 +173,26 @@ export function createCacheApi<
       ensureLayersForCollection: collectionName => ensureLayersForCollection(ctx, collectionName),
       rebuildIndexes: () => rebuildIndexes(ctx, collectionName => getStateForCollection(ctx, collectionName)),
       prune: params => enqueueOperation(ctx, { type: 'prune', params }),
+      hasRowRetention: () => ctx.getStore().$collections.some(ctx.rowRetention.managed),
+      touchRow(collection, key) {
+        if (ctx.rowRetention.tracks(collection) && ctx.state.collections[collection.name]?.value[key])
+          ctx.rowRetention.touch(collection, key)
+      },
+      collectReleasedRow(collection, key, managedOnly) {
+        if (ctx.rowRetention.managed(collection)) {
+          queueManagedGc(collection.name)
+          return
+        }
+        if (managedOnly)
+          return
+        void nextTick(() => {
+          if (ctx.disposed)
+            return
+          const item = getWrappedItem(ctx, collection, ctx.state.collections[collection.name]?.value[key])
+          if (item)
+            garbageCollectItem(ctx, collection, item)
+        })
+      },
       holdQueryState: (queryId, holder) => holdRetainedQueryState(ctx, queryId, holder),
       releaseQueryState: holder => releaseRetainedQueryState(ctx, holder),
       isDisposed: () => ctx.disposed === true,
@@ -177,6 +207,7 @@ function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit,
   const data: Record<string | number, ResolvedCollectionItemBase<any, any, any>> = getStateForCollection(ctx, collection.name)
   const result: Array<WrappedItem<any, any, any>> = []
   let count = 0
+  const usedAt = ctx.rowRetention.tracks(collection) ? Date.now() : undefined
 
   if (keys == null && indexKey != null) {
     const index = getCollectionIndex(ctx, collection.name, indexKey)
@@ -194,6 +225,8 @@ function readItems(ctx: CacheRuntime, { collection, marker, filter, keys, limit,
       continue
     }
     result.push(wrappedItem)
+    if (usedAt !== undefined && ctx.state.collections[collection.name]?.value[key])
+      ctx.rowRetention.touch(collection, key, usedAt)
     count++
     if (limit != null && count >= limit) {
       break
@@ -263,26 +296,4 @@ function clearCollection(ctx: CacheRuntime, collection: Parameters<Cache['clearC
   for (const key in itemsForType.value) {
     enqueueOperation(ctx, { type: 'deleteItem', params: { collection, key } })
   }
-}
-
-function garbageCollect(ctx: CacheRuntime) {
-  for (const collectionName in ctx.state.collections) {
-    const collection = ctx.getStore().$collections.find(m => m.name === collectionName)
-    if (!collection) {
-      continue
-    }
-    const itemsForType = ctx.state.collections[collectionName]?.value
-    if (!itemsForType) {
-      continue
-    }
-    for (const key in itemsForType) {
-      const wrappedItem = getWrappedItem(ctx, collection, itemsForType[key])
-      if (wrappedItem) {
-        garbageCollectItem(ctx, collection, wrappedItem)
-      }
-    }
-  }
-  // Rows whose queued write was dropped or rejected are only reachable here.
-  releaseUnwrittenItems(ctx)
-  sweepQueryState(ctx)
 }

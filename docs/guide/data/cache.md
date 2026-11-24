@@ -72,6 +72,30 @@ store.$cache.writeItems({
 })
 ```
 
+## Limit unused cached rows
+
+Set `garbageCollection` on the store, an individual collection, or both:
+
+```ts
+const messages = defineCollection({
+  name: 'messages',
+  garbageCollection: { maxSize: 250, ttlMs: 60_000 },
+})
+
+const store = await createStore({
+  schema: [messages, users],
+  plugins,
+  experimentalGarbageCollection: true,
+  garbageCollection: { maxSize: 1_000, ttlMs: 5 * 60_000 },
+})
+```
+
+The store caps unused rows across all collections. Each collection can also cap its own unused rows and override the store's idle time. In Nuxt, set the store policy under `rstore.store.garbageCollection`.
+
+GC removes expired rows first, then the least recently used rows beyond each size limit. Writes, cache lookups, and release by the last query or optimistic layer restart idle time. Rows held by a mounted query or an active optimistic layer are protected and excluded from the count. Omitted bounds are unlimited, apart from an inherited TTL. Use `Infinity` to disable a bound or `maxSize: 0` to keep zero unused rows after GC.
+
+Limits apply when `store.$cache.garbageCollect()` runs or a query triggers GC on release through `experimentalGarbageCollection`. Rows can exceed either limit between GC calls. Collections without a policy still collect unused rows immediately when their GC runs. [Saved query results](./query.md#saved-results) have their own retention settings.
+
 ## Delete items
 
 Deleting items from the cache is useful when you want to remove items that are no longer needed. This can be used for example to remove items that are no longer in the store.

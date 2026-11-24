@@ -75,23 +75,16 @@ export function getTrackingResult(page: VueQueryPage<any, any, any, any, any>, r
  * collector remains the authority for whether an unowned row can disappear.
  */
 export function collectUnreconciledTracking(ctx: any, tracking: any): void {
-  if (!tracking) {
+  if (!tracking || !ctx.queryCollectionEnabled) {
     return
   }
-  nextTick(() => {
-    for (const [collectionName, keys] of Object.entries(tracking.items) as Array<[string, Set<string | number>]>) {
-      const collection = ctx.store.$collections.find((candidate: any) => candidate.name === collectionName)
-      if (!collection) {
-        continue
-      }
-      for (const key of keys) {
-        const item = ctx.store.$cache.readItem({ collection, key })
-        if (item) {
-          ctx.store.$cache.garbageCollectItem({ collection, item })
-        }
-      }
+  for (const [collectionName, keys] of Object.entries(tracking.items) as Array<[string, Set<string | number>]>) {
+    const collection = ctx.store.$collections.find((candidate: any) => candidate.name === collectionName)
+    if (collection) {
+      for (const key of keys)
+        ctx.cache._private.collectReleasedRow(collection, key)
     }
-  })
+  }
 }
 
 /** Reconcile cache ownership after either a fetch or a server push. */

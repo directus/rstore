@@ -85,11 +85,12 @@ export function garbageCollectItem<TCollection extends Collection>(
   ctx: CacheRuntime,
   collection: ResolvedCollection<TCollection, CollectionDefaults, StoreSchema>,
   item: WrappedItem<TCollection, CollectionDefaults, StoreSchema>,
+  knownKey?: string | number,
 ) {
   if (item.$meta.queries.size !== 0) {
     return
   }
-  const key = getItemKey(collection, item)
+  const key = knownKey ?? getItemKey(collection, item)
   if (isKeyPinnedByActiveLayer(ctx, collection.name, key)) {
     return
   }

@@ -51,6 +51,7 @@ export async function createStore<
     tombstoneGc: options.tombstoneGc,
     isServer: options.isServer,
     queryStateRetention: options.queryStateRetention,
+    garbageCollection: options.garbageCollection,
   })
 
   return createStoreCore<TSchema, TCollectionDefaults>({

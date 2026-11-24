@@ -1,17 +1,9 @@
-import type { MaybeRefOrGetter } from 'vue'
-import type { VueStore } from './store'
+import type { QueryTrackingOwnershipOptions } from './trackingOwnership'
 import { tryOnScopeDispose } from '@vueuse/core'
 import { createQueryTrackingController } from './trackingOwnership'
 
 /** Options accepted by the public query ownership helper. */
-export interface UseQueryTrackingOptions<TResult> {
-  /** Store containing the query cache. */
-  store: VueStore
-  /** Cache-backed result exposed to consumers. */
-  cached: MaybeRefOrGetter<TResult>
-  /** Latest network result, used when cache data is unavailable. */
-  result?: MaybeRefOrGetter<TResult>
-}
+export interface UseQueryTrackingOptions<TResult> extends QueryTrackingOwnershipOptions<TResult> {}
 
 /**
  * Create page-aware ownership for one query.
@@ -21,6 +13,6 @@ export interface UseQueryTrackingOptions<TResult> {
  */
 export function useQueryTracking<TResult>(options: UseQueryTrackingOptions<TResult>) {
   const controller = createQueryTrackingController(options)
-  tryOnScopeDispose(() => controller.releaseAll({ collect: true }))
+  tryOnScopeDispose(controller.dispose)
   return controller
 }

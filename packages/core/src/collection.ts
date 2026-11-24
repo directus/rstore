@@ -1,5 +1,8 @@
 import type { Collection, CollectionDefaults, CollectionRelation, CollectionRelationReference, CollectionRelations, CollectionSchemas, DefaultIsInstanceOf, Exactly, Full, GetKey, MaybeArray, NormalizedRelation, ResolvedCollection, ResolvedCollectionList, StandardSchemaV1, StoreCore, StoreSchema } from '@rstore/shared'
 
+import { resolveRetention } from './retention.js'
+import { unboundedRowRetention } from './rowRetention.js'
+
 export const defaultGetKey: GetKey<any> = (item: any) => item.id ?? item.__id
 
 export const defaultIsInstanceOf: DefaultIsInstanceOf = collection => item => item.__typename === collection.name
@@ -79,6 +82,10 @@ export function resolveCollection<
     throw new Error(`Collection name "${collection.name}" cannot start with "$"`)
   }
 
+  const garbageCollection = collection.garbageCollection
+  if (garbageCollection !== undefined)
+    resolveRetention(garbageCollection, unboundedRowRetention, `${collection.name}.garbageCollection`)
+
   // Merge default field configs with the collection-specific ones into fresh
   // objects so no collection shares (and can mutate) the defaults or another
   // collection's field configs
@@ -117,6 +124,7 @@ export function resolveCollection<
     },
     'scopeId': collection.scopeId,
     'hooks': collection.hooks,
+    ...(garbageCollection !== undefined && { garbageCollection: { ...garbageCollection } }),
     'meta': {
       ...defaults?.meta,
       ...collection.meta,
