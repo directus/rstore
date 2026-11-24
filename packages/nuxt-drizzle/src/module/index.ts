@@ -79,6 +79,7 @@ export default defineNuxtModule<ModuleOptions>({
     const offlineOptions = setupOffline({ options, nuxt, resolve: resolveRuntime, addPluginImport })
     registerRuntimeConfigTemplate({
       apiPath,
+      cacheScopeFields: options.cacheScopeFields,
       realtime,
       scopeId,
       drizzleConfig,

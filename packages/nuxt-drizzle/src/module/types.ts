@@ -13,6 +13,8 @@ export interface ModuleOptions {
     name: string
     from: string
   }
+  /** Indexed field eligible for an authorized complete snapshot, by collection. */
+  cacheScopeFields?: Record<string, string>
   /** Generated REST API path. */
   apiPath?: string
   /** Enable WebSocket support for real-time updates. */

@@ -4,6 +4,7 @@ import { installCacheHooks } from './cacheHooks'
 import { createDrizzlePluginContext, drizzleScopeId } from './context'
 import { installFetchHooks } from './fetchHooks'
 import { installMutationHooks } from './mutationHooks'
+import { installQueryCacheHooks } from './queryCacheHooks'
 import { installCollectionDefaults } from './utils/defaults'
 
 export default definePlugin({
@@ -13,6 +14,7 @@ export default definePlugin({
   setup({ addCollectionDefaults, hook }) {
     const ctx = createDrizzlePluginContext()
     installCollectionDefaults(addCollectionDefaults)
+    installQueryCacheHooks(ctx, hook)
     installFetchHooks(ctx, hook)
     installCacheHooks(ctx, hook)
     installMutationHooks(ctx, hook)

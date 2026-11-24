@@ -1,9 +1,9 @@
 // @ts-expect-error virtual module
-import { apiPath, dialect, scopeId as drizzleScopeId } from '#build/$rstore-drizzle-config.js'
+import * as config from '#build/$rstore-drizzle-config.js'
 import { useRequestFetch } from '#imports'
 import { getRstoreDrizzleClientId, RSTORE_DRIZZLE_CLIENT_ID_HEADER } from '../utils/client-id'
 
-export { drizzleScopeId }
+export const drizzleScopeId = config.scopeId
 
 /** Runtime context shared by client hook installers. */
 export interface DrizzlePluginContext {
@@ -11,6 +11,8 @@ export interface DrizzlePluginContext {
   apiPath: string
   /** Drizzle SQL dialect used by where filtering. */
   dialect: string
+  /** Configured equality partitions verified by server hooks. */
+  cacheScopeFields?: Record<string, string>
   /** Nuxt request fetch implementation. */
   requestFetch: ReturnType<typeof useRequestFetch>
 }
@@ -18,8 +20,9 @@ export interface DrizzlePluginContext {
 /** Create the shared runtime context for the plugin setup. */
 export function createDrizzlePluginContext(): DrizzlePluginContext {
   return {
-    apiPath,
-    dialect,
+    apiPath: config.apiPath,
+    dialect: config.dialect,
+    cacheScopeFields: config.cacheScopeFields,
     requestFetch: useRequestFetch(),
   }
 }

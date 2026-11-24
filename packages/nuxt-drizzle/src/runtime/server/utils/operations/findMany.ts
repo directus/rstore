@@ -1,9 +1,11 @@
 import type { RelationalQueryBuilder } from 'drizzle-orm/pg-core/query-builders/query'
+import type { DrizzleQueryCacheMetadata } from '../../../utils/query-cache'
 import type { RstoreDrizzleMeta, RstoreDrizzleTransformQuery } from '../hooks'
 import type { RstoreDrizzleQueryParams } from '../index'
 import type { BaseOpArgs } from './shared'
 import { and, or } from 'drizzle-orm'
-import { createError } from 'h3'
+import { createError, setResponseHeader } from 'h3'
+import { exactCacheScope, queryCacheHeader } from '../../../utils/query-cache'
 import { rstoreDrizzleHooks } from '../hooks'
 import {
   convertIncludeToDrizzleWith,
@@ -39,7 +41,7 @@ function resolveLimit(requested: number | undefined | null, maxLimit: number | f
  * `GET /:collection` — list query. Handles `keys`, `where`, pagination,
  * relations, column selection and ordering.
  */
-export async function drizzleFindMany({ event, collection, params, query, searchQuery }: BaseOpArgs & { searchQuery: RstoreDrizzleQueryParams }) {
+export async function drizzleFindMany({ event, collection, params, query, searchQuery, cacheMode }: BaseOpArgs & { searchQuery: RstoreDrizzleQueryParams, cacheMode?: string }) {
   const meta: RstoreDrizzleMeta = {}
   const transforms: RstoreDrizzleTransformQuery[] = []
 
@@ -104,6 +106,10 @@ export async function drizzleFindMany({ event, collection, params, query, search
   let result = await dbQuery[collection]!.findMany(q)
   result ??= []
 
+  const scope = exactCacheScope(searchQuery.where)
+  const cacheMetadata: DrizzleQueryCacheMetadata = {}
+  // A replacement after the database read can change membership independently.
+  const rows = result
   await rstoreDrizzleHooks.callHook('index.get.after', {
     event,
     collection,
@@ -111,8 +117,25 @@ export async function drizzleFindMany({ event, collection, params, query, search
     params,
     query: (query ?? {}) as Record<string, string | string[]>,
     result,
+    requestedCacheScope: cacheMode ? scope : undefined,
     setResult: (r: any) => { result = r },
+    confirmCompleteScope(attested, revision) {
+      if (cacheMode === 'scope' && scope?.field === attested.field && scope.value === attested.value
+        && searchQuery.offset == null && searchQuery.limit == null && !searchQuery.keys && !searchQuery.columns
+        && (limit == null || rows.length < limit)) {
+        cacheMetadata.completeScope = scope
+        cacheMetadata.revision = revision
+      }
+    },
+    confirmLocalCreatePlacement() {
+      if (cacheMode === 'placement' && scope && !searchQuery.offset && !searchQuery.keys && !searchQuery.columns
+        && searchQuery.orderBy?.length && !Object.keys(extras).length) {
+        cacheMetadata.localCreatePlacement = true
+      }
+    },
   })
 
+  if (result === rows && (cacheMetadata.completeScope || cacheMetadata.localCreatePlacement))
+    setResponseHeader(event, queryCacheHeader, encodeURIComponent(JSON.stringify(cacheMetadata)))
   return result
 }

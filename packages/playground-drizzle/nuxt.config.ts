@@ -19,5 +19,6 @@ export default defineNuxtConfig({
   rstoreDrizzle: {
     ws: true,
     offline: true,
+    cacheScopeFields: { todos: 'completed' },
   },
 })
